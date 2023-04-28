@@ -1,0 +1,329 @@
+Toolbar # inside REAPER and in reaper.ini correspondence (if MIDI piano roll toolbar wasn't opened which would threw all sequence off):
+1 = 1, 2 = 2, 3 = 3, 4 = 4, 5 = 5, 6 = 6, 7 = 7, 8 = 8, MIDI 1 = 9,
+MIDI 2 = 10, MIDI 3 = 11, MIDI 4 = 12, 
+Main toolbar = 13, MIDI Piano Roll = 14 (both provisional, only counted if opened, toggle state of the MIDI piano roll toolbar in Arrange and of Main toolbar opened separately is registered in reaper.ini in the wnd_vis= key of a toolbar whose number each of them has assumed)
+9 = 17, 10 = 18, 11 = 19, 12 = 20, 13 = 21, 14 = 22, 15 = 23, 16 = 24
+MIDI 5 = 25, MIDI 6 = 26, MIDI 7 = 27, MIDI 8 = 28
+
+There's now also Media Explorer toolbar, but its place in the sequence isn't clear
+
+Data which governs the sequence if MIDI piano roll toolbar was opened, throwing the above listed sequence off:
+
+[REAPER]
+dockermode3=1 -- left
+0 = bottom, 1 = left, 2 = top, 3 = right,  32768 = unattached to the main window (floating docked)
+Correspond to the docker right-click context menu options:
+'Attached Docker position:bottom' = 0
+'Attached Docker position:left' = 1
+'Attached Docker position:top' = 2
+'Attached Docker position:right' = 3
+'Attach Docker to main window' OFF (floating toolbar docked in an individual Docker) = 32768
+'Attach Toolbar Docker to main window' (dockermode15) OFF (floating Toolbar Docker) = 32770
+when ON then previously listed values are used
+Closed individual floating Docker = 98304
+Closed floating Toolbar Docker = 98306
+Hidden individual Docker attached to main window = 65536
+Hidden Docker attached to main window = 65536 - bottom, 65537 - left, 65538 - top, 65539 - right -- added to dockermode in particular, replacing position value
+
+
+Governs the position of a given toolbar in the toolbar docker.
+The digit before the equal sign (3) refers to the rightmost digit assigned to a toolbar in secton [REAPERdockpref], e.g. toolbar:9=0.50000000 3. '3' stands for the ordinal number of a toolbar added to the toolbar docker, i.e. toolbar 9 was added 3d. The count starts from 0. The 'dockermode' keys for different toolbars may be scattered all over the [REAPER] section.
+
+dockerwprio1= 'docker width priority' for split dockers, number stands for one of the splits, but logic or numbering isn't clear
+
+dockersel2=toolbar:28 -- selected toolbar tab in the docker
+
+-- Re-numbering of toolbars if MIDI piano roll toolbar was opened, arbitrary, zero based
+toolbar:1=13 // MIDI piano roll (14) = 1 in reaper.ini
+toolbar:2=0 // Toolbar 1 from the above list = 2 in reaper.ini
+toolbar:4=1 // Toolbar 2 from the above list = 4 in reaper.ini
+
+These numbers before equal sign are reflected in indivdual toolbar sections, e.g.
+
+[toolbar:4] -- 4 would be that number and correspond to Toolbar 1 as per re-numbering above
+wnd_vis=1
+dock=0 -- toolbar right-click context menu -> Position toolbar -> In toolbar docker
+wnd_left=9
+wnd_top=42
+wnd_width=349
+wnd_height=81
+
+And are used in [REAPERdockpref] section which governs docker position
+
+[REAPERdockpref]
+vkb=0.58187991 0
+toolbar:9=0.50000000 2
+toolbar=0.00000000 2	-- last added toolbar
+toolbar:1=0.50000000 0 -- Attached docker positon: right (when dragged)
+toolbar:2=0.50000000 2 -- Attached docker positon: top (when dragged)
+toolbar:3=0.50000000 1 -- Attached docker positon: left (when dragged)
+toolbar:4=0.50000000 3 -- = pos. of the tab in multi-docker   Attached docker positon: bottom (when dragged)
+toolbar:5=0.00000000 2
+toolbar:7=0.00000000 15 -- once 'dock' key value in the toolbar section becomes 1 as floating toolbar is positioned In Toolbar docker (see above), dockermode value 15 is added here
+
+When toolbars sit in the Toolbar Docker their Open/close actions toggle state doesn't change whether their tab is closed or not.
+To effectively close a toolbar in the Toolbar Docker via action the Toolbar Docker must be visible.
+
+All newly opened toolbars are assigned dockermode 15 which references a dedicated global Toolbar docker and are positioned in the docker position currently assigned to this dockermode in reaper.ini, e.g. dockermode15=1. Thus all are assembled in the same docker being separated by tabs. The dockermode 15 for a particular toolbar is only changed according to the legend above when it's manually dragged to another position.
+
+It appears there're 15 available dockers for each individual toolbar (or application window) counted from 0 to 14 and one Toolbar docker which can contain all toobars and be attached to the main window. So a single docker cannot be split to more than 15 sections.
+
+A docker is split when different dockermodes have the same docker position value, e.g.
+
+[REAPERdockpref]
+toolbar:1=0.50000000 3
+toolbar:4=0.50000000 2
+
+[REAPER]
+dockermode3=1
+dockermode2=1
+
+Toolbars 1 & 4 have different dockermodes 3 & 2 respectively and both sit in a split docker on the left 1
+
+Toolbars share a docker being separated by tabs, when different toolbars have the same dockermode, e.g.
+
+[REAPERdockpref]
+toolbar:1=0.50000000 3
+toolbar:4=0.50000000 3
+
+[REAPER]
+dockermode3=1
+
+Toolbars 1 & 4 have the same dockermode 3 and sit in the same docker on the left 1 with tabs for each one of them.
+This is the default mode
+
+If there're more than one identical entries for the same toolbar in [REAPERdockpref] section the earlier one has a priority.
+
+In horizontal dockers toolbars are positioned from right to left where the leftmost tab belongs to the last toolbar to be opened.
+In vertical dockers they're positioned from top to bottom with the bottommost being the last to be opened.
+
+MIDI Editor
+
+[REAPERdockpref]
+midiedit=0.50000000 1 -- MIDI Editor window dockermode number, refers to dockermode1 whose position values are identical to those of toolbars
+fxbrowser=0.50000000 2 -- FX browser ~
+
+[midiedit]
+docked=1 - docked, 0 - undocked (float)
+
+[REAPER]
+wnd_w=1372
+wnd_h=740
+
+Program window dimensions
+
+
+leftpanewid=  		- TCP width if it was ever changed from the default
+leftpanewid_alt=	- TCP width to restore to when TCP/Arrange divider is double clicked, https://forums.cockos.com/showthread.php?t=230919
+toppane=		- top pane width above the first track below the ruler https://forums.cockos.com/showthread.php?p=1991096#post1991096
+			- https://forums.cockos.com/showthread.php?t=206711 post 11
+dockheight  =		- bottom, left, top and right docker width respectively, only changes if changed manually by dragging the divider
+dockheight_l=		--
+dockheight_t=		--
+dockheight_r=		--
+wnd_x=			-- coordinate of a shrunk program window, inly updates when REAPER closes, decreases wnd_w value
+wnd_y=			--
+			
+
+
+
+MIDI toolbars in the MIDI Editor section don't report toggle state, their toggle state can be gotten from their counterparts in the Main section.
+
+
+
+Docker API functions
+
+https://forums.cockos.com/showthread.php?p=2207085 -- Edgemeal, post 17
+https://forum.cockos.com/showpost.php?p=2045649&postcount=27 -- juliansader
+
+
+Any window which doesn't yet have docker values in reaper.ini is by default docked at the position assigned to 'dokermode0'. Only when its repositioned its value is added to [REAPERdockpref] section
+
+
+fxadd_dock= 		- 'fxbrowser'
+fxadd_vis=
+undownd_dock=		- 'undo' - Undo log window
+undownd_vis=
+mixwnd_dock=		- 'mixer'
+mixwnd_vis=
+transport_vis=		- 'transport', 
+transport_dock=		- 0 when is set to 'Dock transport in docker', not in the Main window, the position is governed by dockermode assigned to 'transport' 				  key in [REAPERdockpref] section
+transport_dock_pos=	- when docked in Main window: 768 - below Arrange, 769 - above Ruler, 770 - bottom of  the main window, 
+			  771 - Top of the main window,
+
+
+
+
+amalgama's idea https://forums.cockos.com/showthread.php?p=2207085 -- post 16
+
+
+=== Native windows ===
+
+actions							| Action list
+bigclock
+converter						| Batch file/Item converter, non-dockable
+docker_0 - docker_15
+explorer						| [reaper_explorer] visible= , docked=
+fadeedit
+fx#{7737D010-1543-482E-900B-00EDC9AF7852}
+fxchain							| one for all track main FX chains, only referenced in [REAPERdockpref] section, no docking indication
+fxchainin						| one for all track input FX chains, same
+fxchain:master						| Master track FX chain
+fxchain:hwout						| Monitor FX chain, only referenced in [REAPERdockpref] section
+fxchain:take
+fxbrowser						| no dedicated section, fxadd_vis= , fxadd_dock=
+itemprops						| Media item properties window
+mastermixer						| mixer Master channel
+midiedit:{895E1604-D07D-407E-ACE7-036456F17C2A}
+midiedit:{1630EDD9-05E1-44BE-BF6E-9D4814C41BA7}
+midiedit:{848A11A1-F8D8-4EDC-A819-CB7E2CAB0300}
+midiedit:{9B8C5606-6670-4C5E-9AA1-CE0B652D43E7}
+midiedit:{68864DB3-3130-4FC7-96B7-165648A858F8}
+midiedit:{89F3B1FC-13FF-45BF-94FF-E6FA3779363C}
+midiedit:{490095BC-40AC-48BB-8F77-73BA10632F3F}
+midiedit:{9D61A79B-55AC-4228-A218-DAEF57B94ACE}
+mixer							| no dedicated section, mixwnd_vis= , mixwnd_dock=
+navigator
+nudge							| non-dockable
+perf							| performance meter
+projbay_0 - projbay_7
+regmgr							| 
+routing							| Routing matrix, no dedicated section, routingwnd_vis= , no docking indication
+screensets
+toolbar							| Arrange main toolbar
+toolbar:1 - toolbar:28
+trackmgr
+transport						| no dedicated section, transport_vis= , transport_dock=
+undo							| Undo log window, no dedicated section, undownd_vis= , undownd_dock=
+video							| [reaper_video] visible= , docked=
+vkb							| Virtual MIDI keyboard
+
+TESTING.lua - ReaScript Development Environment_TESTING.lua=	| IDE window
+
+
+
+=== SWS extension windows ====
+
+ReaConsole
+SWSTrackList
+SWSProjectList
+FNGGroove
+BR - ContextualToolbars WndPos
+BR - AnalyzeLoudness WndPos
+SnMLiveConfigs
+SnMLiveConfigMonitor1 - SnMLiveConfigMonitor8
+SnMResources
+SWSAutoColor
+SnMNotesHelp
+SnMFind
+SnMImage
+SnMRgnPlaylist
+SnMCyclaction
+SWSSnapshots
+
+
+
+local wnd_ident_t = {
+				--	[40279] = 'Docker', -- View: Show docker ('Docker') // not supported by the script
+					[40078] = 'mixwnd_vis', -- View: Toggle mixer visible ('Mixer') // mixwnd_dock
+					[40605] = 'actions', -- Show action list ('Actions') // doesn't keep size // wnd_vis; dock					
+					--=============== 'Project Bay' // 8 actions // dosn't keep size ===============
+					[41157] = 'projbay_0', -- View: Show project bay window    // wnd_vis; dock
+					[41628] = 'projbay_1', -- View: Show project bay window 2
+					[41629] = 'projbay_2', -- View: Show project bay window 3
+					[41630] = 'projbay_3', -- View: Show project bay window 4
+					[41631] = 'projbay_4', -- View: Show project bay window 5
+					[41632] = 'projbay_5', -- View: Show project bay window 6
+					[41633] = 'projbay_6', -- View: Show project bay window 7
+					[41634] = 'projbay_7', -- View: Show project bay window 8
+					--============================== Matrices ======================================
+					[40768] = 'routingwnd_vis', -- View: Show track grouping matrix window ('Grouping Matrix') // routing_dock
+					[40251] = 'routingwnd_vis', -- View: Show routing matrix window ('Routing Matrix')
+					[42031] = 'routingwnd_vis', -- View: Show track wiring diagram ('Track Wiring Diagram')			
+					--===========================================================================
+					[40326] = 'regmgr', -- View: Show region/marker manager window ('Region/Marker Manager') // doesn't keep size // wnd_vis; dock
+					[50124] = 'reaper_explorer', -- Media explorer: Show/hide media explorer ('Media Explorer') // doesn't keep size // visible; docked
+					[40906] = 'trackmgr', -- View: Show track manager window ('Track Manager') // doesn't keep size // wnd_vis; dock
+					[40378] = 'bigclock', -- View: Show big clock window ('Big Clock') // doesn't keep size // // wnd_vis; dock
+					[50125] = 'reaper_video', -- Video: Show/hide video window ('Video Window') // visible; docked
+					[40240] = 'perf', -- View: Show performance meter window ('Performance Meter') // doesn't keep size // wnd_vis; dock
+					[40268] = 'navigator', -- View: Show navigator window ('Navigator') // doesn't keep size // wnd_vis; dock
+					[40377] = 'vkb', -- View: Show virtual MIDI keyboard ('Virtual MIDI Keyboard') // doesn't keep size // wnd_vis; dock
+				--	[41226] = 'nudge_vis', -- Item edit: Nudge/set... // non-toggle
+					[41827] = 'fadeedit', -- View: Show crossfade editor window ('Crossfade Editor') // wnd_vis; dock
+					[40072] = 'undownd_vis', -- View: Show undo history window ('Undo History') // undownd_dock
+					[41076] = 'converter', -- File: Batch file converter ('Batch File/Item Converter')
+					-- !!! the ident string seems to be wrong as the value isn't updated --
+				--	[40271] = 'fxadd_vis', -- View: Show FX browser window ('Add FX to Track #') // fxadd_dock
+				--	[40271] = 'fxadd_vis', -- View: Show FX browser window ('Add FX to: Item')
+				--	[40271] = 'fxadd_vis', -- View: Show FX browser window ('Browse FX')
+					[40271] = 'fxadd_vis', -- View: Show FX browser window ('Add FX to Track #' or 'Add FX to: Item' or 'Browse FX')				
+					[41589] = 'itemprops', -- Item properties: Toggle show media item/take properties ('Media Item Properties') // wnd_vis; dock
+					--=========== TOOLBARS // don't keep size; the ident strings are provisional ==========
+					[41679] = 'toolbar:1', -- Toolbar: Open/close toolbar 1 ('Toolbar 1') // wnd_vis; dock
+					[41680] = 'toolbar:2', -- Toolbar: Open/close toolbar 2 ('Toolbar 2')
+					[41681] = 'toolbar:3', -- Toolbar: Open/close toolbar 3 ('Toolbar 3')
+					[41682] = 'toolbar:4', -- Toolbar: Open/close toolbar 4 ('Toolbar 4')
+					[41683] = 'toolbar:5', -- Toolbar: Open/close toolbar 5 ('Toolbar 5')
+					[41684] = 'toolbar:6', -- Toolbar: Open/close toolbar 6 ('Toolbar 6')
+					[41685] = 'toolbar:7', -- Toolbar: Open/close toolbar 7 ('Toolbar 7')
+					[41686] = 'toolbar:8', -- Toolbar: Open/close toolbar 8 ('Toolbar 8')
+					[41936] = 'toolbar:9', -- Toolbar: Open/close toolbar 9 ('Toolbar 9')
+					[41937] = 'toolbar:10', -- Toolbar: Open/close toolbar 10 ('Toolbar 10')
+					[41938] = 'toolbar:11', -- Toolbar: Open/close toolbar 11 ('Toolbar 11')
+					[41939] = 'toolbar:12', -- Toolbar: Open/close toolbar 12 ('Toolbar 12')
+					[41940] = 'toolbar:13', -- Toolbar: Open/close toolbar 13 ('Toolbar 13')
+					[41941] = 'toolbar:14', -- Toolbar: Open/close toolbar 14 ('Toolbar 14')
+					[41942] = 'toolbar:15', -- Toolbar: Open/close toolbar 15 ('Toolbar 15')
+					[41943] = 'toolbar:16', -- Toolbar: Open/close toolbar 16 ('Toolbar 16')
+					[42404] = 'toolbar:17', -- Toolbar: Open/close media explorer toolbar ('Toolbar 17')
+				--	[41084] = 'Toolbar Docker' -- Toolbar: Show/hide toolbar docker // not supported by the script
+					--====================== NON-TOGGLE WINDOWS // for restoration stage only, on the evaluation stage these are taken care of with wnds_extra_t =========================================
+					[41888] = 'routingwnd_vis', -- View: Show region render matrix window ('Region Render Matrix') // non-toggle
+					[41226] = 'nudge_vis', -- Item edit: Nudge/set... ('Nudge/set items') // non-toggle
+					[40604] = 'recopts', -- Track: View track recording settings (MIDI quantize, file format/path) for last touched track ('Track Recording Settings: Track #') // var. name, not toggle // the ident name seems wrong as its value doesn't change but since it's been allowed through at the restoration stage anyway, the ident name doesn't matter
+					-- >>>>>>>> MIDI Editor has been excluded from wnds_extra_t on the evaluation stage, so the following two entries won't be used <<<<<<<<<<<<
+				--	[40153] = 'MIDI take:', -- Item: Open in built-in MIDI editor (set default behavior in preferences) ('MIDI take:' or 'Edit MIDI (docked)' occasionally appears when MIDI Editor is in a floating docker but the tab name is the former) // var. name, not toggle
+				--	[40153] = 'Edit MIDI', -- see above
+
+
+
+local wnd_ident_t = {
+-- transport docked pos in the top or bottom dockers can't be ascertained
+-- transport_dock=0 any time it's not docked at its reserved positions, which could be 
+-- floating or docked in any other docker
+-- window 'dock=0' keys do not get updated if the window was undocked before a screenset where it's docked was (re)loaded which leads to false positives
+-- The following key names are keys used in [REAPERdockpref] section
+-- % escapes are included for use within string.match()
+actions = {'%[actions%]', 'wnd_vis', 'dock'}, -- Show action list ('Actions') // doesn't keep size	
+--=============== 'Project Bay' // 8 actions // dosn't keep size ===============
+projbay_0 = {'%[projbay_0%]', 'wnd_vis', 'dock'}, -- View: Show project bay window
+projbay_1 = {'%[projbay_1%]', 'wnd_vis', 'dock'}, -- View: Show project bay window 2
+projbay_2 = {'%[projbay_2%]', 'wnd_vis', 'dock'}, -- View: Show project bay window 3
+projbay_3 = {'%[projbay_3%]', 'wnd_vis', 'dock'}, -- View: Show project bay window 4
+projbay_4 = {'%[projbay_4%]', 'wnd_vis', 'dock'}, -- View: Show project bay window 5
+projbay_5 = {'%[projbay_5%]', 'wnd_vis', 'dock'}, -- View: Show project bay window 6
+projbay_6 = {'%[projbay_6%]', 'wnd_vis', 'dock'}, -- View: Show project bay window 7
+projbay_7 = {'%[projbay_7%]', 'wnd_vis', 'dock'}, -- View: Show project bay window 8
+--============================== Matrices ======================================
+routing = {'routingwnd_vis', 'routing_dock'}, -- View: Show track grouping matrix window ('Grouping Matrix'); View: Show routing matrix window ('Routing Matrix'); View: Show track wiring diagram ('Track Wiring Diagram')			
+--===========================================================================
+regmgr = {'%[regmgr%]', 'wnd_vis', 'dock'}, -- View: Show region/marker manager window ('Region/Marker Manager') // doesn't keep size
+explorer = {'%[reaper_explorer%]', 'visible', 'docked'}, -- Media explorer: Show/hide media explorer ('Media Explorer') // doesn't keep size
+trackmgr = {'%[trackmgr%]', 'wnd_vis', 'dock'}, -- View: Show track manager window ('Track Manager')	// doesn't keep size
+bigclock = {'%[bigclock%]', 'wnd_vis', 'dock'}, -- View: Show big clock window ('Big Clock') // doesn't keep size
+video = {'%[reaper_video%]', 'visible', 'docked'}, -- Video: Show/hide video window ('Video Window')
+perf = {'%[perf%]', 'wnd_vis', 'dock'}, -- View: Show performance meter window ('Performance Meter') // doesn't keep size
+navigator = {'%[navigator%]', 'wnd_vis', 'dock'}, -- View: Show navigator window ('Navigator') // doesn't keep size
+vkb = {'%[vkb%]', 'wnd_vis', 'dock'}, -- View: Show virtual MIDI keyboard ('Virtual MIDI Keyboard') // doesn't keep size
+fadeedit = {'%[fadeedit%]', 'wnd_vis', 'dock'}, -- View: Show crossfade editor window ('Crossfade Editor')
+undo = {'undownd_vis', 'undownd_dock'}, -- View: Show undo history window ('Undo History')
+fxbrowser = {40271, 'fxadd_dock'}, -- View: Show FX browser window ('Add FX to Track #' or 'Add FX to: Item' or 'Browse FX') // fxadd_vis value doesn't change hence action to check visibility
+itemprops = {'%[itemprops%]', 'wnd_vis', 'dock'}, -- Item properties: Toggle show media item/take properties ('Media Item Properties')
+-- midiedit = {'%[midiedit%]', '', 'dock'}
+--=========== TOOLBARS // don't keep size; the ident strings are provisional ==========
+toolbar = {'toolbar', 'wnd_vis', 'dock'} -- Toolbar: Open/close toolbar 1 ('Toolbar 1') // must be traversed from 0 until 26
+}
+
+
+
