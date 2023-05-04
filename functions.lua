@@ -72,7 +72,7 @@ local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
 end
 
 
-function Msg(...) -- caption first (must be string otherwise ignored) or none, accepts functions with only one returned value
+function Msg(...) -- caption first (must be string otherwise ignored) or none, accepts functions with only one return value
 local t = {...}
 	if #t > 1 then
 	local cap, param = table.unpack(t) -- assign arguments to vars
@@ -81,7 +81,7 @@ local t = {...}
 	elseif #t == 1 then
 	displ = tostring(...)..'\n'
 	end
-	if Debug then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	if Debug then -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
 	r.ShowConsoleMsg(displ)
 	end
 end
@@ -285,7 +285,7 @@ local input = gfx.showmenu(menu) -- menu string
 gfx.quit()
 
 
-function Re_Store_Ext_State(section, key, persist, value) -- section & key args are strings, persist is boolean if false/nil global ext state is only stored for the duration of REAPER session, only relevant for storage stage; presence of val arg determines whether the state is loaded or stored
+function Re_Store_Ext_State(section, key, persist, val) -- section & key args are strings, persist is boolean if false/nil global ext state is only stored for the duration of REAPER session, only relevant for storage stage; presence of val arg is anything which needs storage, determines whether the state is loaded or stored
 	if not val then
 	local ret, state = r.GetProjExtState(0, section, key)
 	local state = (not ret or #state == 0) and r.GetExtState(section, key) or state
@@ -298,7 +298,7 @@ end
 
 -- USAGE:
 -- local state = Re_Store_Ext_State(section, key) -- load
--- Re_Store_Ext_State(section, key, persist, value) -- store
+-- Re_Store_Ext_State(section, key, persist, val) -- store
 
 
 --------------------- T O G G L E S -------------------------
@@ -323,6 +323,21 @@ end
 -- EMERGENCY_TOGGLE() do return end
 
 ---------------------------------------------
+
+local function defer_with_args1(func,...)
+-- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
+local t = {...}
+return function() func(table.unpack(t)) end
+end
+
+
+local function defer_with_args2(...)
+-- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
+local t = {...}
+local func = t[1] -- assign function name val
+table.remove(t,1) -- remove function name arg
+return function() func(table.unpack(t)) end
+end
 
 
 function At_Exit_Wrapper(func, ...) -- wrapper for a 3d function with arguments for r.atexit()
@@ -395,6 +410,18 @@ r.atexit(r.DeleteExtState(os.date('%x'), 'defer'..defer_data_slot, true))
 --------------------------------------------------------------------------------------------------
 
 
+function Temp_Proj_Tab()
+-- relies on Create_Dummy_Project_File() if current tab isn't linked to a saved project
+local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer
+r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
+-- DO STUFF
+local dummy_proj = Create_Dummy_Project_File()
+r.Main_openProject('noprompt:'..projfn) -- open dummy proj in the newly open tab without save prompt
+r.Main_OnCommand(40860, 0) -- Close current (temp) project tab // save prompt won't appear either because nothing has changed in the dummy proj
+r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
+end
+
+
 
 --========================= U N D O  S T A R T =========================
 
@@ -409,6 +436,7 @@ do r.defer(function() do return end end) end
 function no_undo()
 do return end
 end
+-- USE:
 -- do return r.defer(no_undo) end
 -- OR
 -- if ... then return r.defer(no_undo) end
@@ -1572,6 +1600,12 @@ r.MIDI_InsertTextSysexEvt() -- not inserted with empty bytestr argument
 
 
 function Is_MIDI_Ed_Open()
+-- NOT RELIABLE SINCE DOCKED MIDI EDITOR IN CLOSED DOCK IS STILL VALID
+-- IF DOCK IS FLOATING THE NATURAL INSTINCT IS TO CLOSE IT USING THE WINDOW CLOSE BUTTON
+-- AND THAT'S WHERE THE PROBLEM EMERGES
+-- THE MIDI EDITOR REMAINS DOCKED AND EVEN BEING INVISIBLE IS VALID SINCE IT WASN'T EXPLICITLY CLOSED
+-- ONLY CLOSURE WITH TAB CLOSE BUTTON MAKES IT TRULY NON-FOCUSED AND INVALID
+-- https://forum.cockos.com/showthread.php?t=278871
 return r.GetToggleCommandStateEx(32060, 1014) ~= -1 -- View: Toggle snap to grid // if closed toggle state isn't returned
 end
 
@@ -6655,7 +6689,7 @@ local take_cnt = r.CountTakes(item)
 	table.remove(chunk_t,1) -- remove it
 	local take_chunk_t = reverse_indexed_table(chunk_t) -- reverse, FUNCTION
 	table.insert(take_chunk_t, #take_chunk_t, 'TAKE\n') -- add to the formerly 1st take now being the last as 1st take doesn't have 'TAKE' tag
-	local take_chunk = table.concat(take_chunk_t):match('TAKE.-\n(.+)') -- concatenat, removing TAKE tag from the formerly last take now being the 1st, as 1st take shouldn't have 'TAKE' tag
+	local take_chunk = table.concat(take_chunk_t):match('TAKE.-\n(.+)') -- concatenate, removing TAKE tag from the formerly last take now being the 1st, as 1st take shouldn't have 'TAKE' tag
 	Msg(part_one..take_chunk..'>')
 	r.SetItemStateChunk(item, part_one..take_chunk..'>', false) -- isundo is false // adding chunk closure since it wasn't stored in the table
 	r.UpdateItemInProject(item)
@@ -6736,6 +6770,25 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 
 end
 
+
+function Is_Ctrl_And_Shift(cmdID)
+local is_new_value,filename,sectID,cmdID,mode,resol,val = r.get_action_context()
+-- check if the script is bound to a shortcut containing both Ctrl & Shift
+-- which is not advised when the version of Get_Arrange_and_Header_Heights2() function is used which creates temporary project tab to fetch the Arrange height data becaise in this case if the key combination is long pressed a prompt will appear offering to load project with FX offline
+local named_ID = r.ReverseNamedCommandLookup(cmdID) -- convert numeric returned by get_action_context to alphanumeric listed in reaper-kb.ini
+local res_path = r.GetResourcePath()..r.GetResourcePath():match('[\\/]') -- path with separator
+local s,R = ' ', string.rep
+	for line in io.lines(res_path..'reaper-kb.ini') do
+		if line:match('_'..named_ID) then -- in the shortcut data section command IDs are preceded with the underscore
+		local modif = line:match('KEY (%d+)')
+			if modif == '13' or modif == '29' then -- Ctrl+Shift or Ctrl+Shift+Alt
+			r.MB(R(s,3)..'The script is bound to a shotrcut\n\n'..R(s,5)..'containing Ctrl and Shift keys.\n\n'..R(s,12)..'This will unfortunately\n\n intefere with the script performance.\n\n'..R(s,7)..'It\'s strongly advised to remap\n\n'..R(s,6)..'the script to another shortcut.\n\n\tSincere apologies!','ERROR',0)
+			return true
+			end
+		end
+	end
+end
+-- if Is_Ctrl_And_Shift(cmdID) then return r.defer(no_undo) end
 
 
 function Get_Arrange_and_Header_Heights2() 
@@ -8096,21 +8149,31 @@ end
 --[[
 input = '6B010000F900000039040000030200000000000000000000A7'
 data = input:gsub('%x%x', function(byte) return string.char(tonumber(byte, 16)) end)
-left, top, right, bottom, state, whichdock = string.unpack('<iiiiII', data)
+left, top, right, bottom, state, whichdock = string.unpack('<iiiiII', data) -- state is a bitfield: 1=open, 2=docked
 ]]
 function SWS_wnd_open(input)
 local data = input:gsub('%x%x', function(byte) return string.char(tonumber(byte, 16)) end)
 return ({string.unpack('<iiiiII', data)})[5] == '1'
 end
 
+function SWS_wnd_data(input)
+local data = input:gsub('%x%x', function(byte) return string.char(tonumber(byte, 16)) end)
+local left, top, right, bottom, state, dockermode = string.unpack('<iiiiII', data) -- state is a bitfield: 1=open, 2=docked
+return left, top, right, bottom, state&1 == 1, state&2 == 2, dockermode
+end
+
 
 local wnd_ident_t1 = {
--- transport docked pos in the top or bottom dockers can't be ascertained
--- transport_dock=0 any time it's not docked at its reserved positions, which could be 
--- floating or docked in any other docker
+-- transport docked pos in the top or bottom dockers can't be ascertained;
+-- transport_dock=0 any time it's not docked at its reserved positions in the main window (see below) 
+-- which could be floating or docked in any other docker;
+-- When 'Dock transport in the main window' option is enabled the values of the 'transport_dock_pos' key 
+-- corresponding to options under 'Docked transport position' menu item are:
+-- 0 - Below arrange (default) [above bottom docker]; 1 - Above ruler [below top docker]; 
+-- 2 - Bottom of main window [below bottom docker]; 3 - Top of main window [above top docker]
 --	[40279] = 'Docker', -- View: Show docker ('Docker') // not supported by the script
 [40078] = 'mixwnd_vis', -- View: Toggle mixer visible ('Mixer')
-[40605] = 'actions', -- Show action list ('Actions') // doesn't keep size					
+[40605] = 'actions', -- Show action list ('Actions') // doesn't keep size		
 --=============== 'Project Bay' // 8 actions // dosn't keep size ===============
 [41157] = 'projbay_0', -- View: Show project bay window
 [41628] = 'projbay_1', -- View: Show project bay window 2
@@ -8123,11 +8186,12 @@ local wnd_ident_t1 = {
 --============================== Matrices ======================================
 [40768] = 'routingwnd_vis', -- View: Show track grouping matrix window ('Grouping Matrix')
 [40251] = 'routingwnd_vis', -- View: Show routing matrix window ('Routing Matrix')
-[42031] = 'routingwnd_vis', -- View: Show track wiring diagram ('Track Wiring Diagram')			
+[42031] = 'routingwnd_vis', -- View: Show track wiring diagram ('Track Wiring Diagram')
 --===========================================================================
 [40326] = 'regmgr', -- View: Show region/marker manager window ('Region/Marker Manager')	// doesn't keep size
 [50124] = 'reaper_explorer', -- Media explorer: Show/hide media explorer ('Media Explorer') // doesn't keep size
 [40906] = 'trackmgr', -- View: Show track manager window ('Track Manager')	// doesn't keep size
+[40327] = 'grpmgr' -- View: Show track group manager window ('Track Group Manager')
 [40378] = 'bigclock', -- View: Show big clock window ('Big Clock') // doesn't keep size
 [50125] = 'reaper_video', -- Video: Show/hide video window ('Video Window')
 [40240] = 'perf', -- View: Show performance meter window ('Performance Meter') // doesn't keep size
@@ -8144,6 +8208,7 @@ local wnd_ident_t1 = {
 [40271] = 'fxadd_vis', -- View: Show FX browser window ('Add FX to Track #' or 'Add FX to: Item' or 'Browse FX')
 [41589] = 'itemprops', -- Item properties: Toggle show media item/take properties ('Media Item Properties')
 --=========== TOOLBARS // don't keep size; the ident strings are provisional ==========
+-- when a toolbar is positioned at the top of the main window its dock and visibility states are 0
 [41679] = 'toolbar:1', -- Toolbar: Open/close toolbar 1 ('Toolbar 1')
 [41680] = 'toolbar:2', -- Toolbar: Open/close toolbar 2 ('Toolbar 2')
 [41681] = 'toolbar:3', -- Toolbar: Open/close toolbar 3 ('Toolbar 3')
@@ -8170,7 +8235,7 @@ local wnd_ident_t1 = {
 --	[40153] = 'MIDI take:', -- Item: Open in built-in MIDI editor (set default behavior in preferences) ('MIDI take:' or 'Edit MIDI (docked)' occasionally appears when MIDI Editor is in a floating docker but the tab name is the former) // var. name, not toggle
 --	[40153] = 'Edit MIDI', -- see above
 --[[======================== SWS EXTENSION ======================================
--- SWS extension windows which don't need resizing or pos changed since they maintain them, excluded since there's no way to get their state from reaper.ini;
+-- SWS extension windows which don't need resizing or pos changed since they maintain them, excluded since there's no way to get their state from reaper.ini, the value which can be extracted from there with the above function SWS_wnd_data() is not updated or updated inconsistently when window state changes, from reaper.ini it's possible to get the dockermode and visibility from the action toggle state but the actual dock state is not;
 ['_SWSAUTOCOLOR_OPEN'] = 'SWSAutoColor', -- SWS: Open auto color/icon/layout window ('Auto Color/Icon/Layout')
 ['_BR_CONTEXTUAL_TOOLBARS_PREF'] = 'BR - ContextualToolbars WndPos', -- SWS/BR: Contextual toolbars... ('Contextual toolbars')
 ['_S&M_CYCLEDITOR'] = 'SnMCyclaction', -- SWS/S&M: Open/close Cycle Action editor ('Cycle Actions') // doesn't remember section selection BUT all 3 actions toggle
@@ -8190,12 +8255,18 @@ local wnd_ident_t1 = {
 
 
 local wnd_ident_t = { -- to be used in Get_Mixer_Wnd_Dock_State() function
--- transport docked pos in the top or bottom dockers can't be ascertained
--- transport_dock=0 any time it's not docked at its reserved positions, which could be
--- floating or docked in any other docker
+-- the keys are those appearing in reaper.ini [REAPERdockpref] section
+-- transport docked pos in the top or bottom dockers can't be ascertained;
+-- transport_dock=0 any time it's not docked at its reserved positions in the main window (see below) 
+-- which could be floating or docked in any other docker;
+-- When 'Dock transport in the main window' option is enabled the values of the 'transport_dock_pos' key 
+-- corresponding to options under 'Docked transport position' menu item are:
+-- 0 - Below arrange (default) [above bottom docker]; 1 - Above ruler [below top docker]; 
+-- 2 - Bottom of main window [below bottom docker]; 3 - Top of main window [above top docker]
 -- window 'dock=0' keys do not get updated if the window was undocked before a screenset where it's docked was (re)loaded which leads to false positives
 -- The following key names are keys used in [REAPERdockpref] section
 -- % escapes are included for use within string.match()
+mixer = {'mixwnd_vis', 'mixwnd_dock'}, -- 40078 View: Toggle mixer visible ('Mixer')
 actions = {'%[actions%]', 'wnd_vis', 'dock'}, -- Show action list ('Actions')
 --=============== 'Project Bay' // 8 actions // dosn't keep size ===============
 projbay_0 = {'%[projbay_0%]', 'wnd_vis', 'dock'}, -- View: Show project bay window
@@ -8212,6 +8283,7 @@ routing = {'routingwnd_vis', 'routing_dock'}, -- View: Show track grouping matri
 regmgr = {'%[regmgr%]', 'wnd_vis', 'dock'}, -- View: Show region/marker manager window ('Region/Marker Manager')
 explorer = {'%[reaper_explorer%]', 'visible', 'docked'}, -- Media explorer: Show/hide media explorer ('Media Explorer')
 trackmgr = {'%[trackmgr%]', 'wnd_vis', 'dock'}, -- View: Show track manager window ('Track Manager')
+grpmgr = {'%[grpmgr%]', 'wnd_vis', 'dock'} -- View: Show track group manager window ('Track Group Manager')
 bigclock = {'%[bigclock%]', 'wnd_vis', 'dock'}, -- View: Show big clock window ('Big Clock')
 video = {'%[reaper_video%]', 'visible', 'docked'}, -- Video: Show/hide video window ('Video Window')
 perf = {'%[perf%]', 'wnd_vis', 'dock'}, -- View: Show performance meter window ('Performance Meter')
@@ -8241,7 +8313,7 @@ local mixwnd_dock = r.GetToggleCommandStateEx(0, 40083) == 1 -- or cont:match('m
 local mixer_dockermode = cont:match('%[REAPERdockpref%].-%f[%a]mixer=[%d%.]-%s(%d+)\n') -- find mixer dockermode number // the frontier operator %f is needed to avoid false positive of 'mastermixer' which refers to the Master track
 local mixer_dock_pos = cont:match('dockermode'..mixer_dockermode..'=(%d+)') -- get mixer docker position
 
-	if wantDockPos then return mixer_dock_pos end -- if requested, return pos in case the entire docker is closed and not the Mixer window itself, to condition the rightmost position routine because in this case it won't work, but nevertheless will run because Mixer toggle state will still be OFF and hence true; plus if dockerpos is not 0 or 2 the rightmost position won't be needed anyway as without SWS extension in other docks and in floating window only the leftmost pos is honored; must come before the next condition so it's not blocked by it if the latter is true
+	if wantDockPos then return mixer_dock_pos end -- if requested, return pos in case the entire docker is closed and not the Mixer window itself, to condition the rightmost position routine because in this case it won't work, but nevertheless will run because Mixer toggle state will still be OFF and hence true; plus if dockerpos is not 0 (bottom) or 2 (top) the rightmost position won't be needed anyway as without SWS extension in other docks and in floating window only the leftmost pos is honored by the script; must come before the next condition so it's not blocked by it if the latter is true
 	if not mixwnd_dock -- in floating Mixer window wihtout SWS extension only use leftmost position
 	or (mixer_dock_pos ~= '0' and mixer_dock_pos ~= '2') -- if sits in side dockers, only use leftmost position because the Mixer window cannot have full width anyway
 	then return false
@@ -8539,6 +8611,112 @@ function Exclude_Visible_Windows(t) -- t stems from Re_Store_Windows_Props_By_Na
 end
 
 
+function Move_Window_To_Another_Dock(wnd_id, pos)
+-- wnd_id is window identifier string found in reaper.ini, see table keys
+-- if routing add digit without space: 
+-- routing1 - group matrix; routing2 - routing matrix; 
+-- routing3 - track wiring; routing4 - region render matrix -- non-toggle
+-- to figure out how to toggle midi editor visibility
+-- pos arg is integer: 0 - bottom, 1 - left, 2 - top, 3 right
+
+local routing = {40768, -- View: Show track grouping matrix window ('Grouping Matrix')
+40251, -- View: Show routing matrix window ('Routing Matrix')
+42031, -- View: Show track wiring diagram ('Track Wiring Diagram')
+41888 -- View: Show region render matrix window ('Region Render Matrix') -- non-toggle
+}
+
+local function is_region_render_vis(routing)
+	for _, commID in ipairs(routing) do
+		if r.GetToggleCommandStateEx(0,commID) == 1 
+		then -- one of the other 3 windows which have toggle state is visible
+		return end -- so region render matrix visibility is false
+	end
+-- if the function didn't exit early, continue
+	for line in io.lines(r.get_ini_file()) do
+		if line:match('routingwnd_vis') and line:sub(-1) == '1' then 
+		-- the key has value 1 when region render matrix is open as well	
+		return true
+		end
+	end
+end
+
+local t = {transport = 40259, mixer = 40078, actions = 40605, 
+projbay_0 = 41157, projbay_1 = 41628, projbay_2 = 41629, 
+projbay_3 = 41630, projbay_4 = 41631, projbay_5 = 41632, 
+projbay_6 = 41633, projbay_7 = 41634, --routing = rout,
+regmgr = 40326, explorer = 50124, trackmgr = 40906, grpmgr = 40327, 
+bigclock = 40378, video = 50125, perf = 40240, navigator = 40268, 
+vkb = 40377, fadeedit = 41827, undo = 40072, fxbrowser = 40271, 
+itemprops = 41589, midiedit = '', ['toolbar:1'] = 41679, 
+['toolbar:2'] = 41680, ['toolbar:3'] = 41681, ['toolbar:4'] = 41682, 
+['toolbar:5'] = 41683, ['toolbar:6'] = 41684, ['toolbar:7'] = 41685, 
+['toolbar:8'] = 41686, ['toolbar:9'] = 41936, ['toolbar:10'] = 41937, 
+['toolbar:11'] = 41938, ['toolbar:12'] = 41939, ['toolbar:13'] = 41940,
+['toolbar:14'] = 41941, ['toolbar:15'] = 41942, ['toolbar:16'] = 41943, 
+['toolbar:17'] = 42404 -- MX toolbar
+}
+
+local function defer_with_args(func,...)
+-- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
+local t = {...}
+return function() func(table.unpack(t)) end
+end
+
+--[[ WORKS isn't sutable for Region Render matrix window
+local function wait_and_reopen(commandID)
+	if r.GetToggleCommandStateEx(0,commandID) == 1 then
+	r.defer(defer_with_args(wait_and_reopen, commandID))
+	else
+	r.Main_OnCommand(commandID, 0) -- re-open /// must be inside defer loop, for some reason when the defer loop stops commandID  is not accessible to Main_OnCommand() function outside
+	end
+end
+--]]
+--[-[ WORKS
+local function wait_and_reopen(commandID)
+	if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 0 then
+	r.Main_OnCommand(commandID, 0) -- re-open // must be inside defer loop, for some reason when the defer loop stops commandID  is not accessible to Main_OnCommand() function outside
+	return 
+	elseif commandID == 41888 then
+		for line in io.lines(r.get_ini_file()) do
+			if line:match('routingwnd_vis') and 
+			-- the key has value 0 when region render matrix is closed as well
+			line:sub(-1) == '0' then	
+			r.Main_OnCommand(commandID, 0) return end
+		end
+	end
+r.defer(defer_with_args(wait_and_reopen, commandID))
+end
+--]]
+
+
+-- extract index if routing and select command ID
+local commandID = wnd_id:match('routing') and routing[wnd_id:sub(-1)+0] or t[wnd_id]
+local vis = commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1 
+or commandID == 41888 and is_region_render_vis(routing)
+
+	if not vis then return end -- only update visible windows
+	
+local wnd_id = wnd_id:match('routing') and 'routing' or wnd_id	
+	
+	for i = 0, 15 do -- there're 16 dockermode indices in total
+		if r.DockGetPosition(i) == pos then -- find dockermode associated with the desired position
+		-- in reaper.ini it's e.g. dockermode5=0;
+		-- update dockermode to which the window is assigned in reaper.ini;
+		-- in [REAPERdockpref] section
+		r.Dock_UpdateDockID(wnd_id, i)
+	--	r.UpdateArrange() -- doesn't work to visually update window position
+		-- must be refreshed for the change to become visible, that is its visibility toggled
+			if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1 then -- visible // will work when updating dock position of a window regrdless of visibility if 'if not vis then' condition isn't used above, in which case only if a window is visible it will be reloaded, the rest will be moved in the background
+			r.Main_OnCommand(commandID, 0) -- close
+			wait_and_reopen(commandID) -- toggle state is updated slower than the function runs hence the need to wait and only then re-open
+			elseif commandID == 41888 and is_region_render_vis(routing) then
+			r.Main_OnCommand(commandID, 0) -- close
+			wait_and_reopen(commandID) -- reopen, must also wait until routingwnd_vis value is updated in reaper.ini
+			end
+		break end
+	end
+end
+
 
 --==================================== W I N D O W S   E N D ====================================
 
@@ -8556,7 +8734,7 @@ local sep = r.GetResourcePath():match('[\\/]')
 local sep = r.GetOS():match('Win') and '\\' or '/'
 
 
-function get_script_path()
+function get_script_path() -- same as ({r.get_action_context()})[2]:match('.+[\\/]')
 -- https://forum.cockos.com/showthread.php?t=159547
 local info = debug.getinfo(1,'S');
 local script_path = info.source:match[[^@?(.*[\/])[^\/]-$]]
@@ -8580,23 +8758,6 @@ local script_path = full_script_path:sub(2,-5) -- remove "@" and "file extension
 	end
 end
 require("X-Raym_Functions - console debug messages")
-
-
-function Get_Script_Name(scr_name)
-local t = {'top','bottom','all up','all down','next','previous','explode','implode','crop'} -- EXAMPLE
-local t_len = #t -- store here since with nils length will be harder to get
-	for k, name in ipairs(t) do
-	t[k] = scr_name:match(Esc(name)) --or false -- to avoid nils in the table, although still works with the method below
-	end
--- return table.unpack(t) -- without nils
-return table.unpack(t,1,t_len) -- not sure why this works, not documented anywhere, but does return all values if some of them are nil even without the n value (table length) in the 1st field
--- found mentioned at
--- https://stackoverflow.com/a/1677358/8883033
--- https://stackoverflow.com/questions/1672985/lua-unpack-bug
--- https://uopilot.tati.pro/index.php?title=Unpack_(Lua)
-end
--- USAGE EXAMPLE:
--- local top, bottom, up, down, nxt, prev, explode, implode, crop = Get_Script_Name(scr_name)
 
 
 -- Undo with only the script name
@@ -8658,6 +8819,24 @@ local f = io.open(path..sep..'reaper-kb.ini', 'r')
 end
 
 
+
+function Get_Script_Name(scr_name)
+local t = {'top','bottom','all up','all down','next','previous','explode','implode','crop'} -- EXAMPLE
+local t_len = #t -- store here since with nils length will be harder to get
+	for k, name in ipairs(t) do
+	t[k] = scr_name:match(Esc(name)) --or false -- to avoid nils in the table, although still works with the method below
+	end
+-- return table.unpack(t) -- without nils
+return table.unpack(t,1,t_len) -- not sure why this works, not documented anywhere, but does return all values if some of them are nil even without the n value (table length) in the 1st field
+-- found mentioned at
+-- https://stackoverflow.com/a/1677358/8883033
+-- https://stackoverflow.com/questions/1672985/lua-unpack-bug
+-- https://uopilot.tati.pro/index.php?title=Unpack_(Lua)
+end
+-- USAGE EXAMPLE:
+-- local top, bottom, up, down, nxt, prev, explode, implode, crop = Get_Script_Name(scr_name)
+
+
 function Invalid_Script_Name1(scr_name,...)
 -- check if necessary elements are found in script name
 -- if more than 1 match is needed run twice with different sets of elements which are supposed to appear in the same name, but elements within each set must not be expected to appear in the same name
@@ -8684,6 +8863,18 @@ local found
 end
 -- USAGE EXAMPLE:
 -- Invalid_Script_Name(scr_name, 'right', 'left', 'tracks', 'items')
+-- EXAMPLE when several matches are required:
+--[[
+-- validate script name
+local no_elm1 = Invalid_Script_Name(scr_name,table.unpack(type_t))
+local no_elm2 = Invalid_Script_Name(scr_name,'left','right')
+	if no_elm1 or no_elm2 then
+	local br = '\n\n'
+	r.MB([[The script name has been changed]]..br..Rep(7)..[[which renders it inoperable.]]..br..
+	[[   please restore the original name]]..br..[[  referring to the list in the header,]]..br..
+	Rep(9)..[[or reinstall the package.]], 'ERROR', 0)
+	return r.defer(function() do return end end) end
+]]
 
 
 function Invalid_Script_Name2(scr_name,...)
@@ -9022,11 +9213,19 @@ local i = 0
 end
 
 
+function get_ini_cont()
+local f = io.open(r.get_ini_file(), 'r')
+local cont = f:read('*a')
+f:close()
+return cont
+end
+
+
 function Check_reaper_ini(key,value) -- the args must be strings
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
-local val = cont:match(key..'=([%.%d]+)') == value
+local val = cont:match(key..'=([%.%d]+)') == value -- OR '=(.-)\n'
 return val
 -- OR SIMPLY: return cont:match(key..'=([%.%d]+)') == value
 end
@@ -9058,6 +9257,18 @@ local i, t, popen = 0, {}, io.popen
         t[i] = filename
     end
     return t
+end
+
+
+function Create_Dummy_Project_File()
+local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
+local dummy_proj = scr_name:match('.+[\\/]')..'BuyOne_dummy project (do not rename).RPP'		
+	if not r.file_exists(dummy_proj) then -- create a dummy project file next to the script
+	local f = io.open(dummy_proj,'w')
+	f:write('<REAPER_PROJECT\n>')
+	f:close()
+	end
+return dummy_proj
 end
 
 
