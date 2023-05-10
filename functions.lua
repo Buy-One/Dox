@@ -106,6 +106,12 @@ return start_time == proj_time_offset
 end
 
 
+function Get_Arrange_Size_In_Px()
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+return math.floor((end_time-start_time)*r.GetHZoomLevel()+0.5) -- GetHZoomLevel() returns px/sec; return rounded since fractional pixel values are invalid
+end
+
+
 function Validate_Positive_Integer(str, type) -- str is a numeric string, type is a string, script specific to distinguish between 2 modes
 local default = type and (type:lower() == 'bend' and 12 or type:lower() == 'offset' and 80)
 	if not default then return end
@@ -189,6 +195,7 @@ end
 
 
 function get_tog_state(sect_ID, comm_ID)
+-- supports string command IDs
 return r.GetToggleCommandStateEx(sect_ID, r.NamedCommandLookup(comm_ID))
 end
 
@@ -324,45 +331,38 @@ end
 
 ---------------------------------------------
 
-local function defer_with_args1(func,...)
--- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
-local t = {...}
-return function() func(table.unpack(t)) end
-end
-
-
-local function defer_with_args2(...)
--- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
-local t = {...}
-local func = t[1] -- assign function name val
-table.remove(t,1) -- remove function name arg
-return function() func(table.unpack(t)) end
-end
-
-
-function At_Exit_Wrapper(func, ...) -- wrapper for a 3d function with arguments for r.atexit()
+local function Wrapper1(func,...)
+-- wrapper for a 3d function with arguments
+-- to be used with defer() and atexit()
+-- thanks to Lokasenna, https://forums.cockos.com/showthread.php?t=218805 -- defer with args
 -- func is function name, the elipsis represents the list of function arguments
--- thanks to Lokasenna, https://forums.cockos.com/showthread.php?t=218805 -- defer with args
--- his code didn't work because func(...) produced an error without there being elipsis
--- in function() as well, but gave direction
+-- Lokasenna's code didn't work because func(...) produced an error 
+-- without there being elipsis in function() as well, but gave direction
 local t = {...}
 return function() func(table.unpack(t)) end
 end
--- USAGE:
--- function My_Function(arg1, arg2, arg3) -- some routine -- end
--- r.atexit(At_Exit_Wrapper(My_Function, arg1, arg2, arg3)
+-- USE:
+--[[
+function MY_FUNCTION(arg1, arg2)
+r.defer(Wrapper(MY_FUNCTION, arg1, arg2))
+end
+MY_FUNCTION(arg1, arg2)
+
+function My_Function(arg1, arg2, arg3) -- some routine -- end
+r.atexit(Wrapper(My_Function, arg1, arg2, arg3)
+]]
 
 
-function At_Exit_Wrapper2(...) -- wrapper for a 3d function with arguments for r.atexit() // more wordy
--- the elipsis represents the list of function name, and function arguments
--- thanks to Lokasenna, https://forums.cockos.com/showthread.php?t=218805 -- defer with args
--- his code didn't work because func(...) produced an error without there being elipsis
--- in function() as well, but gave direction
+
+local function Wrapper2(...) -- more wordy
+-- to be used with defer() and atexit()
+-- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
 local t = {...}
 local func = t[1] -- assign function name val
 table.remove(t,1) -- remove function name arg
 return function() func(table.unpack(t)) end
 end
+
 
 
 local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
@@ -541,6 +541,12 @@ function round2(num) -- if decimal part is smaller than 0.5 round down else roun
 local rounded = math.floor(num)
 	if rounded == num then return num end -- if number isn't decimal
 return rounded+0.5 > num and rounded or math.ceil(num)
+end
+
+
+-- OR SIMPLY
+function round3(num)
+return math.floor(num+0.5)
 end
 
 
@@ -6771,10 +6777,12 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 end
 
 
-function Is_Ctrl_And_Shift(cmdID)
-local is_new_value,filename,sectID,cmdID,mode,resol,val = r.get_action_context()
+function Is_Ctrl_And_Shift()
 -- check if the script is bound to a shortcut containing both Ctrl & Shift
--- which is not advised when the version of Get_Arrange_and_Header_Heights2() function is used which creates temporary project tab to fetch the Arrange height data becaise in this case if the key combination is long pressed a prompt will appear offering to load project with FX offline
+-- which is not advised when the version of Get_Arrange_and_Header_Heights() function is used which creates temporary project tab to fetch the Arrange height data because in this case if the key combination is long pressed a prompt will appear offering to load project with FX offline
+-- only relevant if SWS and js_ReaScriptAPI extensions are not installed
+-- because only in this case to get the Arrange height a track max zoom is used in a temp proj tab
+local is_new_value,filename,sectID,cmdID,mode,resol,val = r.get_action_context()
 local named_ID = r.ReverseNamedCommandLookup(cmdID) -- convert numeric returned by get_action_context to alphanumeric listed in reaper-kb.ini
 local res_path = r.GetResourcePath()..r.GetResourcePath():match('[\\/]') -- path with separator
 local s,R = ' ', string.rep
@@ -8236,20 +8244,20 @@ local wnd_ident_t1 = {
 --	[40153] = 'Edit MIDI', -- see above
 --[[======================== SWS EXTENSION ======================================
 -- SWS extension windows which don't need resizing or pos changed since they maintain them, excluded since there's no way to get their state from reaper.ini, the value which can be extracted from there with the above function SWS_wnd_data() is not updated or updated inconsistently when window state changes, from reaper.ini it's possible to get the dockermode and visibility from the action toggle state but the actual dock state is not;
-['_SWSAUTOCOLOR_OPEN'] = 'SWSAutoColor', -- SWS: Open auto color/icon/layout window ('Auto Color/Icon/Layout')
-['_BR_CONTEXTUAL_TOOLBARS_PREF'] = 'BR - ContextualToolbars WndPos', -- SWS/BR: Contextual toolbars... ('Contextual toolbars')
+_SWSAUTOCOLOR_OPEN = 'SWSAutoColor', -- SWS: Open auto color/icon/layout window ('Auto Color/Icon/Layout')
+_BR_CONTEXTUAL_TOOLBARS_PREF = 'BR - ContextualToolbars WndPos', -- SWS/BR: Contextual toolbars... ('Contextual toolbars')
 ['_S&M_CYCLEDITOR'] = 'SnMCyclaction', -- SWS/S&M: Open/close Cycle Action editor ('Cycle Actions') // doesn't remember section selection BUT all 3 actions toggle
 ['_S&M_SHOWFIND'] = 'SnMFind', -- SWS/S&M: Find ('Find')
-['_FNG_GROOVE_TOOL'] = 'FNGGroove', -- SWS/FNG: Show groove tool ('Groove')
+_FNG_GROOVE_TOOL = 'FNGGroove', -- SWS/FNG: Show groove tool ('Groove')
 ['_S&M_SHOWMIDILIVE'] = 'SnMLiveConfigs', -- SWS/S&M: Open/close Live Configs window ('Live Config')
-['_BR_ANALAYZE_LOUDNESS_DLG'] = 'BR - AnalyzeLoudness WndPos', -- SWS/BR: Analyze loudness... ('Loudness')
-['_SWSMARKERLIST1'] = 'SWSMarkerList', -- SWS: Open marker list ('Marker List')
+_BR_ANALAYZE_LOUDNESS_DLG = 'BR - AnalyzeLoudness WndPos', -- SWS/BR: Analyze loudness... ('Loudness')
+_SWSMARKERLIST1 = 'SWSMarkerList', -- SWS: Open marker list ('Marker List')
 ['_S&M_SHOW_NOTES_VIEW'] = 'SnMNotesHelp', -- SWS/S&M: Open/close Notes window ('Notes') // does remember notes type selection so other 11 actions will likely be redundant
-['_SWS_PROJLIST_OPEN'] = 'SWSProjectList', -- SWS: Open project list ('Project List')
-['_SWSCONSOLE'] = 'ReaConsole', -- SWS: Open console ('ReaConsole')
+_SWS_PROJLIST_OPEN = 'SWSProjectList', -- SWS: Open project list ('Project List')
+_SWSCONSOLE = 'ReaConsole', -- SWS: Open console ('ReaConsole')
 ['_S&M_SHOW_RGN_PLAYLIST'] = 'SnMRgnPlaylist', -- SWS/S&M: Open/close Region Playlist window ('Region Playlist')
 ['_S&M_SHOW_RESOURCES_VIEW'] = 'SnMResources', -- SWS/S&M: Open/close Resources window ('Resources') // does remember resource type selection so other 7 actions will likely be redundant
-['_SWSSNAPSHOT_OPEN'] = 'SWSSnapshots' -- SWS: Open snapshots window ('Snapshots') // (caused redraw problem)
+_SWSSNAPSHOT_OPEN = 'SWSSnapshots' -- SWS: Open snapshots window ('Snapshots') // (caused redraw problem)
 ]]
 }
 
@@ -8366,6 +8374,10 @@ local mixer_dock_pos = cont:match('dockermode'..mixer_dockermode..'=(%d+)') -- g
 return true
 
 end
+
+
+
+
 
 
 
@@ -8611,17 +8623,32 @@ function Exclude_Visible_Windows(t) -- t stems from Re_Store_Windows_Props_By_Na
 end
 
 
-function Move_Window_To_Another_Dock(wnd_id, pos)
--- wnd_id is window identifier string found in reaper.ini, see table keys
--- if routing add digit without space: 
--- routing1 - group matrix; routing2 - routing matrix; 
--- routing3 - track wiring; routing4 - region render matrix -- non-toggle
--- to figure out how to toggle midi editor visibility
--- pos arg is integer: 0 - bottom, 1 - left, 2 - top, 3 right
+function Move_Window_To_Another_Dock(wnd_id, new_pos, cur_pos)
+-- wnd_id is window identifier string found in reaper.ini, see table keys below,
+-- if routing, add digit without space: routing1 - routing matrix;
+-- routing2 - group matrix; routing3 - track wiring; 
+-- routing4 - region render matrix -- non-toggle
+-- cur_pos and new_pos args are integer: 0 - bottom, 1 - left, 2 - top, 3 - right, 4 - floating
+-- cur_pos is optional, if passed, docker position will only be changed of the window's current pos matches cur_pos value, otherwise position will be changed regardless of the current one
+-- also to figure out how to toggle midi editor visibility
+-- some info on docks https://forum.cockos.com/showthread.php?t=207081
 
-local routing = {40768, -- View: Show track grouping matrix window ('Grouping Matrix')
-40251, -- View: Show routing matrix window ('Routing Matrix')
+	if not new_pos or not tonumber(new_pos)
+	or tonumber(new_pos) < 0 or tonumber(new_pos) > 4 then
+	return end
+	
+	if cur_pos and (not tonumber(new_pos)
+	or tonumber(new_pos) < 0 or tonumber(new_pos) > 4) then
+	return end
+
+local dockermode = r.GetConfigWantsDock(wnd_id) -- ger dockermode the window is currently assigned to
+	
+	if cur_pos and r.DockGetPosition(dockermode) ~= cur_pos then return end -- compare the position the dockermode belongs to with the cur_pos value if any
+
+-- in actual Routing menu order
+local routing = {40251, -- View: Show routing matrix window ('Routing Matrix')
 42031, -- View: Show track wiring diagram ('Track Wiring Diagram')
+40768, -- View: Show track grouping matrix window ('Grouping Matrix')
 41888 -- View: Show region render matrix window ('Region Render Matrix') -- non-toggle
 }
 
@@ -8631,7 +8658,8 @@ local function is_region_render_vis(routing)
 		then -- one of the other 3 windows which have toggle state is visible
 		return end -- so region render matrix visibility is false
 	end
--- if the function didn't exit early, continue
+-- if the function didn't exit early, all windows with toggle action are closed
+-- 'View: Show region render matrix window' is not a toggle, so evaluate that via reaper,ini 
 	for line in io.lines(r.get_ini_file()) do
 		if line:match('routingwnd_vis') and line:sub(-1) == '1' then 
 		-- the key has value 1 when region render matrix is open as well	
@@ -8653,10 +8681,32 @@ itemprops = 41589, midiedit = '', ['toolbar:1'] = 41679,
 ['toolbar:8'] = 41686, ['toolbar:9'] = 41936, ['toolbar:10'] = 41937, 
 ['toolbar:11'] = 41938, ['toolbar:12'] = 41939, ['toolbar:13'] = 41940,
 ['toolbar:14'] = 41941, ['toolbar:15'] = 41942, ['toolbar:16'] = 41943, 
-['toolbar:17'] = 42404 -- MX toolbar
+['toolbar:17'] = 42404, -- MX toolbar
+SWSAutoColor = '_SWSAUTOCOLOR_OPEN', -- SWS: Open auto color/icon/layout window ('Auto Color/Icon/Layout')
+['BR - ContextualToolbars WndPos'] = '_BR_CONTEXTUAL_TOOLBARS_PREF', -- SWS/BR: Contextual toolbars... ('Contextual toolbars')
+SnMCyclaction = '_S&M_CYCLEDITOR', -- SWS/S&M: Open/close Cycle Action editor ('Cycle Actions') // doesn't remember section selection BUT all 3 actions toggle
+SnMFind = '_S&M_SHOWFIND', -- SWS/S&M: Find ('Find')
+FNGGroove = '_FNG_GROOVE_TOOL', -- SWS/FNG: Show groove tool ('Groove')
+SnMLiveConfigs = '_S&M_SHOWMIDILIVE', -- SWS/S&M: Open/close Live Configs window ('Live Config')
+SnMLiveConfigMonitor1 = '_S&M_OPEN_LIVECFG_MONITOR1', -- SWS/S&M: Live Config #1 - Open/close monitoring window
+SnMLiveConfigMonitor2 = '_S&M_OPEN_LIVECFG_MONITOR2', -- SWS/S&M: Live Config #2 - Open/close monitoring window
+SnMLiveConfigMonitor3 = '_S&M_OPEN_LIVECFG_MONITOR3', -- SWS/S&M: Live Config #3 - Open/close monitoring window
+SnMLiveConfigMonitor4 = '_S&M_OPEN_LIVECFG_MONITOR4', -- SWS/S&M: Live Config #4 - Open/close monitoring window
+SnMLiveConfigMonitor5 = '_S&M_OPEN_LIVECFG_MONITOR5', -- SWS/S&M: Live Config #5 - Open/close monitoring window
+SnMLiveConfigMonitor6 = '_S&M_OPEN_LIVECFG_MONITOR6', -- SWS/S&M: Live Config #6 - Open/close monitoring window
+SnMLiveConfigMonitor7 = '_S&M_OPEN_LIVECFG_MONITOR7', -- SWS/S&M: Live Config #7 - Open/close monitoring window
+SnMLiveConfigMonitor8 = '_S&M_OPEN_LIVECFG_MONITOR8', -- SWS/S&M: Live Config #8 - Open/close monitoring window
+['BR - AnalyzeLoudness WndPos'] = '_BR_ANALAYZE_LOUDNESS_DLG', -- SWS/BR: Analyze loudness... ('Loudness')
+SWSMarkerList = '_SWSMARKERLIST1', -- SWS: Open marker list ('Marker List')
+SnMNotesHelp = '_S&M_SHOW_NOTES_VIEW', -- SWS/S&M: Open/close Notes window ('Notes') // does remember notes type selection so other 11 actions will likely be redundant
+SWSProjectList = '_SWS_PROJLIST_OPEN', -- SWS: Open project list ('Project List')
+ReaConsole = '_SWSCONSOLE', -- SWS: Open console ('ReaConsole')
+SnMRgnPlaylist = '_S&M_SHOW_RGN_PLAYLIST', -- SWS/S&M: Open/close Region Playlist window ('Region Playlist')
+SnMResources = '_S&M_SHOW_RESOURCES_VIEW', -- SWS/S&M: Open/close Resources window ('Resources') // does remember resource type selection so other 7 actions will likely be redundant
+SWSSnapshots = '_SWSSNAPSHOT_OPEN' -- SWS: Open snapshots window ('Snapshots') // (caused redraw problem)
 }
 
-local function defer_with_args(func,...)
+local function wrapper(func,...)
 -- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
 local t = {...}
 return function() func(table.unpack(t)) end
@@ -8665,7 +8715,7 @@ end
 --[[ WORKS isn't sutable for Region Render matrix window
 local function wait_and_reopen(commandID)
 	if r.GetToggleCommandStateEx(0,commandID) == 1 then
-	r.defer(defer_with_args(wait_and_reopen, commandID))
+	r.defer(wrapper(wait_and_reopen, commandID))
 	else
 	r.Main_OnCommand(commandID, 0) -- re-open /// must be inside defer loop, for some reason when the defer loop stops commandID  is not accessible to Main_OnCommand() function outside
 	end
@@ -8684,13 +8734,12 @@ local function wait_and_reopen(commandID)
 			r.Main_OnCommand(commandID, 0) return end
 		end
 	end
-r.defer(defer_with_args(wait_and_reopen, commandID))
+r.defer(wrapper(wait_and_reopen, commandID))
 end
 --]]
 
-
 -- extract index if routing and select command ID
-local commandID = wnd_id:match('routing') and routing[wnd_id:sub(-1)+0] or t[wnd_id]
+local commandID = wnd_id:match('routing') and routing[wnd_id:sub(-1)+0] or r.NamedCommandLookup(t[wnd_id]) -- accounting for SWS ext command IDs
 local vis = commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1 
 or commandID == 41888 and is_region_render_vis(routing)
 
@@ -8699,21 +8748,41 @@ or commandID == 41888 and is_region_render_vis(routing)
 local wnd_id = wnd_id:match('routing') and 'routing' or wnd_id	
 	
 	for i = 0, 15 do -- there're 16 dockermode indices in total
-		if r.DockGetPosition(i) == pos then -- find dockermode associated with the desired position
+		if r.DockGetPosition(i) == new_pos then -- find dockermode associated with the desired position
 		-- in reaper.ini it's e.g. dockermode5=0;
 		-- update dockermode to which the window is assigned in reaper.ini;
 		-- in [REAPERdockpref] section
 		r.Dock_UpdateDockID(wnd_id, i)
 	--	r.UpdateArrange() -- doesn't work to visually update window position
 		-- must be refreshed for the change to become visible, that is its visibility toggled
-			if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1 then -- visible // will work when updating dock position of a window regrdless of visibility if 'if not vis then' condition isn't used above, in which case only if a window is visible it will be reloaded, the rest will be moved in the background
+			if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1 
+			or commandID == 41888 and is_region_render_vis(routing)
+			then -- visible // will work when updating dock position of a window regardless of visibility if 'if not vis then' condition isn't used above, in which case only if a window is visible it will be reloaded, the rest will be moved in the background
 			r.Main_OnCommand(commandID, 0) -- close
-			wait_and_reopen(commandID) -- toggle state is updated slower than the function runs hence the need to wait and only then re-open
-			elseif commandID == 41888 and is_region_render_vis(routing) then
-			r.Main_OnCommand(commandID, 0) -- close
-			wait_and_reopen(commandID) -- reopen, must also wait until routingwnd_vis value is updated in reaper.ini
+			wait_and_reopen(commandID) -- toggle state is updated slower than the function runs hence the need to wait and only then re-open, the same is true for routingwnd_vis value update in reaper.ini
+		-- 	OR
+		--	r.defer(wrapper(wait_and_reopen, commandID)) -- re-open
 			end
 		break end
+	end
+end
+
+
+function Get_Arrange_Dims() 
+-- requires SWS or js_ReaScriptAPI extensions
+local sws, js = r.APIExists('BR_Win32_FindWindowEx'), r.APIExists('JS_Window_Find')
+	if sws or js then -- if SWS/js_ReaScriptAPI ext is installed
+	-- thanks to Mespotine https://github.com/Ultraschall/ultraschall-lua-api-for-reaper/blob/master/ultraschall_api/misc/misc_docs/Reaper-Windows-ChildIDs.txt
+	local main_wnd = r.GetMainHwnd()
+	-- trackview wnd height includes bottom scroll bar, which is equal to track 100% max height + 17 px, also changes depending on the header height and presence of the bottom docker
+	local arrange_wnd = sws and r.BR_Win32_FindWindowEx(r.BR_Win32_HwndToString(main_wnd), 0, '', 'trackview', false, true) -- search by window name // OR r.BR_Win32_FindWindowEx(r.BR_Win32_HwndToString(main_wnd), 0, 'REAPERTrackListWindow', '', true, false) -- search by window class name
+	or js and r.JS_Window_Find('trackview', true) -- exact true // OR r.JS_Window_FindChildByID(r.GetMainHwnd(), 1000) -- 1000 is 'trackview' window ID
+	local retval, rt1, top1, lt1, bot1 = table.unpack(sws and {r.BR_Win32_GetWindowRect(arrange_wnd)} 
+	or js and {r.JS_Window_GetRect(arrange_wnd)})
+	local retval, rt2, top2, lt2, bot2 = table.unpack(sws and {r.BR_Win32_GetWindowRect(main_wnd)} or js and {r.JS_Window_GetRect(main_wnd)})
+	local top2 = top2 == -4 and 0 or top2 -- top2 can be negative (-4) if window is maximized
+	local arrange_h, header_h, wnd_h_offset = bot1-top1-17, top1-top2, top2  -- header_h is distance between arrange and program window top, wnd_h_offset is a coordinate of the program window top which is equal to its distance from the screen top when shrunk // !!!! MAY NOT WORK ON MAC since there Y axis starts at the bottom
+	return arrange_h, header_h, wnd_h_offset
 	end
 end
 
@@ -8823,8 +8892,8 @@ end
 function Get_Script_Name(scr_name)
 local t = {'top','bottom','all up','all down','next','previous','explode','implode','crop'} -- EXAMPLE
 local t_len = #t -- store here since with nils length will be harder to get
-	for k, name in ipairs(t) do
-	t[k] = scr_name:match(Esc(name)) --or false -- to avoid nils in the table, although still works with the method below
+	for k, elm in ipairs(t) do
+	t[k] = scr_name:match(Esc(elm)) --or false -- to avoid nils in the table, although still works with the method below
 	end
 -- return table.unpack(t) -- without nils
 return table.unpack(t,1,t_len) -- not sure why this works, not documented anywhere, but does return all values if some of them are nil even without the n value (table length) in the 1st field
@@ -8845,8 +8914,8 @@ function Invalid_Script_Name1(scr_name,...)
 local t = {...}
 
 local found
-	for k, v in ipairs(t) do
-		if scr_name:match(v) then found = 1 end
+	for k, elm in ipairs(t) do
+		if scr_name:match(Esc(elm)) then found = 1 end
 	end
 
 	if #t > 0 and not found then -- no keyword was found in the script name
@@ -8854,9 +8923,9 @@ local found
 		return (' '):rep(n)
 		end
 	local br = '\n\n'
-	r.MB([[The script name has been changed]]..br..rep(7)..[[which renders it inoperable.]]..br..
+	r.MB([[The script name has been changed]]..br..Rep(7)..[[which renders it inoperable.]]..br..
 	[[   please restore the original name]]..br..[[  referring to the list in the header,]]..br..
-	rep(9)..[[or reinstall the package.]], 'ERROR', 0)
+	Rep(9)..[[or reinstall it.]], 'ERROR', 0)
 	return true
 	end
 
@@ -8884,8 +8953,8 @@ function Invalid_Script_Name2(scr_name,...)
 
 local t = {...}
 
-	for k, v in ipairs(t) do
-		if scr_name:match(v) then return end -- at least one match was found
+	for k, elm in ipairs(t) do
+		if scr_name:match(Esc(elm)) then return end -- at least one match was found
 	end
 
 	local function Rep(n) -- number of repeats, integer
@@ -8894,13 +8963,46 @@ local t = {...}
 
 -- either no keyword was found in the script name or no keyword arguments were supplied
 local br = '\n\n'
-r.MB([[The script name has been changed]]..br..rep(7)..[[which renders it inoperable.]]..br..
+r.MB([[The script name has been changed]]..br..Rep(7)..[[which renders it inoperable.]]..br..
 [[   please restore the original name]]..br..[[  referring to the list in the header,]]..br..
-rep(9)..[[or reinstall the package.]], 'ERROR', 0)
+Rep(9)..[[or reinstall it.]], 'ERROR', 0)
 return true
 
 end
 
+
+function Invalid_Script_Name3(scr_name,...)
+-- check if necessary elements are found in script name and return the one found
+-- only execute once
+local t = {...}
+
+	for k, elm in ipairs(t) do
+		if scr_name:match(Esc(elm)) then return elm end -- at least one match was found
+	end
+
+	local function Rep(n) -- number of repeats, integer
+	return (' '):rep(n)
+	end
+
+-- either no keyword was found in the script name or no keyword arguments were supplied
+local br = '\n\n'
+r.MB([[The script name has been changed]]..br..Rep(7)..[[which renders it inoperable.]]..br..
+[[   please restore the original name]]..br..[[  referring to the name in the header,]]..br..
+Rep(9)..[[or reinstall it.]], 'ERROR', 0)
+
+end
+-- USE:
+--[[
+local keyword = Invalid_Script_Name3(scr_name, 'right', 'left', 'up', 'down')
+	if not keyword then r.defer(no_undo) end
+	
+	if keyword == 'right' then 
+	-- DO STUFF
+	elseif keyword == 'left' then
+	-- DO STUFF
+	-- ETC.
+	end
+]]
 
 
 function Dir_Exists(path)
@@ -9262,7 +9364,7 @@ end
 
 function Create_Dummy_Project_File()
 local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
-local dummy_proj = scr_name:match('.+[\\/]')..'BuyOne_dummy project (do not rename).RPP'		
+local dummy_proj = scr_name:match('.+[\\/]')..'BuyOne_dummy project (do not rename).RPP'
 	if not r.file_exists(dummy_proj) then -- create a dummy project file next to the script
 	local f = io.open(dummy_proj,'w')
 	f:write('<REAPER_PROJECT\n>')
@@ -9498,11 +9600,23 @@ local i = 0
 end
 
 
-
 for key in pairs(reaper) do _G[key] = reaper[key] end  -- MPL: get rid of 'reaper.' table key in functions
 
 
+function Get_Arrange_Size_In_Pexels()
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+return math.floor((end_time-start_time)*r.GetHZoomLevel()+0.5) -- GetHZoomLevel() returns px/sec; return rounded since fractional pixel values are invalid
+end
+
+
+function Beat_To_Pixels()
+return math.floor(60/r.Master_GetTempo()*r.GetHZoomLevel()+0.5) -- GetHZoomLevel() returns px/sec; return rounded since fractional pixel values are invalid
+end
+
+
+
 function Grid_Div_Dur_In_Sec() -- in sec
+-- grid division (div) is the one set in the Snap/Grid settings
 local retval, div, swingmode, swingamt = r.GetSetProjectGrid(0, false, 0, 0, 0) -- proj is 0, set is false, division, swingmode & swingamt are 0 (disabled for the purpose of fetching the data)
 --local convers_t = {[0.015625] = 0.0625, [0.03125] = 0.125, [0.0625] = 0.25, [0.125] = 0.5, [0.25] = 1, [0.5] = 2, [1] = 4} -- number of quarter notes in grid division; conversion from div value
 --return grid_div_time = 60/r.Master_GetTempo()*convers_t[div] -- duration of 1 grid division in sec
@@ -9517,8 +9631,14 @@ end
 function Music_Div_To_Sec(val)
 -- val is either integer (whole bars/notes) or quotient of a fraction x/x, i.e. 1/2, 1/3, 1/4, 2/6 etc
 	if not val or val == 0 then return end
-local tempo = r.Master_GetTempo()
-return 60/tempo*4*val -- multiply crotchet's length by 4 to get full bar length and then multiply the result by the note division
+return 60/r.Master_GetTempo()*4*val -- multiply crotchet's length by 4 to get full bar length and then multiply the result by the note division
+end
+
+
+function Music_Div_To_Pixels(val)
+-- val is either integer (whole bars/notes) or quotient of a fraction x/x, i.e. 1/2, 1/3, 1/4, 2/6 etc
+	if not val or val == 0 then return end
+return math.floor(60/r.Master_GetTempo()*4*val*r.GetHZoomLevel()+0.5) -- multiply crotchet's length by 4 to get full bar length and then multiply the result by the note division
 end
 
 
