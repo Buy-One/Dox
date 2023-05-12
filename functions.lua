@@ -40,6 +40,8 @@ W I N D O W S
 
 F I L E S
 
+M E A S U R E M E N T S
+
 B A S E 6 4  E N / D E C O D E R
 
 U N I C O D E  --  U T F - 8   C O N V E R T E R
@@ -9376,6 +9378,125 @@ end
 
 --=================================== F I L E S   E N D =========================================
 
+--===============================  M E A S U R E M E N T S  =====================================
+
+
+function Get_Arrange_Len_In_Pixels()
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+return math.floor((end_time-start_time)*r.GetHZoomLevel()+0.5) -- GetHZoomLevel() returns px/sec; return rounded since fractional pixel values are invalid
+end
+
+
+function Beat_To_Pixels()
+return math.floor(60/r.Master_GetTempo()*r.GetHZoomLevel()+0.5) -- GetHZoomLevel() returns px/sec; return rounded since fractional pixel values are invalid
+end
+
+
+function Grid_Div_Dur_In_Sec() -- in sec
+-- grid division (div) is the one set in the Snap/Grid settings
+local retval, div, swingmode, swingamt = r.GetSetProjectGrid(0, false, 0, 0, 0) -- proj is 0, set is false, division, swingmode & swingamt are 0 (disabled for the purpose of fetching the data)
+--local convers_t = {[0.015625] = 0.0625, [0.03125] = 0.125, [0.0625] = 0.25, [0.125] = 0.5, [0.25] = 1, [0.5] = 2, [1] = 4} -- number of quarter notes in grid division; conversion from div value
+--return grid_div_time = 60/r.Master_GetTempo()*convers_t[div] -- duration of 1 grid division in sec
+-- OR
+--local grid_div_time = 60/r.Master_GetTempo()*div/0.25 -- duration of 1 grid division in sec; 0.25 corresponds to a quarter note as per GetSetProjectGrid()
+--return grid_div_time
+-- OR
+return 60/r.Master_GetTempo()*div/0.25 -- duration of 1 grid division in sec; 0.25 corresponds to a quarter note as per GetSetProjectGrid()
+end
+
+
+function Music_Div_To_Sec(val)
+-- val is either integer (whole bars/notes) or quotient of a fraction x/x, i.e. 1/2, 1/3, 1/4, 2/6 etc
+	if not val or val == 0 then return end
+return 60/r.Master_GetTempo()*4*val -- multiply crotchet's length by 4 to get full bar length and then multiply the result by the note division
+end
+
+
+function Music_Div_To_Pixels(val)
+-- val is either integer (whole bars/notes) or quotient of a fraction x/x, i.e. 1/2, 1/3, 1/4, 2/6 etc
+	if not val or val == 0 then return end
+return math.floor(60/r.Master_GetTempo()*4*val*r.GetHZoomLevel()+0.5) -- multiply crotchet's length by 4 to get full bar length and then multiply the result by the note division
+end
+
+
+function Scale_Time_By_Horiz_Zoom_Level(val, base_zoom)
+-- mainly for scaling distance of mouse cursor from object
+-- val is distance in sec/ms, base_zoom is pixels per sec at which the value isn't scaled
+-- e.g. if base_zoom is 100 the value isn't scaled at 100 px/sec (or rather in the neighbourhood since zoom value is never this exact) because 100/100 is 1, if the zoom decreases (goes below the base_zoom, zoom out) the value will be increased, if increases (goes above the base_zoom, zoom in) it will be decreased, because the greater the zoom the more precisely can the target value be hit thanks to greater resolution and smaller distance from the target is permissible
+-- the base_zoom value could be precise if extracted directly from GetHZoomLevel() at a specific zoom level beforehand
+return val/(r.GetHZoomLevel()/base_zoom)
+end
+
+
+function frames2ms(frames_num) -- depends on round() function
+local fps, isdropFrame = r.TimeMap_curFrameRate(0)
+local ms_per_frame = 1000/fps
+return round(f*ms_per_frame)
+end
+
+
+function time_pos_to_pixels(posInSec) -- posInSec is an absolute value in project; without SWS extension only accurate when the program window is fully open
+
+--[[ NOT NEEDED WHEN TCP_width var is not in use
+local f = io.open(r.get_ini_file(),'r')
+local cont = f:read('*a')
+f:close()
+--]]
+
+--local rt, top, lt, bot = r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true) -- true - work area, false - the entire screen
+local sws = r.APIExists('BR_Win32_GetWindowRect')
+local dimens_t = sws and {r.BR_Win32_GetWindowRect(r.GetMainHwnd())}
+or {r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)} -- true - work area, false - the entire screen // https://forum.cockos.com/showthread.php?t=195629#4
+	if #dimens_t == 5 then table.remove(dimens_t, 1) end -- remove retval value if BR's function
+local rt, top, lt, bot = table.unpack(dimens_t)
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+--local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
+local Top_area_h = sws and top + 65 or tonumber(cont:match('toppane=(.-)\n')) or 65 -- 'toppane' only changes in reaper.ini when dragged so not reliable // Y coordinate, OPTIONAL, can be changed on a case by case basis
+-- https://forums.cockos.com/showpost.php?p=1991096&postcount=11 thanks to mespotine
+--local arrange_w_px = lt - TCP_width -- accurate
+--local sec_in_arrange = arrange_w/r.GetHZoomLevel() -- accurate
+local arrange_w_px = (end_time - start_time)*r.GetHZoomLevel() -- get width of Arrange in pixels; GetHZoomLevel() returns pixels per second
+local TCP_w_dockheight_l = lt - arrange_w_px -- seems more accurate than TCP_width (leftpanewid) by about 10 px upward when left docker is closed; otherwise accounts for open docker as well; plus TCP_width value is not reliable as it only changes when TCP edge is dragged
+local pos_in_arrange_sec = posInSec - start_time
+local pos_in_arrange_px = pos_in_arrange_sec*r.GetHZoomLevel() + TCP_w_dockheight_l -- + TCP_width // X coordinate
+return math.ceil(pos_in_arrange_px) - pos_in_arrange_px <= pos_in_arrange_px - math.floor(pos_in_arrange_px) and math.ceil(pos_in_arrange_px) or math.floor(pos_in_arrange_px), -- round up or down
+Top_area_h -- OPTIONAL, can be changed on a case by case basis, see above
+
+end
+
+
+function pixel_to_sec(val) -- converts interval in pixels to interval in seconds, val can be either integer or decimal number
+return val/r.GetHZoomLevel()
+end
+
+
+function Horiz_Scroll_Distance(SEC, VALUE) -- SEC is boolean to use seconds as scroll unit when VALUE is in seconds; otherwise musical division
+-- relies on Music_Div_To_Sec() function
+local px_per_sec = r.GetHZoomLevel()
+return SEC and VALUE and px_per_sec*VALUE or -- seconds
+VALUE and px_per_sec*Music_Div_To_Sec(VALUE) or -- musical interval
+px_per_sec*Music_Div_To_Sec(1/4) -- empty, 0 or non-numeric input so it defaults to 1 beat
+end
+
+
+function Get_Screen_Dims()
+local f = io.open(reaper.get_ini_file(), 'r') -- load reaper.ini for parsing
+local f_cont = f:read('*a') -- read the entire content
+f:close()
+--local wnd_w = f_cont:match('(wnd_w=%d*)');
+--local wnd_w = tonumber(wnd_w:match('=(%d*)'))
+-- OR local wnd_w = tonumber(f_cont:match('wnd_w=(%d*)'))
+--local wnd_h = f_cont:match('(wnd_h=%d*)');
+--local wnd_h = tonumber(wnd_h:match('=(%d*)'))
+-- OR wnd_h = tonumber(f_cont:match('wnd_h=(%d*)'))
+-- https://forums.cockos.com/showthread.php?t=203785
+return tonumber(f_cont:match('wnd_w=(%d*)')), tonumber(f_cont:match('wnd_h=(%d*)')) -- width and height
+end
+-- OR
+local dimens_t = {r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)} -- wantWorkArea true // 1 - L, 2 - T, 3 - R, 4 - B // https://forum.cockos.com/showthread.php?t=195629#4
+
+
+--====================== M E A S U R E M E N T S   E N D =======================================
 
 
 function timed_tooltip(tooltip, x, y, time) -- local x, y = r.GetMousePosition()
@@ -9419,7 +9540,7 @@ r.TrackCtl_SetToolTip(text, x, y, true) -- topmost true
 -- r.TrackCtl_SetToolTip(text:upper(), x, y, true) -- topmost true
 -- r.TrackCtl_SetToolTip(text:upper():gsub('.','%0 '), x, y, true) -- spaced out // topmost true
 --[[
--- a time loop can be added to run when certan condition obtains, e.g.
+-- a time loop can be added to run until certain condition obtains, e.g.
 local time_init = r.time_precise()
 repeat
 until condition and r.time_precise()-time_init >= 0.7 or not condition
@@ -9569,7 +9690,6 @@ end
 
 
 function how_recently_the_project_was_saved()
--- relies on round() function
 local retval, projfn = r.EnumProjects(-1) -- -1 current project
 local last_save_time
 	for line in io.lines(projfn) do
@@ -9578,9 +9698,9 @@ local last_save_time
 --os.setlocale ('', 'time') -- set, otherwise timestamp doesn't use current locale https://www.gammon.com.au/scripts/doc.php?lua=os.date // doesn't set custom date format
 local diff = os.time() - last_save_time
 return diff, -- seconds
-round(diff/60+0.5), -- minutes, rounded
-round(diff/3600+0.5), -- hours, rounded
-round(diff/(3600*24)+0.5), -- days, rounded
+math.floor(diff/60+0.5), -- minutes, rounded
+math.floor(diff/3600+0.5), -- hours, rounded
+math.floor(diff/(3600*24)+0.5), -- days, rounded
 os.date('%x %X',last_save_time), -- last save date & time in current locale format
 os.date('%x %X',os.time()) -- current date & time in current locale format
 end
@@ -9603,53 +9723,6 @@ end
 for key in pairs(reaper) do _G[key] = reaper[key] end  -- MPL: get rid of 'reaper.' table key in functions
 
 
-function Get_Arrange_Size_In_Pexels()
-local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
-return math.floor((end_time-start_time)*r.GetHZoomLevel()+0.5) -- GetHZoomLevel() returns px/sec; return rounded since fractional pixel values are invalid
-end
-
-
-function Beat_To_Pixels()
-return math.floor(60/r.Master_GetTempo()*r.GetHZoomLevel()+0.5) -- GetHZoomLevel() returns px/sec; return rounded since fractional pixel values are invalid
-end
-
-
-
-function Grid_Div_Dur_In_Sec() -- in sec
--- grid division (div) is the one set in the Snap/Grid settings
-local retval, div, swingmode, swingamt = r.GetSetProjectGrid(0, false, 0, 0, 0) -- proj is 0, set is false, division, swingmode & swingamt are 0 (disabled for the purpose of fetching the data)
---local convers_t = {[0.015625] = 0.0625, [0.03125] = 0.125, [0.0625] = 0.25, [0.125] = 0.5, [0.25] = 1, [0.5] = 2, [1] = 4} -- number of quarter notes in grid division; conversion from div value
---return grid_div_time = 60/r.Master_GetTempo()*convers_t[div] -- duration of 1 grid division in sec
--- OR
---local grid_div_time = 60/r.Master_GetTempo()*div/0.25 -- duration of 1 grid division in sec; 0.25 corresponds to a quarter note as per GetSetProjectGrid()
---return grid_div_time
--- OR
-return 60/r.Master_GetTempo()*div/0.25 -- duration of 1 grid division in sec; 0.25 corresponds to a quarter note as per GetSetProjectGrid()
-end
-
-
-function Music_Div_To_Sec(val)
--- val is either integer (whole bars/notes) or quotient of a fraction x/x, i.e. 1/2, 1/3, 1/4, 2/6 etc
-	if not val or val == 0 then return end
-return 60/r.Master_GetTempo()*4*val -- multiply crotchet's length by 4 to get full bar length and then multiply the result by the note division
-end
-
-
-function Music_Div_To_Pixels(val)
--- val is either integer (whole bars/notes) or quotient of a fraction x/x, i.e. 1/2, 1/3, 1/4, 2/6 etc
-	if not val or val == 0 then return end
-return math.floor(60/r.Master_GetTempo()*4*val*r.GetHZoomLevel()+0.5) -- multiply crotchet's length by 4 to get full bar length and then multiply the result by the note division
-end
-
-
-function Scale_Time_By_Horiz_Zoom_Level(val, base_zoom)
--- mainly for scaling distance of mouse cursor from object
--- val is distance in sec/ms, base_zoom is pixels per sec at which the value isn't scaled
--- e.g. if base_zoom is 100 the value isn't scaled at 100 px/sec (or rather in the neighbourhood since zoom value is never this exact) because 100/100 is 1, if the zoom decreases (goes below the base_zoom, zoom out) the value will be increased, if increases (goes above the base_zoom, zoom in) it will be decreased, because the greater the zoom the more precisely can the target value be hit thanks to greater resolution and smaller distance from the target is permissible
--- the base_zoom value could be precise if extracted directly from GetHZoomLevel() at a specific zoom level beforehand
-return val/(r.GetHZoomLevel()/base_zoom)
-end
-
 
 function Close_Tab_Without_Save_Prompt()
 -- Close temp project tab without save prompt; when a freshly opened project closes there's no prompt
@@ -9659,14 +9732,6 @@ r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open 
 r.Main_openProject('noprompt:'..projfn) -- open the stored project in the temp tab
 r.Main_OnCommand(40860, 0) -- Close current project tab // won't generate a save prompt
 r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
-end
-
-
-
-function frames2ms(frames_num) -- depends on round() function
-local fps, isdropFrame = r.TimeMap_curFrameRate(0)
-local ms_per_frame = 1000/fps
-return round(f*ms_per_frame)
 end
 
 
@@ -9916,6 +9981,7 @@ end
 
 
 -- Can be used in defer functions to prevent script activity in project tabs other than the one it was launched under
+-- when the project is switched the script will terminate
 proj_init, projfn_init = r.EnumProjects(-1)
 function RUN()
 local proj, projfn = r.EnumProjects(-1)
@@ -9926,57 +9992,6 @@ local proj, projfn = r.EnumProjects(-1)
 end
 -- RUN()
 
-
-local function Get_Screen_Dims()
-local f = io.open(reaper.get_ini_file(), 'r') -- load reaper.ini for parsing
-local f_cont = f:read('*a') -- read the entire content
-f:close()
---local wnd_w = f_cont:match('(wnd_w=%d*)');
---local wnd_w = tonumber(wnd_w:match('=(%d*)'))
--- OR local wnd_w = tonumber(f_cont:match('wnd_w=(%d*)'))
---local wnd_h = f_cont:match('(wnd_h=%d*)');
---local wnd_h = tonumber(wnd_h:match('=(%d*)'))
--- OR wnd_h = tonumber(f_cont:match('wnd_h=(%d*)'))
--- https://forums.cockos.com/showthread.php?t=203785
-return tonumber(f_cont:match('wnd_w=(%d*)')), tonumber(f_cont:match('wnd_h=(%d*)')) -- width and height
-end
--- OR
-local dimens_t = {r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)} -- wantWorkArea true // 1 - L, 2 - T, 3 - R, 4 - B // https://forum.cockos.com/showthread.php?t=195629#4
-
-
-function time_pos_to_pixels(posInSec) -- posInSec is an absolute value in project; without SWS extension only accurate when the program window is fully open
-
---[[ NOT NEEDED WHEN TCP_width var is not in use
-local f = io.open(r.get_ini_file(),'r')
-local cont = f:read('*a')
-f:close()
---]]
-
---local rt, top, lt, bot = r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true) -- true - work area, false - the entire screen
-local sws = r.APIExists('BR_Win32_GetWindowRect')
-local dimens_t = sws and {r.BR_Win32_GetWindowRect(r.GetMainHwnd())}
-or {r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)} -- true - work area, false - the entire screen // https://forum.cockos.com/showthread.php?t=195629#4
-	if #dimens_t == 5 then table.remove(dimens_t, 1) end -- remove retval value if BR's function
-local rt, top, lt, bot = table.unpack(dimens_t)
-local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
---local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
-local Top_area_h = sws and top + 65 or tonumber(cont:match('toppane=(.-)\n')) or 65 -- 'toppane' only changes in reaper.ini when dragged so not reliable // Y coordinate, OPTIONAL, can be changed on a case by case basis
--- https://forums.cockos.com/showpost.php?p=1991096&postcount=11 thanks to mespotine
---local arrange_w_px = lt - TCP_width -- accurate
---local sec_in_arrange = arrange_w/r.GetHZoomLevel() -- accurate
-local arrange_w_px = (end_time - start_time)*r.GetHZoomLevel() -- get width of Arrange in pixels; GetHZoomLevel() returns pixels per second
-local TCP_w_dockheight_l = lt - arrange_w_px -- seems more accurate than TCP_width (leftpanewid) by about 10 px upward when left docker is closed; otherwise accounts for open docker as well; plus TCP_width value is not reliable as it only changes when TCP edge is dragged
-local pos_in_arrange_sec = posInSec - start_time
-local pos_in_arrange_px = pos_in_arrange_sec*r.GetHZoomLevel() + TCP_w_dockheight_l -- + TCP_width // X coordinate
-return math.ceil(pos_in_arrange_px) - pos_in_arrange_px <= pos_in_arrange_px - math.floor(pos_in_arrange_px) and math.ceil(pos_in_arrange_px) or math.floor(pos_in_arrange_px), -- round up or down
-Top_area_h -- OPTIONAL, can be changed on a case by case basis, see above
-
-end
-
-
-function pixel_to_sec(val) -- converts interval in pixels to interval in seconds, val can be either integer or decimal number
-return val/r.GetHZoomLevel()
-end
 
 
 function Get_Mouse_Time_Pos() -- isn't suitable for use during playback as it stops it
@@ -10001,16 +10016,6 @@ function Note_Format_Check(note) -- string
 		return true end
 	end
 return note:match('^/$')
-end
-
-
-function Horiz_Scroll_Distance(SEC, VALUE) -- SEC is boolean to use seconds as scroll unit when VALUE is in seconds; otherwise musical division
--- relies on Music_Div_To_Sec() function
-local px_per_sec = r.GetHZoomLevel()
-Msg(px_per_sec, 'px_per_sec')
-return SEC and VALUE and px_per_sec*VALUE or -- seconds
-VALUE and px_per_sec*Music_Div_To_Sec(VALUE) or -- musical interval
-px_per_sec*Music_Div_To_Sec(1/4) -- empty, 0 or non-numeric input so it defaults to 1 beat
 end
 
 
@@ -10051,12 +10056,12 @@ r.CSurf_OnScroll(x*val,y*val)
 end
 
 
-local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards
 function Mouse_Wheel_Direction(val, mousewheel_reverse) -- mousewheel_reverse is boolean
+local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards
 	if mousewheel_reverse then
-	return val = val > 0 and -1 or val < 0 and 1 -- down (forward) - leftwards or up (backwards) - rightwards
+	return val > 0 and -1 or val < 0 and 1 -- down (forward) - leftwards or up (backwards) - rightwards
 	else -- default
-	return val = val > 0 and 1 or val < 0 and -1 -- down (forward) - rightwards or up (backwards) - leftwards
+	return val > 0 and 1 or val < 0 and -1 -- down (forward) - rightwards or up (backwards) - leftwards
 	end
 end
 
@@ -10089,7 +10094,7 @@ end
 
 
 
-function Is_Project_Start(time) -- for use with time selection / loop / edit cursor pos / item pos values to prevent them getting alighned with the project start and ruining their position relative to the grid when moving leftwards (the concept is used in scripts 'Move edit cursor left by one grid unit' and 'Scroll horizontally and;or move loop and;or time selection by user defined interval')
+function Is_Project_Start(time) -- for use with time selection / loop / edit cursor pos / item pos values to prevent them getting aligned with the project start and ruining their position relative to the grid when moving leftwards (the concept is used in scripts 'Move edit cursor left by one grid unit' and 'Scroll horizontally and;or move loop and;or time selection by user defined interval')
 -- proj end cannot be reached by the cursor hence alignment with it isn't a problem
 local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0) -- isSet false // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
 --local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
