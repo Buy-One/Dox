@@ -108,11 +108,6 @@ return start_time == proj_time_offset
 end
 
 
-function Get_Arrange_Size_In_Px()
-local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
-return math.floor((end_time-start_time)*r.GetHZoomLevel()+0.5) -- GetHZoomLevel() returns px/sec; return rounded since fractional pixel values are invalid
-end
-
 
 function Validate_Positive_Integer(str, type) -- str is a numeric string, type is a string, script specific to distinguish between 2 modes
 local default = type and (type:lower() == 'bend' and 12 or type:lower() == 'offset' and 80)
@@ -9383,7 +9378,10 @@ end
 
 function Get_Arrange_Len_In_Pixels()
 local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
-return math.floor((end_time-start_time)*r.GetHZoomLevel()+0.5) -- GetHZoomLevel() returns px/sec; return rounded since fractional pixel values are invalid
+local len = (end_time-start_time)*r.GetHZoomLevel()-17 -- GetHZoomLevel() returns px/sec // 17 is the vertical scrollbar which is included in the Arrange length in sec but is outside of the visible time line
+return math.floor(len+0.5) -- return rounded since fractional pixel values are invalid
+-- OR
+-- return len -- if rounding will be done outside of the function after additional calculations
 end
 
 
@@ -10057,11 +10055,11 @@ end
 
 
 function Mouse_Wheel_Direction(val, mousewheel_reverse) -- mousewheel_reverse is boolean
-local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards
+local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // val seems to not be able to co-exist with itself retrieved outside of the function, in such cases inside the function it's returned as 0 
 	if mousewheel_reverse then
-	return val > 0 and -1 or val < 0 and 1 -- down (forward) - leftwards or up (backwards) - rightwards
+	return val > 0 and -1 or val < 0 and 1 -- wheel up (forward) - leftwards/downwards or wheel down (backwards) - rightwards/upwards
 	else -- default
-	return val > 0 and 1 or val < 0 and -1 -- down (forward) - rightwards or up (backwards) - leftwards
+	return val > 0 and 1 or val < 0 and -1 -- wheel up (forward) - rightwards/upwards or wheel down (backwards) - leftwards/downwards
 	end
 end
 
