@@ -1,0 +1,619 @@
+ACT 1 0 "2d2431809e205e4da68bffdc3063db15" "Custom: (Rendering) 2. Render selected folder to stereo stem obeying time selection" _SWS_SAVESEL 40728 _SWS_SELCHILDREN 40731 _SWS_RESTORESEL _SWS_AWRENDERSTEREOSMART 40289 40718 40118 40005 _SWS_RESTORESEL 40731 _SWS_SELCHILDREN 40730 _SWS_RESTORESEL
+ACT 1 0 "ec01a4143faee449abcc5092a94722a2" "Custom: (Rendering) 3. Select only children amongst all selected tracks and delete" _SWS_SAVESEL _SWS_SELCHILDREN 40005 _SWS_RESTORESEL _XENAKIOS_SELLASTOFSELTRAX 2000 1041
+ACT 1 0 "580f36e8959a04499cfbee796d0dfc0a" "Custom: (Un)Archive tracks (temporarily, to save resources)-OFF" 40730 _SWS_BYPASSFX _SWS_MUTESENDS _SWS_MUTERECVS 40535 41312
+ACT 1 0 "c933e465e62a3e449239077e4b113436" "Custom: (Un)Archive tracks (temporarily, to save resources)-ON" 41313 _SWS_UNMUTESENDS _SWS_UNMUTERECVS _SWS_UNBYPASSFX 40536 40731
+ACT 1 0 "f8ee73c11772534289659122a3f8ef7d" "Custom: (Un)Freeze track keeping FX intact offline (select track) -- FREEZE -- SWS" _S&M_COPYFXCHAIN5 41223 _S&M_COPYFXCHAIN10 40535 8
+ACT 1 0 "0e38b2feea72904ab4be2833bff2fbba" "Custom: (Un)Freeze track keeping FX intact offline (select track) -- UNFREEZE -- SWS" _S&M_COPYFXCHAIN5 41644 _S&M_CLRFXCHAIN3 _S&M_COPYFXCHAIN10 40536 8
+ACT 1 0 "76327e7334737d438685032ecfa95ea5" "Custom: (Un)Mute locked track (can't work since locked TCP doesn't register clicks)" 41314 40280 41314
+ACT 1 0 "ec12ebf1fa6c2f42ac1d6fcb9eb6363c" "Custom: ADDIKTION_Crossfaded loop from sel. area of item - At end of project (+ create region) [set nudge in samples in the pop-up editor, 1 sec = sample rate in Herz]" _SWS_SELTRKWITEM 40060 1016 41226 2000 41227 41121 _SWS_SAVEXFD _SWS_XFDON 41529 40043 40839 40839 40839 40839 40058 40290 40631 40058 41250 _SWS_SELPREVITEM2 40508 41250 40718 40706 40508 40290 _SWS_RESTOREXFD _SWS_SETREPEAT 40174 40631 40840 _SWS_TOGZOOMHORIZ 1007
+ACT 1 0 "194390570aa9b74c915004cf7c0331e7" "Custom: ADDIKTION_Crossfaded loop from sel. area of item - At end of project + glue (+ create region) [set nudge in samples in the pop-up editor, 1 sec = sample rate in Herz]" _SWS_SELTRKWITEM 40060 1016 41226 2000 41227 41121 _SWS_SAVEXFD _SWS_XFDON 41529 40043 40839 40839 40839 40839 40058 40290 40631 40058 41250 _SWS_SELPREVITEM2 40508 41250 40718 40508 40290 41588 40706 41193 _SWS_RESTOREXFD _SWS_SETREPEAT 40174 40631 40840 _SWS_TOGZOOMHORIZ 1007
+ACT 1 0 "fc2fb70ef75c274e83630f96cd17db3b" "Custom: ADDIKTION_Crossfaded loop from sel. area of item - In place + glue [set nudge in samples in the pop-up editor, 1 sec = sample rate in Herz]" _SWS_SELTRKWITEM 40307 41226 1016 2000 41227 41121 _SWS_SAVEXFD _SWS_XFDON 41529 40058 40290 40631 40058 41250 _SWS_SELPREVITEM2 40508 41119 41120 41250 41118 41121 40718 40508 40290 _SWS_RESTOREXFD _SWS_SELNEXTITEM 41191 40718 41588 40706 41193 _SWS_SETREPEAT 40631 40840 _SWS_TOGZOOMHORIZ 1007
+ACT 1 0 "b23c61fd008d4344b073ccfccc147100" "Custom: ADDIKTION_Crossfaded loop from sel. area of item - In place [set nudge in samples in the pop-up editor, 1 sec = sample rate in Herz]" _SWS_SELTRKWITEM 40307 41226 1016 2000 41227 41121 _SWS_SAVEXFD _SWS_XFDON 41529 40058 40290 40631 40058 41250 _SWS_SELPREVITEM2 40508 41119 41120 41250 41118 41121 40718 40508 40706 40290 _SWS_RESTOREXFD _SWS_SELNEXTITEM 41191 40718 _SWS_SETREPEAT 40631 40840 _SWS_TOGZOOMHORIZ 1007
+ACT 1 0 "2428f80e0e2eff47b83dcbc07e762f0c" "Custom: AdPlastic5240_Glue mono items with FX to stereo (only 1 item at a time) -- does double-glue" 42008 41450 40257
+ACT 1 0 "292284c7e0cb684d89f406ef44386fc2" "Custom: Alkamist_Put selected subfolders in a new subfolder (select subfolders parent tracks)" _SWS_SAVESEL _SWS_INSRTTRKABOVE _SWS_RESTORESEL _XENAKIOS_SELPREVTRACKKEEP _SWS_SELCHILDREN2 _SWS_MAKEFOLDER _SWS_RESTORESEL
+ACT 1 0 "ca4a9376498ee04183fbf6c64af04155" "Custom: Arrange files stepwise across tracks for mastering" _SWS_REGIONSFROMITEMS 40290 40319 40285 40421 41205 _SWS_REGIONSFROMITEMS
+ACT 1 0 "8406bdb94f82cd4dbd34de4f46eff47f" "Custom: Arthur_Soghoyan_Exclusive Solo on Selected Track" 40340 40728
+ACT 1 0 "a2dd81242a54df4bab17e48faeea4abf" "Custom: Arthur_Soghoyan_Exclusive solo next track" 40340 40285 40728
+ACT 1 0 "9b4fffe6fa316447bc410a6d42352ac7" "Custom: Arthur_Soghoyan_Exclusive solo previous track" 40340 40286 40728
+ACT 1 0 "f5d740fee0010b4a9e9c4137d494bb49" "Custom: Arthur_Soghoyan_Go to Next Track (leaving other slected and soloed)" 40287 40340 40728
+ACT 1 0 "e6ff9749aa258847b647f17939430455" "Custom: Arthur_Soghoyan_Go to Previous Track (leaving other slected and soloed)" 40288 40340 40728
+ACT 1 0 "972c2dd608623e4a9bf1b5b1d501dafa" "Custom: Auto record arming: RECORD and set auto record arming OFF" 1013 40740 40294
+ACT 1 0 "d2b862002aed294db60398dfc56385df" "Custom: Auto record arming: STOP Recording and set auto record arming ON" 1016 40740
+ACT 1 0 "9a701f800bf6b340bf79ec4ad34bb782" "Custom: BDL_Lock track and all its items" 40421 40688 41312 40289
+ACT 1 0 "50fafd0205bb844c83f35cb39a650fd6" "Custom: BDL_Make items region go to next" 40348 _SWS_SELNEXTITEM
+ACT 1 0 "8feecb1bee162a479d75bcc362481096" "Custom: BDL_Playstop at point" 1008 1016
+ACT 1 0 "1037e43afb6ddc49a9a9027cfc5654ac" "Custom: BDL_Scrolling (enables auto vew scroll during playback)" 40150 40036 41817
+ACT 1 0 "4021c492cd69724da5a62699f2984105" "Custom: BDL_Stop at point" 1008 1016
+ACT 1 0 "1557b6585970a541ae3fcb2b294b4a16" "Custom: BDL_Tape Record" 1013 40073
+ACT 1 0 "5700a8444a68d748ad9dde40d2aca88f" "Custom: BDL_Unlock track and all its items" 40421 40689 41313 40289
+ACT 1 0 "1cb7dfdd54a6444b964bbdd597813683" "Custom: BDL_Unmute all muted items" _SWS_SELMUTEDITEMS 40720
+ACT 1 0 "c4528858889f9c4d84a485d3b726d372" "Custom: Break chop TEST" 40528 41173 40375 40759 40157 _SWSMARKERLIST5
+ACT 1 0 "5357b9134c80b9408d4b9c98f571cb25" "Custom: Bypass cur FX, select next & unbypass on sel tracks (only works if FX chain wnd toggled, implemented) - SWS" _S&M_HIDEFXCHAIN _S&M_FXBYP_SETONSEL _S&M_SELFXNEXT _S&M_FXBYP_SETOFFSEL 40291
+ACT 1 0 "e58f73ec3decde438f1a031f8fc027f5" "Custom: COMPING 1. Explode takes to new tracks and create a folder" 40224 _SWS_SELTRKWITEM _SWS_MAKEFOLDER _SWS_SELPARENTS 40001 _SWS_SELPARENTS 41173 _XENAKIOS_SELITEMSUNDEDCURSELTX 40118 40289
+ACT 1 0 "3cdc7256f10a4d4e9d0f8461a3fdcbba" "Custom: COMPING 1. Explode takes to new tracks and create a folder (2)" 40438 40224 _SWS_SELTRKWITEM _SWS_MAKEFOLDER _SWS_SELPARENTS 40001 _SWS_SELPARENTS 41173 _XENAKIOS_SELITEMSUNDEDCURSELTX 40118 40289
+ACT 1 0 "5b3a9945609b814eb901a8c40a9a7be7" "Custom: COMPING 2a. Copy selected item selected area to the assemble (parent) track" 40528 40060 40630 _SWS_SELPARENTS 40058
+ACT 1 0 "e372e39803cdfc4daf4c32ed8edbca53" "Custom: COMPING 2b. Move selected item selected area to the assemble (parent) track" 40528 40307 40630 _SWS_SELPARENTS 40058
+ACT 1 0 "8814d6a42542e844b510e829e13096d4" "Custom: COMPING 2c. Copy selected item area split at time sel. to the assemble (parent) track" 40528 40061 40698 40630 _SWS_SELPARENTS 40058 40060
+ACT 1 0 "94ea3e7b9bf8f64babcaa2b9be3faf0c" "Custom: COMPING 3a. Move comp to a new child track in a folder, minimize and mute (parent to be selected)" 41110 40001 40730 _SWS_MINTRACKS _SWS_SELPARENTS 40421 40118 _SWS_SAVESEL _SWS_RESTORESEL
+ACT 1 0 "c74b3e1101f74a49bf5bab450227ae8b" "Custom: COMPING 3b. Move comp to a new child track in a folder, minimize and mute (select any child)" 41110 _SWS_SELPARENTS 40001 40730 _SWS_MINTRACKS _SWS_SELPARENTS 40421 40118 _SWS_SAVESEL _SWS_RESTORESEL
+ACT 1 0 "3c33d48da04c184e8e50a0561f28f70f" "Custom: Clean all active envelope points to the right of selected item (repeatable)" _SWS_SELTRKWITEM 41174 40625 40417 40626 40888 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40089 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40726 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40415 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40331 40635
+ACT 1 0 "af1f747939b09f4c81e150a1050d1d9c" "Custom: Clean all active envelope points to the right of selected item and unselect (repeatable)" 41173 _XENAKIOS_SELITEMSUNDEDCURSELTX _SWS_SELTRKWITEM 41174 40625 40417 40626 40888 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40089 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40726 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40415 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40289 40331 40635
+ACT 1 0 "c5c3dd559bdc2f409446300716f3d5fc" "Custom: Clean envelope points in between items outside of selected item" _BR_SAVE_CURSOR_POS_SLOT_1 _SWS_SELTRKWITEM 40888 41173 40416 41174 40625 40417 40626 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40089 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40726 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40415 40417 40626 40416 41174 40625 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40089 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40726 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40415 40635 _BR_RESTORE_CURSOR_POS_SLOT_1
+ACT 1 0 "c1faa3b35ac8394f87ebe16e84a69c58" "Custom: Clean envelope points outside of selected only item on track (not last in project)" _BR_SAVE_CURSOR_POS_SLOT_1 _SWS_SELTRKWITEM 40888 41173 40626 40042 40625 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40089 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40726 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40415 41174 40625 40043 40626 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40089 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40726 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40415 40635 _BR_RESTORE_CURSOR_POS_SLOT_1
+ACT 1 0 "9dcd7b8016370e4ca27dc30a20648903" "Custom: Clean volume envelope points ouside of selected item - HALF-BAKED" 40290 _SWS_SELTRKWITEM 41866 40325 2000 40324 40646 40625 41174 40647 40626 40089 40290 40058 40331
+ACT 1 0 "e35c7bddd98e374fa105f9a028ba9dd8" "Custom: Collapse children of the selected tracks in the mixer (applying dedicated layout)" _SWS_SELCHILDREN 41715
+ACT 1 0 "ce47e056509dd24b9759d005e0fea0dc" "Custom: Convert take markers in selected items to proj markers" 41173 2001 42394 40157 2002
+ACT 1 0 "259686de94597248bd34660dfadedb39" "Custom: Copy selected area to a separate track assigned to Group 01" _SWS_SAVEALLSELITEMS1 _BR_SAVE_CURSOR_POS_SLOT_1 40060 40804 40914 40042 40421 41174 40058 _BR_RESTORE_CURSOR_POS_SLOT_1 _SWS_RESTALLSELITEMS1
+ACT 1 0 "1b3c4aa0a7b870428a1f7ea4f07b3c10" "Custom: Copy selected items down 1 track" 40528 41173 40698 40058 40118
+ACT 1 0 "73256c9ffb330c4fa12805b777340369" "Custom: Copy selected items up 1 track" 40528 41173 40698 40058 40117
+ACT 1 0 "c52d255015f44b458bd2d9be9ae5882c" "Custom: Copy selected tracks with items to a new project and save as (doesn't keep BPM)" 40210 40859 40058 40022
+ACT 1 0 "e6896c91bb85c54d8ea3d7afac410c31" "Custom: Copy selected tracks with items to new project via sub-project (keeps BPM) - remove junk afterwards" 40210 40182 40290 40001 40013 41997 40861 40058 _SWS_TOGTRACKSEL 40005 _SWSMARKERLIST9 40862 40505 40005
+ACT 1 0 "97f375713eb7234694daaf9f1eb117b4" "Custom: Copy-paste selected item with project markers (select item, place cursor elsewhere)" _BR_SAVE_CURSOR_POS_SLOT_1 _SWS_SAVETIME1 _SWS_SAVESEL _SWS_SAVEXFD 41119 _SWS_SELTRKWITEM 40290 40931 40698 40718 40548 _BR_RESTORE_CURSOR_POS_SLOT_1 40058 40626 41173 40417 40625 40289 40718 _XENAKIOS_CRTMARKERSFROMITEMS1 41167 40416 40625 40718 40898 40548 40289 40635 _SWS_RESTTIME1 _SWS_RESTORESEL _SWS_RESTOREXFD
+ACT 1 0 "d06f42d0788e764cbd42b04ccd72c98f" "Custom: Create 4 envelope points at (selected) item edges" 40528 40290 40726 40635
+ACT 1 0 "5a705f3f2431944eaf0ac305132a7411" "Custom: Create folder and children and set to custom color (select tracks)" _SWS_SAVESEL _SWS_INSRTTRKABOVE _SWS_RESTORESEL _XENAKIOS_SELPREVTRACKKEEP _SWS_MAKEFOLDER 40357 _SWS_RESTORESEL
+ACT 1 0 "f1e3fa357b4fd1408905df6c7982bdd7" "Custom: Create folder for each selected track (1 by 1) - any # of tracks" _SWS_SAVESEL _S&M_CUTSNDRCV1 40702 1041 40058 _XENAKIOS_SELFIRSTOFSELTRAX 1041 1041 _SWS_SELPARENTS2 _S&M_CUTSNDRCV1 _SWS_RESTORESEL _SWS_SAVESEL _S&M_PASTSNDRCV1 _SWS_RESTORESEL
+ACT 1 0 "e573d582216d624bbe1db97eaad4c998" "Custom: Create folder for each selected track (1 by 1) - any # of tracks +  repeat dialogue" _SWS_SAVESEL _S&M_CUTSNDRCV1 40702 1041 40058 _XENAKIOS_SELFIRSTOFSELTRAX 1041 1041 _SWS_SELPARENTS2 _S&M_CUTSNDRCV1 _SWS_RESTORESEL _SWS_SAVESEL _S&M_PASTSNDRCV1 _SWS_RESTORESEL 2002
+ACT 1 0 "657b29ae7a7bac4db6c969397e573191" "Custom: Create folder for each selected track (1 by 1) - run as many times as tracks selected, max 20, expandable" _S&M_CUTSNDRCV1 40702 1041 _S&M_PASTSNDRCV1 _XENAKIOS_SELFIRSTOFSELTRAX 1041 1041 40285 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287 40287
+ACT 1 0 "84626034ff97fc4e8c0351fc43cbfbaa" "Custom: Create folder for each selected track (1 by 1) - with repeat dialogue (at least 1 non-selected track is required)" _S&M_CUTSNDRCV1 40296 _XENAKIOS_SELLASTOFSELTRAX _S&M_PASTSNDRCV1 _XENAKIOS_SELFIRSTOFSELTRAX 40286 2001 40001 1041 40285 1041 1041 2002
+ACT 0 0 "7ab1a1ec79adb44f946a1de83cebd364" "Custom: Create folder for each selected track (1 by1) - any # of tracks, multiple undos INEFFICIENT" _SWS_SAVESEL _S&M_CUTSNDRCV1 40702 1041 40058 _XENAKIOS_SELFIRSTOFSELTRAX 1041 1041 40005 _SWS_RESTORESEL _SWS_SAVESEL 40029 _SWS_RESTORESEL
+ACT 1 0 "29d6ab187215e346a74e70ab40287efd" "Custom: Create multiple tracks and activate name field of the 1st" 41067 40914 40696
+ACT 1 0 "a23764970763a24d999134b35def01b7" "Custom: Create seamless loop (tweak Pref -> Media item defaults -> Overlap split length)" 40528 _XENAKIOS_SELITEMSUNDEDCURSELTX 41995 40927 40757 40032 41051 40928 40635
+ACT 1 0 "1a84de03e6fe364996d078a42a3352bf" "Custom: Create time selection from loop (place cursor inside loop) -- to be assigned to Track mouse double-click" 40632 40625 40633 40626
+ACT 1 0 "cd39c3f36f2bd1489a0f774c4f2a1013" "Custom: Create time selection within region / between markers (place cursor within region) -- to be assigned to Track mouse double-click" 40172 40625 40173 40626
+ACT 1 0 "fdced7dba4e5b84a92cb1af847d665c2" "Custom: Create track and activate name field" 40001 40914 40696
+ACT 1 0 "2863c7b2d453784ea18bf5f05e610bee" "Custom: Crop all items to loop (makes sense when ALL items extend beyond the boundaries, otherwise short items get extended)" 40623 40717 40632 41305 40633 41311 40635 40289
+ACT 1 0 "96c70bf4c79cb54e9ec6fdf1dd1048e7" "Custom: Crop selected items to loop" 40632 41305 40633 41311
+ACT 1 0 "a4011669b0a2b64a9cbf5176a5cc175b" "Custom: Crumbfort_Logic Style Bounce in place (selected track only) (1st select items)" _SWS_SELTRKWITEM 40290 40209 40062 _S&M_CLRFXCHAIN3 40421 40126 40129 _SWS_UNSELONTRACKS 40286 40718 40129 40719 _S&M_FXBYPALL2 40285 40635
+ACT 1 0 "e89ab006c21a4b4ba15198346f500598" "Custom: Cut out time selection and fill in with a file (select item, create time selection)" 40061 40718 40006 40630 40001 40018 40631 41311 40117 40005
+ACT 1 0 "37b7e1e34bc9f44ca0e3b832189541f0" "Custom: Cut out time selection and fill in with a file (select item, track, create time selection) -- create consistent time by always pasting the same dummy item" 42398 40290 40006 40718 40061 40718 40006 40630 40001 40018 40631 41311 40117 40005 40286
+ACT 1 0 "9adb33e23bdfec44806142c46382b3c5" "Custom: DRocks_Set Time Selection to Items and Duplicate" 40290 40717 41296
+ACT 1 0 "c696076100cfd448b187086d11ce16b6" "Custom: DRocks_Set Time Selection to Items, Insert Region, Select Items within and Copy" 40290 40174 40717 40061 41383
+ACT 1 0 "0fd43613f637904fb3016fd53b1a924f" "Custom: Daniel Abendroth_Adobe style trim selected item backwards (can be used with global Ripple edit mode)" 40434 1016 40012 40416 41173 41666 41666 41666 41666 41666 41666 40006 1007
+ACT 1 0 "6f999e3cfbb1a743993f495c331959ce" "Custom: Daniel Abendroth_Adobe style trim selected item forward (can be used with global Ripple edit mode)" 40434 1016 40012 41173 41666 41666 41666 41666 41666 41666 40006 1007
+ACT 1 0 "8ca0e2412f0ada4fab82857508483b9c" "Custom: Delete all points within time selection from all envelopes in track (select top envelope) -- dialogue" 2001 40089 41864 2002
+ACT 1 0 "982a3813eedd944ba6a32c4b1392a3f6" "Custom: Delete item along with underlying envelopes" 40889 40290 _SWS_SELTRKWITEM 40888 40006 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864
+ACT 1 0 "84a62a3fb63ac9429374b908bc275b02" "Custom: Delete selected area of item and glue (1 make time selection, 2 select track)" 40289 40718 40061 40310 40006 40309 40630 41666 40625 40718 42432 40635
+ACT 1 0 "eff1c150120c70428c3daa5fdd795cdc" "Custom: Delete selected area of selected item and glue (1 make time selection, 2 select item)" _SWS_SELTRKWITEM 40718 40061 40310 40006 40309 40630 41666 40625 40718 42432 40635
+ACT 1 0 "780476e52498e14296a001fa35ce5274" "Custom: Delete selected item along with underlying envelopes" _SWS_SELTRKWITEM 40290 40888 40006 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40089 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40726 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40415 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40331 40635
+ACT 1 0 "e79bdd2ebf45634db8840d6d7ac22313" "Custom: Delete selected item along with underlying envelopes (14) - INEFFICIENT" 40290 _SWS_SELTRKWITEM 40888 40006 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864
+ACT 1 0 "29cfe22370fe5a469db7f070c21d5540" "Custom: Delete selected item along with underlying envelopes (14) and hide envelopes -  INEFFICIENT" 40290 _SWS_SELTRKWITEM 40888 40006 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40089 41864 40889
+ACT 1 0 "cd351b53592a86469a58747a098b6890" "Custom: Delete selected item along with underlying envelopes and hide envelopes" _SWS_SELTRKWITEM 40290 40888 40006 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40089 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40726 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40415 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40331 40635 40889
+ACT 1 0 "30dd5023047b8040a258a18960bf1085" "Custom: Delete selected item along with underlying envelopes between remaining adjacent items" _SWS_SELTRKWITEM _SWS_SAVESELITEMS1 40888 40417 40626 40416 40416 41174 40625 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40089 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40726 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40415 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40331 40635 _SWS_RESTSELITEMS1 40006
+ACT 1 0 "09f5eb72b3b93c43b130be784c070d4c" "Custom: Delete selected item along with underlying envelopes between remaining adjacent items and hide envelopes" _SWS_SELTRKWITEM _SWS_SAVESELITEMS1 40888 40417 40626 40416 40416 41174 40625 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40089 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40726 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40415 _BR_NEXT_CMD_SEL_TK_VIS_ENVS 40331 40635 _SWS_RESTSELITEMS1 40006 40889
+ACT 1 0 "0d259818ae42d64a9630cccbea6189a2" "Custom: Delete track and select previous (Studio One style)" 40005 40286
+ACT 1 0 "5a8d68d5324ae646b45080372910d12d" "Custom: Detect tempo of a loop having whole number of bars (select item or hover cursor)" 40528 40290 40801 40635
+ACT 1 0 "c7ab1703c6e1f44da83fb20ef9170e93" "Custom: Detect tempo of a loop having whole number of bars (select item or hover cursor)-2" 40528 41173 40625 41174 40626 40801 40635
+ACT 1 0 "03f43164d190604a980578ebf2745352" "Custom: Detect tempo of a whole bar long loop (select item or hover cursor)" 40528 40290 40801
+ACT 1 0 "408299870544604eba74d19db742d014" "Custom: Duplicate freely aligned item(s) to next bar backward (selected must be the track of the topmost item)" 40528 40698 41173 40840 40058
+ACT 1 0 "1153818343f6c448b41722f218f1ec1f" "Custom: Duplicate freely aligned item(s) to next bar forward (selected must be the track of the topmost item)" 40528 40698 41173 40839 40058
+ACT 1 0 "d5a91012b2f89645bb004b8c1dfbcc03" "Custom: Duplicate freely aligned item(s) to next beat backward (selected must be the track of the topmost item)" 40528 40698 41173 40842 40058
+ACT 1 0 "9260fbc8ffad76449ed7b92b20185f00" "Custom: Duplicate freely aligned item(s) to next beat forward (selected must be the track of the topmost item)" 40528 40698 41173 40841 40058
+ACT 1 0 "b5ef1ee5b002b3499e1c24d641379072" "Custom: Duplicate freely aligned item(s) to next half-bar backward (selected must be the track of the topmost item)" 40528 40698 41173 40842 40842 40058
+ACT 1 0 "f8bb64e11e222e48adf1991e25edb271" "Custom: Duplicate freely aligned item(s) to next half-bar forward (selected must be the track of the topmost item)" 40528 40698 41173 40841 40841 40058
+ACT 1 0 "2d3021c9b657d8419223701a7df61ab9" "Custom: Duplicate selected envelope points LEFT relative to time selection (first make selection Alt + right drag or click env track)" 40324 40037 40630 40058
+ACT 1 0 "64ea84f8c636ec48a01a7576afa05ae2" "Custom: Duplicate selected envelope points RIGHT relative to time selection (first make selection Alt + right drag or click env track)" 40324 40038 40630 40058
+ACT 1 0 "013080443e1a5e41abefbfe705cabf3f" "Custom: Duplicate selected items end-to-end horizontally 1 by 1 back" 40698 41173 40058 _XENAKIOS_MOVEITEMSLEFTBYLEN
+ACT 1 0 "000e92e5a008c24ab67bad4454e67a0b" "Custom: Duplicate selected items end-to-end horizontally 1 by 1 back creating pooled copies" 40698 41173 41072 _XENAKIOS_MOVEITEMSLEFTBYLEN
+ACT 1 0 "dd53b8510e0bde4897f59b16fd5d168a" "Custom: Duplicate selected items end-to-end horizontally 1 by 1 back creating pooled copies with prompt to repeat" 40698 41173 41072 _XENAKIOS_MOVEITEMSLEFTBYLEN 2002
+ACT 1 0 "fbf4cf4a14927446bd75c995354ddbb2" "Custom: Duplicate selected items end-to-end horizontally 1 by 1 back with prompt to repeat" 40698 41173 40058 _XENAKIOS_MOVEITEMSLEFTBYLEN 2002
+ACT 1 0 "f88bc6097b87ba47864196ae0c428f3e" "Custom: Duplicate selected items end-to-end horizontally 1 by 1 forward" 40698 41174 40058
+ACT 1 0 "d43e2a19d160c74695097da3c76210c6" "Custom: Duplicate selected items end-to-end horizontally 1 by 1 forward creating pooled copies" 40698 41174 41072
+ACT 1 0 "aef9e5d2933a11469a2f551f0c0bbbb7" "Custom: Duplicate selected items end-to-end horizontally 1 by 1 forward creating pooled copies with prompt to repeat" 40698 41174 41072 2002
+ACT 1 0 "cc80f5b762e6cf4283084fc9c2901064" "Custom: Duplicate selected items end-to-end horizontally 1 by 1 forward with prompt to repeat" 40698 41174 40058 2002
+ACT 1 0 "01eebe434c6b2d48a877bffbddeb1b4a" "Custom: Duplicate selected track without items and set FX offline" 40062 40421 40006 40535
+ACT 1 0 "2f19cc858e33dd4ab5eab8914160dfe4" "Custom: Duplicate track resetting its state (for color inheritance) (relies on cycle actions for vol adjust and ReaEQ insert) - UNUSED" 40062 _S&M_CLRFXCHAIN3 _XENAKIOS_RESETTRACKVOLANDPAN1 _S&M_CYCLACTION_44 _S&M_CYCLACTION_45 _S&M_SENDS6 _S&M_SENDS5 _S&M_REMOVE_ALLENVS 40421 40006 _SWS_DELALLITEMS 40297
+ACT 1 0 "6dbf129db6e9c141a61222a075cabb46" "Custom: DutchDoctor_Collapse selected TCP and MCP folder fully" _SWS_COLLAPSE _SWS_SELCHILDREN _SWSTL_HIDETCP _SWSTL_HIDEMCP _SWS_SELPARENTS
+ACT 1 0 "037e2797220ba440ac195a4064430c3e" "Custom: DutchDoctor_Uncollapse fully collapsed selected TCP and MCP folder" _SWS_UNCOLLAPSE _SWS_SELCHILDREN _SWSTL_SHOWTCP _SWSTL_SHOWMCP _SWS_SELPARENTS
+ACT 1 0 "e91edc1aabd5044289975863ef0b9efd" "Custom: Edit region at edit cursor (assign to Ruler mouse modif. as altern. to Shift+dbl-click, then dbl-click the region bar)" 40514 40616
+ACT 1 0 "dbce636cc128ed4389df23c4d1fc4074" "Custom: EricM_Folder selected tracks" _SWS_SAVESEL _SWS_INSRTTRKABOVE _XENAKIOS_RESETTRACKVOL1 _SWS_RESTORESEL 40914 40288 _XENAKIOS_SELTRACKSASFOLDER _XENAKIOS_SELFIRSTOFSELTRAX _XENAKIOS_RENAMETRAXDLG
+ACT 1 0 "afe9f82941b0994c91facd3a532a0652" "Custom: Exclusive item solo (un)arm (relies on cycle actions) - main" _S&M_CYCLACTION_126 2021 _S&M_CYCLACTION_127
+ACT 1 0 "677e9d8d8c096e42bb1641f786434775" "Custom: Exclusive track solo (can be assigned to TCP mouse modifiers)" 40340 7
+ACT 1 0 "befa439e19a97348b73124d91e328baf" "Custom: Exclusively mute grouped item under mouse cursor (run via shortcut or a mouse modifier)" 40289 40528 40034 40720 40289 40528 40719
+ACT 1 0 "2934c6ad6fe12f4989f10e75b2ae6010" "Custom: Exclusively mute selected grouped items (1st deselect all items to avoid muting random items)" _SWS_SAVEALLSELITEMS1 40034 40720 40289 _SWS_RESTALLSELITEMS1 40719
+ACT 1 0 "73aac45ca141734d9541470983c91030" "Custom: Exclusively solo all grouped items (toggle: soloes group then unmutes all the rest, save for muted with Mute action earlier)" _SWS_SAVEALLSELITEMS1 40289 _SWS_RESTALLSELITEMS1 40034 41561
+ACT 1 0 "41891b3c1a7f294f8aacb0f6455d39b1" "Custom: Exclusively solo grouped item under mouse cursor (run via shortcut or a mouse modifier)" 40289 40528 40034 40719 40289 40528 40720
+ACT 1 0 "ce55dc682200c84c93782dbdb16abd10" "Custom: Exclusively solo selected grouped items (1st deselect all items to avoid soloing random items)" _SWS_SAVEALLSELITEMS1 40034 40719 40289 _SWS_RESTALLSELITEMS1 40720
+ACT 1 0 "556f24f1bc1d444ba84521f24eedd01a" "Custom: Extend region 10 ms to the left and right (scalable)" 40290 40630 _SWS_MOVECUR5MSLEFT _SWS_MOVECUR5MSLEFT 40625 40631 _SWS_MOVECUR5MSRIGHT _SWS_MOVECUR5MSRIGHT 40626 40615 40174
+ACT 1 0 "33080b6f45d5be4f8a93a76f5de7ade9" "Custom: Extend selected item left edge to end of previous item on the same track (select track)" 40528 41173 41667 40626 41173 40416 41174 40625 40289 40718 41305 40635
+ACT 1 0 "0638ca724e8c704ea623161c5dfc1124" "Custom: Extend selected item right edge to start of next item on the same track (select track)" 40528 41173 41667 40625 40417 40626 40289 40718 41311 40635
+ACT 1 0 "a3f8039a1b3ca1449e069085cfbd51b9" "Custom: Extend selected item to next item (1st select item)" 41174 40417 _BR_SAVE_CURSOR_POS_SLOT_1 40416 _BR_RESTORE_CURSOR_POS_SLOT_1 41311 40289
+ACT 1 0 "8639e13dd1342b41b162ae1ca98d2e50" "Custom: Extend selected item to next item (1st select next item)" 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40416 _BR_RESTORE_CURSOR_POS_SLOT_1 41311 40289
+ACT 1 0 "507dcdc76c562241b00f6d33bb65ecba" "Custom: Extend selected item to previous item (1st select item)" 41173 40416 41174 _BR_SAVE_CURSOR_POS_SLOT_1 40417 _BR_RESTORE_CURSOR_POS_SLOT_1 41305 40289
+ACT 1 0 "9d523300200e434b8c037c75dbdbc29c" "Custom: Extend selected item to previous item (1st select prev item)" 41174 _BR_SAVE_CURSOR_POS_SLOT_1 40417 _BR_RESTORE_CURSOR_POS_SLOT_1 41305 40289
+ACT 1 0 "9c8a8b8a58a09049bbaecc12be0c12c2" "Custom: Extend selected item(s) to next item(s) (Tie Object By Length Change Rightward)-2" 40528 41174 41168 41311
+ACT 1 0 "83abb90ed313ea4e94efc3334964c96e" "Custom: Extend time selection to items (across tracks) incrementally leftwards no prompt" _SWS_SAVETIME5 _SWS_RESTTIME5 40630 40625 40631 40626 40318 40625 _SWS_SAVETIME5
+ACT 1 0 "e274953d4db11940b9e9f7cb996a3b7e" "Custom: Extend time selection to items (across tracks) incrementally leftwards with prompt" 40625 40626 2001 40318 40625 2002
+ACT 1 0 "5e61e025a14fd94ea1ba893984c50b88" "Custom: Extend time selection to items (across tracks) incrementally rightwards no prompt" _SWS_SAVETIME5 _SWS_RESTTIME5 40630 40625 40631 40319 40626 _SWS_SAVETIME5
+ACT 1 0 "94b9e28e61a85f4caf21dde632876918" "Custom: Extend time selection to items (across tracks) incrementally rightwards with prompt" 40625 2001 40319 40626 40631 2002
+ACT 1 0 "162723e43991ab44b87254789bc96a81" "Custom: Extract MIDI seq from a pre-sliced audio item creating MIDI item (1st select all slices)" _SWS_SAVETIME5 40290 _SWS_SELTRKWITEM 40773 40548 _BR_FOCUS_TRACKS _XENAKIOS_SELNEXTTRACK 40718 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 40289 _SWS_RESTTIME5
+ACT 1 0 "ab08177de8657845a1b0088dfefe2c41" "Custom: Extract MIDI seq from media cues creating MIDI item (1st select the source audio item)" _SWS_SAVETIME5 40290 _SWS_SELTRKWITEM 40732 40773 40548 _BR_FOCUS_TRACKS _XENAKIOS_SELNEXTTRACK 40718 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 40289 _SWS_RESTTIME5
+ACT 1 0 "3e4c50ee371f604abcc5a3edca843161" "Custom: Extract MIDI seq from stretch markers creating MIDI item (1st select audio item)" _SWS_SAVETIME5 40290 _SWS_SAVEALLSELITEMS1 _SWS_SELTRKWITEM 40062 40289 40718 _BR_SPLIT_SEL_ITEM_STRETCH_MARKERS 40773 40005 _SWS_RESTALLSELITEMS1 _BR_FOCUS_TRACKS _SWS_SELTRKWITEM _XENAKIOS_SELNEXTTRACK 40718 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 _FNG_MIDI_UP_VEL10 40289 _SWS_RESTTIME5
+ACT 1 0 "283579389a46914b8103c179065fc542" "Custom: Extract item slices according to items on selected tracks (1st select the item) - script X-Raym - Split selected items at step 8" 40290 _SWS_SELTRKWITEM _SWS_SAVESEL 40285 2001 40287 2002 _RSa170c9f3ffe6307630bb0bc546d8b09a2252dbec 40718 40438 40224 _XENAKIOS_SELTRAXNOITEMS 40005 40289 _SWS_RESTORESEL 40285 40718 40032
+ACT 1 0 "651368ade53aa941a06b3af13e9e315e" "Custom: Extract item slices according to items on selected tracks AND move slices together (1st select the item) (copies minimized)  - script X-Raym - Split selected items at step 25" 40290 _SWS_SELTRKWITEM _SWS_SAVESEL _S&M_FOLDERON 40062 40914 40286 1041 1041 40285 _SWS_SELCHILDREN2 _SWS_MINTRACKS _SWS_SELPARENTS 1041 40005 1041 1041 _SWS_RESTORESEL 1041 40718 40285 2001 40287 2002 _RSa170c9f3ffe6307630bb0bc546d8b09a2252dbec 40718 40438 40224 40005 40289 _SWS_RESTORESEL 40285 40718 40032 41120 40117 41121 40118 40285 40005 _SWS_SELTRKWITEM 40001 42069 40286 40718 41120 40118 41121 40117 40289 40285 40718 40117 40005 40310 40006 40309 40505 40286 1041 40635
+ACT 1 0 "c56b90467ce40845ac4b5f5bcb5b6dbf" "Custom: Extract sample looped slices by grid size and heal splits on the fly (select track) (1st create an empty track below)" _BR_FOCUS_ARRANGE_WND _XENAKIOS_SELITEMSUNDEDCURSELTX _SWS_SAVESELITEMS1 40633 40757 40632 _XENAKIOS_SELITEMSUNDEDCURSELTX 40759 40698 40058 40118 40289 _XENAKIOS_SELPREVTRACK _SWS_RESTSELITEMS1 _SWS_SELNEXTITEM2 _SWS_SELNEXTITEM2 40548 40289 40632
+ACT 1 0 "9a965a1a80bb1543a11fcc557dc8e430" "Custom: Extract sample looped slices by grid size and heal splits on the fly (select track) (mult. trax) " _BR_FOCUS_ARRANGE_WND _XENAKIOS_SELITEMSUNDEDCURSELTX _SWS_SAVESELITEMS1 40633 40757 40632 _XENAKIOS_SELITEMSUNDEDCURSELTX 40759 40698 40058 40001 40730 40118 40289 _XENAKIOS_SELPREVTRACK _SWS_RESTSELITEMS1 _SWS_SELNEXTITEM2 _SWS_SELNEXTITEM2 40548 40289 40632
+ACT 1 0 "5az1tzct7c6jc6wq76qxb3u31l86xq8y" "Custom: Extract sample looped slices by grid size to a sep. track on the fly (select track) (create an empty track, assign it to Group 01)" _SWS_SAVESEL _SWS_SAVETIME1 40623 40718 40060 40804 40914 40042 40421 41174 40058 40289 40635 _SWS_RESTTIME1 _SWS_RESTORESEL 40632
+ACT 1 0 "303a57b5b65ef2439abe84539f4ceda8" "Custom: Extract sample looped slices by grid size with time sel. no splits on the fly 1 (select track) (1st create an empty track below)" _BR_FOCUS_ARRANGE_WND _SWS_SAVESEL _SWS_SAVETIME1 40623 40718 41383 40632 40058 40118 40289 _SWS_RESTORESEL 40635 _SWS_RESTTIME1 40632
+ACT 1 0 "03d0c49cb851b84e99bbe0271390b62a" "Custom: Extract sample looped slices by grid size with time sel. no splits on the fly 2 (select track) (mult. tracks)" _BR_FOCUS_ARRANGE_WND _SWS_SAVESEL _SWS_SAVETIME1 40623 40718 41383 40632 40001 40730 40058 40289 _SWS_RESTORESEL 40635 _SWS_RESTTIME1 40632
+ACT 1 0 "8c710ade0a56684a91fbf0e3dc3c63c2" "Custom: Extract sample slices by grid without splits (either select item or track, place cursor WITHIN grid div., 1st create an empty track below)" _BR_FOCUS_ARRANGE_WND _SWS_SAVETIME1 _SWS_SELTRKWITEM _SWS_SAVESEL 40646 40625 40647 40626 40718 _SWS_SAVESELITEMS1 41383 40630 40058 41173 40118 40289 _SWS_RESTSELITEMS1 40630 _SWS_RESTORESEL _SWS_RESTTIME1
+ACT 1 0 "73c7d116d195f646a8449a724494a743" "Custom: Extract sample slices by grid without splits (either select item or track, place cursor at START of grid div., 1st create an empty track below)" _BR_FOCUS_ARRANGE_WND _SWS_SAVETIME1 _SWS_SELTRKWITEM _SWS_SAVESEL 40625 40647 40626 40718 _SWS_SAVESELITEMS1 41383 40630 40058 41173 40118 40289 _SWS_RESTSELITEMS1 40630 _SWS_RESTORESEL
+ACT 1 0 "18990f440b7c374f9b5f690e10bad614" "Custom: Extract sample slices by time selection and heal splits (either select item or track, 1st create an empty track below) - INEFFICIENT" _BR_FOCUS_ARRANGE_WND 40718 _SWS_SELTRKWITEM _SWS_SAVESELITEMS1 40630 40061 40698 40058 40118 40289 _SWS_RESTSELITEMS1 _SWS_SELNEXTITEM2 _SWS_SELNEXTITEM2 40548 40289
+ACT 1 0 "edfeb97e1ed72848b8d50a99d2222840" "Custom: Extract sample slices by time selection without splits and paste on a new track (either select item or track)" _BR_FOCUS_ARRANGE_WND 40718 _SWS_SELTRKWITEM _SWS_SAVESEL _SWS_SAVESELITEMS1 40630 41383 40058 40689 40001 40118 40289 _SWS_RESTORESEL _SWS_RESTSELITEMS1
+ACT 1 0 "da4bf4fc798f8b468f46f5e5be2e6f84" "Custom: Extract sample slices by time selection without splits and paste on a next track (either select item or track)" _BR_FOCUS_ARRANGE_WND 40718 _SWS_SELTRKWITEM _SWS_SAVESEL _SWS_SAVESELITEMS1 40630 41383 40285 40058 40289 _SWS_RESTORESEL _SWS_RESTSELITEMS1
+ACT 1 0 "653be1023bf22c40b6111998a5190ca6" "Custom: Fade vertically aligned item(s) in to cursor on selected track(s)" 40718 _XENAKIOS_SELITEMSUNDEDCURSELTX 40528 40631 40509
+ACT 1 0 "e01a242a1dde874aba848c46df503cbe" "Custom: Fade vertically aligned item(s) in to mouse cursor on selected track(s)" 40513 _XENAKIOS_SELITEMSUNDEDCURSELTX 40528 40509
+ACT 1 0 "157fc3ed8e52ab429b880d48cd5e115f" "Custom: Fade vertically aligned item(s) out from cursor on selected track(s)" 40718 _XENAKIOS_SELITEMSUNDEDCURSELTX 40528 40630 40510
+ACT 1 0 "167b860c7d9da542891e0e68e6626a34" "Custom: Fade vertically aligned item(s) out from mouse cursor on selected track(s)" 40513 _XENAKIOS_SELITEMSUNDEDCURSELTX 40528 40510
+ACT 1 0 "553af33493b3ef4fb18760f9da91ec7f" "Custom: Frank B_Extract sample slices by time selection without splits and paste on a next track (select item)" 40630 _SWS_SAVEALLSELITEMS1 40060 40285 40058 _SWS_RESTALLSELITEMS1
+ACT 1 0 "ae51735217612e4e949c55796326d74e" "Custom: Gianluca Apollaro_Snap multitrack to project BPM (stretch/shrink) - (1. put manually stretch marker at top of one of the items, 2. set grid to 1 bar or other appropriate division, 3. group all items needing adjustment)" 41842 40842 40625 40841 40841 40626 41847 40630 40841 40635
+ACT 1 0 "c33707c27c44004daa7b1882efefd546" "Custom: Glue and rename" 41588 _XENAKIOS_RENMTAKEANDSOURCE
+ACT 1 0 "6ad27d83e680c04eb20626db5a16d346" "Custom: Go to next item on the track (track and cur item must be selected)" 41173 40417
+ACT 1 0 "76554ce26cccb54f96013bfd015633c1" "Custom: Go to prev item on the track (track and cur item must be selected)" 41173 40416
+ACT 1 0 "193b5a671be7f645ad4b44ea0e6a9349" "Custom: Go to selected (or under mouse cursor) item start and play" 40528 41173 40044
+ACT 1 0 "568abffc6b474f4585df3aef6eb03359" "Custom: Hide selected tracks including their children" _SWS_SELCHILDREN2 _SWSTL_HIDE
+ACT 1 0 "2ab8500529398e41880c351f3b86c0b1" "Custom: Hide unselected tracks including their children" _SWS_SELCHILDREN2 _SWSTL_HIDEUNSEL
+ACT 1 0 "9540480f3baf834b834bdae8ff54d2b0" "Custom: IDDQD Sound_Insert 3 env. points (at mouse curs. and time sel.) YT - rDXb2ymumCs" _BR_INSERT_2_ENV_POINT_TIME_SEL _BR_ENV_POINT_MOUSE_CURSOR 2008 40635 40331
+ACT 1 0 "9404fea44323a64a8b1eedf52a18998a" "Custom: IDDQD_Paste item to end of track (copy item, select track)" 40421 41174 42398
+ACT 1 0 "a8948c5d77ab6549933cbabeb0d1d9d5" "Custom: IadAslan_Bounce In Place - Item Selection (showthread.php?t=221654) see preparation in Tips.txt" _SWS_SAVEALLSELITEMS1 41559 40290 _SWS_SAVEMSTFXEN _SWS_DISMASTERFX 42230 _SWS_RESTALLSELITEMS1 41560 40719 _SWS_RESTMSTFXEN 40635
+ACT 1 0 "237e0143ea49674a8d0ac8573ec5cfb9" "Custom: IadAslan_Bounce In Place - Time Selection (showthread.php?t=221654) (create time sel. and select items) see preparation in Tips.txt" _SWS_SAVEALLSELITEMS1 41559 _SWS_SAVEMSTFXEN _SWS_DISMASTERFX 42230 _SWS_RESTALLSELITEMS1 41560 40719 _SWS_RESTMSTFXEN 40635
+ACT 1 0 "bdb67664a4baa54e89305de2e84b9734" "Custom: Implode selected items into one item (disable trim content behind media) - useful for MIDI with different parts" 40644 42432
+ACT 1 0 "0686ce7bc1134e488339e0ec18251f18" "Custom: Insert FOLDER layout track in both TCP and MCP (relies on SWS Auto Color-Icon-Layout and a Cycle action)" 40001 _S&M_CYCLACTION_46 _SWS_COLTRACKPREV _SWS_MINTRACKS 42336 _XENAKIOS_RESETTRACKVOL1 _S&M_CYCLACTION_45
+ACT 1 0 "95c73626eeb14442baa868397ab1d975" "Custom: Insert FX BUSS layout track in both TCP and MCP (relies on SWS Auto Color-Icon-Layout and a Cycle action)" 40001 _S&M_CYCLACTION_41 _SWS_MINTRACKS 42336
+ACT 1 0 "c8fd15d88d3ed546beec6593f3558042" "Custom: Insert SEND LINK layout track in both TCP and MCP (relies on SWS Auto Color-Icon-Layout and a Cycle action)" 40001 _S&M_CYCLACTION_42 _SWS_DISMPSEND _SWS_MINTRACKS
+ACT 1 0 "e26f1bcc4a26bc41b2302ccc0dea7809" "Custom: Insert a dedicated region ruler (select all items in the region or the longest one on both sides)" 40290 40939 40210 40001 40142 42312 40635 40286 40005 40286 42398
+ACT 1 0 "609c7f181219d14aa74d12e837de6c3f" "Custom: Insert a new track inheriting color from previous track, add ReaEQ (relies on cycle action to insert ReaEQ)" 40001 _SWS_COLTRACKPREV _S&M_CYCLACTION_44 _S&M_CYCLACTION_45
+ACT 1 0 "b8b8294ce75af540b46a3ae043208677" "Custom: Insert an item over another at cursor and trim behind it (copy item, make track last touched, place cursor)" 42398 40930
+ACT 1 0 "909c827d17fbc74c82374882b0f5dc4c" "Custom: Insert click track (with prompt to duplicate)" 40042 _SWS_AWINSERTCLICKTRK 2001 _BR_SEL_ALL_ITEMS_CLICK 41295 2002 40042 40289
+ACT 1 0 "012de54bcfc044498a451b4459be4dbe" "Custom: Insert drums track (time base set to beats) inherit color from prev track, add ReaEQ (relies on a cycle action)" 40001 _SWS_COLTRACKPREV 40489 _S&M_CYCLACTION_44 _S&M_CYCLACTION_45
+ACT 1 0 "6a56b0cf354f514f975950dcd4556251" "Custom: Insert drums track (time base set to beats) set to random color, add ReaEQ (relies on a cycle action)" 40001 40358 40489 _S&M_CYCLACTION_44 _S&M_CYCLACTION_45
+ACT 1 0 "cac792c3e49f9c4db4d24357f78d0dfd" "Custom: Insert empty space and extend items on the left to the start of items on the right (select at least one track) " 40289 40200 40630 40626 40416 40625 2000 40717 41639 40635
+ACT 1 0 "3460c4b95dd6fb4792904b560c59a4b6" "Custom: Insert marker and renumber all markers in project (in ascending order) " 40157 40898
+ACT 1 0 "537c49dd3627c34c90738c0336db08f1" "Custom: Insert marker and renumber all markers in project (in ascending order) -- ignores play cursor (SWS)" _S&M_INS_MARKER_EDIT 40898
+ACT 1 0 "f493a89f2a8d6240802db0727cc82561" "Custom: Insert marker at mouse cursor -- ignores play cursor, uses time sel" 1008 40625 40105 40626 40514 40157 40630 40635 1007
+ACT 1 0 "e317a29cdbdc834ab5c4bf80eddcafc4" "Custom: Insert marker at mouse cursor and renumber all markers in project (in ascending order) -- ignores play cursor, uses time sel" 1008 40625 40105 40626 40514 40157 40898 40630 40635 1007
+ACT 1 0 "f171e2eaedd6d44b8a4adf2a9b8d1e25" "Custom: Insert multiple drum tracks (time base set to beats) set to random color, add ReaEQ (relies on a cycle action)" 41067 40358 40489 _S&M_CYCLACTION_44
+ACT 1 0 "d52891bef0501c4e9dded99801f35f41" "Custom: Insert multiple tracks set to random colors, add ReaEQ (relies on a cycle action)" 41067 40358 _S&M_CYCLACTION_44 _S&M_CYCLACTION_45
+ACT 1 0 "79d849c0e736d34c8b2432787360ccb7" "Custom: Insert new track as child of selected track (create folder)" _S&M_FOLDERON 40001 _S&M_FOLDER_LAST
+ACT 1 0 "5ed00b29a48f0a47b588eb056a68d4e2" "Custom: Insert stretch markers on the grid in selected items (with dialogue)" 41173 2001 41842 40647 2002 41173
+ACT 1 0 "ec8c47a5a500b647ae427d86819b0cb3" "Custom: Insert track set to random color, add ReaEQ (relies on a cycle action)" 40001 40358 _S&M_CYCLACTION_44 _S&M_CYCLACTION_45
+ACT 1 0 "36062fb331791342a4190a802d3dbf26" "Custom: Invert positions of 3 vertically aligned items in cycle (select bottommost item)" 41173 _SWS_SELTRKWITEM _SWS_SAVESEL 40699 _XENAKIOS_SELPREVTRACK _XENAKIOS_SELPREVTRACKKEEP 40105 _XENAKIOS_SELITEMSUNDEDCURSELTX 40118 41173 40505 40058 _SWS_RESTORESEL 40104 _XENAKIOS_SELITEMSUNDEDCURSELTX 41173
+ACT 1 0 "d947eb6c910cdd4b80d8fb5bd2b9d6be" "Custom: Invert positions of 3 vertically aligned items in cycle (select bottommost item)-2" 41173 _SWS_SELTRKWITEM _SWS_SAVESEL 40286 40288 40105 _XENAKIOS_SELITEMSUNDEDCURSELTX _SWS_SAVEALLSELITEMS1 _SWS_RESTORESEL _XENAKIOS_SELITEMSUNDEDCURSELTX 40117 40117 _SWS_RESTALLSELITEMS1 40118 _SWS_RESTORESEL _XENAKIOS_SELITEMSUNDEDCURSELTX 41173
+ACT 1 0 "fe1cd92ab15cfc40be3999b3c8812683" "Custom: Item edit: Trim right edge of item to edit cursor (embedded 1 native action)" 41311
+ACT 1 0 "460e8e184c9ecb4eb4f89b10bea5d84d" "Custom: JReverb Chopper items in time selection in/out autofader (relies on SWS Command parameters Fade presets)" 40297 40505 40718 _XENAKIOS_SETITEMFADES
+ACT 1 0 "9a6927fc9de80149ac0b46d53ccb4d55" "Custom: JReverb grid line chopper (for gated effect, removing off beats)" 40297 _SWS_SELTRKWITEM 40319 40318 40932 _XENAKIOS_SELFIRSTITEMSOFTRACKS 40417 40719 40417 40417 40719 40417 40417 40719 40417 40417 40719 40417 40417 40719 40417 40417 40719 40417 40417 40719 40417 40417 40719 _XENAKIOS_REMOVMUTEDITEMS 40417
+ACT 1 0 "2507974d6a86ae4f9f91bbdeaec96000" "Custom: JReverb se edit L (Split/Snap to nearest gridline/Trim previous/backwards Xfade)" _SWS_SAVELOOP1 40759 _SWS_SELTRKWITEM _SWS_SAVESELITEMS1 _SWS_SAVEVIEW _SWS_SAVETIME1 40290 40646 _SWS_ITEMLEFTTOCUR _XENAKIOS_DOSTORECURPOS 40416 _SWS_RESTOREVIEW _XENAKIOS_DORECALLCURPOS 40512 _SWS_RESTSELITEMS1 40635 _XENAKIOS_DORECALLCURPOS 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 _SWS_RESTLOOP1
+ACT 1 0 "867fd10235beaf4bb96ac34e8534cbd0" "Custom: JReverb se edit R (Split/Snap to nearest gridline/Trim previous/backwards Xfade)" _SWS_SAVELOOP1 40759 _SWS_SELTRKWITEM _SWS_SAVESELITEMS1 _SWS_SAVEVIEW _SWS_SAVETIME1 40290 40647 _SWS_ITEMLEFTTOCUR _XENAKIOS_DOSTORECURPOS 40416 _SWS_RESTOREVIEW _XENAKIOS_DORECALLCURPOS 40512 _SWS_RESTSELITEMS1 40635 _XENAKIOS_DORECALLCURPOS 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 40225 _SWS_RESTLOOP1
+ACT 1 0 "4cc78155e6274e4e948c8166a7d58731" "Custom: Join items 1 by 1 on sel. track removing gaps between them to first with hiding tracks (place cursor before or at the 1st item)" _SWSTL_SHOWEX 40417 41167 41205 _SWSTL_SHOWALL
+ACT 1 0 "bf44fe99befbc64b9805bc6d3d9c49bc" "Custom: Join items 1 by 1 on sel. track removing gaps between them to first with hiding tracks (place cursor before or at the 1st item) with prompt to repeat" _SWSTL_SHOWEX 40417 41167 41205 2002 _SWSTL_SHOWALL
+ACT 1 0 "4bb66466c48b0e498fde6a7b8de0c190" "Custom: Join items 1 by 1 on sel. track removing gaps between them to last (place cursor after or at the last item)" 40416 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40416 _BR_RESTORE_CURSOR_POS_SLOT_1 41307
+ACT 1 0 "c312007bac6f9b4d85bbef92bb0fc1b3" "Custom: Join items 1 by 1 on sel. track removing gaps between them to last (place cursor after or at the last item) with prompt to repeat" 40416 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40416 _BR_RESTORE_CURSOR_POS_SLOT_1 41307 2002
+ACT 1 0 "24bc17a2e770634382e128ff1038f57a" "Custom: Join items 1 by 1 on sel. track removing gaps between them to last with hiding tracks (place cursor after or at the last item)" _SWSTL_SHOWEX 40416 40416 41174 41168 41307 _SWSTL_SHOWALL
+ACT 1 0 "cf3625a3bf99ae4895cdb90f0bcfe1c6" "Custom: Join items 1 by 1 on sel. track removing gaps between them to last with hiding tracks (place cursor after or at the last item) with prompt to repeat" _SWSTL_SHOWEX 40416 40416 41174 41168 41307 2002 _SWSTL_SHOWALL
+ACT 1 0 "6d17a077a7ad254c862c9ba4cfd2d36a" "Custom: Jump edit cursor to play cursor and create time selection" 40104 40105 40625 _BR_SAVE_CURSOR_POS_SLOT_1 40434 40626 _BR_RESTORE_CURSOR_POS_SLOT_1
+ACT 1 0 "a792b046971a274695569a5185579afe" "Custom: Jump to loop start & play (2)" 40632 1007
+ACT 1 0 "fad06f2212b62744a2e5b47b36e54863" "Custom: Jump to start of selected item & play" 41173 1007
+ACT 1 0 "f0f8727ebf121b498e3a2c61236e36db" "Custom: Line up items from one track for mastering step wise (select track) 1 -- delete penultimate track manually" 40421 41174 40626 41173 40289 40105 40416 _SWS_REGIONSFROMITEMS 40417 40625 40289 40416 41174 40718 41205 40001 40118 40635
+ACT 1 0 "6b9e69ca04b3e14e83f4631a6ccb8586" "Custom: Line up items from one track for mastering step wise (select track) 2 -- delete penultimate track manually" 40421 41173 40105 40416 _SWS_REGIONSFROMITEMS 40421 41174 40626 41173 40417 40625 40289 40416 41174 40718 41205 40001 40118 40635
+ACT 1 0 "3302e6c6e63e0549bdc130c1454408c5" "Custom: Loops energy inflation with normalization (changes grid to 1/16) - audioordeal.co.uk" 40776 40932 40108 41588 40108
+ACT 1 0 "ac3f2f3737c8d5438c11cd81356b3f14" "Custom: Madrix_bounce in place (select track & item) -- multiple item selection creates one item" 40209 40131 41173 40535
+ACT 1 0 "4cd1cfc9d544c24eab87891eb2fce239" "Custom: Mardix_Acceleration 1/32 (select item and track, mainly for drums)" 40290 40775 40932 40001 40118 40719 _XENAKIOS_SELFIRSTITEMSOFTRACKS 40720 _XENAKIOS_REMOVMUTEDITEMS 41295 41295 41295 41295 41295 41295 41295 40421 41295 40421 41295 40718 40117 40005 40776 40635 _BR_PLAY_MOUSECURSOR
+ACT 1 0 "23b90dd63bfac14ca2b7e8bf16d5d186" "Custom: Mardix_Acceleration 1/32 and play (select item and track, mainly for drums) (all native actions)" 40290 40775 40932 40001 40118 40719 41173 41666 40289 40417 40720 40699 40421 40006 42398 41295 41295 41295 41295 41295 41295 41295 40421 41295 40421 41295 40718 40117 40005 40776 40630 40635 1007
+ACT 1 0 "ae530ade3f07cd43be6798c67aeb0e1f" "Custom: Mardix_All folders collapse (SWS)" _SWS_SELALLPARENTS _SWS_COLLAPSE 40297
+ACT 1 0 "b6e70b1dc526f444afc0c8da70a7b475" "Custom: Mardix_All folders uncollapse (SWS)" _SWS_SELALLPARENTS _SWS_UNCOLLAPSE 40297
+ACT 1 0 "4f44843a302cf845b75b70fca26f816a" "Custom: Mardix_Commit item edit to new file without FX (select item)" 41999 40131
+ACT 1 0 "dcdb7f2bec640c40bf3376543f43c236" "Custom: Mardix_Duplicate all items in folder (select folder, place edit cursor)" 40289 _SWS_SELCHILDREN 40698 _XENAKIOS_SELFIRSTOFSELTRAX 42398 40286
+ACT 1 0 "eca85a6596aae84786813615f6e5507c" "Custom: Mardix_Folder freeze" 41223 _SWS_MUTECHILDREN _SWS_SELCHILDREN2 40535 40421 40688 _SWS_COLLAPSE
+ACT 1 0 "aa6c00d846f8be4183c5d6b22be755da" "Custom: Mardix_Folder unfreeze" 41644 _SWS_UNMUTECHILDREN _SWS_SELCHILDREN2 40536 40421 40689 _SWS_UNCOLLAPSE
+ACT 1 0 "85c1c0be22845d46b932ee2730f42906" "Custom: Mardix_Pre-verse item (select one item, select track) -- my version" 40290 40698 40037 40630 42398 41051 40635
+ACT 1 0 "4fc8e3892535ae4eb3477575293025aa" "Custom: Mardix_Split selected item at cursor and extend to time selection looping (set time sel. to item or have it included in it)" 40636 40012 _SWS_SELPREVITEM 41386 _SWS_SELNEXTITEM 40006
+ACT 1 0 "e36f537f5473d44e9c50cd3ad467a011" "Custom: Mardix_Split selected item at cursor and extend to time selection looping (set time sel. to item or have it included in it) -- all native" 40636 40012 40416 41386 40417 40006
+ACT 1 0 "9ee9a318a8a9c54a926e3895a40ffcf7" "Custom: Mardix_Zoom out project" 40727 40295 _XENAKIOS_TVPAGEHOME
+ACT 1 0 "6b6c48fd218a3946aaa4722dce9628b0" "Custom: Move all selected items together to the 1st one" _SWS_SAVETIME1 40290 _SWS_SELTRKWITEM _SWS_SAVESEL 40698 40001 42069 41120 40630 40058 40006 41121 40718 40117 40005 _SWS_RESTORESEL 40310 40006 40309 _SWS_RESTTIME1
+ACT 1 0 "a15339acc97fd7448d39158cbe8cc9b5" "Custom: Move all selected items together to the last one" 40290 _SWS_SAVETIME1 _SWS_SELTRKWITEM _SWS_SAVESEL 40698 40001 42069 41120 40630 40058 40006 41121 40718 40117 40005 _SWS_RESTORESEL 40310 40006 40718 41174 40625 42069 40718 40699 _SWS_RESTTIME1 40630 42398 40309 40006 40635
+ACT 1 0 "97b84fe0aab5c0458d7924e30063004f" "Custom: Move cursor left to nearest item RIGHT edge on selected track (may overshoot)" _SWS_SAVESELITEMS1 40105 40416 40416 40319 _SWS_RESTSELITEMS1
+ACT 1 0 "7da645a86bfb264dab7dffa4be6b6d49" "Custom: Move cursor left to nearest item edge on selected track (with hiding)" _SWSTL_HIDEUNSEL 41167 _SWSTL_SHOWALL
+ACT 1 0 "4bb6fa1c8351e74fa7ec00531b67ce03" "Custom: Move cursor right to nearest item LEFT edge on selected track" _SWS_SAVESELITEMS1 40417 _SWS_RESTSELITEMS1
+ACT 1 0 "124695682de47245a0f6cea19e7164c6" "Custom: Move cursor right to nearest item edge on selected track (with hiding)" _SWSTL_HIDEUNSEL 41168 _SWSTL_SHOWALL
+ACT 1 0 "e0ac76bc21336249ba33f5465f3ead09" "Custom: Move edit cursor to mouse and trim left edge of seleсted item (creates many undo points)" 40514 41305
+ACT 1 0 "ef329b5fbddc10449610523a7b301e2e" "Custom: Move edit cursor to mouse and trim right edge of seleсted item (creates many undo points)" 40514 41311
+ACT 1 0 "84804cb3e50987478c68722f4e1e2114" "Custom: Move items/envelope poins down one track/a bit (Ripple mode)-2" 40290 41148 40118 40285 41148 _BR_COPY_ENV_TS_SEL_TR_ENVS_VIS_CUR 40889
+ACT 1 0 "06b1a67bea98d34ba20c866e669ca32e" "Custom: Move items/envelope points down one track/a bit (in Ripple mode all tracks)" 40309 40118 41991
+ACT 1 0 "c93f820ffe51b743818d4e50e6ed90df" "Custom: Move items/envelope points down one track/a bit (in Ripple mode per track)" 40309 40118 40310
+ACT 1 0 "c453975613bb074f966dced2dedffc49" "Custom: Move items/envelope points left by grid size with prompt to repeat" 40793 2002
+ACT 1 0 "d79ecf6dbea2d64e95b59a8cc5191041" "Custom: Move items/envelope points right by grid size with prompt to repeat" 40794 2002
+ACT 1 0 "e9502a669e661347a89ef3d7f10b8621" "Custom: Move items/envelope points up one track/a bit (in Ripple mode all tracks)" 40309 40117 41991
+ACT 1 0 "b2781d59caf9ce42b1c13b423d2152a6" "Custom: Move items/envelope points up one track/a bit (in Ripple mode per track)" 40309 40117 40310
+ACT 1 0 "5eadb9887cae854382daeb7de9d8989a" "Custom: Move play cursor to edit cursor at play time" 1016 1007
+ACT 1 0 "34c34ac13e8f114e821632e1d4428e17" "Custom: Move selected envelope points LEFT relative to time selection (first make selection Alt + right drag or click env track)" 40324 40325 40037 40630 40058
+ACT 1 0 "ca9ad64e8cc416419a46f701bab89fdf" "Custom: Move selected envelope points RIGHT relative to time selection (first make selection Alt + right drag or click env track)" 40324 40325 40038 40630 40058
+ACT 1 0 "6d34c6da0a44ef4ab872c86600b24a0a" "Custom: Move selected item(s) to start of time selection or edit cursor absolutely (wih multiple items only works properly moving leftwards, SWS bug)" 40630 _XENAKIOS_MOVEITEMSTOEDITCURSOR
+ACT 1 0 "1b86465472a7c94db165124b3e329518" "Custom: Move selected items each to a new track stepwise (select items, select their track)" 40001 2001 40118 41173 40290 40289 41666 40417 40319 40625 40718 40001 2002
+ACT 1 0 "8a202f0ed260cb408f07383d9cb8ccbc" "Custom: Move selected items each to a new track stepwise and close gaps (select items, select their track)" 40001 40118 2001 41173 40290 40289 41666 40417 40319 40625 40718 41205 40001 40118 2002
+ACT 1 0 "206ce29dcd0a5f458c3d11cbfa571474" "Custom: Move selected items to the start of a new track below (select items, select their track) then reposition (Item end, Time 0.00)" 40001 40118 40042 41205 _XENAKIOS_REPOSITION_ITEMS
+ACT 1 0 "468b902fae1fa54c9fd570535fc766b4" "Custom: Move selected items to the start of a new track below closing gaps (select items, select their track)" 40001 40118 40042 41205 40290 40289 40417 40416 2001 40319 40625 40718 41205 2002
+ACT 1 0 "5b659c499c09d446a6dad1dfbeba235a" "Custom: Move selected or grouped item(s) to start of time selection or edit cursor (relatively)" 40630 41205
+ACT 1 0 "b17402b1074f63409e2d7aef0af36929" "Custom: Move selected tracks to above track 5" 40337 40297 40942 42398
+ACT 1 0 "3980a3cb9c3c694da068d6e8c85e5180" "Custom: Move selected tracks to below track 5" 40337 40297 40943 42398
+ACT 1 0 "c171a8908d81bf43b3925061a2a6b17b" "Custom: Move/Nudge all project markers (unlock all items and disable Ripple mode afterwards)" 40309 40182 40688 40702 40042 40173 40625 40043 40626 40142 40931 40635 40311 41226
+ACT 1 0 "fe449027c5a9a749b2c79f4e7d62c25d" "Custom: Move/Nudge project markers in time selection (unlock all items and disable Ripple mode afterwards)" 40309 40182 40688 40702 40630 40142 40931 40635 40311 41226
+ACT 1 0 "679141dc21d01144af9d337c931e0b9b" "Custom: Musicbynumbers - create crossfade loop (with fade window editor) [Toggle Trim Behind Items must be OFF and crossfade editor closed]" _SWS_SAVEVIEW _SWS_SAVEXFD _SWS_XFDON _SWS_SELTRKWITEM 40630 40508 41294 41306 40061 41128 40699 40718 41290 41290 41290 41290 40058 40228 40225 40226 40718 40297 40622 _SWS_ZOOMSIT 41294 41294 1007 41827 2000 _SWS_AWTRIMCROP 40606 41827 _SWS_RESTOREXFD _SWS_TOGZOOMI 1016 _SWS_RESTOREVIEW
+ACT 1 0 "b06565e991071b4ab5b00b8ee079073c" "Custom: Musicbynumbers - create crossfade loop [start instead of end) ](with fade window editor) MUSIC MODE (good with reverb tails)" _SWS_SAVEVIEW _SWS_SAVEXFD _SWS_XFDON _SWS_SELTRKWITEM 40631 40508 41290 41311 40061 41127 40699 40718 41294 41294 41294 41294 41294 40058 40225 40228 40227 40718 40297 40622 _SWS_ZOOMSIT 40631 41294 41294 1007 41827 2000 _SWS_AWTRIMCROP 40606 41827 _SWS_RESTOREXFD _SWS_TOGZOOMI 1016 _SWS_RESTOREVIEW
+ACT 1 0 "d3fe52bed84f6c4e9843ee5efc9ecdf8" "Custom: NickMoritz_Insert track folder" 40286 40001 1041
+ACT 1 0 "f2369113a8e45f4e9fbf66c02414bf89" "Custom: NickMoritz_Set track/item to black color" _SWS_BLACKITEM _SWS_BLACKTRACK
+ACT 1 0 "a6c0fb7fe914544982ae7f1a2d0b83a1" "Custom: NickMoritz_Set track/item to color gradient" _SWS_ITEMGRAD _SWS_TRACKGRAD
+ACT 1 0 "c72e00910bd69d4a8c4063d86f780acc" "Custom: NickMoritz_Set track/item to default color" 40359 40707
+ACT 1 0 "6118dd6677009846b7fc81039147accf" "Custom: NickMoritz_Set track/item to random colors" _SWS_TRACKRANDCOLS _SWS_ITEMRANDCOLS
+ACT 1 0 "558843a9158a0c45aeb8d99b4785c2f6" "Custom: NickMoritz_Set track/item to white color" _SWS_WHITEITEM _SWS_WHITETRACK
+ACT 1 0 "1541d3ec0d079446bb775a49478f0070" "Custom: NickMoritz_Zoom out project (full)" 40295 40727
+ACT 1 0 "36cfb34a9680044294b4113c63417fb9" "Custom: Open last project in new tab" 40859 _SWS_OPENLASTPROJ
+ACT 1 0 "a273a27b21ed4f42b7d42474e5da4cf4" "Custom: Oz - Freeze all midi items on selected track(s) to stereo and keep midi next to audio" 40914 40421 41173 40698 41223 40058 40719 40751 40645
+ACT 1 0 "6b216e48b9b9184caff6a52b90381100" "Custom: Paste item(s) on one track moving all items grouped across tracks (select track and grouped item(s) in it) -- disable Ripple edit" 40034 _SWS_SAVEALLSELITEMS1 42398 40698 _SWS_RESTALLSELITEMS1 41173 42398 40006 _SWS_RESTALLSELITEMS1 41205
+ACT 1 0 "d73cd54f4295eb478de50dd139e29788" "Custom: Paste, moving later items (first create time selection identical in length to the section being pasted in)" 40200 40058
+ACT 1 0 "0ced9103e2d3544a939706534b7e5dba" "Custom: Pinknoise_4 Points at selection move down 5 db  " _BR_INSERT_2_ENV_POINT_TIME_SEL _SWS_MOVECURSELRIGHT 40915 _SWS_BRMOVEEDITSELPREVENV _SWS_BRMOVEEDITSELNEXTENV _BR_DEC_VOL_ENV_PT_5db 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 _BR_ENV_SHIFT_SEL_RIGHT _BR_DEC_VOL_ENV_PT_5db _SWS_MOVECURSELRIGHT 40915 _BR_INC_VOL_ENV_PT_5db 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 41176 40039 40039 40039 40039 40039 40039 40039 40039 40039 40039 40039 40039 40039 40039 40039 40039
+ACT 1 0 "1515cb5cef85c04cbc23c20b8003d484" "Custom: Pinknoise_4 Points outside selection move down up " 40633 _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT 40915 40632 _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT 40915 _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT 40633 _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _BR_INSERT_2_ENV_POINT_TIME_SEL _FNG_ENVUP _FNG_ENVUP _FNG_ENVUP _FNG_ENVUP _FNG_ENVUP _FNG_ENVUP 40633 _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT 40632 _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _BR_INSERT_2_ENV_POINT_TIME_SEL _FNG_ENVDOWN _FNG_ENVDOWN _FNG_ENVDOWN _FNG_ENVDOWN _FNG_ENVDOWN _FNG_ENVDOWN _FNG_ENVDOWN _FNG_ENVDOWN _FNG_ENVDOWN _FNG_ENVDOWN
+ACT 1 0 "5eba81edff917d44823bb9ea6b912863" "Custom: Pinknoise_4 Points outside selection move up " 40633 _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT 40915 40632 _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT 40915 _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT 40633 _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _BR_INSERT_2_ENV_POINT_TIME_SEL _FNG_ENVUP _FNG_ENVUP _FNG_ENVUP _FNG_ENVUP _FNG_ENVUP _FNG_ENVUP 40633 _SWS_MOVECURSELRIGHT _SWS_MOVECURSELRIGHT 40632 _SWS_MOVECURSELLEFT _SWS_MOVECURSELLEFT _BR_INSERT_2_ENV_POINT_TIME_SEL
+ACT 0 0 "1c22ee9c0440b14db577aa8ad410e879" "Custom: Pinknoise_Bypass FX select next FX unbypass selected fX" _S&M_FXBYP_SETONSEL _S&M_SELFXNEXT _S&M_FXBYP_SETOFFSEL
+ACT 0 0 "aa18960d3f08f34da123a0fd73517766" "Custom: Pinknoise_Bypass FX select previous FX unbypass selected fX" _S&M_FXBYP_SETONSEL _S&M_SELFXPREV _S&M_FXBYP_SETOFFSEL
+ACT 1 0 "f6ed9f6598bc054ea282edf6e6f21419" "Custom: Play and Stop playback at the end of selected item OFF" _SWS_SETREPEAT 40750 _SWS_RESTTIME1 41834
+ACT 1 0 "f486dfb342199a47b27f697f461a1163" "Custom: Play and Stop playback at the end of selected item ON" _SWS_SAVETIME1 40290 40749 _SWS_UNSETREPEAT 41834 40630 41173 1007
+ACT 1 0 "d49925f17ab36b4b94a3e10d1147c934" "Custom: Play and move play cursor to edit cursor at play time" 40044 1007
+ACT 1 0 "3773b0be3a923e4bbf6f53552b08bdd3" "Custom: Pod_Peek_Autocopy selected area to next track and mute original (select item and make time sel)" 40061 40060 40285 40630 40058 40289 40286 40718 40719 40289 40635
+ACT 1 0 "5e1403995e009f4b9428921387a05580" "Custom: Pod_Peek_Remove gaps between items and move all to project start (select track, repos. values: End, 0)" 40421 _XENAKIOS_REPOSITION_ITEMS 40042 41205 40289
+ACT 1 0 "faf795a3fe6d3742862dedeb9783d7b6" "Custom: PooFox aka foxAsteria !!!Panic!!!" 41175
+ACT 1 0 "e36c91a59b99eb4b9910e95cbc3b48e4" "Custom: PooFox aka foxAsteria Apply Groove (Looser)" _FNG_APPLY_MIDI_GROOVE_16 _FNG_APPLY_GROOVE
+ACT 1 0 "4747d175b0e520469baf40512d434d11" "Custom: PooFox aka foxAsteria Apply Groove (Strong)" _FNG_APPLY_GROOVE_32 _FNG_APPLY_MIDI_GROOVE_32
+ACT 1 0 "b6022571e1a23346aa16da91d4cc7184" "Custom: PooFox aka foxAsteria Arm Exclusive" _SWS_TOGTRACKSEL _XENAKIOS_SELTRAX_RECUNARMED _SWS_TOGTRACKSEL _XENAKIOS_SELTRAX_RECARMED
+ACT 1 0 "2e99129f112767499018e5598c3f06ca" "Custom: PooFox aka foxAsteria Arm Exclusive (under mouse)" 41110 _SWS_TOGTRACKSEL _XENAKIOS_SELTRAX_RECUNARMED _SWS_TOGTRACKSEL _XENAKIOS_SELTRAX_RECARMED
+ACT 1 0 "ee9e604e4ba49d49aea0165d27e1b499" "Custom: PooFox aka foxAsteria Arm/Disarm All and Stop Audio Trails" _SWS_SAVESEL 40296 40491 _SWS_RESTORESEL
+ACT 1 0 "e6aea0be7222dc418147a1655252c558" "Custom: PooFox aka foxAsteria Audio Device" 1016 40099
+ACT 1 0 "183ee30b4a78b347b29f4223b212672a" "Custom: PooFox aka foxAsteria Auto Crossfade" 40912 40041
+ACT 1 0 "ce9dac6503e8a0499bef01fc995fc36b" "Custom: PooFox aka foxAsteria CPU Solo (Mute Others)" 40731 _SWSSNAPSHOT_MIXMODE _SWS_SAVESEL _SWSSNAPSHOT_SAVE11 40297 _SWS_SELMUTEDTRACKS 6 _SWS_RESTORESEL _SWS_TOGTRACKSEL 40730 _SWS_RESTORESEL _SWS_SELPARENTS2 40731 _SWS_RESTORESEL
+ACT 1 0 "cdaacef73133df498f98d7d8b7d050ff" "Custom: PooFox aka foxAsteria Close All Floating Windows" _S&M_WNCLS3 _S&M_WNCLS5 _S&M_WNCLS1
+ACT 1 0 "cca81333be922647a5adda59f27e2b88" "Custom: PooFox aka foxAsteria Collapse All Folder Tracks" _SWS_SAVESEL _SWS_SELALLPARENTS _SWS_COLLAPSE _SWS_RESTORESEL
+ACT 1 0 "aac9eaed6a553c40b1987338f16e28c6" "Custom: PooFox aka foxAsteria Convert MIDI to Audio" _SWS_SAVEREPEAT _SWS_UNSETREPEAT 40253 40499 40632 _XEN_PREF_STOPATENDLOOP 1013 _XEN_PREF_STOPATENDLOOP 40496 40076 _SWS_RESTREPEAT
+ACT 1 0 "05299f081dc1e242a75cc72537789e26" "Custom: PooFox aka foxAsteria Copy" 40057 40318
+ACT 1 0 "41d113fbe4fc444d9d9f1ff5de6ade79" "Custom: PooFox aka foxAsteria Copy Envelope Points" 40057
+ACT 1 0 "c8fc250f338cda4c9ae6520b334bc7ff" "Custom: PooFox aka foxAsteria Crossfade Selection" 40717 40916
+ACT 1 0 "5f331c74da703a41b4344c3f226d91cf" "Custom: PooFox aka foxAsteria Curve Shape: Bezier" 40332 40681 40683 40331
+ACT 1 0 "c6d8b3280738824393e62e55cae9d2d5" "Custom: PooFox aka foxAsteria Curve Shape: Fast Start, Slow End (Push)" 40332 40430 40428 40331
+ACT 1 0 "6d9c6a501f52c04dba8f0583ced32fc5" "Custom: PooFox aka foxAsteria Curve Shape: Linear" 40332 40187 40189 40331
+ACT 1 0 "5a171ec42708ba4aa360b88e381fecaf" "Custom: PooFox aka foxAsteria Curve Shape: On/Off (Square)" 40332 40190 40188 40331
+ACT 1 0 "32245774a21fd441866da9d372a6d722" "Custom: PooFox aka foxAsteria Curve Shape: Slow Start, Fast End (Pull)" 40332 40429 40188 40331
+ACT 1 0 "8e686a6353c3fe4d9d376268f96bb185" "Custom: PooFox aka foxAsteria Curve Shape: Slow Start/End (Sine)" 40332 40424 40425 40331
+ACT 1 0 "020e2c92e19faa4d9baa1639d13527f8" "Custom: PooFox aka foxAsteria Delete Envelopes on Tracks" 40333
+ACT 1 0 "9db5099cba9aae43b867ebf73be3322d" "Custom: PooFox aka foxAsteria Duplicate Loop" 40755 40753 40311 40717 41296 40756 40309
+ACT 1 0 "68da500ae4505d4f89691375b3ba57c9" "Custom: PooFox aka foxAsteria Envelopes Toggle" 40926 40289
+ACT 1 0 "86154a65fee0ee48be55c5a1cfcc714e" "Custom: PooFox aka foxAsteria Expand All Folders" _SWS_SAVESEL _SWS_SELALLPARENTS _SWS_UNCOLLAPSE _SWS_RESTORESEL
+ACT 1 0 "0a57e7a2e848af408ff985179d5a02fb" "Custom: PooFox aka foxAsteria Extract Groove" _FNG_GET_GROOVE _FNG_GET_GROOVE_MIDI
+ACT 1 0 "fecc6b664773c741acab0e9051ee7e19" "Custom: PooFox aka foxAsteria Fold Tracks into Top Selected" _SWS_MAKEFOLDER _SWS_UNSELPARENTS _SWS_BYPASSFX _SWS_MUTESENDS _SWS_DISMPSEND _SWS_SELPARENTS 1042 1042
+ACT 1 0 "798ec6f35f1e2747a5fb813c2fff7988" "Custom: PooFox aka foxAsteria Folderize (place selected tracks in new folder)" _SWS_SAVESEL _SWS_INSRTTRKABOVE _SWS_RESTORESEL _XENAKIOS_SELPREVTRACKKEEP _SWS_MAKEFOLDER _SWS_SELPARENTS _XENAKIOS_RENAMETRAXDLG
+ACT 1 0 "8f18dafd9f121442a140abe9be030a38" "Custom: PooFox aka foxAsteria Fx" 40505 _S&M_TOGLFXCHAIN
+ACT 1 0 "61ead65be8ab38488bca4e98149acdf2" "Custom: PooFox aka foxAsteria Glue and Group" 40362 40032
+ACT 1 0 "876eb0fc55743f46b79dc6b75a99116e" "Custom: PooFox aka foxAsteria Go to Previous Position" 40848
+ACT 1 0 "37cbb1047ebbce4e97a89f432fc4e70f" "Custom: PooFox aka foxAsteria Group Aligned Items" 40513 _SWS_SAVESEL 40296 _XENAKIOS_SELITEMSUNDEDCURSELTX 40032 _SWS_RESTORESEL
+ACT 1 0 "e7e870d1880a2d4a98722e65da8cd3da" "Custom: PooFox aka foxAsteria Hear Everything (unmute + unsolo all tracks)" 40340 40339
+ACT 1 0 "d4cdd2668552c94a8500b9ac2724f673" "Custom: PooFox aka foxAsteria Hide Take Envelopes" _S&M_TAKEENV6 _S&M_TAKEENV5 _S&M_TAKEENV4
+ACT 1 0 "6aded9292c75cc488a5d7d5eb1747e22" "Custom: PooFox aka foxAsteria Hotspot: Go To" 40449
+ACT 1 0 "dc040240156f944abd4bb378ed17be97" "Custom: PooFox aka foxAsteria Hotspot: Store" 40469
+ACT 1 0 "cf80ea0c8854a14ab04691affefef1be" "Custom: PooFox aka foxAsteria Insert Marker at Mouse" 40513 40157
+ACT 1 0 "b13ea4dd8a453e40b1ffecc5d65db829" "Custom: PooFox aka foxAsteria Insert Tempo Marker" 40256 40157
+ACT 1 0 "81a6e0ee66dd904db71a7f5743d93e52" "Custom: PooFox aka foxAsteria Insert Time" 40200 40038
+ACT 1 0 "dcf8c70b70b2d74cb2899f885c8deedb" "Custom: PooFox aka foxAsteria Jog" 992
+ACT 1 0 "75f5ccc78fa3584bb5d065d9f8c7fd49" "Custom: PooFox aka foxAsteria Lanes (toggle)" 40435 40507
+ACT 1 0 "c38411e5dad63d4dab7667905751c39d" "Custom: PooFox aka foxAsteria Left Click Item" 41110 41173
+ACT 1 0 "2a45ec8eefb8534f897d2f7715c6ceeb" "Custom: PooFox aka foxAsteria Loop End (set by Tranzport)" 40434 40836 40626
+ACT 1 0 "cc54e34935bb2b428f12df41d5bf4aef" "Custom: PooFox aka foxAsteria Loop End to Mouse" 40513 40626
+ACT 1 0 "f12309c714fcf44b836b5c228af64f17" "Custom: PooFox aka foxAsteria Loop Start (set by Tranzport)" 40434 40836 40625
+ACT 1 0 "cc56f5f6c63e2346a051b85a6c601ec0" "Custom: PooFox aka foxAsteria Loop Start to Mouse" 40513 40625
+ACT 1 0 "a9037b76822ee34ba970118ef796e792" "Custom: PooFox aka foxAsteria Loop to Item under Mouse" 40530 41039 40290 _SWS_SETREPEAT
+ACT 1 0 "f0c81c83f08a6740ae8898e3e14b02b7" "Custom: PooFox aka foxAsteria Marker at Transient" 40755 40753 40421 40836 40157 40756
+ACT 1 0 "1a7c1a64a3e41a4abf9e121db263f46f" "Custom: PooFox aka foxAsteria Metronome (Tranzport)" _SWS_AWMPLAYON _SWS_AWMRECON 40364
+ACT 0 0 "f68286d069cf2c4db6f0669a852aa377" "Custom: PooFox aka foxAsteria Mouse Mute Tool" 40529
+ACT 1 0 "6db5f9a4d4e35a4e8bdfc08a7cfa73ef" "Custom: PooFox aka foxAsteria Mute Envelope" 40889 40867
+ACT 1 0 "1959e83e945b43489a8d01e3d700e107" "Custom: PooFox aka foxAsteria Mute Items Under Cursor" 40529 40034 40175 40289
+ACT 1 0 "42bc5015ee34c64caa59934bceb0f048" "Custom: PooFox aka foxAsteria Mute Track (toggle)" 41110 6
+ACT 1 0 "6b3f080ded08c54982477fb918efa97b" "Custom: PooFox aka foxAsteria New Buss (with receives)" _S&M_SENDS1 _XENAKIOS_RENAMETRAXDLG 40913
+ACT 1 0 "e30031a09bccfc419ff07343d9a8fe25" "Custom: PooFox aka foxAsteria Next Item" 40417 40318 40034 40044 40044
+ACT 1 0 "4f2fca32597a264fbb771ecbc7e90d05" "Custom: PooFox aka foxAsteria Next Region" _SWS_SELNEXTREG 40630
+ACT 1 0 "d699ee26e79f1045b4ae6df843f66543" "Custom: PooFox aka foxAsteria Next Take" 40289 40528 40034 40125 40289
+ACT 1 0 "c34bf80c5965e441ba22e40c6348b128" "Custom: PooFox aka foxAsteria Open in MIDI Editor" 40128
+ACT 1 0 "2997d9ca35b03d46802d5268d924c19f" "Custom: PooFox aka foxAsteria Pan Envelope" 40889 40407
+ACT 1 0 "0f1515a863871144a859c06c85ff05b8" "Custom: PooFox aka foxAsteria Play From Mouse Position" 40755 40753 40513 40756 1007
+ACT 1 0 "b78c9c1168676b40b9e28b47c979f5a8" "Custom: PooFox aka foxAsteria Play Items Once" 41173 41559 _XENAKIOS_TIMERTEST1 41560
+ACT 1 0 "b31f79c07744a1479c371354c016a6cf" "Custom: PooFox aka foxAsteria Play from Item Under Cursor from Start" 40289 40513 40528 41173 1007
+ACT 1 0 "4c10358677deab408693964e519ebdfa" "Custom: PooFox aka foxAsteria Play from Mouse Position" 40513 40528 40836 1007
+ACT 1 0 "988ab7cef95c0d4ab2a113c3547bfde8" "Custom: PooFox aka foxAsteria Play/Pause w Note Off" 40073 40345
+ACT 0 0 "fe08d596dd585142825b704d249b2864" "Custom: PooFox aka foxAsteria Play/Stop" 40044 40289
+ACT 1 0 "afe30168d1912a468e4be5eb72ec6d29" "Custom: PooFox aka foxAsteria Play/Stop (Punch Off)" 40252 40044
+ACT 1 0 "aad6145860615c4caa401bd78487eb68" "Custom: PooFox aka foxAsteria PooFox aka foxAsteria  Zoom 1" 40444 40913 40151
+ACT 1 0 "23bc7b7382000a4880ee7a47cb2105e0" "Custom: PooFox aka foxAsteria Previous Item" 40416 40034 40044 40044
+ACT 1 0 "678031fee2a02c45889a0e4da3e44188" "Custom: PooFox aka foxAsteria Previous Region" _SWS_SELPREVREG 40630
+ACT 1 0 "00d7e876a0c6ef44bc0cbe302f2309a7" "Custom: PooFox aka foxAsteria Previous Take" 40528 40034 40126 40289
+ACT 1 0 "bd6d59ec0c7ac3469127ba975dd27b3a" "Custom: PooFox aka foxAsteria Quantize Item" 40529 40034 _SWS_QUANTITESTART2 40289
+ACT 1 0 "26217b10bb6f664f8eaaa6cfbfecc47e" "Custom: PooFox aka foxAsteria Record" 1013
+ACT 1 0 "1dcaf019382d1e4d9b4f31a89d3e5a56" "Custom: PooFox aka foxAsteria Region from Selection" 40174 40616 _SWSMARKERLIST8
+ACT 1 0 "93f2d735b82f7c4ab5c1cf87ad87d453" "Custom: PooFox aka foxAsteria Remove Style" 40900 40359
+ACT 1 0 "25377822deffbe489f9cbe82f6d58f5e" "Custom: PooFox aka foxAsteria Remove/Delete Track" 40005 40286
+ACT 1 0 "98285243abec86499852a652644c0411" "Custom: PooFox aka foxAsteria Rename and Recolor" 40706 _XENAKIOS_RENMTAKEALL
+ACT 1 0 "8d05c23bf7cada46a697346d8f6b21e5" "Custom: PooFox aka foxAsteria Render as New Item" 40362
+ACT 1 0 "7646d565f423d44d9eb4324f4af80cf0" "Custom: PooFox aka foxAsteria Reset Fades" _XENAKIOS_REMOVEITEMFADES
+ACT 1 0 "da1cdc76b3ff1b47bf9b69f97d7e4f81" "Custom: PooFox aka foxAsteria Reset Time Selection" 40635 _SWS_UNSETREPEAT
+ACT 1 0 "7b25648d59832f4a96ffdb636ffaa2e0" "Custom: PooFox aka foxAsteria Return to Zero/Loop Off" _XENAKIOS_DOSTORECURPOS 40042 41042 _SWS_UNSETREPEAT
+ACT 1 0 "8282e64858683a45a19042d5eeafd92e" "Custom: PooFox aka foxAsteria Scroll Horizontally" 2007 2007 977
+ACT 1 0 "3db6dea3cc9fb94292fdd24e65bc2e41" "Custom: PooFox aka foxAsteria Scroll Vertical" 2004 2007 989
+ACT 1 0 "58b46ec163f33f45ae68d69e2e951b09" "Custom: PooFox aka foxAsteria Scrub" 2003 974
+ACT 1 0 "5d9be4fb861ca342b9d93a34bfdb2f26" "Custom: PooFox aka foxAsteria Select Aligned Items Under Cursor" 40528 40290 40513 _SWS_SAVESEL 40296 _XENAKIOS_SELITEMSUNDEDCURSELTX _SWS_RESTORESEL
+ACT 1 0 "3ad3f583210a6b45a7aa89e27cfd0d28" "Custom: PooFox aka foxAsteria Select All Child Tracks" 40296 _SWS_UNSELPARENTS
+ACT 1 0 "eba3b6308c524141828c1bab2004636f" "Custom: PooFox aka foxAsteria Select All Items on Tracks in Time Selection" 40289 40718
+ACT 1 0 "d8d76902eafad84d819a4d477b88cab7" "Custom: PooFox aka foxAsteria Select Item and Track" 40529 41110
+ACT 1 0 "b0822772e106064e8c46a3240eabb85c" "Custom: PooFox aka foxAsteria Select Tracks in This Folder (siblings)" _SWS_SELCHILDREN2 _XENAKIOS_SELLASTOFSELTRAX _SWS_SELPARENTS2 _SWS_SELCHILDREN
+ACT 1 0 "449f2dbea5423f42892e120dd10d0971" "Custom: PooFox aka foxAsteria Show Envelope" 40890
+ACT 1 0 "41dad466c83fcb4c901dc193fa356ae4" "Custom: PooFox aka foxAsteria Size Items to Mouse (Left Side)" 40513 _XENAKIOS_TRIM_LEFTEDGETO_EDCURSOR
+ACT 1 0 "ef40a774afb9134abc9625e7af0233c3" "Custom: PooFox aka foxAsteria Size Items to Mouse (Right Side)" 40513 _XENAKIOS_TRIM_RIGHTEDGETO_EDCURSOR
+ACT 1 0 "51c19b6d7748ff4686739e695229bc60" "Custom: PooFox aka foxAsteria Solo" 41110 _SWS_TOGTRACKSEL 40729 _SWS_TOGTRACKSEL 7 40345 40513
+ACT 1 0 "6a81f94d9c988248b73e5f5f11c03d16" "Custom: PooFox aka foxAsteria Solo Exclusive" _SWS_SAVESEL _SWS_TOGTRACKSEL 40340 _SWS_RESTORESEL 7
+ACT 1 0 "184bbcb8976fbf4c9c5f2d01a7a6384e" "Custom: PooFox aka foxAsteria Split Items at Mouse" 40529 40513 40757
+ACT 1 0 "7d8e9c8e1785c1478f33039457ed887c" "Custom: PooFox aka foxAsteria Split Items at Mouse (no snapping)" 40755 40753 40529 40514 40757 40756
+ACT 1 0 "1536866d45a9e84881067558340afa29" "Custom: PooFox aka foxAsteria Split Items at Transient Under Mouse" 40755 40753 40529 40513 40836 40757 40756
+ACT 1 0 "ad84b4f6f7af1349be79692004424887" "Custom: PooFox aka foxAsteria Split without Grid Snapping" 1157 40757 1157
+ACT 1 0 "194488dc80e1c74a9707d2796e4dd515" "Custom: PooFox aka foxAsteria Stop" 1016 40289
+ACT 1 0 "77dc8afa9a395241b932fec105d904d7" "Custom: PooFox aka foxAsteria Tempo Map Time Selection" 40801
+ACT 1 0 "18881d2471f0614a9957b53b9f85d1b7" "Custom: PooFox aka foxAsteria Tempo Map to Left of Marker" 40635 40626 40172 40625 40801 40630
+ACT 1 0 "51c2e115a4a5be4385393dbd0e203186" "Custom: PooFox aka foxAsteria Tempo Map to Right of Marker" 40635 40625 40173 40626 40801 40631
+ACT 1 0 "52fb10357b72ce42b1dfa080ad2ace91" "Custom: PooFox aka foxAsteria Time Selection: End at Transient under Mouse" 40528 40514 40836 40626
+ACT 1 0 "48de2154c12b574c8bd9ab81fc0f4d83" "Custom: PooFox aka foxAsteria Time Selection: Left Edge to Left" 40755 40753 40289 40718 40632 40376 40222 40756
+ACT 1 0 "956fc02c4e98d141ad8744f5348a41f8" "Custom: PooFox aka foxAsteria Time Selection: Left Edge to Right" 40755 40753 40289 40718 40632 40375 40222 40756
+ACT 1 0 "66d42678126f094fafd7421767f134ce" "Custom: PooFox aka foxAsteria Time Selection: Right Edge to Left" 40755 40753 40289 40718 40633 40376 40223 40756
+ACT 1 0 "2edd5b48a6adc54d99b25afc173ff511" "Custom: PooFox aka foxAsteria Time Selection: Right Edge to Right" 40755 40753 40289 40718 40633 40375 40223 40756
+ACT 1 0 "77b92f9e9009d743a7a3c5f52ceb8856" "Custom: PooFox aka foxAsteria Time Selection: Start at Transient under Mouse" 40289 40528 40514 40836 40625
+ACT 1 0 "7ea49e4235b54b48a316dc9c98a9b9d9" "Custom: PooFox aka foxAsteria Timebase to Beats" _SWS_SAVESEL 40296 40488 40367 _SWS_RESTORESEL
+ACT 1 0 "82afa1d3a9e7b84581c4cd9d223fc220" "Custom: PooFox aka foxAsteria Timebase to Time" _SWS_SAVESEL 40296 40487 40365 _SWS_RESTORESEL
+ACT 1 0 "a25505c54abd834fbe33b957990bf8ea" "Custom: PooFox aka foxAsteria Toggle Item Pitch Envelope" 40889 41612
+ACT 1 0 "728469d86de76c40a7fe836d9b8b371d" "Custom: PooFox aka foxAsteria Toggle Metronome (not count-in)" _SWS_AWMPLAYTOG _SWS_AWMRECTOG
+ACT 1 0 "d4f1382211473a46b5d98a119119dea1" "Custom: PooFox aka foxAsteria Track Select" 993
+ACT 1 0 "ee75ddca1737454cb49c70d692fb3974" "Custom: PooFox aka foxAsteria Track Type..." 40357 40899
+ACT 1 0 "5efe75b12984bf44be0b97683785a72b" "Custom: PooFox aka foxAsteria Track Type: Backing Vox" _SWS_TRACKCUSTCOL5 _SWS_ITEMCUSTCOL5 40899
+ACT 1 0 "643814916d9ee14c8ee02f32c56206a7" "Custom: PooFox aka foxAsteria Track Type: Bass" _SWS_TRACKCUSTCOL10 40899
+ACT 1 0 "d20525095ad9654f8209075cfabea2ae" "Custom: PooFox aka foxAsteria Track Type: Beat" _SWS_TRACKCUSTCOL2 40899
+ACT 1 0 "53d3d4191e75c540b5fd823725a6b324" "Custom: PooFox aka foxAsteria Track Type: Drums" _SWS_TRACKCUSTCOL3 40899
+ACT 1 0 "66a9bcca4e20a44297c874914c68182b" "Custom: PooFox aka foxAsteria Track Type: Effect" _SWS_TRACKCUSTCOL16 40899
+ACT 1 0 "ac871bf0763eae4fbc9557ded119a79d" "Custom: PooFox aka foxAsteria Track Type: Guitar" _SWS_TRACKCUSTCOL9 40899
+ACT 1 0 "63c21237a2461743ad9a023a8aa72db1" "Custom: PooFox aka foxAsteria Track Type: Pads & Touches" _SWS_TRACKCUSTCOL6 40899
+ACT 1 0 "652ca967a1066f4eb2aae2ac705782f2" "Custom: PooFox aka foxAsteria Track Type: Synth" _SWS_TRACKCUSTCOL1 40899
+ACT 1 0 "77ac0e912947674f9e1ae0fa833a36b3" "Custom: PooFox aka foxAsteria Track Type: Vox" _SWS_TRACKCUSTCOL4 40899
+ACT 1 0 "566041275526424c9069916f2c0cc92a" "Custom: PooFox aka foxAsteria Track View Down" 40505 _XENAKIOS_SELTRAX_RECUNARMED _S&M_HIDEFXCHAIN 40285 _XENAKIOS_SELTRAX_RECARMED
+ACT 1 0 "b479771477393e4abd724b2400e78e7e" "Custom: PooFox aka foxAsteria Track View Up" 40505 _XENAKIOS_SELTRAX_RECUNARMED _S&M_HIDEFXCHAIN 40286 _XENAKIOS_SELTRAX_RECARMED
+ACT 1 0 "e4385452f357174491321fbfa2d7f4b5" "Custom: PooFox aka foxAsteria UnFreeze" 1041 40285 _SWS_UNBYPASSFX 40286 40005
+ACT 1 0 "a3fb5f4b7cfcc6469e86df8371c23264" "Custom: PooFox aka foxAsteria UnMute All Items" 40182 40720 40289
+ACT 1 0 "d178d5c4e5fa7c4a9c9fa1b5c587c9f7" "Custom: PooFox aka foxAsteria Unarm All Tracks/Auto Arm" 40491
+ACT 1 0 "aae18b90e76def458868f00b027c19fe" "Custom: PooFox aka foxAsteria View Current Position" 40150
+ACT 1 0 "f96680c98bd7684aa205b0879605e298" "Custom: PooFox aka foxAsteria Volume Envelope" 40889 40406
+ACT 1 0 "1e9cf2dfe7d7b64aaaed925b643719d7" "Custom: PooFox aka foxAsteria Zoom 2" 40445 40913 40151
+ACT 1 0 "77626e1f09e6df49aae43fe644c73951" "Custom: PooFox aka foxAsteria Zoom 3" 40446 40913 40151
+ACT 1 0 "a506e2a7335afe4ea3c79cf73305bb85" "Custom: PooFox aka foxAsteria Zoom 4" 40447 40913 40151
+ACT 1 0 "84612dda28565b4b885c75a7e77fb7a4" "Custom: PooFox aka foxAsteria Zoom Horizontal" 2004 2007 2007 990
+ACT 1 0 "9d2b23cb3d98934d81f86aadb610e813" "Custom: PooFox aka foxAsteria Zoom Out from Play Cursor" 40151 1011 40151
+ACT 1 0 "2bbe73138f0bf14eaa0aff4a38656324" "Custom: PooFox aka foxAsteria Zoom Right Side of Selection" 40434 40631 1007
+ACT 1 0 "cb5b20312eff43499042b10e60253687" "Custom: PooFox aka foxAsteria Zoom Split and Edit" 41039 40031 40109
+ACT 1 0 "ebaea2d6886b9a4d81c33d3f76abc21e" "Custom: PooFox aka foxAsteria Zoom to Play Cursor" 40151 1012 40151
+ACT 1 0 "71650c01ed970a4fb613a862844f3a74" "Custom: PooFox aka foxAsteria_Duplicate all items in time selection moving later items" 40311 40718 40061 41296 40309
+ACT 1 0 "fc46e9af5d43dd47899e905e86215e62" "Custom: Preview:  Move cursor to the next adjacent item on the track, retreat 1 beat and play (select all items) -- next click after playhead crossed item joint point" 40434 40319 40842 1016 1007
+ACT 1 0 "412aedf8dc03324399918bc077863ee3" "Custom: Preview: Move cursor to the next adjacent item on the track and retreat 1 beat (select track) - 1st click is idle" 41173 40417 40842
+ACT 1 0 "a338cb93e29d544c9adc6c4e90df8428" "Custom: Preview: Move cursor to the next adjacent item on the track and retreat 1 beat (select track, place cursor over the 1st item) -- next click after playhead crossed item joint point" 40434 40319 40842
+ACT 1 0 "1945ec1a94a65046b19b42ec39569f85" "Custom: Preview: Move cursor to the next adjacent item on the track, retreat 1 beat and play (select track) - 1st click is idle" 41173 40417 40842 1016 1007
+ACT 1 0 "ff8743bdce22e542870c29dfc3189e60" "Custom: Put selected tracks in a folder" _SWS_SAVESEL _SWS_INSRTTRKABOVE _SWS_TOGSAVESEL _XENAKIOS_SELPREVTRACKKEEP _SWS_MAKEFOLDER 40297
+ACT 1 0 "b3018347dbdf7549b0f38a3f992b187f" "Custom: Quantize MIDI item notes to 1/4" 40779 _FNG_QUANTIZE_TO_GRID
+ACT 1 0 "ab31a8ab2941524ca3e576d40ae6b924" "Custom: Quantize MIDI item notes to 1/4T" 41214 _FNG_QUANTIZE_TO_GRID
+ACT 1 0 "c768ac085df5d14386e2a335c663e27c" "Custom: Quantize MIDI item notes to 1/8" 40778 _FNG_QUANTIZE_TO_GRID
+ACT 1 0 "13666cce7c77f14f9019e630eaaa3a09" "Custom: Quantize MIDI item notes to 1/8T" 40777 _FNG_QUANTIZE_TO_GRID
+ACT 1 0 "25ee900ece566b4fadb96d6f1b1c52d6" "Custom: Quantize MIDI item notes to 1/16" 40776 _FNG_QUANTIZE_TO_GRID
+ACT 1 0 "823d529dcda1774f8e98cfe023a7dce8" "Custom: Quantize MIDI item notes to 1/16T" 41213 _FNG_QUANTIZE_TO_GRID
+ACT 1 0 "12b0b31d1e85294db26615009c56f257" "Custom: Quantize MIDI item notes to 1/32" 40775 _FNG_QUANTIZE_TO_GRID
+ACT 1 0 "63c5faf76dd04744a6a7e2a5f89282dc" "Custom: Quantize MIDI item notes to 1/32T" 41212 _FNG_QUANTIZE_TO_GRID
+ACT 1 0 "e55a0afd57753546ada7924eea5e76a3" "Custom: Quick navigation through and preview of track items backward" 40416 41039 1007
+ACT 1 0 "8adc0caa82cf904999ec154491783855" "Custom: Quick navigation through and preview of track items forward" 40417 41039 1007
+ACT 1 0 "9415697365508f45bdbb99b38f6a6588" "Custom: REAPERMania_Seek by clicking the item during playback (assign to mouse modifier)" 2022 1007 2015 1007
+ACT 1 0 "f1496cf01b78914bb630d7e2d253c511" "Custom: Re-enable all send tracks for Voxengo SPAN monitoring" _SWS_SAVESEL _SWS_SELPARENTS _SWS_SELCHILDREN _SWS_ENMPSEND _SWS_TOGSAVESEL
+ACT 1 0 "0f8d571967e7f84ea5a3df3664e2ba15" "Custom: ReaperBlog_Merge items across tracks with gluing (select items)" 40919 40644 40362 40922
+ACT 1 0 "c935174878b6334f943dc29bca4f82dc" "Custom: ReaperBlog_Paste in selection (paste special) & fade (to create uniform slince gaps in speech recording) watch?v=si4pfez0oiM" 40309 40630 40058 40508 _SWS_LOOPITEMSECTION 40631 41311 _SWS_SELNEXTITEM 41305 _SWS_SELPREVITEM 40225 40225 40228 40228
+ACT 1 0 "7cf1e3ebc71819428f73e0e2d83d0978" "Custom: Recording: Pre-recording pause (set edit cursor to the start point) -- AFFECTS SELECTED TRACK" 40498 40625 41667 40626 40630 1013 1008 40718 40006 40630 40635 40496
+ACT 1 0 "9d43fca7afdada4ebb6aa9b2eca507ea" "Custom: Refresh theme" 40382 40381
+ACT 1 0 "4835144595a97a4c9e994cd20837499f" "Custom: Region from loop" 40623 40174 40635
+ACT 1 0 "f6ec66fb4a12bc41b8fd3dd50b8e77ed" "Custom: Remove FX from selected tracks" _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX 40297
+ACT 1 0 "8df31470634d7a4094b11ed9b7313524" "Custom: Remove FX from selected tracks-2" _S&M_SELFX1 _S&M_REMOVE_FX _S&M_SELFX1 _S&M_REMOVE_FX _S&M_SELFX1 _S&M_REMOVE_FX _S&M_SELFX1 _S&M_REMOVE_FX _S&M_SELFX1 _S&M_REMOVE_FX _S&M_SELFX1 _S&M_REMOVE_FX _S&M_SELFX1 _S&M_REMOVE_FX _S&M_SELFX1 _S&M_REMOVE_FX _S&M_SELFX1 _S&M_REMOVE_FX _S&M_SELFX1 40297
+ACT 1 0 "99e816cfb02e4c4e906b25684f5766aa" "Custom: Remove all envelopes for all tracks" _SWS_SAVESEL 40296 _S&M_REMOVE_ALLENVS _SWS_RESTORESEL
+ACT 1 0 "ca39285d761f6341b9f5606b409b9280" "Custom: Remove selected area of items and time selection" 40312 40635
+ACT 1 0 "849236be0b3d0c428519bef6472876bb" "Custom: Rename selected item and propagate its name to the track (1st select the item) " _SWS_SELTRKWITEM _XENAKIOS_RENMTAKE _SWS_NAMETKLIKEITEM
+ACT 1 0 "71ce247e34fdda4080099611a0c42914" "Custom: Rename selected items and propagate their name to the track (1st select the items)" _SWS_SELTRKWITEM _XENAKIOS_RENMTAKEALL _SWS_NAMETKLIKEITEM
+ACT 1 0 "c64170d27571744b931f7cc911d0d0ef" "Custom: Render pre-fader st. stem obeying time sel and keep FX on the track (select track) - SWS" _S&M_COPYFXCHAIN5 _SWS_AWRENDERSTEREOSMART _S&M_COPYFXCHAIN10
+ACT 0 0 "3a2c17da563e9f4a8376d1819fec8f0c" "Custom: Render selected tracks and remove silence" 40405 40421 40315
+ACT 1 0 "a9172895842f5b4e9fa48f35ca68b6d1" "Custom: Render track and keep original track color (select original track)" 40062 _S&M_CLRFXCHAIN3 _XENAKIOS_RESETTRACKVOLANDPAN1 _S&M_SENDS6 _S&M_SENDS5 _S&M_REMOVE_ALLENVS 40421 40006 40914 40286 40405 40421 40118 40118 40005 40289
+ACT 1 0 "b6990fd1f0e87842ac5a6a86836c12b7" "Custom: Reno Mellow_remove selected area of item (either time selection or razor)" 40310 40312 40309
+ACT 1 0 "64bdabb7bffbe841894a3fe5e7599266" "Custom: Replace earlier item with the later on the same track (select track!!! & both items)" 41238 41174 40626 40318 40625 40289 40718 40699 41248 41173 42398 40930 40635
+ACT 1 0 "2f5100cd8931d8489f0a183c260b2e0e" "Custom: Replace earlier item with the later on the same track + ripple (select track!!! & both items)" 41238 41174 40626 40318 40625 40289 40718 40310 40699 40309 41248 41173 42398 40930 40635
+ACT 1 0 "af00a0de98e18b43aa0149ddf0042597" "Custom: Reset selected envelope to zero within time selection" 40726 40330 40415
+ACT 1 0 "179ea6af2f1e2940a53f645e57390f07" "Custom: Restore single track selection (select track) -- proof of concept" 40296 40505
+ACT 1 0 "543457ada9470e48be938015f07e8745" "Custom: Reverse hall reverb" 41042 40626 41043 41043 40625 _SWS_AWRENDERSTEREOSMART _XENAKIOS_SELFIRSTITEMSOFTRACKS 40270 40108 40131 _XEN_MOVE_EDCUR32NDRIGHT 41205 41042 41311 _XEN_MOVE_EDCUR32NDLEFT 40509 41518 40510 41525 40285 40731 41043
+ACT 1 0 "d1525858876cd643ac5b1b8fcf888ab2" "Custom: Ripple delete selected items across tracks" 40311 40312 40309
+ACT 1 0 "6d6bcd2d7d271943902e77239d6f7881" "Custom: Ripple edit all tracks (1st make time selection) or use Remove contents of time selection" 40310 _SWS_SAVEALLSELITEMS1 40717 40307 40309 _SWS_RESTALLSELITEMS1
+ACT 1 0 "0a0865a5640b3a4db7a7d51f4ccbc6c8" "Custom: Ripple edit per track (1. make time selection, 2. select item(s))" 40310 _SWS_SELTRKWITEM 40307 40309
+ACT 1 0 "52a738a8b71b034fb54d1a5731ead6b6" "Custom: Ripple record A (uses marker 10)_KennyGioia" 40757 40656 40043 1013
+ACT 1 0 "de33f29acebdc0419f617254fa862983" "Custom: Ripple record A_amagalma" 40757 _BR_SAVE_CURSOR_POS_SLOT_1 2008 40043 1013
+ACT 1 0 "aee41e52928af14f881586e50063804c" "Custom: Ripple record B (uses marker 10)_KennyGioia" 40667 40699 40160 41748
+ACT 1 0 "70ed56089ebef44a83239ee666c511c4" "Custom: Ripple record B_amagalma" 40667 40699 40310 _BR_RESTORE_CURSOR_POS_SLOT_1 42398 40309
+ACT 1 0 "34b3148aca19bf469eda5d5244e1934f" "Custom: SHOW ALL TRACKS in TCP and MCP ignoring track templates" _SWSTL_SHOWALL 40297 _S&M_CYCLACTION_96 _SWS_SELCHILDREN2 _SWSTL_HIDE
+ACT 1 0 "de72774a0f6f31458ee5e6b6d60cc027" "Custom: Sample slices preview backward (disable whatever loop is currently enabled, place cursor at end of item)" 1016 40633 40646 40223 40646 40222 40632 1007
+ACT 1 0 "6cb89312ae002648958ef2b4022531a4" "Custom: Sample slices preview backward (place cursor at end of item, allows jumping to edit cursor)" 1016 _BR_SAVE_CURSOR_POS_SLOT_1 40634 _BR_RESTORE_CURSOR_POS_SLOT_1 40646 40222 40647 40223 40632 1007
+ACT 1 0 "c6bc8bc34e7d154caa78f67b9599319f" "Custom: Sample slices preview forward (disable whatever loop is currently enabled, place cursor at start of item)" 1016 40632 40647 40222 40647 40223 40632 1007
+ACT 1 0 "029f228f45a4b748bb3e2499ef671ada" "Custom: Sample slices preview forward (place cursor at end of item, allows jumping to edit cursor)" 1016 _BR_SAVE_CURSOR_POS_SLOT_1 40634 _BR_RESTORE_CURSOR_POS_SLOT_1 40647 40222 40647 40223 40632 1007
+ACT 1 0 "0960214afde0dd44a84548a5aef9fd2d" "Custom: Save selected item as new file and rename" 41999 40131 _XENAKIOS_RENMTAKEANDSOURCE
+ACT 1 0 "45f1913bba385348bd9c40f6ecea2f9b" "Custom: Select all items following the 1st selected on all tracks (the 1st item excl from selection) -- only 1 item must be selected" 41174 40289 40417 40043 40626 41173 40625 40717 40635
+ACT 1 0 "46f1e72c54cdd54e9b3fb78b7011a1fa" "Custom: Select all items following the 1st selected on selected tracks (the 1st item excl from selection) -- only 1 item must be selected" 41174 40289 40417 40043 40626 41173 40625 40718 40635
+ACT 1 0 "23aac9bf1e345a4cba1f0abb19c0b1db" "Custom: Select all items following the 1st selected on selected tracks (the 1st item incl in selection) -- only 1 item must be selected " 40043 40626 41173 40625 40718 40635
+ACT 1 0 "a6f2111d9d716c4ab6e7d0648e3682a8" "Custom: Select all items following the one under mouse on all tracks (the pointed item excl from selection)" 40289 40528 41174 40289 40417 40043 40626 41173 40625 40717 40635
+ACT 1 0 "2d7a3034a547cf418f8cd5c59cf24648" "Custom: Select all items following the one under mouse on selected tracks (the pointed item excl from selection)" 40289 40528 41174 40289 40417 40043 40626 41173 40625 40718 40635
+ACT 1 0 "215f7e0fcf47244ba986bc328f30d26a" "Custom: Select all items following the one under mouse on selected tracks (the pointed item incl in selection)" 40289 40528 40043 40626 41173 40625 40718 40635
+ACT 1 0 "0d1f79e8de841e499408666887dfe83c" "Custom: Select all items preceding the 1st selected on all tracks (the 1st item excl from selection) -- only 1 item must be selected" 41173 40289 40416 40042 40625 41174 40626 40717 40635
+ACT 1 0 "700de2068ce20b44ac431e01c4609216" "Custom: Select all items preceding the 1st selected on selected tracks (the 1st item excl from selection) -- only 1 item must be selected" 41173 40289 40416 40042 40625 41174 40626 40718 40635
+ACT 1 0 "32a9115e1e25fb4f8fef93f0d787a6fd" "Custom: Select all items preceding the 1st selected on selected tracks (the 1st item incl in selection) -- only 1 item must be selected " 40042 40625 41174 40626 40718 40635
+ACT 1 0 "ac601ba6c3d7ae48be3bdcb7d679e5cc" "Custom: Select all items preceding the one under mouse on all tracks (the pointed item excl from selection) " 40289 40528 41173 40289 40416 40042 40625 41174 40626 40717 40635
+ACT 1 0 "bba16bf6d0dcea4f8281932465d00562" "Custom: Select all items preceding the one under mouse on selected tracks (the pointed item excl from selection)" 40289 40528 41173 40289 40416 40042 40625 41174 40626 40718 40635
+ACT 1 0 "5a89c14e77650d4393aeffd3d3edce94" "Custom: Select all items preceding the one under mouse on selected tracks (the pointed item incl in selection)" 40289 40528 40042 40625 41174 40626 40718 40635
+ACT 1 0 "06eb3ab5583e8e46a6bd60c4984ec8b8" "Custom: Select item under mouse open FX chain" 40528 40638
+ACT 1 0 "89bf07354b17b0448c32de9b76568309" "Custom: Select track under mouse cursor and expand minimizing others" 41110 40723
+ACT 1 0 "b80d32b6c64cec438318cdda0a1e7998" "Custom: Select tracks with items in time selection" 40717 40297 _SWS_SELTRKWITEM
+ACT 1 0 "c542b34134e45e4089cda8f7c3738ee9" "Custom: Send depending on focus copy of track(s) to OR item(s) to track(s) in next project tab (first open another project tab)" 40057 40861 40042 41174 40058 40862
+ACT 1 0 "0f2dd48b3d553944abf8e64b44cae1ee" "Custom: Send depending on focus track(s) to OR item(s) to track(s) in next project tab (first open another project tab)" 40059 40861 40042 41174 40058 40862
+ACT 1 0 "051c5846d063404bb3b01bd304b71cf0" "Custom: Send depending on focus track(s) to OR selected area of selected item(s) to track(s) in next project tab (first open another project tab)" 41383 40861 41174 40058 40042 40862
+ACT 1 0 "192d2c15f4f05d4e93248d4952e1119a" "Custom: Send item copy to one track in next project tab (first open another project tab)" 40698 40861 40042 41174 40058 40862
+ACT 1 0 "61b7a5702fdc8f4189557ad714badbb5" "Custom: Send item to one track in next project tab (first open another project tab)" 40699 40861 40042 41174 40058 40862
+ACT 1 0 "11bbf5d85bcae64788c8201af054d54f" "Custom: Send selected area of selected item to one track in next project tab (first open another project tab)" 40060 40861 40042 41174 40058 40862
+ACT 1 0 "d839555d3196a946a0a467a5e0ceb392" "Custom: Set loop to item in 1 key stroke" 40528 41039
+ACT 1 0 "139ad4144b673643a4229df57b3b61fa" "Custom: Set selected item left edge to end of previous item on the same track (select track & 1st item to move) -- dialogue" 2001 40528 41173 41667 40626 41173 40416 41174 40625 40289 40718 41205 40635 40417 2002
+ACT 1 0 "e276d8bc822f4445bd101f54458c16cc" "Custom: Set selected item left edge to end of previous item on the same track (select track)" 40528 41173 41667 40626 41173 40416 41174 40625 40289 40718 41205 40635
+ACT 1 0 "d06c2dfeff8f9d4fafcfa930f232f3a6" "Custom: Set selected item right edge to start of next item on the same track (select track & 1st item to move) -- dialogue" 2001 40528 41173 41667 40625 40417 40626 40289 40718 41307 40635 41173 41666 40416 2002
+ACT 1 0 "23a764452e34514b97f94ddbd8cfbff8" "Custom: Set selected item right edge to start of next item on the same track (select track)" 40528 41173 41667 40625 40417 40626 40289 40718 41307 40635
+ACT 1 0 "e2ea8b4a5bb9bf47b0827d43279706e6" "Custom: Set selected item right edge to start of next item on the same track, extending left edge (select track)" 40528 41173 41667 40625 40417 40626 40289 40718 41307 40630 41666 41305 40635
+ACT 1 0 "063a97f5e5df8c4b8f92e3c0cbd1c7e3" "Custom: Set selected item to end of previous item on the same track, extending right edge (select track)" 40528 41173 41667 40626 41173 40416 41174 40625 40289 40718 41306 40635
+ACT 1 0 "f85e8caa1a6f0d4fbe9790c905d7d0fb" "Custom: Set time selection to item in 1 key stroke" 40528 40290
+ACT 1 0 "a1ac86d60911e144b83b748c04265987" "Custom: Shift loop left by the loop length (1st create a loop)" 40623 40037 40622 40635
+ACT 1 0 "d6bfa01f0785664bac5abb42b0035b9e" "Custom: Shift loop right by the loop length (1st create a loop)" 40623 40038 40622 40635
+ACT 1 0 "83f9bae2e14886429c266018d6aeb195" "Custom: Shift time selection left by time selection length with prompt to repeat" 40037 2002
+ACT 1 0 "27315a49542d0048b6e05e41a3ec25d0" "Custom: Shift time selection right by time selection length with prompt to repeat" 40038 2002
+ACT 1 0 "08b774f9fcd6d540930860a7c92bf2ce" "Custom: Show BASS track(s) hide others" _SWSCONSOLE_CUST3 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
+ACT 1 0 "10533d1afe03df42bcbf82849c58f7a5" "Custom: Show BASS track(s) hide others (snapshot)" _SWSSNAPSHOT_VISMODE _SWSSNAPSHOT_SAVE1 _SWSCONSOLE_CUST3 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
+ACT 1 0 "8e73ee88880f8b40939f7334d8f546f1" "Custom: Show DRUMS track(s) hide others" _SWSCONSOLE_CUST2 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
+ACT 1 0 "dbcf87c139c80945962a80781feada83" "Custom: Show DRUMS track(s) hide others (snapshot)" _SWSSNAPSHOT_VISMODE _SWSSNAPSHOT_SAVE1 _SWSCONSOLE_CUST2 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
+ACT 1 0 "8ceadb7cc2315143858b0c8d12365b2f" "Custom: Show INSTRUMENTS track(s) hide others" _SWSCONSOLE_CUST7 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
+ACT 1 0 "377292ee9f8bf84da0e3c6320fd202b8" "Custom: Show INSTRUMENTS track(s) hide others (snapshot)" _SWSSNAPSHOT_VISMODE _SWSSNAPSHOT_SAVE1 _SWSCONSOLE_CUST7 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
+ACT 1 0 "40ffb6539582d546bd33e029ee438a80" "Custom: Show SAMPLE track(s) hide others" _SWSCONSOLE_CUST1 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
+ACT 1 0 "be63bbddba516e4ebce43015ea63c4e6" "Custom: Show SAMPLE track(s) hide others (snapshot)" _SWSSNAPSHOT_VISMODE _SWSSNAPSHOT_SAVE1 _SWSCONSOLE_CUST1 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
+ACT 1 0 "23655bce0461274cbe9e1bb642b6434e" "Custom: Slice selected item and extract slices according to items on selected tracks (copies in folder)" 40309 41121 40290 _SWS_SELTRKWITEM _SWS_SAVESEL _S&M_FOLDERON 40062 _SWS_MINTRACKS 1042 1042 40289 _SWS_RESTORESEL 1041 40062 40285 40285 2001 40287 2002 41120 40718 40644 40117 2008 40005 40006 _SWS_RESTORESEL 40914 40285 40718 40699 40286 1041 1041 40630 42398 40006 40285 40005 41117 40635
+ACT 1 0 "96546981fa53854cb945a60c1cc7667d" "Custom: Slice selected item and extract slices according to items on selected tracks (copies minimized)" 40309 41121 40290 _SWS_SELTRKWITEM _SWS_SAVESEL _S&M_FOLDERON 40062 40914 40286 1041 1041 40285 _SWS_SELCHILDREN2 _SWS_MINTRACKS _SWS_SELPARENTS 1041 1041 1041 40289 _SWS_RESTORESEL 1041 40062 40285 40285 2001 40287 2002 40718 41120 40644 40117 2008 40005 40006 _SWS_RESTORESEL 40914 40285 40718 40699 40286 1041 40630 42398 40006 40285 40005 41117 40635
+ACT 1 0 "615ac5c44f21e148a6a4392ece9934a0" "Custom: Slice selected item and extract slices according to items on selected tracks AND move slices together (copies minimized)" 41121 40309 40290 _SWS_SELTRKWITEM _SWS_SAVESEL _S&M_FOLDERON 40062 40914 40286 1041 1041 40285 _SWS_SELCHILDREN2 _SWS_MINTRACKS _SWS_SELPARENTS 1041 1041 1041 40289 _SWS_RESTORESEL 1041 40062 40285 40285 2001 40287 2002 40718 40644 41120 40117 2008 40005 40006 _SWS_RESTORESEL 40914 40285 40718 40699 40286 1041 40630 42398 41990 40006 40285 40005 40309 41121 40635
+ACT 1 0 "90943b059c4e9042973e1ae3a2bf84c9" "Custom: Snap exact start of audio item (with preceding silence) to grid with snap offset when item start is on grid (place cursor before the item)" 41173 40375 40541 41173 41205
+ACT 1 0 "3036bc4d7fb7d0468902f200016723ff" "Custom: Snap exact start of audio item (with preceding silence) to grid with snap offset when item start is on grid (place cursor before the item)-2" 41173 40375 40541 40646 41205
+ACT 1 0 "b32b1f11b463664b8b2d01c74f6ce769" "Custom: Snap exact start of audio item (with preceding silence) to grid with trim (place cursor before the item)" 40375 41305 40646 41205
+ACT 1 0 "6de651f3e857427da2cedad65a209ff4" "Custom: Snap exact start of audio item (with preceding silence) to measure start and set time selection start (place cursor before the item)" 40781 40375 41305 _FNG_QUANTIZE_TO_GRID 41173 40625
+ACT 1 0 "0ae79f4579d6fd4795504edc78dde32a" "Custom: Split MIDI item preserving contents in both parts (select item and its track, place edit cursor)" 40698 41311 40290 40630 40001 42398 40631 41305 40117 40005 40286 40038 40718 40635
+ACT 1 0 "5126e7edeffe184eab9482f2261d74c2" "Custom: Split all stereo items on selected track to two mono items (select track)" 41110 40421 40179 40289 40062 40421 40180
+ACT 1 0 "9f159b7ee8e9654d97395fbe4eb22c0a" "Custom: Split at grid and shuffle (turn off Autocrossfade)" _SWS_SAVEXFD 41039 40932 _XENAKIOS_SHFORDSELITEMS2 _SWS_RESTOREXFD
+ACT 1 0 "f5f9a9e5a98be14b92d57d895957c09c" "Custom: Split item at zero crossing and join (first select item and make time selection)" 40310 40630 41995 40625 40631 41995 40626 40061 40006 40309
+ACT 1 0 "65250ce8b5cb1f4d812765db1126e290" "Custom: Split item(s) at edit cursor on slelected track(s)" _XENAKIOS_SELITEMSUNDEDCURSELTX 40757 40289
+ACT 1 0 "9405ecc299e8704bae86f43e1011770b" "Custom: Split items at project markers (no crossfades)" _SWS_SAVEXFD 41119 40931 _SWS_RESTOREXFD
+ACT 1 0 "c4fbfc80d1741e449180047bcd3fe51e" "Custom: Split items at timeline grid (no crossfades)" _SWS_SAVEXFD 41119 40932 _SWS_RESTOREXFD
+ACT 1 0 "470f8ba701f8b84194c1818e3df43921" "Custom: Split items selected on the same track at take markers (only with dialogue to continue)" 2001 41173 42394 40759 2002
+ACT 1 0 "639306cee949a845b015472c6476ba94" "Custom: Split selected item at each bar" 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 _BR_RESTORE_CURSOR_POS_SLOT_1
+ACT 1 0 "7b127717db5fcc449d74d3494645649a" "Custom: Split selected item at each bar with prompt to repeat" 41173 _BR_SAVE_CURSOR_POS_SLOT_1 2001 40839 40759 2002 _BR_RESTORE_CURSOR_POS_SLOT_1
+ACT 1 0 "5cd392bebfbf1b4ba6b289c2425d0a3f" "Custom: Split selected items at loop" 40632 40759 40633 40758 40289
+ACT 1 0 "3ac24bc403290047a553221934cfe852" "Custom: Split selected items at loop through time selection" _SWS_SAVETIME5 40623 40061 40635 _SWS_RESTTIME5
+ACT 1 0 "6d0934b75be4ed4c8e81b02ec79bbf0d" "Custom: Spread ALL sequential adjacent items except 1st to separate tracks (select track with items) -- repeat as needed" 2001 40289 _XENAKIOS_SELFIRSTITEMSOFTRACKS 41174 40625 40043 40626 40289 40718 40118 40285 2002 40635
+ACT 1 0 "66d1647164d3d847bb41fdbb1a5e79ff" "Custom: Spread ALL sequential adjacent items except 1st to separate tracks (select track with items) -- repeat as needed (all native)" 2001 40421 41173 40625 41667 40626 40289 40718 41174 40625 40043 40626 40289 40718 40118 40285 2002 40635
+ACT 1 0 "9da71eda0f020844a2efdfe263d35404" "Custom: Stop recording and delete last recorded item" 40044 40006
+ACT 1 0 "f3ed2e7418db60488041bb4645bb7193" "Custom: Swap 2 items diagonally bottom to top / (disable grouping, select both)" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40319 40319 _BR_SAVE_CURSOR_POS_SLOT_2 41173 40289 _XENAKIOS_SELLASTOFSELTRAX 41666 40417 40699 _SWS_RESTORESEL _XENAKIOS_SELFIRSTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_2 41666 40417 40001 40118 40286 42398 41173 40289 40285 41666 40417 40699 40005 _SWS_RESTORESEL _XENAKIOS_SELLASTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_1 42398 41173 _SWS_RESTORESEL
+ACT 1 0 "57722a69cc132f4ebbd78ffd7b756b5e" "Custom: Swap 2 items diagonally bottom to top / (select both) (colors, length not preserved)" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40319 40319 _BR_SAVE_CURSOR_POS_SLOT_2 40289 _BR_RESTORE_CURSOR_POS_SLOT_1 _SWS_MOVECUR1MSLEFT 40417 40699 _XENAKIOS_SELFIRSTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_2 _SWS_MOVECUR1MSLEFT 40417 40603 40698 40131 40289 _SWS_RESTORESEL _XENAKIOS_SELLASTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_1 42398 40125 40131 _SWS_RESTORESEL 41173
+ACT 1 0 "72c65c0d6fcc3944872744d1bb84b032" "Custom: Swap 2 items diagonally top to bottom \ (disable grouping, select both)" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40319 40319 _BR_SAVE_CURSOR_POS_SLOT_2 41173 40289 _XENAKIOS_SELFIRSTOFSELTRAX 41666 40417 40699 _SWS_RESTORESEL _XENAKIOS_SELLASTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_2 41666 40417 40001 40118 40286 42398 41173 40289 40285 41666 40417 40699 40005 _SWS_RESTORESEL _XENAKIOS_SELFIRSTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_1 42398 41173 _SWS_RESTORESEL
+ACT 1 0 "1d0df87df6ca6d4b996e9c6438bcc796" "Custom: Swap 2 items diagonally top to bottom \ (select both) (colors, length not preserved)" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40319 40319 _BR_SAVE_CURSOR_POS_SLOT_2 40289 _XENAKIOS_SELFIRSTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_1 _SWS_MOVECUR1MSLEFT 40417 40699 _SWS_RESTORESEL _XENAKIOS_SELLASTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_2 _SWS_MOVECUR1MSLEFT 40417 40603 40698 40131 40289 _SWS_RESTORESEL _XENAKIOS_SELFIRSTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_1 42398 40125 40131 _SWS_RESTORESEL 40318
+ACT 1 0 "f22287391038f34a97d951b4aaec7765" "Custom: Swap 2 items directly vertically | (disable grouping, select both)" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 40289 _XENAKIOS_SELFIRSTOFSELTRAX 41666 40417 40699 _SWS_RESTORESEL _XENAKIOS_SELLASTOFSELTRAX 41666 40417 40001 40118 40286 42398 41173 40289 40285 41666 40417 40699 40005 _SWS_RESTORESEL _XENAKIOS_SELFIRSTOFSELTRAX 42398 41173 _SWS_RESTORESEL
+ACT 1 0 "337955f2cc232e41b2edc10ae6b27e6e" "Custom: Swap 2 items directly vertically | (select both) (colors, length not preserved)" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _SWS_MOVECUR1MSLEFT _XENAKIOS_SELFIRSTOFSELTRAX 40289 40417 40699 _SWS_RESTORESEL _XENAKIOS_SELLASTOFSELTRAX _SWS_MOVECUR1MSLEFT 40417 40603 40698 40131 _SWS_RESTORESEL _XENAKIOS_SELFIRSTOFSELTRAX 42398 40125 40131 _SWS_RESTORESEL 41173
+ACT 1 0 "e5b81d7570a4524082e86a34a799d9bc" "Custom: Swap 2 items directly vertically | (select both) (colors, length not preserved) -- bottom item selection preserved" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _SWS_MOVECUR1MSLEFT _XENAKIOS_SELLASTOFSELTRAX 40289 40417 40699 _SWS_RESTORESEL _XENAKIOS_SELFIRSTOFSELTRAX _SWS_MOVECUR1MSLEFT 40417 40603 40698 40131 _SWS_RESTORESEL _XENAKIOS_SELLASTOFSELTRAX 42398 40125 40131 _SWS_RESTORESEL 41173
+ACT 1 0 "0a8d91d7b35ce5469290d8a250de9206" "Custom: Swap 2 items horizontally — (disable grouping, select both)" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40319 40319 _BR_SAVE_CURSOR_POS_SLOT_2 40289 41666 40417 40699 _BR_RESTORE_CURSOR_POS_SLOT_1 41666 40417 40001 40118 40286 42398 41173 40285 41666 40417 40699 40005 40286 _BR_RESTORE_CURSOR_POS_SLOT_2 42398 _BR_RESTORE_CURSOR_POS_SLOT_1 41666 40417
+ACT 1 0 "bec225061520b2449bd278c76c19c8e4" "Custom: Swap 2 items horizontally — (select both) (colors, length not preserved)" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40319 40319 _BR_SAVE_CURSOR_POS_SLOT_2 40289 _SWS_MOVECUR1MSLEFT 40417 40699 _BR_RESTORE_CURSOR_POS_SLOT_1 _SWS_MOVECUR1MSLEFT 40417 40603 40698 40131 _BR_RESTORE_CURSOR_POS_SLOT_2 42398 40125 40131 _BR_RESTORE_CURSOR_POS_SLOT_1 _SWS_MOVECUR1MSLEFT 40417
+ACT 1 0 "a857682485498c4db830d1854836e82f" "Custom: Swap 2 items horizontally — (select both) (colors, length not preserved) -- keeps both selected" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40001 40118 _SWS_MOVECUR1MSLEFT 40319 40319 40319 _BR_SAVE_CURSOR_POS_SLOT_2 40289 _SWS_MOVECUR1MSLEFT 40417 40699 _BR_RESTORE_CURSOR_POS_SLOT_1 _SWS_MOVECUR1MSLEFT 40417 40603 40698 40131 _BR_RESTORE_CURSOR_POS_SLOT_2 42398 40125 40131 40421 40117 40005 _SWS_RESTORESEL _BR_RESTORE_CURSOR_POS_SLOT_1
+ACT 1 0 "b63cb662bafad14b9a603ae19565ce1c" "Custom: Swap 2 overlapping items diagonally bottom to top / (disable grouping, select both)" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40319 _BR_SAVE_CURSOR_POS_SLOT_2 41173 40289 _XENAKIOS_SELLASTOFSELTRAX 41666 40417 40699 _SWS_RESTORESEL _XENAKIOS_SELFIRSTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_2 41666 40417 40001 40118 40286 42398 41173 40289 40285 41666 40417 40699 40005 _SWS_RESTORESEL _XENAKIOS_SELLASTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_1 42398 41173 _SWS_RESTORESEL
+ACT 1 0 "725b118cbe65ab448102e4a074d7cabc" "Custom: Swap 2 overlapping items diagonally top to bottom \ (disable grouping, select both)" _SWS_SELTRKWITEM _SWS_SAVESEL 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40319 _BR_SAVE_CURSOR_POS_SLOT_2 41173 40289 _XENAKIOS_SELFIRSTOFSELTRAX 41666 40417 40699 _SWS_RESTORESEL _XENAKIOS_SELLASTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_2 41666 40417 40001 40118 40286 42398 41173 40289 40285 41666 40417 40699 40005 _SWS_RESTORESEL _XENAKIOS_SELFIRSTOFSELTRAX _BR_RESTORE_CURSOR_POS_SLOT_1 42398 41173 _SWS_RESTORESEL
+ACT 1 0 "f9079698ee584847bfaf34a5eb70d615" "Custom: Switch preset via MIDI without running playback (when using MIDI item with PC event, select the MIDI item)" 41173 41667 14 1007 1016 14
+ACT 1 0 "a57b19077c34d646a1ba7037ea41bb31" "Custom: Tallisman_ctrl+d duplicate items with time selection (1st create time selection)" 40750 _SWS_SELTRKWITEM 40060 40038 40630 _XENAKIOS_SELFIRSTOFSELTRAX _SWS_SETLTT 40058
+ACT 1 0 "e4771bc1e573954f90ff7f0440474a3f" "Custom: Tap tempo with proj. timebase set to Time" _SWS_AWTBASETIME 1134 _SWS_AWTBASEBEATALL
+ACT 1 0 "f2eddab3f3b3af459ec2b167ff34afc0" "Custom: Togggle zoom to sel. item + MIDI Inline Editor" 41622 40847
+ACT 1 0 "8fd0191c2ab98b4db286a10c80568c5c" "Custom: Toggle mute all grouped items" _SWS_SAVEALLSELITEMS1 40289 _SWS_RESTALLSELITEMS1 40034 40175
+ACT 1 0 "a58412c4de1e0345848902e939b91f16" "Custom: Toggle send track for Voxengo SPAN selective monitoring (create folder, select child track whose output to monitor)" _SWS_SAVESEL _SWS_SELPARENTS _SWS_SELCHILDREN2 _SWS_DISMPSEND _SWS_TOGSAVESEL _SWS_ENMPSEND
+ACT 1 0 "30dd24040d076d42879c2e4716fe9d1a" "Custom: Toggle show/hide children tracks both in TCP and MCP" _SWS_SAVESEL _SWS_SELCHILDREN 40853 40250 _SWS_RESTORESEL
+ACT 1 0 "13b0a5472cd24745826c671a23227f63" "Custom: Track height: (Re)Set selected track default height (can be selected under mouse) -- changeable" _a4fbc117e0f7c1409733ed3503ed7c3f 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41326 41325 41325 41325 41325 41325
+ACT 1 0 "e781fd871154b4438bfb4c0e502e569c" "Custom: Track height: Expand selected track from default height (can be selected under mouse) -- changeable" _13b0a5472cd24745826c671a23227f63 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325 41325
+ACT 1 0 "82ae2b38af4f3445aa69ea4eb1671c3a" "Custom: Track height: Increase selected track height, minimize others" 40727 41325 41325 41325 41325 41325 41325
+ACT 1 0 "a4fbc117e0f7c1409733ed3503ed7c3f" "Custom: Track height: Select track under mouse cursor and adjust height (assign to mousewheel with a modifier)" 41110 972
+ACT 1 0 "b3f2aa24ee37104baf37b046c363853a" "Custom: Track height: Zoom all tracks to default track height" 40727 40111 40111 40111 40111
+ACT 1 0 "ec717df277564447a50a3fa5cc0db64a" "Custom: Transport: Fast forward with seeking" 41667 41667 41667 41667 40626 40631 40635
+ACT 1 0 "a28d09f7de56be4193efb43c37e3b5eb" "Custom: Transport: Rewind with seeking" 41666 41666 41666 41666 40626 40631 40635
+ACT 1 0 "885420a02854d640b7a5fcef166d79d0" "Custom: Transpose All Audio Items +1 Oct" 40289 _BR_SEL_ALL_ITEMS_AUDIO 40515 40289
+ACT 1 0 "d08745480175264faf69c2f8b993064c" "Custom: Transpose All Audio Items +1 st" 40289 _BR_SEL_ALL_ITEMS_AUDIO 40204 40289
+ACT 1 0 "3ef63c34742bf046a5559544a63a5c34" "Custom: Transpose All Audio Items -1 Oct" 40289 _BR_SEL_ALL_ITEMS_AUDIO 40516 40289
+ACT 1 0 "a2d8cb355c6b6a488336009343db704a" "Custom: Transpose All Audio Items -1 st" 40289 _BR_SEL_ALL_ITEMS_AUDIO 40205 40289
+ACT 1 0 "64fdcf5a0d20a9419572cbe9df9c08be" "Custom: Transpose All MIDI Items +1 Oct." 40289 _BR_SEL_ALL_ITEMS_MIDI 40515 40289
+ACT 1 0 "b59794185e5fd4448aa7d4806febd06b" "Custom: Transpose All MIDI Items +1 st" 40289 _BR_SEL_ALL_ITEMS_MIDI 40204 40289
+ACT 1 0 "7b8f9e4b6c31404d8dab18866bb7c8af" "Custom: Transpose All MIDI Items -1 Oct" 40289 _BR_SEL_ALL_ITEMS_MIDI 40516 40289
+ACT 1 0 "8d06d3c8c746f3439c34c8e15b813f73" "Custom: Transpose All MIDI Items -1 st" 40289 _BR_SEL_ALL_ITEMS_MIDI 40205 40289
+ACT 1 0 "c59dba83dde55b4ba98197bb5bb03aba" "Custom: Trim left edge of all items in current intersectional time selection" 40296 40631 _XENAKIOS_SELITEMSUNDEDCURSELTX 40312 40297 40289
+ACT 1 0 "71406a8932b8c74481b69399b7751e0f" "Custom: Trim left edge of all items in current time selection" 40717 40630 41305 40289
+ACT 1 0 "335a4ecb0ebb684786059d2c9b4be487" "Custom: Trim left edge of all items under edit cursor" _SWS_SAVESELITEMS5 40296 _XENAKIOS_SELITEMSUNDEDCURSELTX 41305 40297 40289 _SWS_RESTSELITEMS5
+ACT 1 0 "4bd1f61659c1674d899dea8f2fc98b29" "Custom: Trim left edge of items on selected tracks in current intersectional time selection" 40631 _XENAKIOS_SELITEMSUNDEDCURSELTX 40312 40297 40289
+ACT 1 0 "ba6c520cd172924d85b611f16e8cfe4e" "Custom: Trim left edge of items on selected tracks in current time selection" 40718 40630 41305 40289
+ACT 1 0 "a2f7e79463352c49a2c44a7ce9507d41" "Custom: Trim left edge of items under edit cursor 1 by 1 moving down" _XENAKIOS_SELITEMSUNDEDCURSELTX 41305 40289 _XENAKIOS_SELNEXTTRACK
+ACT 1 0 "832a94f028ae3d4e9411c6ece8ee3ebb" "Custom: Trim left edge of items under edit cursor 1 by 1 moving up" _XENAKIOS_SELITEMSUNDEDCURSELTX 41305 40289 _XENAKIOS_SELPREVTRACK
+ACT 1 0 "068d58c756ab51478f969c1d535890a4" "Custom: Trim left edge of items under edit cursor on selected tracks" _XENAKIOS_SELITEMSUNDEDCURSELTX 41305 40289
+ACT 1 0 "431aa908cf455449a6435e919d90a388" "Custom: Trim right edge of all items in current intersectional time selection" 40296 40630 _XENAKIOS_SELITEMSUNDEDCURSELTX 40312 40297 40289
+ACT 1 0 "c2089e66ee3c88468369a015ab015234" "Custom: Trim right edge of all items in current time selection" 40717 40631 41311 40289
+ACT 1 0 "8de97db134407e44900cab72e098a778" "Custom: Trim right edge of all items on selected tracks in current time selection" 40718 40631 41311 40289
+ACT 1 0 "2682156c16dff94bab05efb4b136584e" "Custom: Trim right edge of all items under edit cursor" _SWS_SAVESELITEMS5 40296 _XENAKIOS_SELITEMSUNDEDCURSELTX 41311 40297 40289 _SWS_RESTSELITEMS5
+ACT 1 0 "35015f11ea41c74fa263f435560cced8" "Custom: Trim right edge of items on selectd tracks in current intersectional time selection" 40630 _XENAKIOS_SELITEMSUNDEDCURSELTX 40312 40297 40289
+ACT 1 0 "db88170ff0ce974a85221a607ffcdbb7" "Custom: Trim right edge of items under edit cursor 1 by 1 moving down" _XENAKIOS_SELITEMSUNDEDCURSELTX 41311 40289 _XENAKIOS_SELNEXTTRACK
+ACT 1 0 "94f164633d21bb458e8c50d4e81ed51e" "Custom: Trim right edge of items under edit cursor 1 by 1 moving up" _XENAKIOS_SELITEMSUNDEDCURSELTX 41311 40289 _XENAKIOS_SELPREVTRACK
+ACT 1 0 "5c87c55a7a914b47bfb21e5e67986dc6" "Custom: Trim right edge of items under edit cursor on selected tracks" _XENAKIOS_SELITEMSUNDEDCURSELTX 41311 40289
+ACT 1 0 "0f0cc3629b97824f9f96cafac7a3401e" "Custom: Trim selected AUDIO item left edge to grid and SHIFT FOLLOWING ITEMS LEFT on selected track (to use with Ripple per track) -- incpompat with MIDI due to split" 40528 40290 41173 40647 40012 40416 40006 41205 40718 40635
+ACT 1 0 "8dd647bd3e767c4c8aec71c757e97f4f" "Custom: Trim selected AUDIO item right edge to grid and SHIFT FOLLOWING ITEMS LEFT on selected track (to use with Ripple per track) -- incpompat with MIDI due to split" 40528 40290 41174 40646 40012 40006 41205 40718 40635
+ACT 1 0 "91c7f176d06cee4ba9717a5ecebc5920" "Custom: Trim selected item left edge to grid and SHIFT FOLLOWING ITEMS LEFT on selected track (to use with Ripple per track)" 40528 40290 41173 40647 41305 40630 41205 40635
+ACT 1 0 "47ab09fcc933f34c9f3fc2c5e7ab9016" "Custom: Trim selected item right edge to grid and SHIFT FOLLOWING ITEMS LEFT on selected track (to use with Ripple per track)" 40528 40290 41174 40646 41311 40698 40631 41311 40635 41173 40006 42398
+ACT 1 0 "cf32f2dde91d94488cae4578b7d86d10" "Custom: Trim(Un) selected item left edge to grid and SHIFT FOLLOWING ITEMS RIGHT on selected track (to use with Ripple per track)" 40528 40290 41173 40646 41305 40630 41205 40635
+ACT 1 0 "4bed15b5e04c4b43b16db06a54fd8215" "Custom: Trim(Un) selected item right edge to grid and SHIFT FOLLOWING ITEMS RIGHT on selected track (to use with Ripple per track)" 40528 41174 40625 40647 40626 41174 40142 41295 40037 40718 41174 40647 41311 40930 40038 40038 40718 40006 40037 40718 41174 40635
+ACT 1 0 "180385ce3d7f44adb950a2e3b01d4711" "Custom: Vanhaze (Rob Van Hees)_Apply Take and Track FX (MIDI out) and crop to active item and bypass FX1" 40436 40131 _S&M_FXBYP_SETON1
+ACT 1 0 "f008b683bfec364c85d7558be6858916" "Custom: Vanhaze (Rob Van Hees)_Make folder from selected tracks" _SWS_SAVESEL _SWS_INSRTTRKABOVE 1041 _SWS_TOGSAVESEL 40337 _SWS_TOGSAVESEL 40058 _XENAKIOS_SELLASTOFSELTRAX 1041 1041 _SWS_RESTORESEL
+ACT 1 0 "e0dbe8a80529764898ca5a68d43d22de" "Custom: Vanhaze (Rob Van Hees)_Make folder from selected tracks, name and color it" _SWS_SAVESEL _SWS_INSRTTRKABOVE 1041 _SWS_TOGSAVESEL 40337 _SWS_TOGSAVESEL 40058 _XENAKIOS_SELLASTOFSELTRAX 1041 1041 _SWS_SELPARENTS _XENAKIOS_RENAMETRAXDLG 40357 _SWS_RESTORESEL
+ACT 1 0 "be16c696a1ed734db12007ae7f5892a2" "Custom: Vanhaze (Rob Van Hees)_Render MIDI item to audio and delete" 41999 40131
+ACT 1 0 "6685de38e0081a4090db62dbffa5d171" "Custom: X-Raym_Go to next item and set time sel. to item" 40417 40290
+ACT 1 0 "16f9294d4543f3499946cd967bd5370d" "Custom: X-Raym_Go to next item, Play" 40417 41039 1007
+ACT 1 0 "5c61e90b0a432b489660908590afefb8" "Custom: X-Raym_Go to previous item and set time sel. to item" 40416 40290
+ACT 1 0 "33f82385550f034a868f8284a4a00e96" "Custom: X-Raym_Go to previous item, Play" 40416 41039 1007
+ACT 1 0 "a19e04266d3ce94da9d3acf98b677a16" "Custom: X-Raym_Insert Empty Items" _BR_SAVE_CURSOR_POS_SLOT_1 40626 41110 40914 40142 40635 _BR_RESTORE_CURSOR_POS_SLOT_1
+ACT 1 0 "59e68a584acaae4cb4a773fd83f711ba" "Custom: billybk_Freeze all items on selected track and add as takes (mono)" 41110 40421 40361 42353 40535
+ACT 1 0 "a283ae3ddd8d4c4aafbc3f0a975c67e4" "Custom: billybk_Freeze all items on selected track and add as takes (stereo)" 41110 40421 40209 42353 40535
+ACT 1 0 "ada1913fff4d2d4eb1d1633ecec9cc77" "Custom: billybk_Thaw frozen items on selected track (the frozen take must be active) -- the file will remain on the disk" 41110 40421 40129 40536 42354
+ACT 1 0 "dcd51fcc6424884c8ab6a5ff319a96e2" "Custom: boses_Region: Add new empty at cursor (1 bar long) -- expandable" 40625 40839 40626 40200 40174 40630 40635
+ACT 1 0 "970f84c4213fed4cb1ca6f7d44be421f" "Custom: boses_Region: Add new empty at the end of project (depends on a custom action)" _SWS_PROJEND _dcd51fcc6424884c8ab6a5ff319a96e2
+ACT 1 0 "f0b79bd9f9cce24db50450073db69987" "Custom: boses_Region: Contract by 1 beat from the right (place edit cursor inside region) -- name isn't kept, expandable" 40173 40626 40842 40625 40201 40630 40626 40172 40625 40615 40174 40635
+ACT 1 0 "cf706f499a03d24eb317271fec40601d" "Custom: boses_Region: Copy contents with automation (place edit cursor insdie region) -- must be soon followed by Paste" 40172 40625 40173 40626 _SWS_SAVEALLSELITEMS1 40717 _SWS_SAVESEL _SWS_SELTRKWITEM 40060 40324 40635
+ACT 1 0 "602961b2baa7c74bbb03e7d772039d84" "Custom: boses_Region: Duplicate contents with automation and add new region bar (place edit cursor inside region)" _cf706f499a03d24eb317271fec40601d 40172 40625 40173 40626 40038 40200 40630 _3dbfc5ce1037774d86b816469039af22 40174 40635
+ACT 1 0 "b336d19426e4164fb0d9251504b20b57" "Custom: boses_Region: Duplicate contents with automation without extending (place edit cursor inside region)" _cf706f499a03d24eb317271fec40601d 40172 40625 40173 40626 40038 40200 40630 _3dbfc5ce1037774d86b816469039af22 40635
+ACT 1 0 "a2fa3208ae6dcd4294d1570a8f073db6" "Custom: boses_Region: Duplicate region bar length (place edit cursor inside region) -- name isn't kept" 40172 40625 40173 40626 40038 40172 40625 40615 40174 40635
+ACT 1 0 "7710a58402317b4cb9caaffcd711b1d9" "Custom: boses_Region: Duplicate with automation and extend with or without contents (place edit cursor inside region) -- name isn't kept" _cf706f499a03d24eb317271fec40601d 40172 40625 40173 40626 40038 40200 40630 40172 40625 40173 _3dbfc5ce1037774d86b816469039af22 40630 40615 40174 40635
+ACT 1 0 "d6059421f82d2247acf9060d34da1ebd" "Custom: boses_Region: Extend by 1 empty beat to the right (place edit cursor inside region) -- name isn't kept, expandable" 40173 40625 40841 40626 40200 40631 40172 40172 40625 40615 40174 40635
+ACT 1 0 "fc5636b33bdcc347846e14d235230e89" "Custom: boses_Region: Merge two adjacent region bars (place edit cursor inside first) -- names aren't kept" 40172 40625 40615 40173 40173 40626 40172 40615 40630 40172 40173 40174 40635
+ACT 1 0 "c5f78df566bc2f4f9b589b8841c2d56d" "Custom: boses_Region: Paste copied contents at cursor (use by itself)" 40311 40914 42398 40309 _SWS_RESTORESEL _SWS_RESTALLSELITEMS1
+ACT 1 0 "3dbfc5ce1037774d86b816469039af22" "Custom: boses_Region: Paste copied contents at cursor (used inside other custom actions)" 40914 42398 _SWS_RESTORESEL _SWS_RESTALLSELITEMS1
+ACT 1 0 "c25b64c7264b4a4aa4f6d2f4aa2fb636" "Custom: boses_Region: Paste copied contents at cursor and add new region bar (use by itself)" 40311 40914 42398 40309 40290 40174 40635 _SWS_RESTORESEL _SWS_RESTALLSELITEMS1
+ACT 1 0 "783e59900e47a24aa6f9805b7dad4ee1" "Custom: chilled-panda_Create Sequencer Mega Baby Pattern Selector Item" _FNG_MIDI_BASIC _XENAKIOS_RENMTAKEALL _FNG_MIDI_UP_OCT _FNG_MIDI_UP_OCT _FNG_MIDI_UP_OCT _SWS_TAKECUSTCOL1 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL2 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL3 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL4 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL5 40639 _FNG_MIDI_UP_SEMI _SWS_tAKECUSTCOL6 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL7 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL8 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL9 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL10 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL11 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL12 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL13 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL14 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL15 40639 _FNG_MIDI_UP_SEMI _SWS_TAKECUSTCOL16 45000 40643 _XENAKIOS_SELFIRSTITEMSOFTRACKS
+ACT 1 0 "35565cd46e3b4a468cf1f80eaa9d097c" "Custom: clepsydrae lacinato_duplicate selected tracks and set to seperate group (??)" 40062 40421 41173 _SWS_SAVESEL _SWS_SELTRKWITEM 40699 _XENAKIOS_SELFIRSTOFSELTRAX 40058 _SWS_RESTORESEL
+ACT 1 0 "09130a8088bfb0468aafa8a8b5389f3c" "Custom: d3r3luka_Record_Edit_Drums split at mouse cursor, crossfade into split" 40289 40528 _SWS_SELTRKWITEM 40290 40514 40759 _XENAKIOS_MOVECURRLEFTCONFSECS _XENAKIOS_TRIM_LEFTEDGETO_EDCURSOR 40718 40034 41059 40635 40289
+ACT 1 0 "87d1db634e594a3c9d4389d42288cbea" "Custom: daveyajd_Create Track Duplicate, remove items and arm" _XENAKIOS_SELTRAX_RECUNARMED 40062 40421 40006 _XENAKIOS_RENAMETRAXDLG _XENAKIOS_SELTRAX_RECARMED
+ACT 1 0 "b6524971e186394abf922c026afe0bd2" "Custom: gofer_Select all items to the right of edit cursor on selected track" _SWS_SAVETIME1 _XENAKIOS_DOSTORECURPOS 40625 40043 40626 40718 _XENAKIOS_DORECALLCURPOS _SWS_RESTTIME1
+ACT 1 0 "b1a4e053fd4b674da35f0222731fb29b" "Custom: jnif_Open all items on track in the MIDI editor (depends on preferences)" _SWS_SAVESEL _SWS_SAVEALLSELITEMS1 _SWS_SELTRKWITEM 40421 40153 _SWS_RESTALLSELITEMS1 _SWS_RESTORESEL
+ACT 1 0 "e506970c90e35e4bb0c373630fb74d15" "Custom: leafac_Ripple delete selected item" 40290 40201
+ACT 1 0 "9ac2d1852d17624f9f0a09147eb00b04" "Custom: nickstomp_Scroll Between Markers with Mousewheel (t=241566)" 2013 40173 2014 40172
+ACT 3 0 "f8723a9989b8914eb4d2939a676af412" "Custom: prastya28_(Stereo Tool) Stereo Track --> Dual Mono" 40062 _SWS_UNSELONTRACKS _XENAKIOS_SELPREVTRACK 40179 40289 _XENAKIOS_SELNEXTTRACK 40421 40180
+ACT 1 0 "3481f6486c626d4eb851ac66ef6ad8e8" "Custom: protoolstoreaper.com_Back to Last Transient" 40625 40626 40421 40434 40376 40289
+ACT 1 0 "e3e021254e772a4b930db21032b56274" "Custom: protoolstoreaper.com_Consolidate Clip" 41588 41173 40289 40635
+ACT 1 0 "86b2069db7f21f4a8675292a699041a1" "Custom: protoolstoreaper.com_Ctrl X - Cut selected" 41173 40059
+ACT 1 0 "9a47b8f3d768374ba2bc1ab27b6202b6" "Custom: protoolstoreaper.com_Delete" 40697 40289 40635
+ACT 1 0 "3556adc2e466432781a9a15d0fb8d1a5" "Custom: protoolstoreaper.com_Delete All Fades in Clip" 40513 40528 41193 40289
+ACT 1 0 "0cd25f2f123745c3af6c7d146e0438b8" "Custom: protoolstoreaper.com_Fade In Left Side" 40513 40528 40509 41516 40289
+ACT 1 0 "1bd742c8c1db4b9480da17b5ff98adf1" "Custom: protoolstoreaper.com_Fade Out Right Side" 40513 40528 40510 41523 40289
+ACT 1 0 "34762a1e8cc14d158bc30bdbe2ee7f36" "Custom: protoolstoreaper.com_Heal Clips in Selection" 40718 40548 40289 40635
+ACT 1 0 "8c129fec9b1142d3ad30b15f6353219d" "Custom: protoolstoreaper.com_Reverse" 40513 40528 41051 40289
+ACT 1 0 "7872df1650a0c54dbecb12f4a83109dd" "Custom: protoolstoreaper.com_Tab Through Sessions" 40861
+ACT 1 0 "0de83e25dca44996ac6aa4604edfe73c" "Custom: protoolstoreaper.com_Tab to Transient" 40625 40626 40421 40434 40375 40289
+ACT 1 0 "78caea95aa084c92923984186088ec27" "Custom: protoolstoreaper.com_Toggle Item Pitch Envelope" 40513 40528 41612 40289
+ACT 1 0 "671786c1c170467996f63c084ba4c807" "Custom: protoolstoreaper.com_Trim Left Side of item to mouse cursor" 40513 40528 41305 40289
+ACT 1 0 "9f67a076b69e4b67a3d9675a31483441" "Custom: protoolstoreaper.com_Trim Right Side of item to mouse cursor" 40513 40528 41311 40289
+ACT 1 0 "ec502bd8c060a046a665e2a37355db48" "Custom: reapertips_Ripple delete selected items on the same track" 41990 40312 40309
+ACT 1 0 "68f923aa7ff4d84fbe3069f80b894af1" "Custom: stephenschappler.com_Adjust ttem volume with mousewheel by 1 dB" 40528 2014 41924 2013 41925
+ACT 1 0 "cc7c136b4dee6447826056c99ff61abf" "Custom: xpander_Move selected tracks to top" _S&M_CUTSNDRCV1 _SWS_CREATETRK1 _S&M_PASTSNDRCV1 _XENAKIOS_SELFIRSTOFSELTRAX _XENAKIOS_SELPREVTRACK 40005
