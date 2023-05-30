@@ -665,6 +665,27 @@ View: Scroll view right/left - scroll by 481 px regardless of the zoom level
 
 View: Scroll view down/up - scroll exactly track by track regardless of the zoom level, not very precise when tracks have different heights
 
+
+The following ones don't create undo points and undoing them may produce inconsistent results.
+Wrapping then inside a custom action seems to be a workround, it was tested with the last two.
+
+SWS/BR: Insert CC event at edit cursor in lane under mouse cursor
+SWS/BR: Delete selected events in last clicked lane
+SWS/BR: Delete all events in last clicked lane
+SWS/BR: Copy selected CC events in active item to last clicked lane
+SWS/BR: Hide all CC lanes except last clicked lane
+SWS/BR: Hide last clicked CC lane
+
+
+View: Scroll view right/left -- scroll by exactly 488 px regardless of the zoom level (that is 122 x 4, see next)
+
+View: Scroll horizontally [reversed] (MIDI CC relative/mousewheel) -- scroll by exactly 122 px regardless of the zoom level
+
+
+Item: Select item under mouse cursor -- selects item under mouse (or keeps selected), deselects others; deselects all if mouse is outside of items within Arrange
+
+Item: Set focus to item under mouse cursor -- selects item under mouse, keeps others selected; doesn't deselect all if mouse is outside of items within Arrange
+
 ----------------------------------------------------
 
 MIDI Editor
@@ -1944,13 +1965,13 @@ In sections other than Main the command ID of the script at the same path is dis
 
 Main 0: RS9de8cea86eb5a13361c01d1f0ae1d5f86c998101 -- no infix
 
-MIDI Editor 32060: RS7d3c_9de8cea86eb5a13361c01d1f0ae1d5f86c998101 -- infix is 7d3c_
+MIDI Editor 32060: RS7d3c_9de8cea86eb5a13361c01d1f0ae1d5f86c998101 -- infix is 7d3c_ (7d3c is 32060 in hexadecimal)
 
-MIDI Event list editor 32061: RS7d3d_9de8cea86eb5a13361c01d1f0ae1d5f86c998101 -- infix is 7d3d_
+MIDI Event list editor 32061: RS7d3d_9de8cea86eb5a13361c01d1f0ae1d5f86c998101 -- infix is 7d3d_ (7d3d is 32061 in hexadecimal)
 
-MIDI Inline editor 32062: RS7d3e_9de8cea86eb5a13361c01d1f0ae1d5f86c998101 -- infix is 7d3e_
+MIDI Inline editor 32062: RS7d3e_9de8cea86eb5a13361c01d1f0ae1d5f86c998101 -- infix is 7d3e_ (7d3e is 32062 in hexadecimal)
 
-Media Explorer 32063: RS7d3f_9de8cea86eb5a13361c01d1f0ae1d5f86c998101  -- infix is 7d3f_
+Media Explorer 32063: RS7d3f_9de8cea86eb5a13361c01d1f0ae1d5f86c998101  -- infix is 7d3f_ (7d3f is 32063 in hexadecimal)
 
 
 This is also reflected in the .ini files
@@ -3661,10 +3682,59 @@ https://www.askjf.com/index.php?q=5473s
 
 ==============================================================
 
+-- Trigger multi-sample in RS5k at different velocities from audio source
+
+For this you need 2 tracks with the same audio material
+
+1. on one track you insert Audio To MIDI Drum Trigger, MIDI Velocity Control, RS5k (in this order)
+
+2. from another track you send audio to the first one on channels 3/4 or any other except 1/2
+
+3. in the first track enable parameter modulation from audio signal for 'Velocity add' slider of MIDI Velocity Control plugin, the audio source should be channels 3/4, that is audio coming in from the second track
+
+then it's a matter of playing with parameter modulation settings
+
+see track semplate Trigger multi-samples in RS5k from audio based on audio volume.RTrackTemplate
+
+The solution is based on ashcat_lt suggestion at https://forums.cockos.com/showthread.php?t=197392
+Prompted by a question at https://www.youtube.com/watch?v=PTNy4SYRNbo&lc=UgwrwqbPiREVrwdmZ8R4AaABAg
 
 
+==============================================================
 
+-- Convetring individial drum tracks into MIDI
 
+1. Split with the Dynamic split with the following settings:
+
+'At transients' is the only option checked under 'Split points'
+'Min slice length' and 'Min silence legth' sliders are at the minimum
+'Split selected item' option is enabled under 'Action to perform' 
+'Create chromatic MIDI from slices' is checked
+The rest is unchecked
+
+2. Adjust the threshold with 'Transient Detection settings' dialogue
+
+'Use zero crossings' can be unchecked since we won't be using the audio
+
+3. Hit the 'Split' button in the Dynamic split dialogue
+
+4. Keeping the source audio item selected right click the item and run 'Heal splits in items'
+
+5. Select all the MIDI notes in the generated MIDI item, right click -> Note properties, 
+from the 'Note:' menu select the target note to move all the notes to and click Apply
+
+5. If you need to combine all the created MIDI items into one, place them on top of each other
+then marquee select so that items underneath are selected as well, right click on the item and run 'Glue items'
+to glue them into one.
+
+--------------
+
+Alternative method using 'Audio to MIDI Drum Trigger' stock JS plugin and the action
+'Apply trac/take FX to items as new takes (MIDI output)' + some tricks
+
+https://www.youtube.com/watch?v=VwgvBtAZLZU
+
+==============================================================
 
 
 
