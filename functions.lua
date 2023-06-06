@@ -125,7 +125,7 @@ end
 function validate_settings1(...) -- if actual setting value is immaterial
 local t = {...}
 	for k, sett in ipairs(t) do
-		if type(sett) == 'string' and #sett:gsub(' ','') > 0 
+		if type(sett) == 'string' and #sett:gsub(' ','') > 0
 		or type(sett) == 'number' then t[k] = true
 		else t[k] = false
 		end
@@ -365,7 +365,7 @@ local function Wrapper1(func,...)
 -- to be used with defer() and atexit()
 -- thanks to Lokasenna, https://forums.cockos.com/showthread.php?t=218805 -- defer with args
 -- func is function name, the elipsis represents the list of function arguments
--- Lokasenna's code didn't work because func(...) produced an error 
+-- Lokasenna's code didn't work because func(...) produced an error
 -- without there being elipsis in function() as well, but gave direction
 local t = {...}
 return function() func(table.unpack(t)) end
@@ -489,6 +489,13 @@ r.Undo_EndBlock('', -1)
 if undo then
 r.Undo_EndBlock(undo, -1)
 else r.Undo_EndBlock('', -1) end
+
+
+function undo_block(undo) -- undo is string
+	if not undo then r.Undo_BeginBlock()
+	else r.Undo_EndBlock(undo, -1)
+	end
+end
 
 
 function Force_MIDI_Undo_Point1(take)
@@ -855,6 +862,11 @@ function ends_with(str, ending)
 end
 
 
+function strip_spaces(str) -- keeps chars and punctuation, strips leading and trailing spaces and control chars
+return str:match('[%w%p].*[%w%p]*') -- accommodating both mutlti- and single char string
+end
+
+
 -- split string to multi-line by character count represented with line_len
 function split_to_multiple_lines(str, line_len) -- str is string, line_len is integer
 local line_len = math.floor(line_len) -- prevent decimals
@@ -874,7 +886,7 @@ end
 
 
 
-function Are_Multiple_Captures(chunk, str)
+function Are_Multiple_Captures(chunk, str) -- relies on Esc() function
 local cnt = 0
 	for w in chunk:gmatch(Esc(str)) do
 		if w then cnt = cnt+1 end
@@ -1006,7 +1018,7 @@ local repl_str = 'ffsds'
 	end
 	-- result: 'one1 one one2 one one test'
 
-	
+
 function replace_capture_by_capture_number(str, what, with, ...)
 -- the elipsis represents a list of integers denoting the number of the what instance in the str
 -- if the what instance number is out of scope or it isn't found, returns the original str
@@ -1020,7 +1032,7 @@ local i = 1
 		i = e+1
 		else
 		i = i+1
-		end	
+		end
 	end
 table.sort(inst_t) -- in case the what instance numbers weren't passed in ascending order
 	for i = inst_t[#inst_t], 1, -1 do -- iterating backwards from the greatest ordinal number
@@ -1028,13 +1040,13 @@ table.sort(inst_t) -- in case the what instance numbers weren't passed in ascend
 		if t[idx] then -- instance number from the arguments matches key in the table holding indices of the what instances
 		str = str:sub(1,t[idx]-1)..with..str:sub(t[idx]+#what)
 		end
-	end	
+	end
 return str
 end
 -- EXAMPLE
 -- local str = 'one two one two one two, two'
 -- local str = replace_capture_by_capture_number(str, 'two', 'three', 1, 3, 4) -- replaces 1st, 2nd and 4th instances of 'two' with 'three'
-	
+
 
 
 -- !!!! OVER 26 captures may make the system freeze (could also depend on the length of each capture) // same with string.find()
@@ -1134,7 +1146,7 @@ local truth_cnt = 0
 		if w then cnt = cnt+1 end
 		if target_str:match(Esc(w)) then truth_cnt = truth_cnt+1 end
 	end
-return cnt > 0 and cnt == truth_cnt -- all words/punctuation marks of the search term found in the track name; preventing equality of zeros
+return cnt > 0 and cnt == truth_cnt -- all words/punctuation marks of the search term found in the target_str; preventing equality of zeros
 end
 
 
@@ -1168,7 +1180,7 @@ local text, menu = '',''
 		if multibyte_str_len(text_clean) > max_line_len or text:match('(.+)|') then -- dump text var to menu var and reset text, if not dumped immediately when the text var ends with line break then when text var will exceed the length limit containing a user line break, hanging words will appear after such line break because they will now be included in the menu var and next time length of text var will be evaluated without them, e.g.:
 		-- | text = 'The generated Lorem Ipsum is therefore | always' -- assuming the string exceeds the length limit, 'always' will be left hanging ...
 		-- | menu = menu..'The generated Lorem Ipsum is therefore | always'..pipe -- line break is created after 'always' with pipe var, next time text var will be added after the pipe, so the result will look like:
-		-- | 'The generated Lorem Ipsum is therefore 
+		-- | 'The generated Lorem Ipsum is therefore
 		-- | always
 		-- | free from repetition, injected humor
 		-- whereas 'always' has to be grouped with 'free from repetition, injected humor'
@@ -1239,7 +1251,7 @@ local period = t == '%I' and (os.date('%H')+0 < 12 and ' AM' or ' PM') or ''
 local date = os.date(d..'/%Y '..t..':%M'..period)
 	local function roman(str)
 	local t = {'I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'}
-	return '/'..t[tonumber(str:match('%d+'))]..' ' 
+	return '/'..t[tonumber(str:match('%d+'))]..' '
 	end
 	local function isr(str)
 		if str:match('0%d/0%d') then return str:gsub('0','')
@@ -1248,11 +1260,20 @@ local date = os.date(d..'/%Y '..t..':%M'..period)
 		end
 	end
 -- local date = '02/01/2023 15:29' -- TESTING
-local date = not US_order and 
-(Roman_month and date:gsub('/%d+/', roman) or Isr_date and date:gsub('%d+/%d+/', isr)) 
+local date = not US_order and
+(Roman_month and date:gsub('/%d+/', roman) or Isr_date and date:gsub('%d+/%d+/', isr))
 or date
 local date = not Roman_month and dot and date:gsub('/','.') or date
 return date
+end
+
+
+function Get_Type_Of_Action(str)
+local native = str ~= '0' and tonumber(str)
+local script = str:match('_?RS') and (#str == 43 or #str == 42)
+local cust_act = str:match('^_?[%l%d]+$') and (#str == 33 or #str == 32)
+local sws_act = str:match('^_?[%u%p%d]+$')
+return native, cust_act, sws_act, script
 end
 
 
@@ -1408,7 +1429,28 @@ local offset = 1-index
 end
 
 
-function merge_tables(t, new, ...) -- new is boolean to indicate if to merge with t or create a new table, elipsis represents a list of tables to be merged with t
+
+function merge_tables1(t,...)
+-- elipsis represents a list of tables to be merged with t;
+-- be aware that since the tables passed as elipsis will be merged with t
+-- after the merge it will contain all of them,
+-- so if you plan to use t afterwards with its original contents
+-- it's safer to pass an anonymous table {} as the 1st argument
+local to_merge = {...}
+	for _, table in ipairs(to_merge)do
+		for i = 1, #table do
+		t[#t+1] = table[i]
+	--[[ OR
+		for _, v in ipairs(table) do
+		t[#t+1] = v
+	--]]
+		end
+	end
+return t
+end
+
+
+function merge_tables2(t, new, ...) -- new is boolean to indicate if to merge with t or create a new table, elipsis represents a list of tables to be merged with t
 local t = new and {table.unpack(t)} or t
 local to_merge = {...}
 	for _, table in ipairs(to_merge)do
@@ -1571,7 +1613,7 @@ local fin = #t
 	while t[mid] < value do
 	local result = math.floor((fin+mid)/2)
 		if t[result] < value and result ~= mid then mid = result -- result ~= mid prevents endless loop when the sought value is the last in the array
-		elseif 
+		elseif
 		t[result] > value and result ~= fin then fin = result
 		else break end -- breaks short of the searched last value by 1
 	end
@@ -1634,7 +1676,7 @@ r.MIDI_InsertTextSysexEvt() -- not inserted with empty bytestr argument
 -- https://forum.cockos.com/showthread.php?t=241140
 
 
-function Is_MIDI_Ed_Open()
+function Is_MIDI_Ed_Open() -- see MIDIEditor_GetActiveAndVisible() below
 -- NOT RELIABLE SINCE DOCKED MIDI EDITOR IN CLOSED DOCK IS STILL VALID
 -- IF DOCK IS FLOATING THE NATURAL INSTINCT IS TO CLOSE IT USING THE WINDOW CLOSE BUTTON
 -- AND THAT'S WHERE THE PROBLEM EMERGES
@@ -1643,6 +1685,31 @@ function Is_MIDI_Ed_Open()
 -- https://forum.cockos.com/showthread.php?t=278871
 return r.GetToggleCommandStateEx(32060, 1014) ~= -1 -- View: Toggle snap to grid // if closed toggle state isn't returned
 end
+
+
+function MIDIEditor_GetActiveAndVisible()
+-- solution to the problem described at https://forum.cockos.com/showthread.php?t=278871
+local ME = r.MIDIEditor_GetActive()
+local dockermode_idx, floating = r.DockIsChildOfDock(ME) -- floating is true regardless of the floating docker visibility
+-- OR
+-- local floating = r.DockGetPosition(dockermode_idx) == 4 -- another way to evaluate if docker is floating
+-- the MIDI Editor is either not docked or docked in an open docker attached to the main window
+	if ME and (dockermode_idx == -1 or dockermode_idx > -1 and not floating
+	and r.GetToggleCommandStateEx(0,40279) == 1) -- View: Show docker
+	then return ME
+-- the MIDI Editor is docked in an open floating docker
+	elseif ME and floating then
+		for line in io.lines(r.get_ini_file()) do
+			if line:match('dockermode'..dockermode_idx)
+			and line:match('32768') -- open floating docker
+			-- OR
+			-- and not line:match('98304') -- not closed floating docker
+			then return ME
+			end
+		end
+	end
+end
+
 
 
 function Lane_Type_To_Event_Data(ME) -- relies on Error_Tooltip() for error message
@@ -3498,7 +3565,7 @@ local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, e
 r.PreventUIRefresh(1)
 local edge = right_tcp and start_time-5 or end_time+5
 r.SetEditCurPos(edge, false, false) -- moveview, seekplay false // to secure against a vanishing probablility of overlap between edit and mouse cursor positions in which case edit cursor won't move just like it won't if mouse cursor is over the TCP // +/-5 sec to move edit cursor beyond right/left edge of the Arrange view to be completely sure that it's far away from the mouse cursor // if start_time is 0 and there's negative project start offset the edit cursor is still moved to the very start, that is past 0, the function ignores negative start offset therefore is fully compatible with GetSet_ArrangeView2()
-r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping) // more sensitive than with snapping
+r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping) // more sensitive than with snapping // works along the entire screen Y axis outside of the TCP regardless of whether the program window is under the mouse
 local new_cur_pos = r.GetCursorPosition()
 local tcp_under_mouse = new_cur_pos == edge or new_cur_pos == 0 -- if the TCP is on the right and the Arrange is scrolled all the way to the project start or close enough to it start_time-5 won't make the edit cursor move past the project start hence the 2nd condition, but it can move past the right edge
 -- Restore orig. edit cursor pos
@@ -3646,7 +3713,7 @@ function Re_Store_Track_Heights_Selection_x_Scroll(t, ref_tr_y) -- scroll state 
 			if tr_h ~= height then
 			r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', height)
 			r.TrackList_AdjustWindows(true) -- isMinor is true // updates TCP only https://forum.cockos.com/showthread.php?t=208275
-			
+
 			--[[ -- Since botched track zoom overhaul in 6.76 https://forum.cockos.com/showthread.php?t=278646 track heights cannot be changed smoothly with actions
 			local bigger, smaller = tr_h > height, tr_h < height
 			local action = bigger and 41326 -- View: Decrease selected track heights
@@ -4052,11 +4119,11 @@ local parm_t = {'VOLUME','VOLUME_VCA','PAN','WIDTH','MUTE','SOLO',
 end
 
 
-function Is_TrackList_Hidden() 
+function Is_TrackList_Hidden()
 -- after double click the the divider between it and the Arrange view
 	for line in io.lines(r.get_ini_file()) do
 	local leftpane = line:match('leftpanewid=(%d+)')
-		if leftpane then return leftpane == '0' end 
+		if leftpane then return leftpane == '0' end
 	end
 end
 
@@ -5079,7 +5146,7 @@ true:
 1. fx UI is shown in the open fx chain
 2. fx UI is shown in a floating window regardless of being shown in fx chain and of fx chain visibility
 false:
-1. fx UI is not shown both in fx chain and in a floating window while fx chain is open 
+1. fx UI is not shown both in fx chain and in a floating window while fx chain is open
 2. fx UI is not shown in a floating window while fx chain is closed
 
 r.TrackFX_GetChainVisible(tr)
@@ -6004,7 +6071,7 @@ function TrackFX_GetRecChainVisible1(tr)
 	local open_fx_idx -- get fx whose UI is open in FX chain
 		for i = 0, CountFX(tr)-1 do
 		local idx = i+0x1000000
-			if r.TrackFX_GetOpen(tr, idx) then 
+			if r.TrackFX_GetOpen(tr, idx) then
 			open_fx_idx = idx break end
 		end
 	-- restore floating windows	// z-order and focused window won't be restored, the foreground will be occupied but the window of the fx selected in the fx chain if its window was floating, otherwise the windows are loaded in the fx order
@@ -6030,7 +6097,7 @@ local chain_open, shown_fx
 		shown_fx = i
 		end
 	end
-	if not chain_open then -- retry in case the chain is open but empty or the fx open in the chain but also floating which in itself isn't reliable because it returns true even when the chain is closed	
+	if not chain_open then -- retry in case the chain is open but empty or the fx open in the chain but also floating which in itself isn't reliable because it returns true even when the chain is closed
 	r.TrackFX_AddByName(tr, 'ReaGate', true, -1000) -- recFX true, instantiate -1000 (1st slot) // insert temporary stock fx to evaluate against it, its UI will be automatically shown in the chain
 	local idx = 0x1000000 -- 1st slot
 	chain_open = r.TrackFX_GetOpen(tr, idx)
@@ -6058,7 +6125,7 @@ function Re_Store_FX_Windows_Visibility(t)
 				if r.TrackFX_GetOpen(tr, i) then -- is open in the FX chain window or a floating window
 				local len = #t[tr].trackfx+1
 				-- storing floating status and fx chain UI visibility status even if the UI is floating
-				t[tr].trackfx[len] = {idx=i, float=r.TrackFX_GetFloatingWindow(tr, i), ui=r.TrackFX_GetChainVisible(tr)==i} 
+				t[tr].trackfx[len] = {idx=i, float=r.TrackFX_GetFloatingWindow(tr, i), ui=r.TrackFX_GetChainVisible(tr)==i}
 				end
 			end
 			for i = 0, r.TrackFX_GetRecCount(tr)-1 do
@@ -6066,7 +6133,7 @@ function Re_Store_FX_Windows_Visibility(t)
 			local open_fx_idx = Get_InputMonFX_Chain_Truely_SelectedFX(tr)
 				if r.TrackFX_GetOpen(tr, i) then -- is open in the FX chain window or a floating window
 				local len = #t[tr].trackfx+1
-				t[tr].trackfx[len] = {idx=i, float=r.TrackFX_GetFloatingWindow(tr, i), ui=open_fx_idx==i} 
+				t[tr].trackfx[len] = {idx=i, float=r.TrackFX_GetFloatingWindow(tr, i), ui=open_fx_idx==i}
 				end
 			end
 			for i = 0, r.GetTrackNumMediaItems(tr)-1 do
@@ -6074,13 +6141,13 @@ function Re_Store_FX_Windows_Visibility(t)
 			t[tr].takefx[itm] = {}
 				for i = 0, r.CountTakes(itm)-1 do
 				local take = r.GetTake(itm, i)
-				t[tr].takefx[itm][take] = {}				
-					for i = 0, r.TakeFX_GetCount(take)-1 do					
+				t[tr].takefx[itm][take] = {}
+					for i = 0, r.TakeFX_GetCount(take)-1 do
 						if r.TakeFX_GetOpen(take, i) then -- is open in the FX chain window or a floating window
 						local len = #t[tr].takefx[itm][take]+1
-						t[tr].takefx[itm][take][len] = {idx=i, float=r.TakeFX_GetFloatingWindow(take, i), ui=r.TakeFX_GetChainVisible(take)==i}						
+						t[tr].takefx[itm][take][len] = {idx=i, float=r.TakeFX_GetFloatingWindow(take, i), ui=r.TakeFX_GetChainVisible(take)==i}
 						end
-					end				
+					end
 				end
 			end
 		end
@@ -6102,7 +6169,7 @@ function Re_Store_FX_Windows_Visibility(t)
 			then
 				for _, fx_data in ipairs(t[tr].trackfx) do
 					if fx_data.ui then r.TrackFX_Show(tr, fx_data.idx, 1) end -- showFlag 1 (open FX chain with fx ui shown) // OR r.TrackFX_SetOpen(tr, fx_idx, true) -- open true
-					if fx_data.float then r.TrackFX_Show(tr, fx_data.idx, 3) end -- showFlag 3 (open in a floating window)				
+					if fx_data.float then r.TrackFX_Show(tr, fx_data.idx, 3) end -- showFlag 3 (open in a floating window)
 				end
 				for itm, takes_t in pairs(t[tr].takefx) do
 					for take, fx_t in pairs(takes_t) do
@@ -6113,7 +6180,7 @@ function Re_Store_FX_Windows_Visibility(t)
 					end
 				end
 			end
-		end	
+		end
 end
 
 end
@@ -6693,7 +6760,7 @@ r.SetEditCurPos(-3600, false, false) -- moveview seekplay false // move to -3600
 local notes_item = r.AddMediaItemToTrack(notes_tr)
 r.SetMediaItemSelected(notes_item, true) -- selected true // to be able to open notes with action
 local proj_len = r.GetProjectLength(0)
-	
+
 r.SetMediaItemInfo_Value(notes_item, 'D_LENGTH', proj_len == 0 and 5 or proj_len) -- set notes item length to full project length if there're time line objects, if there's none and so proj length is 0 then set to 5 sec
 r.AddTakeToMediaItem(notes_item) -- creates a quasi-MIDI item so label can be added to it since label (P_NAME) is a take property // the item is affected by actions 'SWS/BR: Add envelope points...', 'SWS/BR: Insert 2 envelope points...' and 'SWS/BR: Insert envelope points on grid...' when applied to the Tempo envelope which cause creation of stretch markers in the item
 r.GetSetMediaItemTakeInfo_String(r.GetActiveTake(notes_item), 'P_NAME', 'track "'..tr_name..'"', true) -- setNewValue true // add label to the notes item
@@ -6768,9 +6835,9 @@ end
 
 -- Combined with Get_Item_Edge_At_Mouse() can be used to get 4 item corners at the mouse cursor
 
-function Get_Arrange_and_Header_Heights1() 
--- fetches data from a temporary project tab, WORKS, but isn't ideal because of being way too intrusive, project loading process is usually visible 
--- if no SWS estension only works if the program window is fully open 
+function Get_Arrange_and_Header_Heights1()
+-- fetches data from a temporary project tab, WORKS, but isn't ideal because of being way too intrusive, project loading process is usually visible
+-- if no SWS estension only works if the program window is fully open
 -- only runs when there's track or item under mouse cursor
 -- relies on round() function
 
@@ -6793,7 +6860,7 @@ local window_h, arrange_h = state:match('(.+);(.+)')
 local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track top edge coordinate inside Get_Item_Track_Segment_At_Mouse() function when the sws extension is installed to be able to get segments in the shrunk program window, in this case 'top' value represents difference between program window top and full screen top coordinates which is needed to match mouse cursor Y coordinate which is absolute i.e. is relative to the full screen size // !!!! MIGHT NOT WORK ON MAC since there Y axis starts at the bottom
 
 	if sws and window_h ~= wnd_h..'' or not window_h then -- either only update if sws extension is installed and program window height has changed or initially store
-	
+
 	-- get 'Maximum vertical zoom' set at Preferences -> Editing behavior, which affects max track height set with 'View: Toggle track zoom to maximum height', introduced in build 6.76
 	local cont
 		if tonumber(r.GetAppVersion():match('(.+)/')) >= 6.76 then
@@ -6803,7 +6870,7 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 		end
 	local max_zoom = cont and cont:match('maxvzoom=([%.%d]+)\n') -- min value is 0.125 (13%), max is 8 (800%)
 	local max_zoom = not max_zoom and 100 or max_zoom*100 -- ignore in builds prior to 6.76 by assigning 100 so that when track height is divided by 100 and multiplied by 100% nothing changes, otherwise convert to conventional percentage value; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is accurate, otherwise there's ±1 px diviation, because the actual track height in pixels isn't fractional like the one obtained through calculation therefore some part is lost
-		
+
 	-- Get Arrange and window header height
 	local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer
 	-- r.PreventUIRefresh(1) -- PREVENTS GetMediaTrackInfo_Value RETURN VALUE PROBABLY BECAUSE THE HIGHT ISN'T UPDATED AFTER ACTION
@@ -6860,7 +6927,7 @@ end
 -- if Is_Ctrl_And_Shift(cmdID) then return r.defer(no_undo) end
 
 
-function Get_Arrange_and_Header_Heights2() 
+function Get_Arrange_and_Header_Heights2()
 -- if no SWS extension only works if the program window is fully open
 -- only runs when there's track or item under mouse cursor
 -- relies on round() function
@@ -6892,7 +6959,7 @@ local item, take = r.GetItemFromPoint(x, y, false) -- allow_locked false // item
 local track, info = r.GetTrackFromPoint(x, y)
 
 	if (item or track) and (sws and window_h ~= wnd_h..'' or not window_h) then -- either only update if sws extension is installed and program window height has changed or initially store
-	
+
 	-- get 'Maximum vertical zoom' set at Preferences -> Editing behavior, which affects max track height set with 'View: Toggle track zoom to maximum height', introduced in build 6.76
 	local cont
 		if tonumber(r.GetAppVersion():match('(.+)/')) >= 6.76 then
@@ -6935,7 +7002,7 @@ local track, info = r.GetTrackFromPoint(x, y)
 			local action = bigger and 41326 -- View: Decrease selected track heights
 			or smaller and 41325 -- View: Increase selected track heights
 			--[[ WORKED perfectly in 6.56 and earlier, but since vertical zoom overhaul in 6.76 TCP height change is visible during the loop https://forum.cockos.com/showthread.php?t=278646
-			r.SetOnlyTrackSelected(tr)			
+			r.SetOnlyTrackSelected(tr)
 				repeat
 				r.Main_OnCommand(action, 0)
 				local tr_h = r.GetMediaTrackInfo_Value(tr, 'I_TCPH')
@@ -7531,7 +7598,7 @@ function Is_Item_Under_Mouse()
 local GetCnt = r.CountSelectedMediaItems
 local sel_t = {}
 	for i = 0, GetCnt(0)-1 do	-- store selected items
-	sel_t[#sel_t+1] = r.GetSelectedMediaItem(0,i)		
+	sel_t[#sel_t+1] = r.GetSelectedMediaItem(0,i)
 	end
 r.SelectAllMediaItems(0,false) -- selected false // deselect all
 r.Main_OnCommand(40528, 0) -- Item: Select item under mouse cursor // selects item under mouse (or keeps selected), deselects others; deselects all if mouse is outside of items within Arrange
@@ -8254,15 +8321,15 @@ end
 
 local wnd_ident_t1 = {
 -- transport docked pos in the top or bottom dockers can't be ascertained;
--- transport_dock=0 any time it's not docked at its reserved positions in the main window (see below) 
+-- transport_dock=0 any time it's not docked at its reserved positions in the main window (see below)
 -- which could be floating or docked in any other docker;
--- When 'Dock transport in the main window' option is enabled the values of the 'transport_dock_pos' key 
+-- When 'Dock transport in the main window' option is enabled the values of the 'transport_dock_pos' key
 -- corresponding to options under 'Docked transport position' menu item are:
--- 0 - Below arrange (default) [above bottom docker]; 1 - Above ruler [below top docker]; 
+-- 0 - Below arrange (default) [above bottom docker]; 1 - Above ruler [below top docker];
 -- 2 - Bottom of main window [below bottom docker]; 3 - Top of main window [above top docker]
 --	[40279] = 'Docker', -- View: Show docker ('Docker') // not supported by the script
 [40078] = 'mixwnd_vis', -- View: Toggle mixer visible ('Mixer')
-[40605] = 'actions', -- Show action list ('Actions') // doesn't keep size		
+[40605] = 'actions', -- Show action list ('Actions') // doesn't keep size
 --=============== 'Project Bay' // 8 actions // dosn't keep size ===============
 [41157] = 'projbay_0', -- View: Show project bay window
 [41628] = 'projbay_1', -- View: Show project bay window 2
@@ -8347,11 +8414,11 @@ _SWSSNAPSHOT_OPEN = 'SWSSnapshots', -- SWS: Open snapshots window ('Snapshots') 
 local wnd_ident_t = { -- to be used in Get_Mixer_Wnd_Dock_State() function
 -- the keys are those appearing in reaper.ini [REAPERdockpref] section
 -- transport docked pos in the top or bottom dockers can't be ascertained;
--- transport_dock=0 any time it's not docked at its reserved positions in the main window (see below) 
+-- transport_dock=0 any time it's not docked at its reserved positions in the main window (see below)
 -- which could be floating or docked in any other docker;
--- When 'Dock transport in the main window' option is enabled the values of the 'transport_dock_pos' key 
+-- When 'Dock transport in the main window' option is enabled the values of the 'transport_dock_pos' key
 -- corresponding to options under 'Docked transport position' menu item are:
--- 0 - Below arrange (default) [above bottom docker]; 1 - Above ruler [below top docker]; 
+-- 0 - Below arrange (default) [above bottom docker]; 1 - Above ruler [below top docker];
 -- 2 - Bottom of main window [below bottom docker]; 3 - Top of main window [above top docker]
 -- window 'dock=0' keys do not get updated if the window was undocked before a screenset where it's docked was (re)loaded which leads to false positives
 -- The following key names are keys used in [REAPERdockpref] section
@@ -8458,7 +8525,7 @@ return true
 end
 
 
-local wnd_ident_t = { -- to be used with Detect_Docker_Pane_Change(), Get_Mixer_Width() 
+local wnd_ident_t = { -- to be used with Detect_Docker_Pane_Change(), Get_Mixer_Width()
 -- the keys are those appearing in reaper.ini [REAPERdockpref] section
 -- visibility key isn't used, the preceding action command ID is used instead to evaluate visibility
 -- dockheight_t= height of the top docker // doesn't change when a new window with greater height is added to the docker, only when the docker is resized manually, just like toppane= value
@@ -8746,18 +8813,18 @@ local sws, js = r.APIExists('BR_Win32_GetMixerHwnd'), r.APIExists('JS_Window_Fin
 	local retval, rt, top, lt, bot = table.unpack(sws and {r.BR_Win32_GetWindowRect(mixer)} or js and {r.JS_Window_GetRect(mixer)})
 	return lt-rt-master_w
 	end
-	
+
 	if GetToggle(0, 40083) == 0 then return end -- Mixer: Toggle docking in docker // Mixer isn't docked, with native API its window size cannot be determined
 
 -- without the extensions only respect docked Mixer, at the top/bottom its width will be considered equal full screen width, on the left/right it will be equal 1 track
-	
-local ini = r.get_ini_file()	
+
+local ini = r.get_ini_file()
 	-- a floating docker cannot be split, only tabbed
 local found, dockermode_init
 	for line in io.lines(ini) do -- get Mixer dockermode
 		if line:match('REAPERdockpref') then found = 1
 		elseif found and line:match('^mixer=') then
-		dockermode_init = line:match('.+ (%d+)') 
+		dockermode_init = line:match('.+ (%d+)')
 		break end
 	end
 local pos
@@ -8775,7 +8842,7 @@ local t = {}
 	end
 local splits_num, found = 1
 	for line in io.lines(ini) do -- count windows associated with the collected dockermodes and visible, that is which share the docker with the Mixer in split mode (different dockermodes, same position)
-		if line:match('REAPERdockpref') then found = 1 
+		if line:match('REAPERdockpref') then found = 1
 		elseif found and line:match('%[.-%]') then break -- new section after 'REAPERdockpref'
 		elseif found then
 		local dockermode = line:match('.-=.+ (%d+)')
@@ -8796,7 +8863,7 @@ local splits_num, found = 1
 					elseif wnd == 'midiedit' then
 						if tab[3] then splits_num = splits_num+1 end
 					elseif GetToggle(0, tab[3]) == 1 then
-					splits_num = splits_num+1	
+					splits_num = splits_num+1
 					end
 				end
 			end
@@ -8884,7 +8951,7 @@ function Re_Store_Windows_Props_By_Names1(names_t, t) -- relies on Esc() functio
 		local dock_idx, isFloatingDocker = r.DockIsChildOfDock(hwnd)
 			if dock_idx == -1 then -- not docked to prevent undocking window in which case it'll become invisible
 			r.JS_Window_Move(hwnd, wnd.lt, wnd.tp)
-		--  OR	
+		--  OR
 		--	r.JS_Window_SetPosition(hwnd, wnd.lt, wnd.tp, wnd.w, wnd.h) -- ZOrder, flags are ommitted
 				--	if wnd.focus then r.JS_Window_SetFocus(hwnd) end -- focus is not stored above but it's more granular and targets elements in the foreground window which isn't really necessary
 				if wnd.foregrnd then r.JS_Window_SetForeground(hwnd) end -- only restored if the script is run via a shortcut because clicking changes foreground window, r.JS_Window_SetZOrder() should be avoided as it's global to the OS
@@ -8924,7 +8991,7 @@ function Re_Store_Windows_Props_By_Names2(names_t, t)
 		local dock_idx, isFloatingDocker = r.DockIsChildOfDock(hwnd)
 			if dock_idx == -1 then -- not docked to prevent undocking window in which case it'll become invisible
 			r.JS_Window_Move(hwnd, wnd.lt, wnd.tp)
-		--  OR	
+		--  OR
 		--	r.JS_Window_SetPosition(hwnd, wnd.lt, wnd.tp, wnd.w, wnd.h) -- ZOrder, flags are omitted
 				--	if wnd.focus then r.JS_Window_SetFocus(hwnd) end -- focus is not stored above but it's more granular and targets elements in the foreground window which isn't really necessary
 				if wnd.foregrnd then r.JS_Window_SetForeground(hwnd) end -- only restored if the script is run via a shortcut because clicking changes foreground window, r.JS_Window_SetZOrder() should be avoided as it's global to the OS
@@ -9022,7 +9089,7 @@ function Window_Is_Visible(hwnd)
 -- r.JS_Window_GetForeground() is safer when the window is surely closed because it doesn't remove focus from children of the currently focused window, e.g. list entry active status
 --[-[
 local ForeGrnd = r.JS_Window_GetForeground
-local foregrnd = ForeGrnd() 
+local foregrnd = ForeGrnd()
 	if foregrnd == hwnd then return true end
 r.JS_Window_SetForeground(hwnd)
 local foregrnd = ForeGrnd()
@@ -9052,9 +9119,11 @@ end
 
 
 function Move_Window_To_Another_Dock(wnd_id, new_pos, cur_pos)
+-- same as the native 'Docker: Show in bottom/top/left/right of main window'
+-- only that the action affects explicitly selected window;
 -- wnd_id is window identifier string found in reaper.ini, see table keys below,
 -- if routing, add digit without space: routing1 - routing matrix;
--- routing2 - group matrix; routing3 - track wiring; 
+-- routing2 - group matrix; routing3 - track wiring;
 -- routing4 - region render matrix -- non-toggle
 -- cur_pos and new_pos args are integer: 0 - bottom, 1 - left, 2 - top, 3 - right, 4 - floating
 -- cur_pos is optional, if passed, docker position will only be changed of the window's current pos matches cur_pos value, otherwise position will be changed regardless of the current one
@@ -9064,13 +9133,13 @@ function Move_Window_To_Another_Dock(wnd_id, new_pos, cur_pos)
 	if not new_pos or not tonumber(new_pos)
 	or tonumber(new_pos) < 0 or tonumber(new_pos) > 4 then
 	return end
-	
+
 	if cur_pos and (not tonumber(new_pos)
 	or tonumber(new_pos) < 0 or tonumber(new_pos) > 4) then
 	return end
 
 local dockermode = r.GetConfigWantsDock(wnd_id) -- ger dockermode the window is currently assigned to
-	
+
 	if cur_pos and r.DockGetPosition(dockermode) ~= cur_pos then return end -- compare the position the dockermode belongs to with the cur_pos value if any
 
 -- in actual Routing menu order
@@ -9082,33 +9151,33 @@ local routing = {40251, -- View: Show routing matrix window ('Routing Matrix')
 
 local function is_region_render_vis(routing)
 	for _, commID in ipairs(routing) do
-		if r.GetToggleCommandStateEx(0,commID) == 1 
+		if r.GetToggleCommandStateEx(0,commID) == 1
 		then -- one of the other 3 windows which have toggle state is visible
 		return end -- so region render matrix visibility is false
 	end
 -- if the function didn't exit early, all windows with toggle action are closed
--- 'View: Show region render matrix window' is not a toggle, so evaluate that via reaper,ini 
+-- 'View: Show region render matrix window' is not a toggle, so evaluate that via reaper,ini
 	for line in io.lines(r.get_ini_file()) do
-		if line:match('routingwnd_vis') and line:sub(-1) == '1' then 
-		-- the key has value 1 when region render matrix is open as well	
+		if line:match('routingwnd_vis') and line:sub(-1) == '1' then
+		-- the key has value 1 when region render matrix is open as well
 		return true
 		end
 	end
 end
 
-local t = {transport = 40259, mixer = 40078, actions = 40605, 
-projbay_0 = 41157, projbay_1 = 41628, projbay_2 = 41629, 
-projbay_3 = 41630, projbay_4 = 41631, projbay_5 = 41632, 
+local t = {transport = 40259, mixer = 40078, actions = 40605,
+projbay_0 = 41157, projbay_1 = 41628, projbay_2 = 41629,
+projbay_3 = 41630, projbay_4 = 41631, projbay_5 = 41632,
 projbay_6 = 41633, projbay_7 = 41634, --routing = rout,
-regmgr = 40326, explorer = 50124, trackmgr = 40906, grpmgr = 40327, 
-bigclock = 40378, video = 50125, perf = 40240, navigator = 40268, 
-vkb = 40377, fadeedit = 41827, undo = 40072, fxbrowser = 40271, 
-itemprops = 41589, midiedit = '', ['toolbar:1'] = 41679, 
-['toolbar:2'] = 41680, ['toolbar:3'] = 41681, ['toolbar:4'] = 41682, 
-['toolbar:5'] = 41683, ['toolbar:6'] = 41684, ['toolbar:7'] = 41685, 
-['toolbar:8'] = 41686, ['toolbar:9'] = 41936, ['toolbar:10'] = 41937, 
+regmgr = 40326, explorer = 50124, trackmgr = 40906, grpmgr = 40327,
+bigclock = 40378, video = 50125, perf = 40240, navigator = 40268,
+vkb = 40377, fadeedit = 41827, undo = 40072, fxbrowser = 40271,
+itemprops = 41589, midiedit = '', ['toolbar:1'] = 41679,
+['toolbar:2'] = 41680, ['toolbar:3'] = 41681, ['toolbar:4'] = 41682,
+['toolbar:5'] = 41683, ['toolbar:6'] = 41684, ['toolbar:7'] = 41685,
+['toolbar:8'] = 41686, ['toolbar:9'] = 41936, ['toolbar:10'] = 41937,
 ['toolbar:11'] = 41938, ['toolbar:12'] = 41939, ['toolbar:13'] = 41940,
-['toolbar:14'] = 41941, ['toolbar:15'] = 41942, ['toolbar:16'] = 41943, 
+['toolbar:14'] = 41941, ['toolbar:15'] = 41942, ['toolbar:16'] = 41943,
 ['toolbar:17'] = 42404, -- MX toolbar
 SWSAutoColor = '_SWSAUTOCOLOR_OPEN', -- SWS: Open auto color/icon/layout window ('Auto Color/Icon/Layout')
 ['BR - ContextualToolbars WndPos'] = '_BR_CONTEXTUAL_TOOLBARS_PREF', -- SWS/BR: Contextual toolbars... ('Contextual toolbars')
@@ -9153,12 +9222,12 @@ end
 local function wait_and_reopen(commandID)
 	if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 0 then
 	r.Main_OnCommand(commandID, 0) -- re-open // must be inside defer loop, for some reason when the defer loop stops commandID  is not accessible to Main_OnCommand() function outside
-	return 
+	return
 	elseif commandID == 41888 then
 		for line in io.lines(r.get_ini_file()) do
-			if line:match('routingwnd_vis') and 
+			if line:match('routingwnd_vis') and
 			-- the key has value 0 when region render matrix is closed as well
-			line:sub(-1) == '0' then	
+			line:sub(-1) == '0' then
 			r.Main_OnCommand(commandID, 0) return end
 		end
 	end
@@ -9168,13 +9237,13 @@ end
 
 -- extract index if routing and select command ID
 local commandID = wnd_id:match('routing') and routing[wnd_id:sub(-1)+0] or r.NamedCommandLookup(t[wnd_id]) -- accounting for SWS ext command IDs
-local vis = commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1 
+local vis = commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1
 or commandID == 41888 and is_region_render_vis(routing)
 
 	if not vis then return end -- only update visible windows
-	
-local wnd_id = wnd_id:match('routing') and 'routing' or wnd_id	
-	
+
+local wnd_id = wnd_id:match('routing') and 'routing' or wnd_id
+
 	for i = 0, 15 do -- there're 16 dockermode indices in total
 		if r.DockGetPosition(i) == new_pos then -- find dockermode associated with the desired position
 		-- in reaper.ini it's e.g. dockermode5=0;
@@ -9183,7 +9252,7 @@ local wnd_id = wnd_id:match('routing') and 'routing' or wnd_id
 		r.Dock_UpdateDockID(wnd_id, i)
 	--	r.UpdateArrange() -- doesn't work to visually update window position
 		-- must be refreshed for the change to become visible, that is its visibility toggled
-			if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1 
+			if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1
 			or commandID == 41888 and is_region_render_vis(routing)
 			then -- visible // will work when updating dock position of a window regardless of visibility if 'if not vis then' condition isn't used above, in which case only if a window is visible it will be reloaded, the rest will be moved in the background
 			r.Main_OnCommand(commandID, 0) -- close
@@ -9196,7 +9265,7 @@ local wnd_id = wnd_id:match('routing') and 'routing' or wnd_id
 end
 
 
-function Get_Arrange_Dims() 
+function Get_Arrange_Dims()
 -- requires SWS or js_ReaScriptAPI extensions
 local sws, js = r.APIExists('BR_Win32_FindWindowEx'), r.APIExists('JS_Window_Find')
 	if sws or js then -- if SWS/js_ReaScriptAPI ext is installed
@@ -9205,7 +9274,7 @@ local sws, js = r.APIExists('BR_Win32_FindWindowEx'), r.APIExists('JS_Window_Fin
 	-- trackview wnd height includes bottom scroll bar, which is equal to track 100% max height + 17 px, also changes depending on the header height and presence of the bottom docker
 	local arrange_wnd = sws and r.BR_Win32_FindWindowEx(r.BR_Win32_HwndToString(main_wnd), 0, '', 'trackview', false, true) -- search by window name // OR r.BR_Win32_FindWindowEx(r.BR_Win32_HwndToString(main_wnd), 0, 'REAPERTrackListWindow', '', true, false) -- search by window class name
 	or js and r.JS_Window_Find('trackview', true) -- exact true // OR r.JS_Window_FindChildByID(r.GetMainHwnd(), 1000) -- 1000 is 'trackview' window ID
-	local retval, rt1, top1, lt1, bot1 = table.unpack(sws and {r.BR_Win32_GetWindowRect(arrange_wnd)} 
+	local retval, rt1, top1, lt1, bot1 = table.unpack(sws and {r.BR_Win32_GetWindowRect(arrange_wnd)}
 	or js and {r.JS_Window_GetRect(arrange_wnd)})
 	local retval, rt2, top2, lt2, bot2 = table.unpack(sws and {r.BR_Win32_GetWindowRect(main_wnd)} or js and {r.JS_Window_GetRect(main_wnd)})
 	local top2 = top2 == -4 and 0 or top2 -- top2 can be negative (-4) if window is maximized
@@ -9424,8 +9493,8 @@ end
 --[[
 local keyword = Invalid_Script_Name3(scr_name, 'right', 'left', 'up', 'down')
 	if not keyword then r.defer(no_undo) end
-	
-	if keyword == 'right' then 
+
+	if keyword == 'right' then
 	-- DO STUFF
 	elseif keyword == 'left' then
 	-- DO STUFF
@@ -10024,7 +10093,7 @@ r.TrackCtl_SetToolTip('TEXT', x, y, true) -- topmost is true; if x and y are tak
 end
 
 
-function Error_Tooltip(text, caps, spaced, x2, y2) 
+function Error_Tooltip(text, caps, spaced, x2, y2)
 -- caps and spaced are booleans
 -- x2, y2 are integers to adjust tooltip position by
 local x, y = r.GetMousePosition()
@@ -10268,6 +10337,33 @@ return pos
 end
 
 
+function Get_Mouse_TimeLine_Pos(zones_t)
+-- zones_t contains start and end time along X axis
+-- if zones_t arg is absent the function evaluates if mouse if over the TCP, otherwise if mouse is within a paricular zone on the Arrange time line
+-- r.GetTrackFromPoint() covers the entire track timeline hence isn't suitable for getting the TCP
+-- master track is supported
+local right_tcp = r.GetToggleCommandStateEx(0,42373) == 1 -- View: Show TCP on right side of arrange
+local curs_pos = r.GetCursorPosition() -- store current edit curs pos
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start, screen_x_end are 0 to get full arrange view coordinates // get time of the current Arrange scroll position to use to move the edit cursor away from the mouse cursor // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and end_time should be on the screen when non-zero when isSet is true // when the Arrange is scrolled all the way to the start the function ignores project start time offset and any offset start still treats as 0
+--local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
+r.PreventUIRefresh(1)
+local edge = right_tcp and start_time-5 or end_time+5
+r.SetEditCurPos(edge, false, false) -- moveview, seekplay false // to secure against a vanishing probablility of overlap between edit and mouse cursor positions in which case edit cursor won't move just like it won't if mouse cursor is over the TCP // +/-5 sec to move edit cursor beyond right/left edge of the Arrange view to be completely sure that it's far away from the mouse cursor // if start_time is 0 and there's negative project start offset the edit cursor is still moved to the very start, that is past 0, the function ignores negative start offset therefore is fully compatible with GetSet_ArrangeView2()
+r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping) // more sensitive than with snapping // works along the entire screen Y axis outside of the TCP regardless of whether the program window is under the mouse
+local new_cur_pos = r.GetCursorPosition()
+local target
+	if not zones_t then
+	target = new_cur_pos == edge or new_cur_pos == 0 -- if the TCP is on the right and the Arrange is scrolled all the way to the project start or close enough to it start_time-5 won't make the edit cursor move past the project start hence the 2nd condition, but it can move past the right edge
+	else
+	target = new_cur_pos >= zones_t.start and new_cur_pos <= zones_t.fin
+	end
+-- Restore orig. edit cursor pos
+r.SetEditCurPos(curs_pos, false, false) -- moveview, seekplay false // restore orig. edit curs pos
+r.PreventUIRefresh(-1)
+return target
+end
+
+
 function GetRulerTimeUnit(main) -- main is boolean
 -- thanks to Mespotine https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
 -- https://github.com/mespotine/ultraschall-and-reaper-docs/blob/master/Docs/Reaper-ConfigVariables-Documentation.txt
@@ -10395,7 +10491,7 @@ local x, y = r.GetMousePosition()
 local tr_at_mouse, info = r.GetTrackFromPoint(x, y)
 	if not tr_at_mouse or info == 2 -- info 2 - FX
 	then return end -- scripts which will rely in this function WILL HAVE TO INCLUDE INSTRUCTION to place cursor opposite to any track in Arrange, this is to prevent the ugly track expansion trick below, this means that below the track list on X axis Arrange won't be detected
-	
+
 local item, tr
 local ACT = r.Main_OnCommand
 
@@ -10412,14 +10508,14 @@ local ACT = r.Main_OnCommand
 	-- if mouse happens to point at a temporary item it itself or the temp track won't be deleted
 	-- hence it must be invisible to the mouse, so the length isn't set, and pos is set to be outside of visible Arrange area
 	-- r.SetMediaItemInfo_Value(item, 'D_LENGTH', 2) -- 2 sec
-	local st, fin = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false	
+	local st, fin = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false
 	r.SetMediaItemInfo_Value(item, 'D_POSITION', fin)
 	end
 
 ----- Temp track routine
 ---- The following routine is prevented by 'not tr_at_mouse' condition above because of its ugly implementation due to botched track zoom overhaul in build 6.76 https://forum.cockos.com/showthread.php?t=278646, it could work if increase and decrease loops where both enclosed between the same PreventUIRefresh() instances but it's not possible because they will prevent getting new track height, but otherwise
 -- it determines if mouse points at a track within Arrange and if not, expands the last track to the entire Arrange height so the mouse ends up pointing at it because the action 'Item: Select item under mouse cursor' used to detect Arrange only works along a track time line therefore if the mouse doesn't already point at a track either the track must be made Arrange tall by expansion or multiple tracks must be inserted to fill the entire Arrange height
--- by itself validity if tr_at_mouse value isn't indicative because TCP outside or Arrange is also covered, it's used to condition track expansion below if the mouse happens to not point at a track within the time line; tr_at_mouse is valid when the cursor points at an item as well	
+-- by itself validity if tr_at_mouse value isn't indicative because TCP outside or Arrange is also covered, it's used to condition track expansion below if the mouse happens to not point at a track within the time line; tr_at_mouse is valid when the cursor points at an item as well
 local tr_at_mouse = tr_at_mouse and info ~= 2 -- info 2 is FX, info 1 - envelope is also valid both at TCP and along the time lime
 local sel_t = {tr={}, itm={}}
 	if not tr_at_mouse then -- store since selection may change due to necessity to expand a track below which has to be selected
@@ -10430,7 +10526,7 @@ local sel_t = {tr={}, itm={}}
 local track = not tr_at_mouse and r.GetTrack(0,r.GetNumTracks()-1) -- use last to expand because if 1st is used the track list scrolls to it when it's expanded, and if there're enough tracks in the project the only situation when mouse won't point at any is at the bottom of the track list anyway, in all other cases track list isn't long enough and it will be scrolled to the start at the end of the routine
 	if track then -- only runs if mouse doesn't point at a track within Arrange
 --[[ -- not really successful attempt to prevent triggering the function multiple times in a row if script is triggered with a mousewheel because 1 mousewheel scroll sends multiple triggers, which turns out to be faster than the track expansion and contraction
-	local last = r.GetExtState('Is_Mouse_Over_Arrange()', 'last') 
+	local last = r.GetExtState('Is_Mouse_Over_Arrange()', 'last')
 	local cur_time = r.time_precise()
 		if #last > 0 and cur_time-last < 2 then Msg(last, 'last') return end
 --	r.SetExtState('Is_Mouse_Over_Arrange()', 'last', cur_time, false) -- persist false
@@ -10449,7 +10545,7 @@ local track = not tr_at_mouse and r.GetTrack(0,r.GetNumTracks()-1) -- use last t
 local GetCount = r.CountSelectedMediaItems
 local itm_cnt = GetCount(0)
 	for i = 0, itm_cnt-1 do	-- store selected items
-	sel_t.itm[#sel_t.itm+1] = r.GetSelectedMediaItem(0,i)	
+	sel_t.itm[#sel_t.itm+1] = r.GetSelectedMediaItem(0,i)
 	end
 	if itm_cnt == 0 then -- if no selected select 1st item to use as a means of evaluation
 	r.SetMediaItemSelected(r.GetMediaItem(0,0), true)
@@ -10496,12 +10592,12 @@ end
 
 
 
-function Is_Mouse_Over_Arrange()
+function Is_Mouse_Over_Arrange2()
 -- if no items or tracks temp objects are added
 local x, y = r.GetMousePosition()
 	if r.GetItemFromPoint(x, y, true)-- allow_locked true
 	then return true end -- if there's item under mouse it's surely over Arrange
-	
+
 local item, tr
 local ACT = r.Main_OnCommand
 
@@ -10623,7 +10719,7 @@ end
 
 
 
-function Get_Mouse_Time_Pos() -- isn't suitable for use during playback as it stops it
+function Get_Mouse_Time_Pos() -- isn't suitable for use during playback as it stops it (this seems wrong)
 local cur_pos_init = r.GetCursorPosition()
 r.Main_OnCommand(40514, 0) -- View: Move edit cursor to mouse cursor (no snapping)
 local cur_pos = r.GetCursorPosition()
@@ -10686,7 +10782,7 @@ end
 
 
 function Mouse_Wheel_Direction(val, mousewheel_reverse) -- mousewheel_reverse is boolean
-local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // val seems to not be able to co-exist with itself retrieved outside of the function, in such cases inside the function it's returned as 0 
+local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // val seems to not be able to co-exist with itself retrieved outside of the function, in such cases inside the function it's returned as 0
 	if mousewheel_reverse then
 	return val > 0 and -1 or val < 0 and 1 -- wheel up (forward) - leftwards/downwards or wheel down (backwards) - rightwards/upwards
 	else -- default
@@ -10752,6 +10848,28 @@ local x, y = r.GetMousePosition()
 end
 Ad_Hoc_Setting()
 return r.defer(function() do return end end) end
+
+
+---- VALIDATE VARIABLES
+
+function validate_global_var(var_name, typ)
+-- var_name is a string
+-- typ is a string supported by the Lua type() function, optional
+local var = _G[var_name]
+return (not typ or typ and type(var) == typ) and var
+end
+
+-- validate local variable
+-- https://stackoverflow.com/questions/2834579/print-all-local-variables-accessible-to-the-current-scope-in-lua
+-- https://www.gammon.com.au/scripts/doc.php?lua=debug.getlocal
+-- this loop must not be enclosed in a function otherwise only variables local to the function will be traversed
+local i = 1
+local var_name, typ, var = '', '' -- type in var name and type supported by the Lua type() function which is optional
+	repeat
+	local name, val = debug.getlocal(1, i) -- 1 is stack level
+		if name == var_name and (not typ or typ and type(val) == typ) then var = val break end
+	i = i+1
+	until not name
 
 
 -- amagalma breakpoint for debugging
