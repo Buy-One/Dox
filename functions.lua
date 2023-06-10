@@ -3951,7 +3951,10 @@ end
 --local t = Find_And_Get_New_Tracks(t) -- get new if any, if none returns nil
 
 
-function Get_Track_Minimum_Height() -- may be different from 24 px in certain themes
+
+function Get_Track_Minimum_Height1() -- may be different from 24 px in certain themes
+
+-- OBSOLETE SINCE 6.76 when TCP zoom was overhauled which rendered actions to in/decrease track height unusable in reascript due to visible UI refresh and extreme slowness, see version 2 below
 
 r.PreventUIRefresh(1)
 
@@ -4008,6 +4011,24 @@ r.PreventUIRefresh(-1)
 return H_min
 
 end
+
+
+
+function Get_Track_Minimum_Height2() -- may be different from 24 px in certain themes
+--r.PreventUIRefresh(1) -- prevents getting height so shouldn't be used
+local tr = r.GetTrack(0,0)
+local H_orig = r.GetMediaTrackInfo_Value(tr, 'I_TCPH')
+Msg(H_orig)
+r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1) -- decrease height
+r.TrackList_AdjustWindows(true) -- isMinor is true // updates TCP only https://forum.cockos.com/showthread.php?t=208275
+local H_min = r.GetMediaTrackInfo_Value(tr, 'I_TCPH') -- store
+Msg(H_min)
+r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', H_orig) -- restore
+r.TrackList_AdjustWindows(true)
+--r.PreventUIRefresh(-1)
+return H_min
+end
+
 
 
 function Reverse_Track_Order(tr_t) -- tr_t is a table of track pointers in their current order, must all be adjacent
@@ -4401,11 +4422,11 @@ local tr_idx, tr
 	end
 
 	if not tr then tr = r.CSurf_TrackFromID(tr_idx, false) end -- mcpView false
-	if not tr_idx then r.CSurf_TrackToID(tr_idx, false)-1 end -- mcpView false
+	if not tr_idx then tr_idx = r.CSurf_TrackToID(tr, false)-1 end -- mcpView false
 
 local depth = r.GetTrackDepth(tr)
 local child_t = {}
-	for i = tr_idx, r.CountTracks(0) do
+	for i = tr_idx, r.CountTracks(0)-1 do
 	local tr = r.GetTrack(0,i)
 	local tr_depth = r.GetTrackDepth(tr)
 		if tr_depth > depth then
@@ -4470,8 +4491,8 @@ end
 
 
 function Track_Is_Vis_And_Child_Of_Collapsed_TCP_Folder(tr)
-return r.GetMediaTrackInfo_Value(tr, 'B_SHOWINTCP') == 1 -- track isn't hidden in the Mixer // same as r.IsTrackVisible(tr, true) -- mixer true
-and r.GetParentTrack(tr) and r.GetMediaTrackInfo_Value(r.GetParentTrack(tr), 'I_FOLDERCOMPACT') == 2 -- mcpView true // when the track is inside a collaped MCP folder the function doesn't return its index // r.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER') doesn't work this way so not suitable
+return r.GetMediaTrackInfo_Value(tr, 'B_SHOWINTCP') == 1 -- track isn't hidden in the TCP // same as r.IsTrackVisible(tr, false) -- mixer false
+and r.GetParentTrack(tr) and r.GetMediaTrackInfo_Value(r.GetParentTrack(tr), 'I_FOLDERCOMPACT') == 2
 end
 
 
@@ -4510,6 +4531,18 @@ not wantMixer and get_first_collapsed_tcp_fldr(tr)) -- in Arrange
 
 end
 
+
+
+function All_Parent_Folders_Uncollapsed(tr)
+local parent = r.GetParentTrack(tr)
+	if parent then
+		if r.GetMediaTrackInfo_Value(parent, 'I_FOLDERCOMPACT') > 0 
+		then return false
+		else return All_Parent_Folders_Uncollapsed(parent)
+		end
+	end
+return true
+end
 
 
 --================================ F O L D E R S  E N D =================================
@@ -8105,7 +8138,7 @@ local i, mrkr_idx, rgn_idx = 0, -1, -1 -- -1 to count as 0-based
 end
 
 
--- USAGE (in deferred loop):
+-- USAGE (in defer loop):
 -- ref_t = update and Monitor_MrkrsOrRgns(USE_REGIONS) or ref_t -- collect markers and regions time data, only update if there's change, otherwise updates constantly and change isn't
 -- if update then --[[ SOME ROUTINE ]] end
 -- update = Monitor_MrkrsOrRgns(USE_REGIONS, ref_t) -- search for changes in markers and regions time data; update is used as a condition in getting marker/region properties routine above
@@ -10711,11 +10744,44 @@ proj_init, projfn_init = r.EnumProjects(-1)
 function RUN()
 local proj, projfn = r.EnumProjects(-1)
 -- MAIN CODE
-	if projfn == projfn_init then
+--	if projfn == projfn_init then -- this won't work in tabs without saved project
+	if proj == proj_init then
 	defer(RUN)
 	end
 end
--- RUN()
+-- to keep the script running without execution
+function RUN()
+local proj, projfn = r.EnumProjects(-1)
+--	if projfn == projfn_init then -- this won't work in tabs without saved project
+	if proj == proj_init then
+	-- MAIN CODE
+	end	
+defer(RUN)
+end
+-- to be able to run the script exclusively under the project it's been originally launched under and re-link it to another project by toggling Master track visibility in TCP, including to re-link automatically after the orig proj has been closed
+IGNORE_OTHER_PROJECTS = "1"
+IGNORE_OTHER_PROJECTS = #IGNORE_OTHER_PROJECTS:gsub(' ','') > 0
+proj = r.EnumProjects(-1) -- -1 current, project the script was launched under
+local new_tab, master_vis = proj
+function RUN()
+-- re-ordering proj tabs doesn't affect linkage
+proj = IGNORE_OTHER_PROJECTS and r.EnumProjects(-1) ~= proj and Link_To_New_Project() or proj -- switch to currently open proj if the orig one wasn't found
+
+	if IGNORE_OTHER_PROJECTS then
+		if r.EnumProjects(-1) ~= new_tab then -- another project tab, store its current Master track visibility
+		master_vis = r.GetMasterTrackVisibility()&1 -- store current Master track visibility under new tab
+		new_tab = r.EnumProjects(-1) -- update to make this condition false in subsequent cycles
+		elseif master_vis and master_vis ~= r.GetMasterTrackVisibility()&1 then -- re-link to another project if its Master track visibility has been toggled
+		proj, master_vis = r.EnumProjects(-1), nil -- update project, reset Master track visibility status
+		end
+	end
+	
+	if IGNORE_OTHER_PROJECTS and r.EnumProjects(-1) == proj or not IGNORE_OTHER_PROJECTS then
+	-- MAIN CODE
+	end
+defer(RUN)	
+end
+
 
 
 
