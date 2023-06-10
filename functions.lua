@@ -10763,6 +10763,16 @@ IGNORE_OTHER_PROJECTS = "1"
 IGNORE_OTHER_PROJECTS = #IGNORE_OTHER_PROJECTS:gsub(' ','') > 0
 proj = r.EnumProjects(-1) -- -1 current, project the script was launched under
 local new_tab, master_vis = proj
+function Link_To_New_Project()
+-- if orig proj tab has been closed
+local i = 0
+	repeat
+	local p = r.EnumProjects(i)
+		if p == proj then return end -- original project is still open
+	i = i+1
+	until not p
+return r.EnumProjects(-1) -- original project wasn't found, switch to currently open
+end
 function RUN()
 -- re-ordering proj tabs doesn't affect linkage
 proj = IGNORE_OTHER_PROJECTS and r.EnumProjects(-1) ~= proj and Link_To_New_Project() or proj -- switch to currently open proj if the orig one wasn't found
