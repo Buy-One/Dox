@@ -686,6 +686,23 @@ Item: Select item under mouse cursor -- selects item under mouse (or keeps selec
 
 Item: Set focus to item under mouse cursor -- selects item under mouse, keeps others selected; doesn't deselect all if mouse is outside of items within Arrange
 
+
+View: Move edit cursor to mouse cursor (no snapping) -- works along the entire screen Y axis outside of the TCP regardless of whether the program window is under the mouse
+
+
+
+-- 'View: Attach/unattach docker to/from main window' (40313) 
+
+When the toggle state is ON it cannot be set to OFF if there're no visible dockers, its toggle state is linked to the state of the last docker to be attached/unattached with the option 'Attach docker to main window' (including a toolbar docker) and only such docker can be toggled using it, undocking a window by dragging doesn't set the action toggle state to OFF;
+
+when there're no visible dockers and its toggle state is OFF, toggling it invokes the last toggled docker and changes the docker's attach state
+
+The action toggle state is ON when there's no docker whose attach state was last toggled with it (which happens when windows were undocked by dragging) and when the toolbar docker is hidden, if the toolbar docker is visible in this scenario, the action toggle state is OFF
+
+
+-- 'View: Show docker' (40279) doesn't work with the toolbar docker, but does with individual toolbars floating docker
+
+
 ----------------------------------------------------
 
 MIDI Editor
@@ -3735,6 +3752,23 @@ Alternative method using 'Audio to MIDI Drum Trigger' stock JS plugin and the ac
 https://www.youtube.com/watch?v=VwgvBtAZLZU
 
 ==============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
