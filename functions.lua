@@ -801,6 +801,7 @@ end
 function space(n) -- number of repeats, integer
 local n = not n and 0 or tonumber(n) and math.abs(math.floor(n)) or 0
 return string.rep(' ',n)
+-- OR
 -- return (' '):rep(n)
 end
 
@@ -808,7 +809,8 @@ end
 function Rep(x) -- repeat space x times, to be added to the Message box text
 local x = not n and 0 or tonumber(x) and math.abs(math.floor(x)) or 0
 return string.rep(' ', x)
--- return (' '):rep(n)
+-- OR
+-- return (' '):rep(x)
 end
 
 
@@ -4019,7 +4021,7 @@ function Get_Track_Minimum_Height2() -- may be different from 24 px in certain t
 local tr = r.GetTrack(0,0)
 local H_orig = r.GetMediaTrackInfo_Value(tr, 'I_TCPH')
 Msg(H_orig)
-r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1) -- decrease height
+r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1) -- decrease height // 0 does nothing BUT disables height locked status without clearing the chekmark in the menu https://forum.cockos.com/showthread.php?p=2202082
 r.TrackList_AdjustWindows(true) -- isMinor is true // updates TCP only https://forum.cockos.com/showthread.php?t=208275
 local H_min = r.GetMediaTrackInfo_Value(tr, 'I_TCPH') -- store
 Msg(H_min)
@@ -9085,7 +9087,7 @@ function Re_Store_Windows_Props_By_Names_And_Handles2(names_t, t)
 --	local name_t = {'FX:','- Track','- Item'}
 	local t = {}
 	for k, name in pairs(names_t) do
-	local array = r.new_array({}, 1023)
+	local array = r.new_array({}, 1023) -- 1023 array length
 	r.JS_Window_ArrayFind(name, false, array) -- exact false
 	local array = array.table()
 		for k, address in ipairs(array) do -- duplicate names with different hwnd may occur, such as FX chain windows, so the number of windows which satisfy the search may be greater than the number of visible windows
@@ -9211,7 +9213,7 @@ itemprops = 41589, midiedit = '', ['toolbar:1'] = 41679,
 ['toolbar:8'] = 41686, ['toolbar:9'] = 41936, ['toolbar:10'] = 41937,
 ['toolbar:11'] = 41938, ['toolbar:12'] = 41939, ['toolbar:13'] = 41940,
 ['toolbar:14'] = 41941, ['toolbar:15'] = 41942, ['toolbar:16'] = 41943,
-['toolbar:17'] = 42404, -- MX toolbar
+['toolbar:17'] = 42404, -- MX toolbar // toolbars don't work, the numbers in their window titles are likely to not correspond to their section numbers in reaper.ini
 SWSAutoColor = '_SWSAUTOCOLOR_OPEN', -- SWS: Open auto color/icon/layout window ('Auto Color/Icon/Layout')
 ['BR - ContextualToolbars WndPos'] = '_BR_CONTEXTUAL_TOOLBARS_PREF', -- SWS/BR: Contextual toolbars... ('Contextual toolbars')
 SnMCyclaction = '_S&M_CYCLEDITOR', -- SWS/S&M: Open/close Cycle Action editor ('Cycle Actions') // doesn't remember section selection BUT all 3 actions toggle
@@ -9307,12 +9309,125 @@ local sws, js = r.APIExists('BR_Win32_FindWindowEx'), r.APIExists('JS_Window_Fin
 	-- trackview wnd height includes bottom scroll bar, which is equal to track 100% max height + 17 px, also changes depending on the header height and presence of the bottom docker
 	local arrange_wnd = sws and r.BR_Win32_FindWindowEx(r.BR_Win32_HwndToString(main_wnd), 0, '', 'trackview', false, true) -- search by window name // OR r.BR_Win32_FindWindowEx(r.BR_Win32_HwndToString(main_wnd), 0, 'REAPERTrackListWindow', '', true, false) -- search by window class name
 	or js and r.JS_Window_Find('trackview', true) -- exact true // OR r.JS_Window_FindChildByID(r.GetMainHwnd(), 1000) -- 1000 is 'trackview' window ID
-	local retval, rt1, top1, lt1, bot1 = table.unpack(sws and {r.BR_Win32_GetWindowRect(arrange_wnd)}
+	local retval, lt1, top1, rt1, bot1 = table.unpack(sws and {r.BR_Win32_GetWindowRect(arrange_wnd)}
 	or js and {r.JS_Window_GetRect(arrange_wnd)})
-	local retval, rt2, top2, lt2, bot2 = table.unpack(sws and {r.BR_Win32_GetWindowRect(main_wnd)} or js and {r.JS_Window_GetRect(main_wnd)})
+	local retval, lt2, top2, rt2, bot2 = table.unpack(sws and {r.BR_Win32_GetWindowRect(main_wnd)} or js and {r.JS_Window_GetRect(main_wnd)})
 	local top2 = top2 == -4 and 0 or top2 -- top2 can be negative (-4) if window is maximized
 	local arrange_h, header_h, wnd_h_offset = bot1-top1-17, top1-top2, top2  -- header_h is distance between arrange and program window top, wnd_h_offset is a coordinate of the program window top which is equal to its distance from the screen top when shrunk // !!!! MAY NOT WORK ON MAC since there Y axis starts at the bottom
 	return arrange_h, header_h, wnd_h_offset
+	end
+end
+
+
+function JS_Window_IsVisible(hwnd)
+-- visibility functions JS_Window_IsVisible() and BR_Win32_IsWindowVisible() aren't suitable for visibility validation of windows in multi-window dockers because these return false if a docked window is inactive, but they're accurate if there's only one window in a docker
+local parent, parent_tit
+local toggle_state = r.GetToggleCommandStateEx
+local docker = toggle_state(0, 40279) == 1 -- 'View: Show docker'
+	for i = 1, 2 do
+	parent = r.JS_Window_GetParent(hwnd)
+	parent_tit = r.JS_Window_GetTitle(parent)
+		-- floating dockers
+		if parent_tit == 'Toolbar Docker' and toggle_state(0, 41084) == 1 -- 'Toolbar: Show/hide toolbar docker'
+		or parent_tit == 'Docker' and docker -- regular docker
+		or parent_tit:match('(docked)') and r.JS_Window_IsVisible(hwnd) -- single window in a floating toolbar / regular docker
+		then return hwnd end
+	hwnd = parent -- update for the next cycle
+	end
+	-- if floating docker wasn't found, search docker attached to the main window
+	-- it cannot be searched in the loop above because being a child of the floating docker window it precedes it in the parent search and would cause loop exit before the floating docker window title could be evaluated
+	if parent_tit == 'REAPER_dock' and docker then return hwnd end
+
+end
+
+
+function Find_Window_SWS(wnd_name, want_main_children)
+-- finds main window children, their siblings, their grandchildren and their siblings, including docked ones, floating windows and probably their children as well
+-- want_main_children is boolean to search embedded main window children and their children regardless of the dock being open, the dock condition in the routine is only useful fot validating visibility of windows which can be docked
+
+-- 1. search floating toolbars with BR_Win32_FindWindowEx(), including docked
+-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowtexta#return-value
+-- 2. search floating docker with BR_Win32_FindWindowEx() using 2 title options, and loop to find children and siblings
+-- 3. search dockers attached to the main window with r.GetMainHwnd() and loop to find children and siblings
+
+	local function Find_Win(title)
+	return r.BR_Win32_FindWindowEx('0', '0', '', title, false, true) -- hwndParent, hwndChildAfter '0', className empty string, searchClass false, searchName true // does find single windows and single windows docked in floating dockers with '(docked)' appendage in the title, doesn't find children windows, such as docked in multi-tab docks and single docked in dockers attached to the main window, hence the actual function Find_Window_SWS()
+	end
+
+	local function get_wnd_siblings(hwnd, val, wnd_name)
+	-- val = 2 next; 3 prev doesn't work if hwnd belongs
+	-- to the very 1st child returned by BR_Win32_GetWindow() with val 5, which seems to always be the case
+	local Get_Win = r.BR_Win32_GetWindow
+	-- evaluate found window
+	local ret, tit = r.BR_Win32_GetWindowText(hwnd)
+		if tit == wnd_name then return hwnd
+		elseif tit == 'REAPER_dock' then -- search children of the found window
+		-- dock windows attached to the main window have 'REAPER_dock' title and can have many children, each of which is a sibling to others, if nothing is attached the child name is 'Custom1', 15 'REAPER_dock' windows are siblings to each other
+		local child = Get_Win(hwnd, 5) -- get child 5, GW_CHILD
+		local hwnd = get_wnd_siblings(child, val, wnd_name) -- recursive search for child siblings
+			if hwnd then return hwnd end
+		end
+	local sibl = Get_Win(hwnd, 2) -- get next sibling 2, GW_HWNDNEXT
+		if sibl then return get_wnd_siblings(sibl, val, wnd_name) -- proceed with recursive search for dock siblings and their children
+		else return end
+	end
+
+	local function search_floating_docker(docker_hwnd, docker_open, wnd_name) -- docker_hwnd is docker window handle, docker_open is boolean, wnd_name is a string of the sought window name
+		if docker_hwnd and docker_open then -- windows can be found in closed dockers hence toggle state evaluation
+	-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindow
+		local child = r.BR_Win32_GetWindow(docker_hwnd, 5) -- get child 5, GW_CHILD // 1st docker child is the last added window
+		local ret, tit = r.BR_Win32_GetWindowText(child) -- floating docker window 1st child name is 'REAPER_dock', attached windows are 'REAPER_dock' child and/or the child's siblings
+		return get_wnd_siblings(child, 2, wnd_name) -- go recursive enumerating child siblings; sibling 2 (next) - GW_HWNDNEXT, 3 (previous) - GW_HWNDPREV, 3 doesn't seem to work regardless of the 1st child position in the docker, probably because BR_Win32_GetWindow with val 5 always retrieves the very 1st child, so all the rest are next
+		end
+	end
+
+-- search for floating toolbar
+local wnd = Find_Win(wnd_name)
+-- search for a floating docker with one attached toolbar window // toolbars can be attached to a regular floating docker as well
+or Find_Win(wnd_name..' (docked)') -- when a single toolbar is attached to a floating docker its title is 'MIDI 1 (docked)' or 'Toolbar 1 (docked)' or whatever the toolbar custom name is with '(docked)' added regardless of whether this a toolbar docker or a regular docker
+
+	if wnd and r.JS_Window_IsVisible(tb) then return wnd -- JS_Window_IsVisible() isn't suitable for multi-window dockers because it returns false when a window is inactive, but it works reliably when floating docker only has one attached window which cannot be inactive
+	end -- if not found the function will continue
+
+-- docker toggle states are used for visibility validation instead of extension functions due to unreliabiliy of the latter which return false in multi-window docker scenarios when a window is inactive
+local tb_dock = r.GetToggleCommandStateEx(0, 41084) == 1 -- 'Toolbar: Show/hide toolbar docker'
+local dock = r.GetToggleCommandStateEx(0, 40279) == 1 -- 'View: Show docker'
+
+-- search floating docker with multiple attached windows
+local docker = Find_Win('Toolbar Docker') -- when toolbars are collected in the floating toolbar docker to begin with and there're more than 1, its title is 'Toolbar Docker'
+wnd = search_floating_docker(docker, tb_dock, wnd_name)
+	if wnd then return wnd end -- if not found the function will continue
+
+local docker = Find_Win('Docker') -- when a docker attached to the main window is detached from it by toggling 'Attach docker to the main window' and there're several windows in it, the floating docker title is 'Docker'
+wnd = search_floating_docker(docker, dock, wnd_name)
+	if wnd then return wnd end -- if not found the function will continue
+
+-- search docks attached to the main window
+	if dock and not want_main_children or want_main_children then -- windows can be found in closed dockers hence toggle state evaluation
+	local main = r.GetMainHwnd() -- the name of the dock window is 'REAPER_dock' of which there're 15 all being children of the main window and siblings of each other, attached windows are dock children and are siblings of each other
+	local child = r.BR_Win32_GetWindow(main, 5) -- get child 5, GW_CHILD // 1st docker child is the last added window
+	return get_wnd_siblings(child, 2, wnd_name)
+	end
+
+end
+
+
+local is_new_value,filename,sectionID,cmdID_orig,mode,resolution,val = r.get_action_context()
+function Activate_Context(sectionID) -- MIDI or Arrange
+-- for sws relies on Find_Window_SWS() function from above
+local sws, js = r.APIExists('BR_Win32_FindWindowEx'), r.APIExists('JS_Window_Find')
+	if sws or js then
+		if sectionID ~= 32060 then -- not midi when the script is run from the Main section of the Action list, that is sectionID returned by get_action_context() is not 32060
+	--	r.JS_Window_SetFocus(r.GetMainHwnd()) -- DOESN'T SET FOCUS TO THE MAIN WINDOW if the open MIDI Editor is docked and attached to the main window because the MIDI Editor ends up being focused instead
+		local main_wnd = js and r.JS_Window_Find('trackview', true) or sws and Find_Window_SWS('trackview', true) -- want_main_children true
+		local focus = js and r.JS_Window_SetFocus(main_wnd) or sws and r.BR_Win32_SetFocus(main_wnd)
+		else -- no additional conditions are required because if midi is true, the script is run from inside an open MIDI Editor window
+	--	r.JS_Window_SetFocus(r.MIDIEditor_GetActive()) -- DOESN'T MAKE MIDI EDITOR DOCKED IN A DOCKER ATTACHED TO THE MAIN WINDOW FOCUSED, BUT DOES WORK FOR FLOATING MIDI EDITOR DOCKED OR NOT
+		local ME_wnd = js and r.JS_Window_Find('midiview', true) or sws and Find_Window_SWS('midiview')
+		local focus = js and r.JS_Window_SetFocus(ME_wnd) or sws and r.BR_Win32_SetFocus(ME_wnd) -- 'midiview' window parent title is 'Edit MIDI' after toggling the MIDI Editor (docked or not) but focusing this parent doesn't work; alternative to 'midiview' is 'midipianoview', when either is focused without toggling the MIDI Editor, the parent is the window titled 'MIDI take: <MIDI take name>'
+		
+	--	r.Main_OnCommand(40716,0) r.Main_OnCommand(40716,0) -- View: Toggle show MIDI editor windows // DOES MAKE MIDI EDITOR DOCKED IN A DOCKER ATTACHED TO THE MAIN WINDOW FOCUSED, and works generally in other window states, BUT FLICKERING LOOKS UGLY
+		end
 	end
 end
 
@@ -10397,121 +10512,6 @@ return target
 end
 
 
-function GetRulerTimeUnit(main) -- main is boolean
--- thanks to Mespotine https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
--- https://github.com/mespotine/ultraschall-and-reaper-docs/blob/master/Docs/Reaper-ConfigVariables-Documentation.txt
--- can be extracted from the listed toggle actions state
-local main_t = {
-40365, -- Minutes:Seconds 40365
-40366, -- Measures.Beats / Minutes:Seconds 40366
-41918, -- Measures.Beats (minimal) / minutes:Seconds 41918
-40367, -- Measures.Beats 40367
-41916, -- Measures.Beats (minimal) 41916
-40368, -- Seconds 40368
-40369, -- Samples 40369
-40370, -- Hours:Minutes:Seconds:Frames 40370
-41973  -- Absolute Frames 41973
-}
-local second_t = {
-42360, -- None 42360
-42361, -- Minutes:Seconds 42367
-42362, -- Seconds 42362
-42363, -- Samples 42363
-42364, -- Hours:Minutes:Seconds:Frames 42364
-42365  -- Absolute Frames 42365
-}
-local t = main and main_t or second_t
-	for k, ID in ipairs(t) do
-	t[k] = r.GetToggleCommandStateEx(0, ID) == 1
-	end
-return t
-
-end
-
-
-function GetTransportTimeUnit(main) -- main is boolean
--- thanks to Mespotine https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
--- https://github.com/mespotine/ultraschall-and-reaper-docs/blob/master/Docs/Reaper-ConfigVariables-Documentation.txt
-local main_t = {
-40379, -- Use ruler time unit 40379
-40410, -- Minutes:Seconds 40410
-40534, -- Measures.Beats / Minutes:Seconds 40534
-40411, -- Measures.Beats 40411
-40412, -- Seconds 40412
-40413, -- Samples 40413
-40414, -- Hours:Minutes:Seconds:Frames 40414
-41972  -- Absolute Frames 41972
-}
-local second_t = {
-42366, -- None 42366
-42367, -- Minutes:Seconds 42367
-42368, -- Seconds 42368
-42369, -- Samples 42369
-42370, -- Hours:Minutes:Seconds:Frames 42370
-42371  -- Absolute Frames 42371
-}
-local t = main and main_t or second_t
-	for k, ID in ipairs(t) do
-	t[k] = r.GetToggleCommandStateEx(0, ID) == 1
-	end
-return t
-
-end
-
-
-function Get_Armed_Action_Name(path, sep)
-
-	local function script_exists(line, name)
-	-- how paths external to \Scripts folder may look on MacOS
-	-- https://github.com/Samelot/Reaper/blob/master/reaper-kb.ini
-	local f_path = line:match(esc(name)..' "(.+)"$') or line:match(esc(name)..' (.+)$') -- path either with or without spaces, in the former case it's enclosed within quotation marks
-	local f_path = f_path:match('^%u:') and f_path or path..sep..'Scripts'..sep..f_path -- full (starts with the drive letter and a colon) or relative file path; in reaper-kb.ini full path is stored when the script resides outside of the 'Scripts' folder of the REAPER instance being used // NOT SURE THE FULL PATH SYNTAX IS VALID ON OSs OTHER THAN WIN
---	script_exists = r.file_exists(f_path)
-	return r.file_exists(f_path)
-	end
-
-local sws = r.APIExists('CF_GetCommandText')
-
-local sect_t = {['']=0,['MIDI Editor']=32060,['MIDI Event List Editor']=32061,
-				['MIDI Inline Editor']=32062,['Media Explorer']=32063}
-
-	if r.GetToggleCommandStateEx(0,40605) == 1 then -- Show action list // only if Action list window is open to force deliberate use of action notes and prevent accidents in case some action is already armed for other purposes
-	local cmd, section = r.GetArmedCommand() -- cmd is 0 when no armed action, empty string section is 'Main' section
-	r.ArmCommand(0, section) -- 0 unarm all
-		if cmd > 0 then
-		local named_cmd = r.ReverseNamedCommandLookup(cmd) -- if the cmd belongs to a native action or is 0 the return value is nil
-		local name, scr_exists, mess = false, true -- mess is nil // scr_exists is true by default to accomodate actions which can't be removed
-			if cmd > 0 and not named_cmd and not sws then -- native action is armed; without CF_GetCommandText() there's no way to retrieve native action name, only script and custom action names via reaper-kb.ini; without the sws extension cycle actions aren't available
-			mess = space(6)..'since the sws extension \n\n'..space(11)..'is not installed \n\n only non-cycle custom actions \n\n'..space(4)..'and scripts are supported'
-			elseif named_cmd and not sws then -- without CF_GetCommandText() there's no way to retrieve the sws extension action names, only custom actions and scripts from reaper-kb.ini; without the sws extension cycle actions aren't available anyway
-				for line in io.lines(path..sep..'reaper-kb.ini') do -- much quicker than using io.read() which freezes UI
-				name = line:match('ACT.-("'..esc(named_cmd)..'" ".-")') or line:match('SCR.-('..esc(named_cmd)..' ".-")') -- extract command ID and name
-					if name then
-						if line:match('SCR') then -- evaluate if script exists
-						scr_exists = script_exists(line, name)
-						end
-					name = name:gsub('Custom:', 'Script:', 1) -- make script data retrieved from reaper-kb.ini conform to the name returned by CF_GetCommandText() which prefixes the name with 'Script:' following their appearance in the Action list instead of 'Custom:' as they're prefixed in reaper-kb.ini file
-					break end
-				end
-			elseif cmd > 0 then -- sws extension is installed
-			name = cmd > 0 and (named_cmd or cmd)..' "'..r.CF_GetCommandText(sect_t[section], cmd)..'"' -- add quotes to match data being retrieved form reaper-kb.ini to simplify creation of section title // if script, returns name with prefix 'Script:' as they're listed in the Action list even though in reaper-kb.ini script names are prefixed with 'Custom:' just like custom action names
-				if name and name:match('Script') then
-				local scr_name = name:gsub('Script:', 'Custom:') -- evaluate if script exists having made a replacement to conform to the reaper-kb.ini syntax
-					for line in io.lines(path..sep..'reaper-kb.ini') do
-						if line:match(esc(scr_name)) then
-						scr_exists = script_exists(line, scr_name)
-						break end
-					end
-				end
-			end
-		return name, scr_exists, mess
-		end
-	end
-
-end
-
-
-
 function Is_Mouse_Over_Arrange1() -- SEE Is_Mouse_Over_Arrange2() for version without limitations
 -- if no items or tracks temp objects are added
 -- set up to only detect Arrange when the mouse cursor is placed opposite of a track with Arrange
@@ -10700,6 +10700,121 @@ end
 
 
 
+function GetRulerTimeUnit(main) -- main is boolean
+-- thanks to Mespotine https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
+-- https://github.com/mespotine/ultraschall-and-reaper-docs/blob/master/Docs/Reaper-ConfigVariables-Documentation.txt
+-- can be extracted from the listed toggle actions state
+local main_t = {
+40365, -- Minutes:Seconds 40365
+40366, -- Measures.Beats / Minutes:Seconds 40366
+41918, -- Measures.Beats (minimal) / minutes:Seconds 41918
+40367, -- Measures.Beats 40367
+41916, -- Measures.Beats (minimal) 41916
+40368, -- Seconds 40368
+40369, -- Samples 40369
+40370, -- Hours:Minutes:Seconds:Frames 40370
+41973  -- Absolute Frames 41973
+}
+local second_t = {
+42360, -- None 42360
+42361, -- Minutes:Seconds 42367
+42362, -- Seconds 42362
+42363, -- Samples 42363
+42364, -- Hours:Minutes:Seconds:Frames 42364
+42365  -- Absolute Frames 42365
+}
+local t = main and main_t or second_t
+	for k, ID in ipairs(t) do
+	t[k] = r.GetToggleCommandStateEx(0, ID) == 1
+	end
+return t
+
+end
+
+
+function GetTransportTimeUnit(main) -- main is boolean
+-- thanks to Mespotine https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
+-- https://github.com/mespotine/ultraschall-and-reaper-docs/blob/master/Docs/Reaper-ConfigVariables-Documentation.txt
+local main_t = {
+40379, -- Use ruler time unit 40379
+40410, -- Minutes:Seconds 40410
+40534, -- Measures.Beats / Minutes:Seconds 40534
+40411, -- Measures.Beats 40411
+40412, -- Seconds 40412
+40413, -- Samples 40413
+40414, -- Hours:Minutes:Seconds:Frames 40414
+41972  -- Absolute Frames 41972
+}
+local second_t = {
+42366, -- None 42366
+42367, -- Minutes:Seconds 42367
+42368, -- Seconds 42368
+42369, -- Samples 42369
+42370, -- Hours:Minutes:Seconds:Frames 42370
+42371  -- Absolute Frames 42371
+}
+local t = main and main_t or second_t
+	for k, ID in ipairs(t) do
+	t[k] = r.GetToggleCommandStateEx(0, ID) == 1
+	end
+return t
+
+end
+
+
+function Get_Armed_Action_Name(path, sep)
+
+	local function script_exists(line, name)
+	-- how paths external to \Scripts folder may look on MacOS
+	-- https://github.com/Samelot/Reaper/blob/master/reaper-kb.ini
+	local f_path = line:match(esc(name)..' "(.+)"$') or line:match(esc(name)..' (.+)$') -- path either with or without spaces, in the former case it's enclosed within quotation marks
+	local f_path = f_path:match('^%u:') and f_path or path..sep..'Scripts'..sep..f_path -- full (starts with the drive letter and a colon) or relative file path; in reaper-kb.ini full path is stored when the script resides outside of the 'Scripts' folder of the REAPER instance being used // NOT SURE THE FULL PATH SYNTAX IS VALID ON OSs OTHER THAN WIN
+--	script_exists = r.file_exists(f_path)
+	return r.file_exists(f_path)
+	end
+
+local sws = r.APIExists('CF_GetCommandText')
+
+local sect_t = {['']=0,['MIDI Editor']=32060,['MIDI Event List Editor']=32061,
+				['MIDI Inline Editor']=32062,['Media Explorer']=32063}
+
+	if r.GetToggleCommandStateEx(0,40605) == 1 then -- Show action list // only if Action list window is open to force deliberate use of action notes and prevent accidents in case some action is already armed for other purposes
+	local cmd, section = r.GetArmedCommand() -- cmd is 0 when no armed action, empty string section is 'Main' section
+	r.ArmCommand(0, section) -- 0 unarm all
+		if cmd > 0 then
+		local named_cmd = r.ReverseNamedCommandLookup(cmd) -- if the cmd belongs to a native action or is 0 the return value is nil
+		local name, scr_exists, mess = false, true -- mess is nil // scr_exists is true by default to accomodate actions which can't be removed
+			if cmd > 0 and not named_cmd and not sws then -- native action is armed; without CF_GetCommandText() there's no way to retrieve native action name, only script and custom action names via reaper-kb.ini; without the sws extension cycle actions aren't available
+			mess = space(6)..'since the sws extension \n\n'..space(11)..'is not installed \n\n only non-cycle custom actions \n\n'..space(4)..'and scripts are supported'
+			elseif named_cmd and not sws then -- without CF_GetCommandText() there's no way to retrieve the sws extension action names, only custom actions and scripts from reaper-kb.ini; without the sws extension cycle actions aren't available anyway
+				for line in io.lines(path..sep..'reaper-kb.ini') do -- much quicker than using io.read() which freezes UI
+				name = line:match('ACT.-("'..esc(named_cmd)..'" ".-")') or line:match('SCR.-('..esc(named_cmd)..' ".-")') -- extract command ID and name
+					if name then
+						if line:match('SCR') then -- evaluate if script exists
+						scr_exists = script_exists(line, name)
+						end
+					name = name:gsub('Custom:', 'Script:', 1) -- make script data retrieved from reaper-kb.ini conform to the name returned by CF_GetCommandText() which prefixes the name with 'Script:' following their appearance in the Action list instead of 'Custom:' as they're prefixed in reaper-kb.ini file
+					break end
+				end
+			elseif cmd > 0 then -- sws extension is installed
+			name = cmd > 0 and (named_cmd or cmd)..' "'..r.CF_GetCommandText(sect_t[section], cmd)..'"' -- add quotes to match data being retrieved form reaper-kb.ini to simplify creation of section title // if script, returns name with prefix 'Script:' as they're listed in the Action list even though in reaper-kb.ini script names are prefixed with 'Custom:' just like custom action names
+				if name and name:match('Script') then
+				local scr_name = name:gsub('Script:', 'Custom:') -- evaluate if script exists having made a replacement to conform to the reaper-kb.ini syntax
+					for line in io.lines(path..sep..'reaper-kb.ini') do
+						if line:match(esc(scr_name)) then
+						scr_exists = script_exists(line, scr_name)
+						break end
+					end
+				end
+			end
+		return name, scr_exists, mess
+		end
+	end
+
+end
+
+
+
 function Un_Set_MW_Config_Flags(TCP, focused_fx, all_faders, TCP_faders) -- TCP and focused_fx are booleans, all_faders, TCP_faders are for restoration
 -- Preferences -> Editing behavior -> Mouse
 -- 'Ignore mousewheel on all faders'
@@ -10858,12 +10973,56 @@ end
 
 
 function Mouse_Wheel_Direction(val, mousewheel_reverse) -- mousewheel_reverse is boolean
-local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // val seems to not be able to co-exist with itself retrieved outside of the function, in such cases inside the function it's returned as 0
+local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // val seems to not be able to co-exist with itself retrieved outside of the function, in such cases inside the function it's returned as 0; if there's another function which includes this function in one of them it won't work properly so the val will have to be take outiside of both functions and used as an argument in them
 	if mousewheel_reverse then
 	return val > 0 and -1 or val < 0 and 1 -- wheel up (forward) - leftwards/downwards or wheel down (backwards) - rightwards/upwards
 	else -- default
 	return val > 0 and 1 or val < 0 and -1 -- wheel up (forward) - rightwards/upwards or wheel down (backwards) - leftwards/downwards
 	end
+end
+-- USE:
+-- dir = Mouse_Wheel_Direction(val, mousewheel_reverse)
+-- if dir > 0 then DO STUFF
+-- elseif dir < 0 then DO OTHER STUFF
+-- end
+
+
+function Process_Mousewheel_Sensitivity(val, cmdID, MOUSEWHEEL_SENSITIVITY)
+-- val & cmdID stem from r.get_action_context()
+-- MOUSEWHEEL_SENSITIVITY unit is one mousewheel nudge, normally a single scroll consists of 5-6 nudges
+	if MOUSEWHEEL_SENSITIVITY == 1 then return true end
+local cmdID = r.ReverseNamedCommandLookup(cmdID) -- command ID differs in different Action list sections
+local data = r.GetExtState(cmdID, 'MOUSEWHEEL')
+--[[ WORKS, substituted with 2 lines below marked NEW, to prevent frequent deletion of the ext state as it seems unnecessary
+	if #data ~= 0 and math.abs((data+val)/MOUSEWHEEL_SENSITIVITY) >= 15 then -- +val to accound for the latest event, otherwise the switch will only occur on the next
+	r.DeleteExtState(cmdID, 'MOUSEWHEEL', true) -- persist true
+	return true end -- 1 mousewheel nudge equals 15 or -15 depending on direction
+--]]
+local val = #data == 0 and val or data+0 + val
+local val = math.abs(val/MOUSEWHEEL_SENSITIVITY) >= 15 and 0 or val -- NEW instead of the statement commented out above 
+r.SetExtState(cmdID, 'MOUSEWHEEL', val, false) -- persist false
+return val == 0 -- NEW instead of the statement commented out above
+end
+--[[ USE:
+
+MOUSEWHEEL_SENSITIVITY = MOUSEWHEEL_SENSITIVITY:gsub(' ','')
+MOUSEWHEEL_SENSITIVITY = tonumber(MOUSEWHEEL_SENSITIVITY) and tonumber(MOUSEWHEEL_SENSITIVITY) > 1 and math.floor(math.abs(tonumber(MOUSEWHEEL_SENSITIVITY))) or 1
+MOUSEWHEEL_SENSITIVITY = not MOUSEWHEEL and val == 63 and nil or MOUSEWHEEL_SENSITIVITY -- if mousewheel isn't enabled but mousewheel sensitivity is, disable it, otherwise if it's greater than 4 the script executed with a shortcut won't be triggered at the first run because the expected value will be at least 5x15 = 75 while val returned by get_action_context() will only produce 63 per execution, it will only be triggered on the next run since 63x2 = 126 > 75 -------- IF THIS EXPRESSION IS USED THE WARNING MESSAGE BELOW IS REDUNDANT, BECAUSE IT'S SIMPLY DISABLED SENSITIVITY IF SCRIPT IS RUN WITH A SHORTCUT
+
+	if MOUSEWHEEL and MOUSEWHEEL_SENSITIVITY > 4 and val == 63 then -- val stems from r.get_action_context() // val is ±15 when mousewheel is used and 63 in all other cases, when mousewheel is enabled and its sensitivity setting is 5 the expected sum to trigger action is 15x5 = 75, therefore if the script is not run with the mousewheel the action won't be triggered due to 63 being less than 75, but it will on the next run since 63x2 = 126 > 75, if the sensitivity is 4, that is 15x4 = 60, and the first run produces 63 this will be enough to trigger action
+	local function s(n) return (' '):rep(n) end
+	Error_Tooltip('\n\n'..s(4)..'since the script is executed \n\n\t'..s(6)..'with a shortcut \n\n while the mousewheel is enabled \n\n\t'..s(4)..'and its sensitivity \n\n\t'..s(5)..'is greater than 4, \n\n  it won\'t work at the first run \n\n',1,1) -- caps, spaced true
+	end
+
+if Process_Mousewheel_Sensitivity(val, cmdID, MOUSEWHEEL_SENSITIVITY) then
+--DO STUFF
+end
+
+--]]
+
+local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context()-- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // the function must be outside as it cannot work properly inside more than 1 user function, in which case val will be 0	
+function Mousewheel_Or_Shortcut(val)
+return val == math.abs(15), val == 63 -- mousewheel, shortcut
 end
 
 
