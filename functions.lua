@@ -604,7 +604,7 @@ return math.floor(num*dec+0.5)/dec
 end
 
 
-math.randomseed(math.floor(r.time_precise()*1000)) -- seems to facilitate greater randomization at fast rate thanks to milliseconds count
+math.randomseed(math.floor(r.time_precise()*1000)) -- seems to facilitate greater randomization at fast rate thanks to milliseconds count; math.floor() because the seeding number must be integer
 
 
 function Get_Closest_Prev_Whole_Multiple(dividend, int_divisor)
@@ -1165,13 +1165,13 @@ end
 
 
 function Convert_Text_To_Menu(text, max_line_len) -- max_line_len is integer, determines length of line as a menu item, 70 seems optimal
--- relies on multibyte_str_len() function to accurately count UTF-8 characters
+-- relies on multibyte_str_len() function to accurately count UTF-8 characters; can be removed if the text is sure to only contain basic Latin, in which case the line 'multibyte_str_len(text_clean)' can be replaced with '#text_clean'
 
 local text = text:gsub('|', 'ㅣ') -- replace pipe, if any, with Hangul character for /i/ since its a menu special character
-local notes, stat = notes:gsub('&', '+') -- convert ampersand to + because it's a menu special character used as a quick access shortuct hence not displayed in the menu
-local text = text:gsub('\n', '|')-- OR notes:gsub('\r', '|') // convert user line breaks into pipes to divide lines by creating menu items, otherwise user line breaks aren't respected; multiple line break is created thanks to the space between pipes originally left after each \n character, if there's none a solid line is displayed instead or several thereof starting from 3 pipes and more
+local text = text:gsub('&', '+') -- convert ampersand to + because it's a menu special character used as a quick access shortuct hence not displayed in the menu
+local text = text:gsub('\n', '|')-- OR text:gsub('\r', '|') // convert user line breaks into pipes to divide lines by creating menu items, otherwise user line breaks aren't respected; multiple line break is created thanks to the space between pipes originally left after each \n character, if there's none a solid line is displayed instead or several thereof starting from 3 pipes and more
 local t = {}
-	for w in notes:gmatch('[%w%p\128-\255]+[%s%p]*') do -- split into words + trailing space if any; [%w%p] makes sure that words with apostrophe <it's>, <don't> aren't split up; [%s%p] makes menu divider pipes and special characters (!#<>), if any, attached to the words bevause they're punctuation marks (%p); accounting for utif-8 characters
+	for w in text:gmatch('[%w%p\128-\255]+[%s%p]*') do -- split into words + trailing space if any; [%w%p] makes sure that words with apostrophe <it's>, <don't> aren't split up; [%s%p] makes menu divider pipes and special characters (!#<>), if any, attached to the words bevause they're punctuation marks (%p); accounting for utif-8 characters
 		if w then
 		t[#t+1] = w end
 	end
@@ -4151,6 +4151,30 @@ function Is_TrackList_Hidden()
 end
 
 
+
+function Parse_Razor_Edit_Data(data)
+local t = {}
+	for st, fin in data:gmatch('([%.%d]+) ([%.%d]+)') do
+	t[#t+1] = {st, fin}
+	end
+return t
+end
+
+
+function Collect_Razor_Edit_Areas() -- relies on Parse_Razor_Edit_Data() function
+local t, found = {}
+	for i = 0, r.GetNumTracks()-1 do
+	local tr = r.GetTrack(0,i)
+	local exists, raz_edit_data = r.GetSetMediaTrackInfo_String(tr, 'P_RAZOREDITS', '', false) -- stringNeedBig empty string, setNewValue false // exists return value is useless because it's always true
+		if #raz_edit_data > 0 then
+		found = 1 -- 1 is enough
+		t[tr] = Parse_Razor_Edit_Data(raz_edit_data)
+		end
+	end	
+return found and t
+end
+
+
 --================================ T R A C K S  E N D ================================
 
 
@@ -5841,14 +5865,14 @@ local src_parm_t = get_fx_parms(src_obj, src_fx_idx)
 local dest_parm_t = get_fx_parms(dest_obj, dest_fx_idx)
 
 	if src_parm_t and dest_parm_t and #src_parm_t == #dest_parm_t then
-	math.randomseed(math.floor(r.time_precise())*1000) -- math.floor() because the seeding number musr be integer
 		for i = 1, #src_parm_t do -- compare the entire parm list
-		local src, dest = src_parm_t[r], dest_parm_t[r]
+		local src, dest = src_parm_t[i], dest_parm_t[i]
 			if src ~= 'Wet' and src ~= 'Bypass' and src ~= 'Delta' then -- not stock parameters
 				if src ~= dest then return false
 			end
 		end
 	--[[ OR
+	math.randomseed(math.floor(r.time_precise())*1000) -- math.floor() because the seeding number must be integer
 	local r, r_init
 		for i = 1, 3 do	-- 3 random comparisons
 			if #src_parm_t > 4 then -- if 4 or less the loop might get stuck when none of the 'until' conditions is met, so math.random must be allowed to alternate between at least two values other than the 3 stock params
@@ -7200,6 +7224,8 @@ function Proj_Time_2_Item_Time(proj_time, item, take)
 
 --local cur_pos = r.GetCursorPosition()
 local item_pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+local item_end = item_pos + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+local within_view = proj_time >= item_pos and proj_time <= item_end -- can be used as a condition to return value if only visible item area is relevant
 --OR
 --local item_pos = r.GetMediaItemInfo_Value(r.GetMediaItemTake_Item(take), 'D_POSITION')
 local offset = r.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
@@ -7209,16 +7235,19 @@ return item_time
 end
 
 
-function Item_Time_2_Proj_Time(item_time, item, take) -- such as take, stretch markers and transient guides time, item_time is their position within item returned by the corresponding functions
+function Item_Time_2_Proj_Time(item_time, item, take) -- such as take, stretch markers and transient guides time, item_time is their position within take media source returned by the corresponding functions
 -- e.g. take, stretch markers and transient guides time to edit/play cursor, proj markers/regions time
 
 --local cur_pos = r.GetCursorPosition()
 local item_pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+local item_end = item_pos + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
 --OR
 --local item_pos = r.GetMediaItemInfo_Value(r.GetMediaItemTake_Item(take), 'D_POSITION')
 local offset = r.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
 local playrate = r.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE') -- affects take start offset and take marker pos
-local proj_time = item_pos + (item_time - offset)/playrate
+local proj_time = item_pos + (item_time - offset)/
+
+return proj_time >= item_pos and proj_time <= item_end and proj_time -- ignoring content outside of item bounds -- OPTIONAL
 end
 
 
@@ -7937,7 +7966,7 @@ local function Store_Delete_Restore_Proj_Mark_Regions(t) -- the function is to b
 	local i = num_markers + num_regions-1 -- -1 isn't necessary, if there's no marker with the initial index no error occurs, just one extra loop cycle
 	local mark_reg_t = {}
 	repeat -- store and delete in decscending order
-		local retval, is_rgn, pos, rgn_end, name, mrk_idx, color = r.EnumProjectMarkers3(0, i) -- mrk_id is the actual marker ID displayed in Arrange which may differ from retval // markers/regions are returned in the timeline order, if they fully overlap they're returned in the order of their displayed indices
+		local retval, is_rgn, pos, rgn_end, name, mrk_idx, color = r.EnumProjectMarkers3(0, i) -- mrk_idx is the actual marker ID displayed in Arrange which may differ from retval // markers/regions are returned in the timeline order, if they fully overlap they're returned in the order of their displayed indices
 			if retval > 0 then
 			local rgn_end = is_rgn and rgn_end
 			mark_reg_t[#mark_reg_t+1] = {mrk_idx, pos, rgn_end, name, color}
@@ -9343,7 +9372,7 @@ end
 
 function Find_Window_SWS(wnd_name, want_main_children)
 -- finds main window children, their siblings, their grandchildren and their siblings, including docked ones, floating windows and probably their children as well
--- want_main_children is boolean to search embedded main window children and their children regardless of the dock being open, the dock condition in the routine is only useful fot validating visibility of windows which can be docked
+-- want_main_children is boolean to search for internal or non-dockable main window children and for their children regardless of the dock being open, the dock condition in the routine is only useful fot validating visibility of windows which can be docked
 
 -- 1. search floating toolbars with BR_Win32_FindWindowEx(), including docked
 -- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowtexta#return-value
@@ -10267,6 +10296,28 @@ r.TrackCtl_SetToolTip(text, x, y, true) -- topmost true
 end
 
 
+
+function Center_Message_Text(mess, spaced) 
+-- to be used before Error_Tooltip()
+-- spaced is boolean, must be true if the same argument is true in  Error_Tooltip()
+local t, max = {}, 0
+	for line in mess:gmatch('[^%c]+') do
+		if line then
+		t[#t+1] = line
+		max = #line > max and #line or max
+		end
+	end
+local coeff = spaced and 1.5 or 2 -- 1.5 seems to work when the text is spaced out inside Error_Tooltip(), otherwise 2 needs to be used
+	for k, line in ipairs(t) do
+	local shift = math.floor((max - #line)/2*coeff+0.5) 
+	local lb = k < #t and '\n\n' or ''
+	t[k] = (' '):rep(shift)..line..lb
+	end
+return table.concat(t)
+end
+
+
+
 function Get_Tooltip_Settings()
 -- Preferences -> Appearance - Appearance settings - Tooltips:
 local f = io.open(r.get_ini_file(),'r')
@@ -11007,7 +11058,7 @@ end
 
 MOUSEWHEEL_SENSITIVITY = MOUSEWHEEL_SENSITIVITY:gsub(' ','')
 MOUSEWHEEL_SENSITIVITY = tonumber(MOUSEWHEEL_SENSITIVITY) and tonumber(MOUSEWHEEL_SENSITIVITY) > 1 and math.floor(math.abs(tonumber(MOUSEWHEEL_SENSITIVITY))) or 1
-MOUSEWHEEL_SENSITIVITY = not MOUSEWHEEL and val == 63 and nil or MOUSEWHEEL_SENSITIVITY -- if mousewheel isn't enabled but mousewheel sensitivity is, disable it, otherwise if it's greater than 4 the script executed with a shortcut won't be triggered at the first run because the expected value will be at least 5x15 = 75 while val returned by get_action_context() will only produce 63 per execution, it will only be triggered on the next run since 63x2 = 126 > 75 -------- IF THIS EXPRESSION IS USED THE WARNING MESSAGE BELOW IS REDUNDANT, BECAUSE IT'S SIMPLY DISABLED SENSITIVITY IF SCRIPT IS RUN WITH A SHORTCUT
+MOUSEWHEEL_SENSITIVITY = not MOUSEWHEEL and val == 63 and nil or MOUSEWHEEL_SENSITIVITY = MOUSEWHEEL and val == 63 and 1 or MOUSEWHEEL_SENSITIVITY -- if mousewheel and mousewheel sensitivity are enabled but the script is run via a shortcut (val returned by get_action_context() is 63), disable the mousewheel sensitivity otherwise if it's greater than 4 the script won't be triggered at the first run because the expected value will be at least 5x15 = 75 (val returned by get_action_context() is ±15) while val will only produce 63 per execution, it will only be triggered on the next run since 63x2 = 126 > 75 -------- IF THIS EXPRESSION IS USED THE WARNING MESSAGE BELOW IS REDUNDANT, BECAUSE IT DISABLES SENSITIVITY IF SCRIPT IS RUN WITH A SHORTCUT
 
 	if MOUSEWHEEL and MOUSEWHEEL_SENSITIVITY > 4 and val == 63 then -- val stems from r.get_action_context() // val is ±15 when mousewheel is used and 63 in all other cases, when mousewheel is enabled and its sensitivity setting is 5 the expected sum to trigger action is 15x5 = 75, therefore if the script is not run with the mousewheel the action won't be triggered due to 63 being less than 75, but it will on the next run since 63x2 = 126 > 75, if the sensitivity is 4, that is 15x4 = 60, and the first run produces 63 this will be enough to trigger action
 	local function s(n) return (' '):rep(n) end
