@@ -321,6 +321,44 @@ local input = gfx.showmenu(menu) -- menu string
 gfx.quit()
 
 
+function Reload_Menu_at_Same_Pos1(menu)
+-- only useful for looking up the result of a toggle action, below see a more practical example
+::RELOAD::
+local x, y = r.GetMousePosition()
+	if x+0 <= 100 then -- 100 px within the screen left edge
+	gfx.init('', 0, 0)
+	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
+	gfx.x = gfx.mouse_x
+	gfx.y = gfx.mouse_y
+	local retval = gfx.showmenu(menu) -- menu string
+		if retval > 0 then
+		goto RELOAD
+		end
+	end
+end
+
+::RELOAD::
+function Reload_Menu_at_Same_Pos2(menu) -- still doesn't allow keeping the menu open after clicking away
+local x, y = r.GetMousePosition()
+	if x+0 <= 100 then -- 100 px within the screen left edge
+	gfx.init('', 0, 0)
+	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
+	gfx.x = gfx.mouse_x
+	gfx.y = gfx.mouse_y
+	return gfx.showmenu(menu) -- menu string
+	end
+end
+-- USE:
+--[[
+local retval = Reload_Menu_at_Same_Pos2(menu)
+	if retval == xyz then
+-- 	DO STUFF
+	end
+	if retval > 0 then goto RELOAD
+	else return r.defer(function() do return end end)
+	end
+]]
+
 function Re_Store_Ext_State(section, key, persist, val) -- section & key args are strings, persist is boolean if false/nil global ext state is only stored for the duration of REAPER session, only relevant for storage stage; presence of val arg is anything which needs storage, determines whether the state is loaded or stored
 	if not val then
 	local ret, state = r.GetProjExtState(0, section, key)
@@ -1198,7 +1236,9 @@ local text, menu = '',''
 --Msg(text) -- interesting to watch
 		end
 	end
-return menu
+local tmp = menu
+local _, line_cnt = tmp:gsub('|+','') -- count pipe clusters which format lines to find out the number of lines in case there'll be a need to add genuine menu items after the text, in which case their index will be equal line_cnt+n returned by gfx.showmenu()
+return menu, line_cnt
 end
 
 
@@ -7774,33 +7814,46 @@ local function num2rgb(integer)
 end
 
 
-function RGB_To_From_Integer(r,g,b,integer)
+function RGB_To_From_Integer1(r,g,b,integer)
 -- based on https://stackoverflow.com/a/19277438/8883033
+-- local r, g, b = 12, 13, 14
 	if not integer and r and g and b then
-	local blueMask, greenMask, redMask = 0xFF0000, 0xFF00, 0xFF
-	local r, g, b = 12, 13, 14
-	return bgrValue = (b << 16) + (g << 8) + r
+	return integer = (b << 16) + (g << 8) + r
 	elseif integer then
-	local b = bgrValue & blueMask) >> 16
-	local g = (bgrValue & greenMask) >> 8
-	local r = bgrValue & redMask
+	local blueMask, greenMask, redMask = 0xFF0000, 0xFF00, 0xFF
+	local b = (integer & blueMask) >> 16
+	local g = (integer & greenMask) >> 8
+	local r = integer & redMask
 	return r, g, b
 	end
 end
 
-function RGB_To_From_Integer(r,g,b,integer)
+function RGB_To_From_Integer2(r,g,b,integer)
 -- based on https://stackoverflow.com/a/29130472/8883033
 -- local r, g, b = 111, 222, 121
 	if not integer and r and g and b then
-	local code = red*256*256 + green*256 + blue
-	return code
+	local integer = red*256*256 + green*256 + blue
+	return integer
 	elseif integer then
-	local red = (code - blue - green*256)/(256*256)
-	local green = (code%(256*256) - blue)/256
-	local blue = code%256
+	local r = (integer - blue - green*256)/(256*256)
+	local g = (integer%(256*256) - blue)/256
+	local b = integer%256
 	return r, g, b
 	end
 end
+
+
+function Split_Integer_To_RGB_And_Combine(color)
+-- color is 24 bit value returned by GR_SelectColor() or r.ColorToNative(r, g, b)
+
+local r, g, b = color & 0xFF, color >> 8 & 0xFF, color >> 16  -- color value returned by GR_SelectColor() is 24 bit little endian (3 clusters of 8 bits each, i.e. 3 ranges of 0 - 255), max decimal value is 16777215 (zero based), count starts on the right, so rgb direction is right to left // 'color & 0xFF' is masking rightmost 8 bits with 11111111, 'color >> 8 & 0xFF' is shifting middle 8 bits rightwards 8 places so they replace the original rightmost 8 bits and then masking, 'color >> 16' is shifting leftmost 8 bits 16 places rightwards so they relplace the original rightmost 8 bits, no masking is needed because at this point there're no set bits anymore beyond these 8 // same as r.ColorFromNative()
+
+-- DO STUFF (like randomize or other operations)
+
+local color = b<<16 | g<<8 | r -- combine back into a 24 bit value, b<<16 creates a 24 bit value because b is 8 bit and shifting by 16 places leftwards makes it 8+16 = 24, in reverse order since color value must be little endian, g<<8 is 16 bit value (8+8=16) and r is 8 bit // same as r.ColorToNative(r, g, b)
+
+end
+
 
 
 -------------- ENCODE RGB TO AND DECODE FROM INTEGER END ------------------
@@ -9831,8 +9884,10 @@ end
 
 
 function Count_Files_In_Folder(path,ext)
---r.EnumerateFiles(path..'..', 0) -- reset EnumerateFiles() cache by accessing a dummy dir
---r.EnumerateFiles(path, -1) -- since 6.20
+--r.EnumerateFiles(path..'..', 0) -- reset EnumerateFiles() cache by accessing a valid dummy dir, e.g. r.EnumerateFiles(r.GetResourcePath(), 0)
+--r.EnumerateFiles(path, -1) -- -1 to clear the cache, or pass another directory (incalid one is suppprted), since 6.20
+-- https://forum.cockos.com/showthread.php?t=203235
+-- applies to r.EnumerateSubdirectories() as well
 local i = 0
 local f_cnt = 0
 	repeat
