@@ -200,7 +200,7 @@ local act = comm_ID and comm_ID ~= 0 and r.Main_OnCommand(r.NamedCommandLookup(c
 end
 
 
-local ME = r.MIDIEditor_GetActive()
+local ME = r.MIDIEditor_GetActive() -- UNRELIABLE, see MIDIEditor_GetActiveAndVisible()
 function ACT(ID, ME) -- supports MIDI Editor actions, get MIDI editor pointer ME and add as argument otherwise can be left out
 -- ID - string or integer
 	if ID then
@@ -216,10 +216,16 @@ function ACT(ID, ME) -- supports MIDI Editor actions, get MIDI editor pointer ME
 end
 
 
-function ACT(comm_ID, midi) -- midi is boolean
+function ACT1(comm_ID, midi) -- midi is boolean
+local act = midi and r.MIDIEditor_LastFocused_OnCommand(r.NamedCommandLookup(comm_ID), false) -- islistviewcommand false
+or not midi and r.Main_OnCommand(r.NamedCommandLookup(comm_ID), 0) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything
+end
+
+
+function ACT2(comm_ID, midi) -- midi is boolean
 local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
 local act = comm_ID and comm_ID ~= 0 and (midi and r.MIDIEditor_LastFocused_OnCommand(comm_ID, false) -- islistviewcommand false
-or r.Main_OnCommand(comm_ID, 0)) -- only if valid command_ID
+or not midi and r.Main_OnCommand(comm_ID, 0)) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything // only if valid command_ID
 end
 
 
@@ -529,7 +535,7 @@ r.Undo_EndBlock(undo, -1)
 else r.Undo_EndBlock('', -1) end
 
 
-function undo_block(undo) -- undo is string
+function undo_block(undo) -- undo arg is a string, which isn't used at the beginning of the block and only used at its end
 	if not undo then r.Undo_BeginBlock()
 	else r.Undo_EndBlock(undo, -1)
 	end
@@ -7780,6 +7786,18 @@ return RGB
 end
 
 
+function Generate_Radom_Color_Val()
+-- https://stackoverflow.com/questions/36756331/js-generate-random-boolean
+-- https://stackoverflow.com/questions/29851873/convert-a-number-between-1-and-16777215-to-a-colour-value
+math.randomseed(math.floor(r.time_precise()*1000)) -- seems to facilitate greater randomization at fast rate thanks to milliseconds count; math.floor() because the seeding number must be integer
+return math.random(0, 16777215) -- the range of values returned by GR_SelectColor()
+end
+-- USE:
+-- local rand = Generate_Radom_Color_Val()
+-- local color = math.random(0, rand)|0x1000000 -- gives greater randomization
+-- r.SetMediaTrackInfo_Value(tr, 'I_CUSTOMCOLOR', color, true) -- for example
+
+
 function zaibuyidao_RGBHexToDec(R, G, B)
 -- https://raw.githubusercontent.com/zaibuyidao/ReaScripts/239ebd6a73cf5e7b124ef6f65b21e8eae63acd61/Regions/zaibuyidao_Set%20Region%20Color.lua
   local red = string.format("%x", R)
@@ -7791,6 +7809,21 @@ function zaibuyidao_RGBHexToDec(R, G, B)
   local color = "01" .. blue .. green .. red
   return tonumber(color, 16)
 end
+
+
+function randomize_color()
+-- source https://github.com/joabeslopes/Reaper-scripts-multitrack-creation/blob/main/Scripts/createMultipleTracks.lua
+local r,g,b
+	for n = 100, math.random(150,200) do
+	math.randomseed(os.time()..n..n)
+	math.random(); math.random();
+	r = math.random(0,255)
+	g = math.random(0,255)
+	b = math.random(0,255)
+	end
+return r,g,b
+end
+
 
 
 ------------------- ENCODE RGB TO AND DECODE FROM INTEGER ------------------
@@ -8228,6 +8261,21 @@ end
 -- update = Monitor_MrkrsOrRgns(USE_REGIONS, ref_t) -- search for changes in markers and regions time data; update is used as a condition in getting marker/region properties routine above
 
 
+
+function Take_Marker_Exists(take, pos)
+--[[ pos must be position within source, calculated as follows:
+local item_pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+local offset = r.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
+local playrate = r.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
+local pos = (cur_pos - item_pos + offset)*playrate
+]]
+local i = 0
+	repeat
+	local src_pos, name, color = r.GetTakeMarker(take, i)
+		if src_pos == pos then return true end
+	i = i+1
+	until src_pos == -1
+end
 
 
 --========================== M A R K E R S  &  R E G I O N S  E N D =========================
@@ -10325,7 +10373,7 @@ r.TrackCtl_SetToolTip('TEXT', x, y, true) -- topmost is true; if x and y are tak
 end
 
 
-function Error_Tooltip(text, caps, spaced, x2, y2)
+function Error_Tooltip(text, caps, spaced, x2, y2) -- the tooltip sticks under the mouse within Arrange but quickly disappears over the TCP, to make it stick just a tad longer there it must be directly under the mouse
 -- caps and spaced are booleans
 -- x2, y2 are integers to adjust tooltip position by
 local x, y = r.GetMousePosition()
@@ -10345,6 +10393,7 @@ end
 
 
 function Error_Tooltip2(text, format) -- format must be true
+-- the tooltip sticks under the mouse within Arrange but quickly disappears over the TCP, to make it stick just a tad longer there it must be directly under the mouse
 local x, y = r.GetMousePosition()
 local text = text and type(text) == 'string' and (format and text:upper():gsub('.','%0 ') or text) or 'not a valid "text" argument'
 r.TrackCtl_SetToolTip(text, x, y, true) -- topmost true
@@ -11603,7 +11652,6 @@ reaper.GetTrackGUID(tr)
 --===================================================================================
 
 -- Functions to get track folder state
-
 
 reaper.GetMediaTrackInfo_Value(tr, 'I_FOLDERDEPTH')
 -- 0=normal, 1=track is a folder parent, -1=track is the last in the innermost folder,
