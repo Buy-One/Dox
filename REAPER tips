@@ -2806,6 +2806,7 @@ https://forum.cockos.com/showthread.php?t=165974
 -- Automation modes
 
 https://www.youtube.com/watch?v=ckjl-rpzDPA
+https://www.youtube.com/watch?v=JHGGZiXUnqI
 
 1. Trim/Read - allows previewing and trimming the envelope by moving/affecting the control of the parameter being automated without affecting the actual curve, so effectively changing envelope Base parameter available also in automation item properties.
 When activated, the control setting is transfered to the envelope while the control itself is reset, which allows trimming.
@@ -2814,16 +2815,16 @@ During playback the control of the automated parameter doesn't follow the envelo
 2. Read - In playback the control of the automated parameter follows the envelope's existing curve.
 
 3. Touch - allows punching in envelope change by moving/affecting the control of the parameter being automated.
-Only applies change as long as it's being affected by the user, otherwise simply follows the envelope's existing curve.
+Only applies change for as long as it's being effected by the user, otherwise simply follows the envelope's existing curve.
 
 4. Latch - allows writing envelope curve by moving/affecting the control of the parameter being automated.
-Once affected by the user it continues writing envelope even without user interference until transport is stopped.
+Once effected by the user continues writing envelope even without user interference until transport is stopped.
 If during playback the control of the automated parameter isn't affected by the user, it simply follows the envelope's existing curve.
 
 5.Latch preview - doesn't write an envelope curve, only allows previwing how changing the setting of the parameter being automated affects the output.
 If during playback the control of the automated parameter isn't affected by the user, it simply follows the envelope's existing curve.
 
-6. Write - allows writing envelope curve by moving/affecting the control of the parameter being automated.
+6. Write - allows writing envelope curve by moving/affecting the control of the parameter being automated. Main mode to write automation when there's none.
 During playback overwrites the envelope using the value the control has been last parked at, therefore isn't suitable for previewing the envelope. 
 To preview use Read, Trim/Read or Touch.
 
