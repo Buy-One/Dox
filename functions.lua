@@ -200,7 +200,7 @@ local act = comm_ID and comm_ID ~= 0 and r.Main_OnCommand(r.NamedCommandLookup(c
 end
 
 
-local ME = r.MIDIEditor_GetActive() -- UNRELIABLE, see MIDIEditor_GetActiveAndVisible()
+local ME = r.MIDIEditor_GetActive() -- UNRELIABLE if script is run from the Main section of the action list, see MIDIEditor_GetActiveAndVisible()
 function ACT(ID, ME) -- supports MIDI Editor actions, get MIDI editor pointer ME and add as argument otherwise can be left out
 -- ID - string or integer
 	if ID then
@@ -319,12 +319,16 @@ Msg(t.a) Msg(t.b) Msg(t.c)
 ]]
 
 
-gfx.init('', 0, 0)
+-- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
+-- https://forum.cockos.com/showthread.php?t=280658#25
+-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82 -- or '[%d%.]+'
+local init = old and gfx.init('', 0, 0)
 -- open menu at the mouse cursor
 gfx.x = gfx.mouse_x
 gfx.y = gfx.mouse_y
 local input = gfx.showmenu(menu) -- menu string
-gfx.quit()
+local quit = old and gfx.quit()
 
 
 function Reload_Menu_at_Same_Pos1(menu)
@@ -332,7 +336,11 @@ function Reload_Menu_at_Same_Pos1(menu)
 ::RELOAD::
 local x, y = r.GetMousePosition()
 	if x+0 <= 100 then -- 100 px within the screen left edge
-	gfx.init('', 0, 0)
+-- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
+-- https://forum.cockos.com/showthread.php?t=280658#25
+-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82 -- or '[%d%.]+'
+	local init = old and gfx.init('', 0, 0)
 	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
 	gfx.x = gfx.mouse_x
 	gfx.y = gfx.mouse_y
@@ -347,7 +355,11 @@ end
 function Reload_Menu_at_Same_Pos2(menu) -- still doesn't allow keeping the menu open after clicking away
 local x, y = r.GetMousePosition()
 	if x+0 <= 100 then -- 100 px within the screen left edge
-	gfx.init('', 0, 0)
+-- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
+-- https://forum.cockos.com/showthread.php?t=280658#25
+-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82 -- or '[%d%.]+'
+	local init = old and gfx.init('', 0, 0)
 	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
 	gfx.x = gfx.mouse_x
 	gfx.y = gfx.mouse_y
@@ -357,7 +369,7 @@ end
 -- USE:
 --[[
 local retval = Reload_Menu_at_Same_Pos2(menu)
-	if retval == xyz then
+	if retval == xyz then -- returned menu item index other than 0
 -- 	DO STUFF
 	end
 	if retval > 0 then goto RELOAD
@@ -409,8 +421,13 @@ local function Wrapper1(func,...)
 -- to be used with defer() and atexit()
 -- thanks to Lokasenna, https://forums.cockos.com/showthread.php?t=218805 -- defer with args
 -- func is function name, the elipsis represents the list of function arguments
--- Lokasenna's code didn't work because func(...) produced an error
--- without there being elipsis in function() as well, but gave direction
+-- Lokasenna's code didn't work because func(...) produced an error 
+-- " cannot use '...' outside a vararg function near '...' "
+-- without there being elipsis in function() as well, but gave direction;
+-- if original function has arguments they MUST be passed to the Wrapper() function 
+-- regardless of their scope (global or local); 
+-- if it doesn't, the upvalues must all be global and it doesn't matter 
+-- whether they're passed to the Wrapper() function
 local t = {...}
 return function() func(table.unpack(t)) end
 end
@@ -495,6 +512,27 @@ r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
 end
 
 
+function Is_Win()
+local OS = r.GetAppVersion()
+return not OS:match('/') or OS:match('/x')
+end
+
+
+function Get_OS()
+local OS = r.GetAppVersion()
+return (not OS:match('/') or OS:match('/x')) and 'win'
+or OS:match('OS') and 'mac' or OS:match('linux')
+-- OR
+-- local OS = r.GetOS()
+-- return OS:match('Win') or OS:match('OSX') and 'Mac' or 'Other'
+end
+
+
+function Bump_Proj_Change_Cnt() -- API functions seems to not update project change count, most of them anyway
+r.Main_OnCommand(41156,0) -- Options: Selecting one grouped item selects group
+r.Main_OnCommand(41156,0)
+end
+
 
 --========================= U N D O  S T A R T =========================
 
@@ -567,7 +605,7 @@ function GetUndoSettings()
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
-local undoflags = cont:match('undomask=(%d+)')
+local undoflags = cont:match('undomask=(%d+)')+0 -- +0 is accommodating for Lua 5.4 where implicit conversion of strings to integers doesn't work in bitwise operations
 local t = {
 1, -- item selection
 2, -- time selection
@@ -1209,13 +1247,13 @@ end
 
 
 function Convert_Text_To_Menu(text, max_line_len) -- max_line_len is integer, determines length of line as a menu item, 70 seems optimal
--- relies on multibyte_str_len() function to accurately count UTF-8 characters; can be removed if the text is sure to only contain basic Latin, in which case the line 'multibyte_str_len(text_clean)' can be replaced with '#text_clean'
+-- relies on multibyte_str_len() function (see below) to accurately count UTF-8 characters; can be removed if the text is sure to only contain basic Latin, in which case the line 'multibyte_str_len(text_clean)' can be replaced with '#text_clean'
 
 local text = text:gsub('|', 'ㅣ') -- replace pipe, if any, with Hangul character for /i/ since its a menu special character
 local text = text:gsub('&', '+') -- convert ampersand to + because it's a menu special character used as a quick access shortuct hence not displayed in the menu
 local text = text:gsub('\n', '|')-- OR text:gsub('\r', '|') // convert user line breaks into pipes to divide lines by creating menu items, otherwise user line breaks aren't respected; multiple line break is created thanks to the space between pipes originally left after each \n character, if there's none a solid line is displayed instead or several thereof starting from 3 pipes and more
 local t = {}
-	for w in text:gmatch('[%w%p\128-\255]+[%s%p]*') do -- split into words + trailing space if any; [%w%p] makes sure that words with apostrophe <it's>, <don't> aren't split up; [%s%p] makes menu divider pipes and special characters (!#<>), if any, attached to the words bevause they're punctuation marks (%p); accounting for utif-8 characters
+	for w in text:gmatch('[%w%p\128-\255]+[%s%p]*') do -- split into words + trailing space if any; [%w%p] makes sure that words with apostrophe <it's>, <don't> aren't split up; [%s%p] makes menu divider pipes and special characters (!#<>), if any, attached to the words because they're punctuation marks (%p); accounting for utif-8 characters
 		if w then
 		t[#t+1] = w end
 	end
@@ -1230,8 +1268,8 @@ local text, menu = '',''
 		-- | always
 		-- | free from repetition, injected humor
 		-- whereas 'always' has to be grouped with 'free from repetition, injected humor'
-		local pipe = text:match('(.+)|') and '' or '|' -- when the above condition is true because text end with pipe the pipe is user's line break so no need to add another one, otherwise when condition is true because the line length exceeds the limit pipe is added to delimit lines as menu items
-		text = #pipe == 0 and text:gsub('[!#<>]',' %0') or text -- make sure that menu special characters at the beginning of a new line (menu item) are ignored prefacing them with space; when string stored in the text var has pipe in the end, if ther're any menu special characters in the user text, they will follow the pipe due to the way user text are split into words at the beginning of the function, so if there're any specal characters placed at the beginning of a new line in the user text they will necessarily be found in the text var right next to the new line character converted at the beginning of the function into pipe to conform to the menu syntax and such new line character is attached to the preceding line
+		local pipe = text:match('(.+)|') and '' or '|' -- when the above condition is true because text ends with pipe the pipe is user's line break so no need to add another one, otherwise when condition is true because the line length exceeds the limit pipe is added to delimit lines as menu items
+		text = #pipe == 0 and text:gsub('[!#<>]',' %0') or text -- make sure that menu special characters at the beginning of a new line (menu item) are ignored prefacing them with space; when string stored in the text var has pipe in the end, if ther're any menu special characters in the user text, they will follow the pipe due to the way user text is split into words at the beginning of the function, so if there're any specal characters placed at the beginning of a new line in the user text they will necessarily be found in the text var right next to the new line character converted at the beginning of the function into pipe to conform to the menu syntax and such new line character is attached to the preceding line
 		menu = menu..text..pipe -- between menu and text pipe isn't needed because it's added after the text and next time will be at the end of the menu
 		text = ''
 		end
@@ -1324,6 +1362,19 @@ local sws_act = str:match('^_?[%u%p%d]+$')
 return native, cust_act, sws_act, script
 end
 
+
+function magiclines(s) 
+-- iterate over lines including blank
+-- https://stackoverflow.com/questions/19326368/iterate-over-lines-including-blank-lines
+	if s:sub(-1)~='\n' then s=s..'\n' end
+	return s:gmatch('(.-)\n')
+end
+--[[ USE:
+local s = '' -- some string
+	for line in magiclines(s) do
+	-- DO STUFF WITH LINE
+	end
+]]
 
 --=========================== S T R I N G S  E N D ==============================
 
@@ -1739,12 +1790,13 @@ function MIDIEditor_GetActiveAndVisible()
 -- solution to the problem described at https://forum.cockos.com/showthread.php?t=278871
 local ME = r.MIDIEditor_GetActive()
 local dockermode_idx, floating = r.DockIsChildOfDock(ME) -- floating is true regardless of the floating docker visibility
+local dock_pos = r.DockGetPosition(dockermode_idx) -- -1=not found, 0=bottom, 1=left, 2=top, 3=right, 4=floating
 -- OR
--- local floating = r.DockGetPosition(dockermode_idx) == 4 -- another way to evaluate if docker is floating
+-- local floating = dock_pos == 4 -- another way to evaluate if docker is floating
 -- the MIDI Editor is either not docked or docked in an open docker attached to the main window
 	if ME and (dockermode_idx == -1 or dockermode_idx > -1 and not floating
 	and r.GetToggleCommandStateEx(0,40279) == 1) -- View: Show docker
-	then return ME
+	then return ME, dock_pos
 -- the MIDI Editor is docked in an open floating docker
 	elseif ME and floating then
 		for line in io.lines(r.get_ini_file()) do
@@ -1752,7 +1804,7 @@ local dockermode_idx, floating = r.DockIsChildOfDock(ME) -- floating is true reg
 			and line:match('32768') -- open floating docker
 			-- OR
 			-- and not line:match('98304') -- not closed floating docker
-			then return ME
+			then return ME, 4 -- here dock_pos will always be floating i.e. 4
 			end
 		end
 	end
@@ -2342,7 +2394,7 @@ local act_ch_t, filter_state = {}
 			if val then
 				for i = 0, 15 do
 				local bit = 2^i
-					if val&bit == bit then -- channel numbers are 0-based logarithm of the value from the chunk with base 2
+					if val+0&bit == bit then -- channel numbers are 0-based logarithm of the value from the chunk with base 2 // +0 is accommodating for Lua 5.4 where implicit conversion of strings to integers doesn't work in bitwise operations
 					act_ch_t[#act_ch_t+1] = i+1 -- 1-based channel number // can be changed
 					end
 				end
@@ -3283,7 +3335,7 @@ local obj, obj_type
 	obj, obj_type = table.unpack(retval == 2 and tr > 0 and {r.GetTrackMediaItem(r.GetTrack(0,tr-1), item), 1} or retval == 1 and tr > 0 and {r.GetTrack(0,tr-1), 0} or {r.GetMasterTrack(0), 0})
 	else -- not FX chain
 	local x, y = r.GetMousePosition()
-		if tonumber(r.GetAppVersion():match('(.+)/')) >= 6.37 then -- SUPPORTS MCP
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.37 then -- or '[%d%.]+'; SUPPORTS MCP
 		local retval, info_str = r.GetThingFromPoint(x, y)
 		obj, obj_type = table.unpack(info_str == 'arrange' and {({r.GetItemFromPoint(x, y, true)})[1], 1} -- allow locked is true
 		or info_str:match('[mt]cp') and {r.GetTrackFromPoint(x, y), 0} or {nil})
@@ -4221,6 +4273,126 @@ return found and t
 end
 
 
+-- Still note names management is cleaner via chunk,
+-- with the functions when note names are shifted blank name placeholders must be
+-- left at their old locations which creates junk in the chunk
+function Update_Track_MIDI_Note_Names(tr, shift_by, chan) 
+-- shift_by is either integer (pos or neg) or a table storing old pitch as table index and new pitch as value, both 0-based
+-- shift_by as integer is only suitable for linear (uniform) shifts, i.e. all note names are shifted by the same amount
+-- otherwise new number of each note is to be stored in a table and then their name assignments updated 1 by 1;
+-- chan is either channel number integer in the range of  -1 - 15 (-1 = Omni), or array with channel numbers as values
+-- if chan is nil or integer and is negative or greater than 15, defaults to Onmi (-1);
+-- When there're note names assigned to both Omni and a specific MIDI channel, e.g.
+--[[
+1 47 "" 0 47 -------- blank
+-1 47 "test 1" 0 47
+1 48 "test 1" 0 48
+-1 48 "test 2" 0 48
+1 49 "test 2" 0 49
+1 50 "" 0 50 ------- blank
+-1 50 "test 3" 0 50
+1 51 "test 3" 0 51
+]]
+-- note names assigned to a specific channel only appear when this channel is selected in the MIDI Editor channel filter,
+-- if any other channel which doesn't have assigned note names is selected in the filter, 
+-- note names assigned to Omni will appear;
+-- note names assigned to both Omni and a specific MIDI channel will appear side by side as long as there're no blank names
+-- assigned to such specific channel which correspond to note names assigned to Omni, see chunk excerpt above;
+-- under MIDINOTENAMES token in the chunk the note names don't have to be listed in a particular order channel wise;
+-- if a note is assigned to Omni (-1), which is always the case in manual note name input, 
+-- the function GetTrackMIDINoteName(Ex) will get a note name even if it's channel argument integer is other than < 0
+
+-- TrackMIDINoteNameEx(): channel < 0 assigns note name to all channels, pitch 128 assigns name for CC0, pitch 129 for CC1, etc.
+-- contrary to the API doc any negative channel value is only recognized in the Get functions
+-- Set functions only work successfully with -1, even though returns true if any other negative value is used
+-- that must be because -1 and none other value signifies Onmi assignment in the track chunk
+-- https://forum.cockos.com/showthread.php?t=250568&page=2#50
+
+	if not tr or (tonumber(shift_by) and tonumber(shift_by) == 0) 
+	or (type(shift_by) == 'table' and not next(shift_by)) then return end
+
+chan = tonumber(chan)
+chan = (not chan or chan and (chan > 15 or chan < 0)) and -1 or chan -- if chan arg is nil, negative or greater than 15, default to Onmi
+local cur_names_t = {}
+
+	local function get_note_names(tr, shift_by, chan, cur_names_t, is_table) -- is_table is boolean, refers to chan argument of the main Update_Track_MIDI_Note_Names() function
+		for i=0, 127 do
+		local name = r.GetTrackMIDINoteNameEx(0, tr, i, chan)
+			if name and #name > 0 then -- if no name is assigned the function above returns nil
+				if is_table then
+				cur_names_t[chan][i] = name -- pitch is stored as 0-based table index because it's likely to not be sequential anyway
+				else
+				cur_names_t[i] = name -- pitch is stored as 0-based table index
+				end
+				if tonumber(shift_by) then -- if shift_by is integer delete all
+				r.SetTrackMIDINoteNameEx(0, tr, i, chan, '') -- name is empty string to delete current name
+				elseif type(shift_by) == 'table' then -- if shift_by is a table only delete those whose note number match note numbers found in the table
+					for note_orig_idx, note_new_idx in pairs(shift_by) do -- pairs because the indexing is likely non-sequential
+						if note_orig_idx == i then
+						r.SetTrackMIDINoteNameEx(0, tr, i, chan, '') -- name is empty string to delete current name
+						end
+					end
+				end
+			end
+		end
+		
+	end
+	
+-- Collect named notes
+	if tonumber(chan) then -- chan is integer
+	chan = math.floor(chan+0.5)
+	get_note_names(tr, shift_by, chan, cur_names_t)
+	elseif type(chan) == 'table' then
+		for _, chanNo in ipairs(chan) do
+		cur_names_t[chanNo] = {}
+		get_note_names(tr, shift_by, chanNo, cur_names_t, true) -- is_table true
+		end
+	end
+ 
+-- Abort if named notes aren't found
+local note_names_exist
+	if tonumber(chan) and not next(cur_names_t) then return
+	elseif type(chan) == 'table' then 
+		for chan, note_names_t in pairs(cur_names_t) do
+			if next(note_names_t) then note_names_exist = 1 end
+		end
+		if not note_names_exist then return end
+	end	
+
+	local function set_note_names(tr, shift_by, chan, cur_names_t, is_table) -- is_table is boolean, refers to chan argument of the main Update_Track_MIDI_Note_Names() function
+		if tonumber(shift_by) then -- if shift_by is an integer
+		local cur_names_t = is_table and cur_names_t[chan] or cur_names_t
+			for pitch, name in pairs(cur_names_t) do -- pairs because the indexing is likely non-sequential
+			r.SetTrackMIDINoteNameEx(0, tr, pitch+shift_by, chan, name)
+			end
+		elseif type(shift_by) == 'table' then -- if shift_by is a table storing old note idx as a table index and its new idx as the value, both shall be 0-based
+			for note_orig_idx, note_new_idx in pairs(shift_by) do -- pairs because the indexing is likely non-sequential
+			local cur_names_t = is_table and cur_names_t[chan] or cur_names_t
+				for pitch, name in pairs(cur_names_t) do -- pairs because the indexing is likely non-sequential
+					if note_orig_idx == pitch then -- both are 0-based
+					r.SetTrackMIDINoteNameEx(0, tr, note_new_idx, chan, name)
+					end
+				end
+			end
+		end
+		
+	end  
+
+-- Update named note assignments
+	if tonumber(chan) then -- chan is integer
+	set_note_names(tr, shift_by, chan, cur_names_t)
+	elseif type(chan) == 'table' then -- chan is a table
+		for _, chanNo in ipairs(chan) do
+		set_note_names(tr, shift_by, chanNo, cur_names_t, true) -- is_table true
+		end
+	end
+    
+end
+-- USE
+-- Update_Track_MIDI_Note_Names(tr, {[50]=48,[48]=46}, {0,1}) -- shift_by table, chan array
+-- Update_Track_MIDI_Note_Names(tr, 3, 2) -- shift_by 3, chan 2
+
+
 --================================ T R A C K S  E N D ================================
 
 
@@ -4812,7 +4984,7 @@ function Get_Vol_Env_Range()
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
-local val = cont:match('volenvrange=(.-)\n')
+local val = cont:match('volenvrange=(.-)\n') 
 local val = tonumber(val)
 -- Thanks to Mespotine
 -- https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
@@ -5157,21 +5329,21 @@ local function GetObjChunk1(retval, obj, obj_type) -- retval stems from r.GetFoc
 -- https://forum.cockos.com/showthread.php?t=193686
 -- https://raw.githubusercontent.com/EUGEN27771/ReaScripts_Test/master/Functions/FXChain
 -- https://github.com/EUGEN27771/ReaScripts/blob/master/Various/FXRack/Modules/FXChain.lua
-		if not obj then return end
-		if retval == 0 then retval = tonumber(obj_type) end -- for pasting stage when fx chains/floating windows are closed or not in focus
-  -- Try standard function -----
-	local t = retval == 1 and {r.GetTrackStateChunk(obj, '', false)} or {r.GetItemStateChunk(obj, '', false)} -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
-	local ret, obj_chunk = table.unpack(t)
-		if ret and obj_chunk and #obj_chunk >= 4194303 and not r.APIExists('SNM_CreateFastString') then return 'err_mess'
-		elseif ret and obj_chunk and #obj_chunk < 4194303 then return ret, obj_chunk -- 4194303 bytes (4.194303 Mb) = (4096 kb * 1024 bytes) - 1 byte // since build 4.20 http://reaper.fm/download-old.php?ver=4x
-		end
+	if not obj then return end
+	if retval == 0 then retval = tonumber(obj_type) end -- for pasting stage when fx chains/floating windows are closed or not in focus
+-- Try standard function -----
+local t = retval == 1 and {r.GetTrackStateChunk(obj, '', false)} or {r.GetItemStateChunk(obj, '', false)} -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
+local ret, obj_chunk = table.unpack(t)
+	if ret and obj_chunk and #obj_chunk >= 4194303 and not r.APIExists('SNM_CreateFastString') then return 'err_mess'
+	elseif ret and obj_chunk and #obj_chunk < 4194303 then return ret, obj_chunk -- 4194303 bytes (4.194303 Mb) = (4096 kb * 1024 bytes) - 1 byte // since build 4.20 http://reaper.fm/download-old.php?ver=4x
+	end
 -- If chunk_size >= max_size, use wdl fast string --
-	local fast_str = r.SNM_CreateFastString('')
-		if r.SNM_GetSetObjectState(obj, fast_str, false, false) -- setnewvalue and wantminimalstate = false
-		then obj_chunk = r.SNM_GetFastString(fast_str)
-		end
-	r.SNM_DeleteFastString(fast_str)
-		if obj_chunk then return true, obj_chunk end
+local fast_str = r.SNM_CreateFastString('')
+	if r.SNM_GetSetObjectState(obj, fast_str, false, false) -- setnewvalue and wantminimalstate = false
+	then obj_chunk = r.SNM_GetFastString(fast_str)
+	end
+r.SNM_DeleteFastString(fast_str)
+	if obj_chunk then return true, obj_chunk end
 end
 
 
@@ -5179,42 +5351,40 @@ local function GetObjChunk2(obj)
 -- https://forum.cockos.com/showthread.php?t=193686
 -- https://raw.githubusercontent.com/EUGEN27771/ReaScripts_Test/master/Functions/FXChain
 -- https://github.com/EUGEN27771/ReaScripts/blob/master/Various/FXRack/Modules/FXChain.lua
-		if not obj then return end
+	if not obj then return end
 local tr = r.ValidatePtr(obj, 'MediaTrack*')
 local item = r.ValidatePtr(obj, 'MediaItem*')
 local env = r.ValidatePtr(obj, 'TrackEnvelope*') -- works for take envelope as well
-  -- Try standard function -----
-	local t = tr and {r.GetTrackStateChunk(obj, '', false)} or item and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
-	local ret, obj_chunk = table.unpack(t)
-	-- OR
-	-- local ret, obj_chunk = table.unpack(tr and {r.GetTrackStateChunk(obj, '', false)} or item and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} or {x,x}) -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
-		if ret and obj_chunk and #obj_chunk >= 4194303 and not r.APIExists('SNM_CreateFastString') then return 'err_mess'
-		elseif ret and obj_chunk and #obj_chunk < 4194303 then return ret, obj_chunk -- 4194303 bytes (4.194303 Mb) = (4096 kb * 1024 bytes) - 1 byte // since build 4.20 http://reaper.fm/download-old.php?ver=4x
-		end
+-- Try standard function -----
+local t = tr and {r.GetTrackStateChunk(obj, '', false)} or item and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
+local ret, obj_chunk = table.unpack(t)
+-- OR
+-- local ret, obj_chunk = table.unpack(tr and {r.GetTrackStateChunk(obj, '', false)} or item and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} or {x,x}) -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
+	if ret and obj_chunk and #obj_chunk >= 4194303 and not r.APIExists('SNM_CreateFastString') then return 'err_mess'
+	elseif ret and obj_chunk and #obj_chunk < 4194303 then return ret, obj_chunk -- 4194303 bytes (4.194303 Mb) = (4096 kb * 1024 bytes) - 1 byte // since build 4.20 http://reaper.fm/download-old.php?ver=4x
+	end
 -- If chunk_size >= max_size, use wdl fast string --
-	local fast_str = r.SNM_CreateFastString('')
-		if r.SNM_GetSetObjectState(obj, fast_str, false, false) -- setnewvalue and wantminimalstate = false
-		then obj_chunk = r.SNM_GetFastString(fast_str)
-		end
-	r.SNM_DeleteFastString(fast_str)
-		if obj_chunk then return true, obj_chunk end
+local fast_str = r.SNM_CreateFastString('')
+	if r.SNM_GetSetObjectState(obj, fast_str, false, false) -- setnewvalue and wantminimalstate = false
+	then obj_chunk = r.SNM_GetFastString(fast_str)
+	end
+r.SNM_DeleteFastString(fast_str)
+	if obj_chunk then return true, obj_chunk end
 end
 
 
 function Err_mess() -- if chunk size limit is exceeded and SWS extension isn't installed
-
-	local sws_ext_err_mess = "              The size of data requires\n\n     the SWS/S&M extension to handle them.\n\nIf it's installed then it needs to be updated.\n\n         After clicking \"OK\" a link to the\n\n SWS extension website will be provided\n\n\tThe script will now quit."
-	local sws_ext_link = 'Get the SWS/S&M extension at\nhttps://www.sws-extension.org/\n\n'
-
-	local resp = r.MB(sws_ext_err_mess,'ERROR',0)
-		if resp == 1 then r.ShowConsoleMsg(sws_ext_link, r.ClearConsole()) return end
+local sws_ext_err_mess = "              The size of data requires\n\n     the SWS/S&M extension to handle them.\n\nIf it's installed then it needs to be updated.\n\n         After clicking \"OK\" a link to the\n\n SWS extension website will be provided\n\n\tThe script will now quit."
+local sws_ext_link = 'Get the SWS/S&M extension at\nhttps://www.sws-extension.org/\n\n'
+local resp = r.MB(sws_ext_err_mess,'ERROR',0)
+	if resp == 1 then r.ShowConsoleMsg(sws_ext_link, r.ClearConsole()) return end
 end
 
 
 local function SetObjChunk(retval, obj, obj_type, obj_chunk) -- retval stems from r.GetFocusedFX(), value 0 is only considered at the pasting stage because in the copying stage it's error caught before the function
-		if not (obj and obj_chunk) then return end
-		if retval == 0 then retval = tonumber(obj_type) end -- for pasting stage when fx chains/floating windows are closed or not in focus
-	return retval == 1 and r.SetTrackStateChunk(obj, obj_chunk, false) or r.SetItemStateChunk(obj, obj_chunk, false) -- isundo is false // https://forum.cockos.com/showthread.php?t=181000#9
+	if not (obj and obj_chunk) then return end
+	if retval == 0 then retval = tonumber(obj_type) end -- for pasting stage when fx chains/floating windows are closed or not in focus
+return retval == 1 and r.SetTrackStateChunk(obj, obj_chunk, false) or r.SetItemStateChunk(obj, obj_chunk, false) -- isundo is false // https://forum.cockos.com/showthread.php?t=181000#9
 end
 
 
@@ -5223,7 +5393,7 @@ local function SetObjChunk2(obj, obj_chunk)
 local tr = r.ValidatePtr(obj, 'MediaTrack*')
 local item = r.ValidatePtr(obj, 'MediaItem*')
 local env = r.ValidatePtr(obj, 'TrackEnvelope*') -- works for take envelope as well
-	return tr and r.SetTrackStateChunk(obj, obj_chunk, false) or item and r.SetItemStateChunk(obj, obj_chunk, false) or env and r.SetEnvelopeStateChunk(obj, obj_chunk, false) -- isundo is false // https://forum.cockos.com/showthread.php?t=181000#9
+return tr and r.SetTrackStateChunk(obj, obj_chunk, false) or item and r.SetItemStateChunk(obj, obj_chunk, false) or env and r.SetEnvelopeStateChunk(obj, obj_chunk, false) -- isundo is false // https://forum.cockos.com/showthread.php?t=181000#9
 end
 
 
@@ -5507,7 +5677,7 @@ local FXCHAINSEC = take and '<TAKEFX' or fx_idx >= 16777216 and not MON_FX and '
 
 	if MON_FX then
 	local path = r.GetResourcePath()
-	local sep = r.GetResourcePath():match('[\\/]+')
+	local sep = r.GetResourcePath():match('[\\/]+') -- or package.config:sub(1,1)
 	local f = io.open(path..sep..'reaper-hwoutfx.ini', 'r')
 	obj_chunk = f:read('*a') -- not global so isn't accessible outside of the function
 	f:close()
@@ -5734,6 +5904,7 @@ is_last_touched, tr_idx, tr, item_idx, item, take_idx, take, fx_idx, parm_idx = 
 
 
 function Collect_FX_Output_Data(tr) -- fx index and output channels // blueprint of dealing with output channels
+-- this function is tailored for RS5k
 local t, rs5k_cnt = {}, 0
 	for fx_idx = 0, r.TrackFX_GetCount(tr)-1 do
 	local RS5k
@@ -5849,32 +6020,6 @@ local obj = take or tr
 end
 
 
-
-function Check_If_FX_Selected_In_FX_Browser()
-
-r.PreventUIRefresh(1)
-r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false // insert new track at end of track list and hide it
-local temp_track = r.GetTrack(0,r.CountTracks(0)-1)
-r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0)
-r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0)
-r.TrackFX_AddByName(temp_track, 'FXADD:', false, -1)
-local fx_list
-	if r.TrackFX_GetCount(temp_track) == 0 then
-	r.MB('No FX have been selected in the FX browser.', 'ERROR', 0)
-	else
-	fx_list = ''
-		for i = 0, r.TrackFX_GetCount(temp_track)-1 do
-		fx_list = fx_list..'\n'..select(2,r.TrackFX_GetFXName(temp_track, i, ''))
-		end
-	end
-r.DeleteTrack(temp_track)
-r.PreventUIRefresh(-1)
-return fx_list:sub(3) -- removing leading line break // mainly for display in a prompt
-
-end
-
-
-
 function Get_FX_Type(obj, fx_idx)
 -- https://forum.cockos.com/showthread.php?t=277103
 local plug_types_t = {[0] = 'DX', [1] = 'LV2', [2] = 'JSFX', [3] = 'VST',
@@ -5887,7 +6032,8 @@ local GetIOSize = obj and (r.ValidatePtr(obj, 'MediaItem_Take*') and r.TakeFX_Ge
 end
 
 
-function Is_Same_Plugin(src_obj, src_fx_idx, dest_obj, dest_fx_idx) -- obj is either track or take
+function Is_Same_Plugin(src_obj, src_fx_idx, dest_obj, dest_fx_idx) 
+-- src_obj and dest_obj are either track or take
 -- input/Monitoring FX index must be fed in the API format, i.e. 0x1000000+idx or 16777216+idx
 -- may not be good for JSFX plugins, because they may have too few params to reliably compare
 -- while having common wet, bypass, delta params
@@ -5968,6 +6114,31 @@ local fx_list, valid_fx_cnt, _129 = '', 0
 	r.MB('No presets in FX of the focused FX chain.', 'ERROR', 0)
 	end
 return fx_list:sub(2), valid_fx_cnt, _129 -- removing leading line break from fx_list
+end
+
+
+
+function Check_If_FX_Selected_In_FX_Browser()
+
+r.PreventUIRefresh(1)
+r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false // insert new track at end of track list and hide it
+local temp_track = r.GetTrack(0,r.CountTracks(0)-1)
+r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0)
+r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0)
+r.TrackFX_AddByName(temp_track, 'FXADD:', false, -1)
+local fx_list
+	if r.TrackFX_GetCount(temp_track) == 0 then
+	r.MB('No FX have been selected in the FX browser.', 'ERROR', 0)
+	else
+	fx_list = ''
+		for i = 0, r.TrackFX_GetCount(temp_track)-1 do
+		fx_list = fx_list..'\n'..select(2,r.TrackFX_GetFXName(temp_track, i, ''))
+		end
+	end
+r.DeleteTrack(temp_track)
+r.PreventUIRefresh(-1)
+return fx_list:sub(3) -- removing leading line break // mainly for display in a prompt
+
 end
 
 
@@ -6072,7 +6243,7 @@ local t = {}
 		if name then
 			if line:match('<JS') then -- JSFX bank header will include the name from 'desc:' tag inside of the JSFX file and the file path or only the file path if the name couldn't be retrived
 			local path = r.GetResourcePath()
-			local sep = path:match('[\\/]')
+			local sep = path:match('[\\/]') -- or package.config:sub(1,1)
 				if name:match('<Project>') then -- JSFX local to the project only if project is saved; for the local JSFX to load presets its file in the /presets folder must be named js-_Project__(JSFX file name).ini
 				local retval, proj_path = r.EnumProjects(-1) -- -1 active project
 				local proj_path = proj_path:match('.+[\\/]') -- excluding the file name // OR proj_path:match('.+'..Esc(r.GetProjectName(0, '')))
@@ -6286,10 +6457,48 @@ function Re_Store_FX_Windows_Visibility(t)
 				end
 			end
 		end
-end
+	end
 
 end
 
+
+
+function FX_Exists1(obj, fx_name, fx_parm_cnt, parmA_idx, parmA_name, parmB_idx, parmB_name, parmC_idx, parmC_name, fx_idx)
+-- fx_name is original fx name, will be used in builds 6.37 onwards
+-- fx_idx is optional, if passed the function will evaluate whether the FX with this particular index is the sought one
+-- otherwise it searches for ar least one matching FX in the entire FX chain
+-- the function currently doesn't support Input/Monitoring FX chains
+-- NOT failproof because if at least 1 parameter has an alias, its name won't match 
+-- the default one if this is what's passed as an argument
+-- currently the original name can only be verified via chunk
+-- feature request for doing this with FX_GetNamedConfigParm():
+-- https://forum.cockos.com/showthread.php?t=282037
+local tr, take = r.ValidatePtr(obj,'MediaTrack*'), r.ValidatePtr(obj,'MediaItem_Take*')
+local obj = tr or take
+	if not obj then return 'invalid object' end
+local FX_Count, FX_GetNumParams, FX_GetParamName, FX_GetNamedConfigParm = table.unpack(
+tr and {r.TrackFX_GetCount, r.TrackFX_GetNumParams, r.TrackFX_GetParamName, r.TrackFX_GetNamedConfigParm}
+or take and {r.TakeFX_GetCount, r.TakeFX_GetNumParams, r.TakeFX_GetParamName, r.TakeFX_GetNamedConfigParm}
+local parm_t = {[parmA_idx] = parmA_name, [parmB_idx] = parmB_name, [parmC_idx] = parmC_name}
+local start, fin = fx_idx or 0, fx_idx or FX_Count(obj)-1
+local supported = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.37 -- since this build FX_GetNamedConfigParm() can retrieve the original FX name, which obviates using chunk
+	for idx = start, fin do
+	local found_cnt = 0
+		if supported and #fx_name:gsub(' ','') > 0 then
+		local _, org_name = FX_GetNamedConfigParm(obj, idx, 'fx_name') -- parmname could be 'original_name'
+			if fx_name == org_name then return true end
+		else
+		local parm_cnt = FX_GetNumParams(obj, idx)
+			if parm_cnt == fx_parm_cnt then
+				for parm_idx, name in pairs(parm_t) do
+				local retval, parm_name = FX_GetParamName(obj, idx, parm_idx, '')
+					if parm_name == name then found_cnt = found_cnt+1 end
+				end
+				if found_cnt == 3 then return true end -- all 3 parameter names match
+			end
+		end
+	end
+end
 
 
 --================================================  F X  E N D  ==============================================
@@ -6643,7 +6852,7 @@ function Are_Itms_Overlapping_Selected_Collapsed(t) -- t is an array storing sel
 -- true if overlapping and non-overlapping items are all selected
 -- true if selected item lanes are collapsed excluding non-overlapping items
 
-local is_build_6_54_onward = tonumber(r.GetAppVersion():match('(.+)/')) >= 6.54
+local is_build_6_54_onward = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.54 -- or '[%d%.]+'
 local lanes_collapsed_cnt = 0
 
 local get_item_props = r.GetMediaItemInfo_Value
@@ -6703,7 +6912,7 @@ local get_item_props = r.GetMediaItemInfo_Value
 	else break
 	end
 
-local build = tonumber(r.GetAppVersion():match('(.+)/'))
+local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
 
 local function Get_reaper_ini(key)
 local f = io.open(r.get_ini_file(),'r')
@@ -6968,7 +7177,7 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 
 	-- get 'Maximum vertical zoom' set at Preferences -> Editing behavior, which affects max track height set with 'View: Toggle track zoom to maximum height', introduced in build 6.76
 	local cont
-		if tonumber(r.GetAppVersion():match('(.+)/')) >= 6.76 then
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.76 then
 		local f = io.open(r.get_ini_file(),'r')
 		cont = f:read('*a')
 		f:close()
@@ -7017,7 +7226,7 @@ function Is_Ctrl_And_Shift()
 -- because only in this case to get the Arrange height a track max zoom is used in a temp proj tab
 local is_new_value,filename,sectID,cmdID,mode,resol,val = r.get_action_context()
 local named_ID = r.ReverseNamedCommandLookup(cmdID) -- convert numeric returned by get_action_context to alphanumeric listed in reaper-kb.ini
-local res_path = r.GetResourcePath()..r.GetResourcePath():match('[\\/]') -- path with separator
+local res_path = r.GetResourcePath()..r.GetResourcePath():match('[\\/]') -- path with separator; or or package.config:sub(1,1) to get the separator
 local s,R = ' ', string.rep
 	for line in io.lines(res_path..'reaper-kb.ini') do
 		if line:match('_'..named_ID) then -- in the shortcut data section command IDs are preceded with the underscore
@@ -7067,7 +7276,7 @@ local track, info = r.GetTrackFromPoint(x, y)
 
 	-- get 'Maximum vertical zoom' set at Preferences -> Editing behavior, which affects max track height set with 'View: Toggle track zoom to maximum height', introduced in build 6.76
 	local cont
-		if tonumber(r.GetAppVersion():match('(.+)/')) >= 6.76 then
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.76 then
 		local f = io.open(r.get_ini_file(),'r')
 		cont = f:read('*a')
 		f:close()
@@ -7690,7 +7899,10 @@ or start_offset_take >= 0 and len_item > len_sect - start_offset_take and len_se
 or start_offset_take < 0 and len_item + start_offset_take -- item is extended beyond its source at the start
 or len_sect >= len_item and len_item -- item is or isn't trimmed at either end
 
+-- https://forum.cockos.com/showpost.php?p=1817782&postcount=5
 r.TrackFX_SetNamedConfigParm(track, rs5k_idx, 'FILE0', file_name)
+r.TrackFX_SetNamedConfigParm(track, rs5k_idx, 'DONE', '')
+
 local set_inf = vol < 1 and r.TrackFX_SetParam(track, rs5k_idx, 2, 0) -- 'Gain for minimum velocity' aka 'Min vol' // set to -inf if item/take voulume < 0 so negative vol can be set
 r.TrackFX_SetParam(track, rs5k_idx, 0, vol) -- 'Volume' // Normalized type of function must not be used since take (and item) volume scale isn't linear
 -- no difference between the result of using functions below with or without Normalized
@@ -7877,7 +8089,7 @@ end
 
 
 function Split_Integer_To_RGB_And_Combine(color)
--- color is 24 bit value returned by GR_SelectColor() or r.ColorToNative(r, g, b)
+-- color is 24 bit integer returned by GR_SelectColor() or r.ColorToNative(r, g, b)
 
 local r, g, b = color & 0xFF, color >> 8 & 0xFF, color >> 16  -- color value returned by GR_SelectColor() is 24 bit little endian (3 clusters of 8 bits each, i.e. 3 ranges of 0 - 255), max decimal value is 16777215 (zero based), count starts on the right, so rgb direction is right to left // 'color & 0xFF' is masking rightmost 8 bits with 11111111, 'color >> 8 & 0xFF' is shifting middle 8 bits rightwards 8 places so they replace the original rightmost 8 bits and then masking, 'color >> 16' is shifting leftmost 8 bits 16 places rightwards so they relplace the original rightmost 8 bits, no masking is needed because at this point there're no set bits anymore beyond these 8 // same as r.ColorFromNative()
 
@@ -8480,7 +8692,7 @@ end
 function SWS_wnd_data(input)
 local data = input:gsub('%x%x', function(byte) return string.char(tonumber(byte, 16)) end)
 local left, top, right, bottom, state, dockermode = string.unpack('<iiiiII', data) -- state is a bitfield: 1=open, 2=docked
-return left, top, right, bottom, state&1 == 1, state&2 == 2, dockermode
+return left, top, right, bottom, state+0&1 == 1, state+0&2 == 2, dockermode -- +0 is accommodating for Lua 5.4 where implicit conversion of strings to integers doesn't work in bitwise operations
 end
 
 
@@ -9562,6 +9774,53 @@ local sws, js = r.APIExists('BR_Win32_FindWindowEx'), r.APIExists('JS_Window_Fin
 end
 
 
+-- to be used with r.ViewPrefs(int, '')
+-- source: cfillion_Open preferences page.lua
+-- the numbers are prone to change
+local pages = { -- prefpage_lastpage
+  ['General'                 ] = { 0x08b  ,
+  [  'Paths'                 ] =   0x1da  ,
+  [  'Keyboard, Multitouch'  ] =   0x0db },
+  ['Project'                 ] = { 0x0d4  ,
+  [  'Track, Send Defaults'  ] =   0x0b2  ,
+  [  'Media Item Defaults'   ] =   0x1dd },
+  ['Audio'                   ] = { 0x09c  ,
+  [  'Device'                ] =   (macos   and 0x1d9) or
+                                   (windows and 0x076) or
+                                                0x242,
+  [  'MIDI Devices'          ] =   0x099  ,
+  [  'Buffering'             ] =   0x0cb  ,
+  [  'Mute, Solo'            ] =   0x248  ,
+  [  'Playback'              ] =   0x088  ,
+  [  'Seeking'               ] =   0x205  ,
+  [  'Recording'             ] =   0x089  ,
+  [  'Loop Recording'        ] =   0x206  ,
+  [  'Rendering'             ] =   0x1de },
+  ['Appearance'              ] = { 0x0d5  ,
+  [  'Media'                 ] =   0x0ec  ,
+  [  'Peaks, Waveforms'      ] =   0x1cb  ,
+  [  'Fades, Crossfades'     ] =   0x20c  ,
+  [  'Track Control Panels'  ] =   0x1ca },
+  ['Editing Behavior'        ] = { 0x0ac  ,
+  [  'Envelope Display'      ] =   0x1bf  ,
+  [  'Automation'            ] =   0x207  ,
+  [  'Mouse'                 ] =   0x0d7  ,
+  [  'Mouse Modifiers'       ] =   0x1d2  ,
+  [  'MIDI Editor'           ] =   0x1ea },
+  ['Media'                   ] = { 0x08a  ,
+  [  'MIDI'                  ] =   0x101  ,
+  [  'Video, REX, Misc'      ] =   0x1c1 },
+  ['Plug-ins'                ] = { 0x09a  ,
+  [  'Compatibility'         ] =   0x1f9  ,
+  [  'VST'                   ] =   0x0d2  ,
+  [  'LV2'                   ] =   0x251  ,
+  [  'ReWire'                ] =   0x0d1  ,
+  [  'ReaScript'             ] =   0x203  ,
+  [  'ReaMote'               ] =   0x0e3 },
+  ['Control, OSC, web'       ] =   0x09d  ,
+  ['External Editors'        ] =   0x0a0  ,
+}
+
 
 --==================================== W I N D O W S   E N D ====================================
 
@@ -9577,6 +9836,7 @@ local named_ID = r.ReverseNamedCommandLookup(cmd_ID) -- to ensure more unique ex
 local path = r.GetResourcePath()
 local sep = r.GetResourcePath():match('[\\/]')
 local sep = r.GetOS():match('Win') and '\\' or '/'
+local sep = package.config:sub(1,1)
 
 
 function get_script_path() -- same as ({r.get_action_context()})[2]:match('.+[\\/]')
@@ -9610,8 +9870,8 @@ r.Undo_EndBlock(({r.get_action_context()})[2]:match('([^\\/_]+)%.%w+$'), -1)
 
 
 function Get_Script() -- by name elements, by command ID, by section, from reaper-kb.ini
-local sep = r.GetResourcePath():match('[\\/]')
-local res_path = r.GetResourcePath()..r.GetResourcePath():match('[\\/]') -- path with separator
+local sep = r.GetResourcePath():match('[\\/]') -- or package.config:sub(1,1)
+local res_path = r.GetResourcePath()..sep -- path with separator
 local cont
 local f = io.open(res_path..'reaper-kb.ini', 'r')
 	if f then -- if file available, just in case
@@ -9630,8 +9890,6 @@ local f = io.open(res_path..'reaper-kb.ini', 'r')
 		end
 	end
 end
-
-
 
 
 function set_script_instances_mode(path, sep, cmd_ID, scr_name, Esc)
@@ -9813,6 +10071,14 @@ return mess:match('Permission denied') and path..sep -- dir exists // this one i
 end
 
 
+function File_Exists(path)
+local f, mess = io.open(path, 'r')
+	if mess and mess:match('No such file or directory') then return 
+	else f:close() return true
+	end
+end
+
+
 -- Validate path supplied in the user settings
 function Validate_Folder_Path(path) -- returns empty string if path is empty and nil if it's not a string
 	if type(path) == 'string' then
@@ -9845,7 +10111,7 @@ Msg(str)
 	else -- dump to a file because ReaScript Console won't display the whole list
 	local dir = Dir_Exists(PATH_TO_DUMP_FILE)
 		if not dir then -- if dir is empty or otherwise invalid dump into the REAPER resource directory
-		dir = r.GetResourcePath()..r.GetResourcePath():match('[\\/]') end
+		dir = r.GetResourcePath()..r.GetResourcePath():match('[\\/]') end -- or package.config:sub(1,1) to get the separator
 	local f = io.open(dir..file_name, 'w')
 	f:write(str)
 --	local f_exists = io.input(dir..file_name) -- must come before close(); throws generic lua error message on failure hence unsuitable
@@ -9933,7 +10199,7 @@ end
 
 function Count_Files_In_Folder(path,ext)
 --r.EnumerateFiles(path..'..', 0) -- reset EnumerateFiles() cache by accessing a valid dummy dir, e.g. r.EnumerateFiles(r.GetResourcePath(), 0)
---r.EnumerateFiles(path, -1) -- -1 to clear the cache, or pass another directory (incalid one is suppprted), since 6.20
+--r.EnumerateFiles(path, -1) -- -1 to clear the cache, or pass another directory (invalid one is suppported), since 6.20
 -- https://forum.cockos.com/showthread.php?t=203235
 -- applies to r.EnumerateSubdirectories() as well
 local i = 0
@@ -10022,7 +10288,7 @@ end
 
 
 function delete_string_from_file(f_path, to_delete) -- to_delete arg is a string
--- f_path = r.GetResourcePath()..r.GetResourcePath():match('[\\/]')..'reaper-extstate.ini
+-- f_path = r.GetResourcePath()..r.GetResourcePath():match('[\\/]')..'reaper-extstate.ini -- or package.config:sub(1,1) to get the separator
 local f = io.open(f_path', 'r')
 local cont = f:read('*a')
 f:close()
@@ -10079,7 +10345,7 @@ local i = 0
 	i = i+1
 	until not ret
 	if retval then -- the project is open in a tab
-		if tonumber(r.GetAppVersion():match('(.+)/')) >= 6.43 then -- if can be retrieved via API regardless of being saved to the project file // API for getting title was added in 6.43
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.43 then -- or '[%d%.]+'; if can be retrieved via API regardless of being saved to the project file // API for getting title was added in 6.43
 		retval, proj_title = r.GetSetProjectInfo_String(retval, 'PROJECT_TITLE', '', false) -- is_set false // retval is a proj pointer, not an index
 		else -- retrieve from file which in theory may be different from the latest title in case the project hasn't been saved
 		proj_title = get_from_file(projpath)
@@ -10216,7 +10482,19 @@ end
 function frames2ms(frames_num) -- depends on round() function
 local fps, isdropFrame = r.TimeMap_curFrameRate(0)
 local ms_per_frame = 1000/fps
-return round(f*ms_per_frame)
+--return round(f*ms_per_frame)
+--return math.floor(frames_num*ms_per_frame+0.5)
+return frames_num*ms_per_frame
+end
+
+
+function frames2sec(frames_num)
+local frame_rate, isdropFrame = r.TimeMap_curFrameRate(0)
+return frames_num/frame_rate
+--[[ OR
+local sec_per_frame = 1/frame_rate
+return frames_num*sec_per_frame
+]]
 end
 
 
@@ -10373,7 +10651,10 @@ r.TrackCtl_SetToolTip('TEXT', x, y, true) -- topmost is true; if x and y are tak
 end
 
 
-function Error_Tooltip(text, caps, spaced, x2, y2) -- the tooltip sticks under the mouse within Arrange but quickly disappears over the TCP, to make it stick just a tad longer there it must be directly under the mouse
+function Error_Tooltip2(text, caps, spaced, x2, y2)
+-- the tooltip sticks under the mouse within Arrange 
+-- but quickly disappears over the TCP, to make it stick 
+-- just a tad longer there it must be directly under the mouse
 -- caps and spaced are booleans
 -- x2, y2 are integers to adjust tooltip position by
 local x, y = r.GetMousePosition()
@@ -10392,7 +10673,54 @@ until condition and r.time_precise()-time_init >= 0.7 or not condition
 end
 
 
-function Error_Tooltip2(text, format) -- format must be true
+
+function Error_Tooltip2(text, caps, spaced, x2, y2, want_color, want_blink)
+-- the tooltip sticks under the mouse within Arrange 
+-- but quickly disappears over the TCP, to make it stick 
+-- just a tad longer there it must be directly under the mouse
+-- caps and spaced are booleans
+-- x2, y2 are integers to adjust tooltip position by
+-- want_color is boolean to enable temporary ruler coloring to emphasize the error
+-- want_blink is boolean to enable ruler color blinking
+local x, y = r.GetMousePosition()
+local text = caps and text:upper() or text
+local text = spaced and text:gsub('.','%0 ') or text
+local x2, y2 = x2 and math.floor(x2) or 0, y2 and math.floor(y2) or 0
+r.TrackCtl_SetToolTip(text, x+x2, y+y2, true) -- topmost true
+-- r.TrackCtl_SetToolTip(text:upper(), x, y, true) -- topmost true
+-- r.TrackCtl_SetToolTip(text:upper():gsub('.','%0 '), x, y, true) -- spaced out // topmost true
+	if want_color then	
+	local color_init = r.GetThemeColor('col_tl_bg', 0)
+	local color = color_init ~= 255 and 255 or 65535 -- use red or yellow if red is taken
+		if want_blink then
+		    for i = 1, 100 do    
+				if i == 1 or i == 40 or i == 80 then
+				r.SetThemeColor('col_tl_bg', color, 0)
+				elseif i == 20 or i == 60 or i == 100 then
+				r.SetThemeColor('col_tl_bg', color_init, 0)
+				end
+				r.UpdateTimeline()
+			end		
+		else
+		r.SetThemeColor('col_tl_bg', color, 0) -- Timeline background
+			for i = 1, 200 do -- ensures that the warning color sticks for some time
+			-- without the function inside the loop the end (200) value must be much greater
+			r.UpdateTimeline()
+			end
+		r.SetThemeColor('col_tl_bg', color_init, 0) -- Timeline background // restore the orig color
+		r.UpdateTimeline() -- without this function the color will only be restored when user clicks within the Arrange
+		end
+	end
+--[[
+-- a time loop can be added to run until certain condition obtains, e.g.
+local time_init = r.time_precise()
+repeat
+until condition and r.time_precise()-time_init >= 0.7 or not condition
+]]
+end
+
+
+function Error_Tooltip3(text, format) -- format must be true
 -- the tooltip sticks under the mouse within Arrange but quickly disappears over the TCP, to make it stick just a tad longer there it must be directly under the mouse
 local x, y = r.GetMousePosition()
 local text = text and type(text) == 'string' and (format and text:upper():gsub('.','%0 ') or text) or 'not a valid "text" argument'
@@ -10536,7 +10864,7 @@ end
 
 -- REAPER version check
 function REAPER_Ver_Check(build) -- build is REAPER build number, the function must be followed by 'do return end'
-	if tonumber(r.GetAppVersion():match('(.+)/')) < build then -- or match('[%d%.]+')
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) < build then
 	local x,y = r.GetMousePosition()
 	local mess = '\n\n   THE SCRIPT REQUIRES\n\n  REAPER '..build..' AND ABOVE  \n\n '
 	local mess = mess:gsub('.','%0 ')
@@ -10548,7 +10876,7 @@ end
 
 function REAPER_Ver_Eval(some_build) -- some_build is a string/number
 local some_build = some_build and tonumber(some_build)
-local cur_build = tonumber(r.GetAppVersion():match('(.+)/'))
+local cur_build = tonumber(r.GetAppVersion():match('[%d%.]+'))
 	if some_build then -- return full table
 	return {current = cur_build, earlier = cur_build < some_build, later = cur_build > some_build, same = cur_build == some_build}
 	end
@@ -11003,7 +11331,7 @@ local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
 local val = cont:match('mousewheelmode=(%d+)\n')
-local all_faders, TCP_faders = val&2 == 2, val&4 == 4
+local all_faders, TCP_faders = val+0&2 == 2, val+0&4 == 4 -- +0 is accommodating for Lua 5.4 where implicit conversion of strings to integers doesn't work in bitwise operations
 return all_faders, TCP_faders
 end
 
