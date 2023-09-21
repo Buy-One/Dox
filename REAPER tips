@@ -2032,6 +2032,8 @@ Use SWS 'Reposition selected items..' which acts in one go, all must be selected
 
 ===================================================================================
 
+-- RS5k
+
 About the new TrackFX_SetNamedConfigParm(), TrackFX_GetNamedConfigParm(), TakeFX_SetNamedConfigParm(), and TakeFX_GetNamedConfigParm() APIs:
 
 These are designed to allow setting/getting plug-in specific parameters that are not exposed as normal VST-style parameters. The first use of this is for ReaSamplomatic5k, to allow getting/setting the list of sample files.
@@ -2057,7 +2059,7 @@ reaper.TrackFX_SetNamedConfigParm(track,fx, "DONE","")
 If other REAPER plug-ins have parameters that you'd like having script access to, let me know. I suppose having this for JSFX filename-parameters would be handy too.
 
 https://forum.cockos.com/showthread.php?p=1817782#post1817782
-
+https://forum.cockos.com/showpost.php?p=1817782&postcount=5
 
 ===================================================================================
 
@@ -2836,6 +2838,9 @@ To preview use Read, Trim/Read or Touch.
 
 https://forum.cockos.com/showthread.php?t=188959
 
+https://forum.cockos.com/showthread.php?t=131531#35
+https://forum.cockos.com/showthread.php?t=131531&page=3#85
+
 https://forum.cockos.com/showthread.php?t=132815
 
 https://forum.cockos.com/showthread.php?t=92825
@@ -2880,6 +2885,48 @@ instances  	1   2   3   4   5   6   7   8   9   10   11   12
 remember to check Remove played notes from FX chain on all RS5k instances 
 
 but the last in the chain, the one with 100% probability
+
+
+RR formula:
+
+probability per instance in % = 100 / (number or RS5k instances - instance number + 1)
+
+https://forum.cockos.com/showthread.php?t=131531&page=3#96
+
+-----------------------------------------------------------------------
+
+Round-robin with multiple velocities
+
+
+If you have 8 velocities and 6 hits per velocity, loading 48 samples into one instance of RS5k 
+
+is still the wrong way to do it. RS5k will take those 48 samples and use them as 48 different velocities. 
+
+Try playing 6 consecutive hits at the same velocity and it will always play the same sample.
+
+It's a bit counter intuitive but you need to take those 48 samples and divide them in 6 groups made of 8 samples 
+
+of different velocities. Something like this:
+
+Group 1: Hardest 1, Hard 1, regular 1,Soft 1, softest 1, ghost 1... (8 samples per group)
+
+Group 2: Hardest 2, Hard 2, regular 2,Soft 2, softest 2, ghost 2...
+
+...
+
+Group 6: Hardest 6, Hard 6, regular 6,Soft 6, softest 6, ghost 6...
+
+Then you need to load 6 instances of RS5k on the same track, one for every group, and activate the round robin button 
+
+in every instance of the plugin. Then set the probability from 1/6 in the first instance, then 1/5 and so on until 1 
+
+in the final instance of RS5K in the track. Also, every instance of RS5k has to have the "remove played notes from midi stream" ON.
+
+
+https://www.reddit.com/r/Reaper/comments/hxzpan/comment/fzg2x5s/?utm_source=share&utm_medium=web2x&context=3
+
+
+Also see chapter 17.12 of the User Guide
 
 ==============================================================
 
@@ -3570,7 +3617,7 @@ https://old.reddit.com/r/Reaper/comments/11s0urb/project_template_specific_theme
 
 ==============================================================
 
--- Storing record mode between projects and sesstion
+-- Storing record mode between projects and session
 
 Record mode toggle states aren't stored in reaper.exe file or any .ini files
 
@@ -3754,9 +3801,68 @@ https://www.youtube.com/watch?v=VwgvBtAZLZU
 
 ==============================================================
 
+-- Obscure file formats
 
 
+REAPER can read .sd2 files! If the file does not already have a filename extension, add .sd2 (or .raw or .pcm), 
 
+and drag them into REAPER. You should get a popup window with some more information.
+
+Because .sd2 files do not natively include metadata about the bit depth or sample rate, REAPER will guess at those 
+
+parameters when importing. If the file doesn't sound right, open the source file properties for information about how 
+
+to change the decoding parameters.
+
+
+https://forum.cockos.com/showthread.php?t=281830#14
+
+==============================================================
+
+-- Preserve sample length at different pitches in RS5k
+
+
+To play RS5K Samples at different pitches while preserving sample length, select Mode: Sample, and place the ReaVoice vst after RS5K.
+
+You may want to adjust settings on RS5K such as Max Voices: 1, and selecting if you want it to Obey note-offs, Loop, or Xfade.
+
+You can select the number of voices you want to play simultaneously in ReaVoice.
+
+There will likely be a strange, slight delay before ReaVoice starts to generate the intended result. I suggest resampling/recording 
+
+the output until this feature is improved and integrated into RS5K so that you can play it in real time like Akai, Ableton, or Maschine samplers.
+
+
+https://forum.cockos.com/showthread.php?t=184952#29
+
+==============================================================
+
+
+-- Moving marker / region start/end to the edit cursor
+
+1. Set the ruler time unit to Minutes:Seconds OR Seconds
+2. Open 'Region/Marker Manager'
+3. Place the Edit cursor at the desired location
+4. Double click the time readout in the Transport
+5. From the 'Jump to time/marker/region' copy the time value displayed in the 'Jump to' field
+which is the Edit custor current time
+6. Double click Start or End field of the relevant marker/region in the 'Region/Marker Manager'
+5. Paste the value copied in step 5
+7. Hit enter to confirm.
+
+To move those to an item start, from Media Items Ptoperties dialogue extract item start time value
+and follow steps 6-7 from above
+
+
+==============================================================
+
+-- Ramapping Virtual MIDI keyboard note computer keyboard keys associations
+
+https://forums.cockos.com/showthread.php?t=11905#12
+https://forum.cockos.com/showthread.php?t=158271#10
+
+
+==============================================================
 
 
 
