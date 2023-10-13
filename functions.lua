@@ -331,7 +331,7 @@ local input = gfx.showmenu(menu) -- menu string
 local quit = old and gfx.quit()
 
 
-function Reload_Menu_at_Same_Pos1(menu)
+function Reload_Menu_at_Same_Pos1(menu, OPTION)
 -- only useful for looking up the result of a toggle action, below see a more practical example
 ::RELOAD::
 local x, y = r.GetMousePosition()
@@ -342,8 +342,15 @@ local x, y = r.GetMousePosition()
 	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82 -- or '[%d%.]+'
 	local init = old and gfx.init('', 0, 0)
 	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
-	gfx.x = gfx.mouse_x
-	gfx.y = gfx.mouse_y
+	
+		-- ensure that if OPTION is enabled the menu opens every time at the same spot
+		if OPTION and not coord_t then -- OPTION is the one which enables menu reload
+		coord_t = {x = gfx.mouse_x, y = gfx.mouse_y}
+		elseif not OPTION then
+		coord_t = nil
+		end
+	gfx.x = coord_t and coord_t.x or gfx.mouse_x
+	gfx.y = coord_t and coord_t.y or gfx.mouse_y
 	local retval = gfx.showmenu(menu) -- menu string
 		if retval > 0 then
 		goto RELOAD
@@ -352,7 +359,7 @@ local x, y = r.GetMousePosition()
 end
 
 ::RELOAD::
-function Reload_Menu_at_Same_Pos2(menu) -- still doesn't allow keeping the menu open after clicking away
+function Reload_Menu_at_Same_Pos2(menu, OPTION) -- still doesn't allow keeping the menu open after clicking away
 local x, y = r.GetMousePosition()
 	if x+0 <= 100 then -- 100 px within the screen left edge
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
@@ -361,8 +368,15 @@ local x, y = r.GetMousePosition()
 	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82 -- or '[%d%.]+'
 	local init = old and gfx.init('', 0, 0)
 	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
-	gfx.x = gfx.mouse_x
-	gfx.y = gfx.mouse_y
+	
+		-- ensure that if OPTION is enabled the menu opens every time at the same spot
+		if OPTION and not coord_t then -- OPTION is the one which enables menu reload
+		coord_t = {x = gfx.mouse_x, y = gfx.mouse_y}
+		elseif not OPTION then
+		coord_t = nil
+		end
+	gfx.x = coord_t and coord_t.x or gfx.mouse_x
+	gfx.y = coord_t and coord_t.y or gfx.mouse_y
 	return gfx.showmenu(menu) -- menu string
 	end
 end
@@ -598,6 +612,61 @@ r.MarkTrackItemsDirty(tr, item)
 end
 
 
+function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, pass, want_chain) 
+-- Due to REAPER bug https://forum.cockos.com/showthread.php?t=281778
+-- undo point for all RS5k instances is only created with open FX chain window
+-- to create an undo point for a single instance it suffices to open it in a floating window
+-- the function must be run in two passes within the Undo blocks
+-- 1st pass before the action for which undo point needs to be created, 2nd pass after it
+-- if flag -1 doesn't work in Undo block flag 2 must be used
+-- ARGS:
+-- targ_fx_idx is the single target fx to be affected by the script and to be opened in the floating window, must only be valid if want_chain is false, to be used in both function passes;
+-- targ_fx_floats isn't needed in the 1st pass, only needed in the second if want_chain is false;
+-- last_sel_idx and last_sel_fx_floats in the 1st pass aren't needed, only needed in the 2nd pass if want_chain is true;
+-- pass is integer, 1 or 2;
+-- want_chain is boolean if the entire chain has to be opened because multiple RS5k instances are affected, in this case relies on GetObjChunk() function
+
+	if pass == 1 then
+	local chain_vis = r.TrackFX_GetChainVisible(tr) ~= -1
+	local targ_fx_floats = r.TrackFX_GetFloatingWindow(tr, targ_fx_idx)
+		if (want_chain and not chain_vis or not want_chain and not chain_vis and targ_fx_idx and not targ_fx_floats)
+		then -- open
+		local last_sel_idx = 0
+			if want_chain then
+			local ret, chunk = GetObjChunk(tr)		
+				if ret then -- if chunk was successfully retrieved
+					for line in tr_chunk:gmatch('[^\n\r]+') do
+						if line:match('LASTSEL') then last_sel_idx = line:match('%d+') break end -- extract the index of fx selected in fx chain so that if the chain is closed it could be opened with this fx visible to make REAPER register change in the undo history
+					end
+				end
+			end
+		local last_sel_fx_floats = want_chain and r.TrackFX_GetFloatingWindow(tr, last_sel_idx) -- if last selected fx window floats while the fx chain is closed, after toggling open-close the fx chain below the floating window will be closed because the function will use its index to keep it selected in the chain, so find if it floats to re-float it after toggling the fx chain open-close
+		local open = want_chain and r.TrackFX_SetOpen(tr, last_sel_idx, true) -- open arg true - open fx chain with last selected fx shown
+		or fx_idx and not targ_fx_floats and r.TrackFX_Show(tr, fx_idx, 3) -- or open target fx in a floating window, flag 3
+		return last_sel_idx, last_sel_fx_floats, r.TrackFX_GetFloatingWindow(tr, fx_idx)
+		end
+	elseif pass == 2 then -- close
+	local clse = last_sel_idx and r.TrackFX_SetOpen(tr, last_sel_idx, false) -- close fx chain if was closed originally, open arg is false
+	or fx_idx and targ_fx_floats and r.TrackFX_Show(tr, fx_idx, 2) -- or close the target fx floating window if was closed originally, flag 2 close floating window
+	local re_float = last_sel_fx_floats and r.TrackFX_Show(tr, last_sel_idx, 3) -- show in a floating window, flag 3, re-float fx last selected in the fx chain if it was floating prior to toggling the fx chain open-close, because it will end up being closed as a result
+	end
+
+end
+-- USE (WORKING WITH A SINGLE RS5k INSTANCE):
+-- Undo_BeginBlock()
+-- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, false) -- targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain false
+-- DO STUFF
+-- Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- last_sel_idx, last_sel_fx_floats are nil, pass is 2, want_chain false
+-- Undo_EndBlock()
+
+-- (WORKING WITH MULTIPLE RS5k INSTANCES):
+-- Undo_BeginBlock()
+-- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, true) -- targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain true
+-- DO STUFF
+-- Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- targ_fx_idx, targ_fx_floats and nil, last_sel_idx is integer, last_sel_fx_floats is boolean, pass is 2, want_chain true
+-- Undo_EndBlock()
+
+
 function GetUndoSettings()
 -- Checking settings at Preferences -> General -> Undo settings -> Include selection:
 -- thanks to Mespotine https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
@@ -684,6 +753,8 @@ local dec = tonumber(dec) and 10^math.floor(dec) -- preventing non-numbers and d
 	elseif not num then return 'Error: missing arguments' end
 return math.floor(num*dec+0.5)/dec
 end
+-- OR simply
+-- math.floor(float*(10^5)+0.5)/10^5 -- truncating down to 5 (10^5) dec places
 
 
 math.randomseed(math.floor(r.time_precise()*1000)) -- seems to facilitate greater randomization at fast rate thanks to milliseconds count; math.floor() because the seeding number must be integer
@@ -1246,8 +1317,27 @@ return loop_run -- if nothing is found the loop doesn't start, if does start and
 end
 
 
-function Convert_Text_To_Menu(text, max_line_len) -- max_line_len is integer, determines length of line as a menu item, 70 seems optimal
+function Convert_Text_To_Menu(text, max_line_len, indent) 
+-- max_line_len is integer, determines length of line as a menu item, 70 seems optimal;
+-- indent is both boolean and integer to indent all lines following the first paragraph line
+-- which is useful when the first line starts with a number in the list to look like so
+--[[
+1. Lorem ipsum dolor sit amet, consectetur adipiscing elit, 
+   sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. 
+   Ut enim ad minim veniam.
+]]
+-- to force new lines in such paragraph while keeping the identation the new line 
+-- must be indented in the source text, e.g.
+--[[
+1. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. 
+     Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
+]]
+-- additional manual tweaking of the source text may be required,
+-- as integer 'indent' arg determines the length of the indent made of empty spaces
+-- 5 seems optimal;
+-- if ommitted no indentation is created;
 -- relies on multibyte_str_len() function (see below) to accurately count UTF-8 characters; can be removed if the text is sure to only contain basic Latin, in which case the line 'multibyte_str_len(text_clean)' can be replaced with '#text_clean'
+
 
 local text = text:gsub('|', 'ㅣ') -- replace pipe, if any, with Hangul character for /i/ since its a menu special character
 local text = text:gsub('&', '+') -- convert ampersand to + because it's a menu special character used as a quick access shortuct hence not displayed in the menu
@@ -1258,7 +1348,7 @@ local t = {}
 		t[#t+1] = w end
 	end
 
-local text, menu = '',''
+local text, menu, indent = '','', indent and (' '):rep(indent) or ''
 	for k, w in ipairs(t) do
 	local text_clean = (text..w):gsub('|','') -- doesn't seem to make a difference with or without the pipe
 		if multibyte_str_len(text_clean) > max_line_len or text:match('(.+)|') then -- dump text var to menu var and reset text, if not dumped immediately when the text var ends with line break then when text var will exceed the length limit containing a user line break, hanging words will appear after such line break because they will now be included in the menu var and next time length of text var will be evaluated without them, e.g.:
@@ -1268,7 +1358,7 @@ local text, menu = '',''
 		-- | always
 		-- | free from repetition, injected humor
 		-- whereas 'always' has to be grouped with 'free from repetition, injected humor'
-		local pipe = text:match('(.+)|') and '' or '|' -- when the above condition is true because text ends with pipe the pipe is user's line break so no need to add another one, otherwise when condition is true because the line length exceeds the limit pipe is added to delimit lines as menu items
+		local pipe = text:match('(.+)|') and '' or '|'..indent -- when the above condition is true because text ends with pipe the pipe is user's line break so no need to add another one, otherwise when condition is true because the line length exceeds the limit pipe is added to delimit lines as menu items
 		text = #pipe == 0 and text:gsub('[!#<>]',' %0') or text -- make sure that menu special characters at the beginning of a new line (menu item) are ignored prefacing them with space; when string stored in the text var has pipe in the end, if ther're any menu special characters in the user text, they will follow the pipe due to the way user text is split into words at the beginning of the function, so if there're any specal characters placed at the beginning of a new line in the user text they will necessarily be found in the text var right next to the new line character converted at the beginning of the function into pipe to conform to the menu syntax and such new line character is attached to the preceding line
 		menu = menu..text..pipe -- between menu and text pipe isn't needed because it's added after the text and next time will be at the end of the menu
 		text = ''
@@ -1811,6 +1901,23 @@ local dock_pos = r.DockGetPosition(dockermode_idx) -- -1=not found, 0=bottom, 1=
 end
 
 
+function Force_MIDI_Undo_Point1(take)
+-- a trick shared by juliansader to force MIDI API to register undo point; Undo_OnStateChange() works too but with native actions it may create extra undo points, therefore Undo_Begin/EndBlock() functions must stay
+-- https://forum.cockos.com/showpost.php?p=1925555
+local item = take and r.GetMediaItemTake_Item(take) or r.GetMediaItemTake_Item(r.MIDIEditor_GetTake(r.MIDIEditor_GetActive()))
+--r.SetMediaItemSelected(item, false)
+--r.SetMediaItemSelected(item, true)
+local is_item_sel = r.IsMediaItemSelected(item)
+r.SetMediaItemSelected(item, not is_item_sel)
+r.SetMediaItemSelected(item, is_item_sel)
+end
+
+function Force_MIDI_Undo_Point2(take) -- may or may not work, the above version is more reliable
+local item = r.GetMediaItemTake_Item(take)
+local tr = r.GetMediaItemTrack(item)
+r.MarkTrackItemsDirty(tr, item)
+end
+
 
 function Lane_Type_To_Event_Data(ME) -- relies on Error_Tooltip() for error message
 -- further implementation see in Insert or edit MIDI event at edit cursor.lua
@@ -1917,6 +2024,19 @@ return r.MIDI_EnumSelNotes(take, -1) ~= -1 -- OR >= 0 OR > -1 // 1st selected no
 end
 
 
+-- MUCH SIMPLER r.MIDI_EnumSelNotes(take, -1) == 0
+function selected_notes_exist(ME, take)
+local ME = not ME and r.MIDIEditor_GetActive() or ME
+local take = not take and r.MIDIEditor_GetTake(ME) or take
+local noteidx = -1 -- since MIDI_EnumSelNotes returns the index of the next selected MIDI note, the first of which would be 0
+	repeat
+	noteidx = r.MIDI_EnumSelNotes(take, noteidx)
+		if noteidx > 0 then break end -- at least 1 sel note
+	until noteidx == -1 -- -1 if there are no more or no selected events
+end
+
+
+
 function CC_Evts_Selected(ME, take) -- in current MIDI channel but across all CC lanes
 local ME = not ME and r.MIDIEditor_GetActive() or ME
 local take = not take and r.MIDIEditor_GetTake(ME) or take
@@ -1966,7 +2086,7 @@ local sel_note_cnt = 0
 local noteidx = -1 -- since MIDI_EnumSelNotes returns the index of the next selected MIDI note, the first of which would be 0
 	repeat
 	noteidx = r.MIDI_EnumSelNotes(take, noteidx)
-	sel_note_cnt = noteidx > -1 and sel_note_cnt+1 or sel_note_cnt
+	sel_note_cnt = noteidx > -1 and sel_note_cnt+1 or sel_note_cnt	
 	until noteidx == -1 -- -1 if there are no more or no selected events
 return sel_note_cnt
 end
@@ -2022,17 +2142,6 @@ return sel_evt_cnt
 
 end
 
-
-
-function selected_notes_exist(ME, take)
-local ME = not ME and r.MIDIEditor_GetActive() or ME
-local take = not take and r.MIDIEditor_GetTake(ME) or take
-local noteidx = -1 -- since MIDI_EnumSelNotes returns the index of the next selected MIDI note, the first of which would be 0
-	repeat
-	noteidx = r.MIDI_EnumSelNotes(take, noteidx)
-		if noteidx > 0 then break end -- at least 1 sel note
-	until noteidx == -1 -- -1 if there are no more or no selected events
-end
 
 
 function find_first_next_note(take, start_pos) -- the first which starts later than the given one (start_pos) which allows ignoring chord notes in case they start simultaneously
@@ -2331,7 +2440,7 @@ function Get_Currently_Active_Chan_And_Filter_State1(ME, take)
 -- returns number of currently active channel is channel filter is enabled or multiple active channels if multichannel mode is enabled
 -- if filter isn't enabled and no multichannel mode, the returned table will be empty and the filter state will be nil
 -- MIDI Ed actions toggle state can only be evaluated when ME is open
-local is_open = ME or r.MIDIEditor_GetActive() -- check if MIDI Editor is open
+local is_open = ME or r.MIDIEditor_GetActive() -- check if MIDI Editor is open // USE FUNCTION MIDIEditor_GetActiveAndVisible() instead because if MIDI Editor is docked and the docker is closed it remains active without being visible
 -- OR
 -- local is_open = ME or r.GetToggleCommandStateEx(32060, 40218) > -1
 local open = not is_open and r.Main_OnCommand(40153, 0) -- Item: Open in built-in MIDI editor (set default behavior in preferences)
@@ -2366,7 +2475,7 @@ end
 function Get_Currently_Active_Chan_And_Filter_State2(obj, ME) -- via chunk, ME is MIDI Editor pointer
 -- returns channel filter status and the channels currently selected in the filter regardless of its being enabled in 1-BASED COUNT
 -- for a single active channel when filter is enabled see Get_Ch_Selected_In_Ch_Filter() or Ch_Filter_Enabled1()
--- filter enabled status is true when either a single channel is active, multichannel mode is active or 'Show only events that pass the filter' option is checked in Event filter dialogue and can be true when 'All channels' option is active in the menu as well;
+-- filter enabled status is true when either a single channel is active, multichannel mode is active or 'Show only events that pass the filter' option is checked in the Event filter dialogue and can be true when 'All channels' option is active in the menu as well;
 -- when the table contains a single channel this means this channel is selected in the filter drop-down menu, in this case the filter status indicates whether this channel is exclusively displayed;
 -- when the table contains several channels the filter state is always true;
 -- the table's being empty means that ALL channels are active, i.e. 'All channels' option is selected in the filter drop-down menu while filter isn't enabled, filter_state will be false, in this case last active channel will be returned;
@@ -3029,6 +3138,33 @@ local del = events_move and Store_Insert_Notes_OR_Evts(ME, take, t, events_move,
 if #notes_t > 0 and notes then Store_Insert_Notes_OR_Evts(ME, take, notes_t, notes_move, ch-1, false) end -- events false // insert
 if #evts_t > 0 and events then Store_Insert_Notes_OR_Evts(ME, take, evts_t, events_move, ch-1, true) end -- events true // insert
 ]]
+
+
+function Get_MIDI_Ed_Grid(take)
+
+local grid_QN, swing_val, note_len = r.MIDI_GetGrid(take) -- in QN, quarter note is 1, 1/8th is 0.5 and so on. Swing is between -1 and 1 (the API doc is inaccurate in saying 0 and 1), when swing is negative the grid is shifted leftwards. Note length is 0 if it follows the grid size.; triplet is 1.5 of the straight division, 1/4T = 1/4 / 1.5 = 1 / 1.5; dotted is 1.5 time straight, 1/4D = 1/4 * 1.5 = 1 * 1.5; swing doesn't affect grid_QN value because it's returned as swing_val
+local t = {['Grid'] = 0, ['1'] = 4, -- Grid is used in note_len evaluation
+['1/2'] = 2, ['1/2T'] = 2/1.5, ['1/2D'] = 2*1.5,
+['1/4'] = 1, ['1/4T'] = 1/1.5, ['1/4D'] = 1.5, 
+['1/8'] = 1/2, ['1/8T'] = 1/2/1.5, ['1/8D'] = 1/2*1.5,
+['1/16'] = 1/4, ['1/16T'] = 1/4/1.5, ['1/16D'] = 1/4*1.5,
+['1/32'] = 1/8, ['1/32T'] = 1/8/1.5, ['1/32D'] = 1/8*1.5,
+['1/64'] = 1/16, ['1/64T'] = 1/16/1.5, ['1/64D'] = 1/16*1.5,
+['1/128'] = 1/32, ['1/128T'] = 1/32/1.5, ['1/128D'] = 1/32*1.5}
+
+local grid, swing, note
+
+	for div, val in pairs(t) do
+		if grid_QN == val then grid, swing = div, swing_val*100 break end -- converting the swing value to percentage 
+	end
+	
+	for div, val in pairs(t) do
+		if note_len == val then note = div break end
+	end
+
+return 	grid, swing, note
+
+end
 
 
 --============================= M I D I  E N D =============================
@@ -6499,6 +6635,62 @@ local supported = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.37 -- since 
 		end
 	end
 end
+
+
+
+function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, pass, want_chain) 
+-- Due to REAPER bug https://forum.cockos.com/showthread.php?t=281778
+-- undo point for all RS5k instances is only created with open FX chain window
+-- to create an undo point for a single instance it suffices to open it in a floating window
+-- the function must be run in two passes within the Undo blocks
+-- 1st pass before the action for which undo point needs to be created, 2nd pass after it
+-- if flag -1 doesn't work in Undo block flag 2 must be used
+-- ARGS:
+-- targ_fx_idx is the single target fx to be affected by the script and to be opened in the floating window, must only be valid if want_chain is false, to be used in both function passes;
+-- targ_fx_floats isn't needed in the 1st pass, only needed in the second if want_chain is false;
+-- last_sel_idx and last_sel_fx_floats in the 1st pass aren't needed, only needed in the 2nd pass if want_chain is true;
+-- pass is integer, 1 or 2;
+-- want_chain is boolean if the entire chain has to be opened because multiple RS5k instances are affected, in this case relies on GetObjChunk() function
+
+	if pass == 1 then
+	local chain_vis = r.TrackFX_GetChainVisible(tr) ~= -1
+	local targ_fx_floats = r.TrackFX_GetFloatingWindow(tr, targ_fx_idx)
+		if (want_chain and not chain_vis or not want_chain and not chain_vis and targ_fx_idx and not targ_fx_floats)
+		then -- open
+		local last_sel_idx = 0
+			if want_chain then
+			local ret, chunk = GetObjChunk(tr)		
+				if ret then -- if chunk was successfully retrieved
+					for line in tr_chunk:gmatch('[^\n\r]+') do
+						if line:match('LASTSEL') then last_sel_idx = line:match('%d+') break end -- extract the index of fx selected in fx chain so that if the chain is closed it could be opened with this fx visible to make REAPER register change in the undo history
+					end
+				end
+			end
+		local last_sel_fx_floats = want_chain and r.TrackFX_GetFloatingWindow(tr, last_sel_idx) -- if last selected fx window floats while the fx chain is closed, after toggling open-close the fx chain below the floating window will be closed because the function will use its index to keep it selected in the chain, so find if it floats to re-float it after toggling the fx chain open-close
+		local open = want_chain and r.TrackFX_SetOpen(tr, last_sel_idx, true) -- open arg true - open fx chain with last selected fx shown 
+		or fx_idx and not targ_fx_floats and r.TrackFX_Show(tr, fx_idx, 3) -- or open target fx in a floating window, flag 3
+		return last_sel_idx, last_sel_fx_floats, r.TrackFX_GetFloatingWindow(tr, fx_idx)
+		end
+	elseif pass == 2 then -- close
+	local clse = last_sel_idx and r.TrackFX_SetOpen(tr, last_sel_idx, false) -- close fx chain if was closed originally, open arg is false
+	or fx_idx and targ_fx_floats and r.TrackFX_Show(tr, fx_idx, 2) -- or close the target fx floating window if was closed originally, flag 2 close floating window
+	local re_float = last_sel_fx_floats and r.TrackFX_Show(tr, last_sel_idx, 3) -- show in a floating window, flag 3, re-float fx last selected in the fx chain if it was floating prior to toggling the fx chain open-close, because it will end up being closed as a result
+	end
+
+end
+-- USE (WORKING WITH A SINGLE RS5k INSTANCE):
+-- Undo_BeginBlock()
+-- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, false) -- targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain false
+-- DO STUFF
+-- Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- last_sel_idx, last_sel_fx_floats are nil, pass is 2, want_chain false
+-- Undo_EndBlock('',2) -- the flag MUST be 2 (UNDO_STATE_FX), NOT -1 which works only once if the plugin UI is originally open
+
+-- (WORKING WITH MULTIPLE RS5k INSTANCES):
+-- Undo_BeginBlock()
+-- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, true) -- targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain true
+-- DO STUFF
+-- Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- targ_fx_idx, targ_fx_floats and nil, last_sel_idx is integer, last_sel_fx_floats is boolean, pass is 2, want_chain true
+-- Undo_EndBlock('',2) -- the flag MUST be 2 (UNDO_STATE_FX), NOT -1 which works only once if the plugin UI is originally open
 
 
 --================================================  F X  E N D  ==============================================
@@ -10569,7 +10761,7 @@ local Track_Vol_dB = 20*math.log(val, 10) -- same as 20*math.log10(val) but math
 local Track_Vol_val = 10^(dB_val/20)
 
 
-function Calc_New_Vol_Value(old_val, add_val) -- add_val is positive or negative
+function Calc_New_Vol_Value(old_val, add_val) -- add_val is positive or negative in dB
 local old_val_dB = 20*math.log(old_val, 10)
 local new_val_dB = old_val_dB + add_val
 return 10^(new_val_dB/20)
