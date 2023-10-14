@@ -10807,6 +10807,297 @@ local v = math.log(x)*8.6858896380650365530225783783321
 end
 
 
+-- SEE OPTIMIZED VERSION BELOW
+function Adjust_Velocity_By_dB1(vel, dB) -- relevant to ReaPlugs first of all
+-- vel is current velocity
+-- dB is negative or positive value in decibels to increase/reduce the current value by
+
+-- ReaPlugs velocity to amplitude:
+-- Linear interpolation of gain (so if mapping 0..127 to -inf .. +0dB, 63 would be around -6dB (0.5), 32 would be around -12dB (0.25) etc. https://www.askjf.com/index.php?q=6883s
+-- confirmed with ReaSynth and 'Loudness Meter' JSFX
+-- thus the entire velocity range only covers dynamic range of 42 dB from -42 to 0 dB (7 velocity ranges 6 dB each)
+
+local vel = vel < 1  and 1 or vel > 127 and 127 or vel
+
+--[-[
+-- find the lower limit of the range the current velocity value belongs to
+local lower_limit, upper_limit
+	for i = 1, 7 do -- 7 since it's the max exponent in the range of 1 - 128
+	lower_limit, upper_limit = 2^i, 2^(i+1)
+		if vel < upper_limit and vel >= lower_limit then break 
+		end
+	end
+--]]
+--[[ WORKS
+local upper_limit, lower_limit = 128 -- 127 doesn't work in subtruction from lower limit values
+	for i = 1, 7 do -- 7 since it's the max exponent in the range of 1 - 128 which is the initial upper limit value
+	lower_limit = upper_limit/2 -- divide each next lower limit by 2 to get the next -6 dB range which is getting shorter as the level becomes lower until the range becomes shorter than the caclulated value
+		if vel < upper_limit and vel >= lower_limit then break
+		end
+	upper_limit = lower_limit
+	end
+--]]
+	
+-- calculate dB per velocity unit in the velocity range the current velocity value belongs to 
+local dB_per_vel_unit = 6/lower_limit -- 6 because each range corresponds to 6 dB; the lover limit value is equal to the total velocity units in the range, e.g. 2 -> 4 = 2, 4 -> 8 = 4, 8 -> 16 = 8, 16 -> 32 = 16, 32 -> 64 = 32, 64 -> 127 = 63 (almost 64)
+
+-- calculate dB value of the current velocity within the given velocity range (from the lower limit) if dB arg is negative or 0 and from the upper limit if dB arg is positive (neither of which is an absolute value above vel 0) to then be able to find out how much of the dB value is already covered within the current velocity range
+local current_dB = (dB <= 0 and vel - lower_limit or lower_limit*2 - vel) * dB_per_vel_unit
+
+local vel_change = 0
+
+	if dB < 0 and dB+current_dB < 0 -- as positive value dB is greater than the current dB which means that subtraction will cross into the previous 6 dB velocity range(s) with different dB_per_vel_unit value(s)
+	then
+	-- calculate the number of velocity ranges the difference between dB and current dB spans
+	local diff = math.abs(dB+current_dB) -- part which crosses into another range with different dB_per_vel_unit value
+	local dB_to_vel = 0
+		if diff <= 6 then -- only spans one other range
+	 -- dB_to_vel = diff/(6/(lower_limit/2))
+     -- OR
+		dB_to_vel = diff/(dB_per_vel_unit*2) -- because in each previous range dB_per_vel_unit value is doubled, e.g. 6/32 = 0.1875, 6/16 = 0.375, 6/8 = 0.75
+		else -- spans several ranges
+		local int, fract = math.modf(diff/6) -- 6 because each velocity range equals 6 dB	
+		local new_lower_limit = lower_limit
+			for i = 1, int do -- traverse full ranges if int is not 0
+			new_lower_limit = new_lower_limit/2
+		--	dB_to_vel = dB_to_vel + (diff-(6*i))/(6/new_lower_limit) -- WORKS, too complicated and not completely sure why it works
+		--	OR
+		--	dB_to_vel = dB_to_vel + 6/(6/new_lower_limit) -- WORKS
+		--	OR
+			dB_to_vel = dB_to_vel + new_lower_limit -- ALTERNATIVE TO THE LINES ABOVE, adding full velocity ranges because they match the lower limit value
+			end
+		-- account for the range the fractional part crosses into
+	--	dB_to_vel = dB_to_vel + fract/(6/(new_lower_limit/2)) -- if fract is 0, dB_to_vel value won't change // WORKS
+	--	OR
+		dB_to_vel = dB_to_vel + fract/(dB_per_vel_unit*2^(int+1)) -- multiply dB_per_vel_unit by 2 risen to the power equal to the number of full ranges plus 1 to account for the one the fractional part crosses into because in each prev range dB_per_vel_unit value is doubled, e.g. 6/32 = 0.1875, 6/16 = 0.375, 6/8 = 0.75; if fract is 0, dB_to_vel value won't change
+		end
+	vel_change = ((vel - lower_limit) + dB_to_vel)*-1 -- add the calculated velocity value to the difference between current vel value and the lower limit to then be subtracted from the current velocity value to culculate the target velocity after dB reduction; *-1 because dB_to_vel was calculated as a positive number whereas this value must be subtracted 
+	------------------------------------------
+	elseif dB > 0 and dB > current_dB -- dB is greater than the distance between current value and the upper limit represented by lower_limit*2 or upper_limit which means that addition will cross into the next 6 dB velocity range(s) with different dB_per_vel_unit value(s)
+	then
+	local diff = dB-current_dB -- part which crosses into another range with different dB_per_vel_unit value
+	local dB_to_vel = 0
+		if diff <= 6 then -- only spans one other range
+		dB_to_vel = diff/(dB_per_vel_unit/2) -- because in each next range dB_per_vel_unit value is halved, e.g. 6/8 = 0.75, 6/16 = 0.375, 6/32 = 0.1875
+		else -- spans several ranges
+		local int, fract = math.modf(diff/6) -- 6 because each velocity range equals 6 dB	
+		local new_lower_limit = lower_limit
+			for i = 1, int do -- traverse full ranges if int is not 0, including the current one		
+			new_lower_limit = new_lower_limit*2
+		--	dB_to_vel = dB_to_vel + (diff-(6*i))/(6/new_lower_limit) -- WORKS, too complicated and not completely sure why it works
+		--	OR
+		--	dB_to_vel = dB_to_vel + 6/(6/new_lower_limit) -- WORKS
+		--	OR
+			dB_to_vel = dB_to_vel + new_lower_limit -- ALTERNATIVE TO THE LINE ABOVE, adding full velocity ranges because they match the lower limit value
+			end
+	-- account for the range the fractional part crosses into
+	--	dB_to_vel = dB_to_vel + fract/(6/(new_lower_limit*2)) -- if fract is 0, dB_to_vel value won't change // WORKS
+	--	OR
+		dB_to_vel = dB_to_vel + fract/(dB_per_vel_unit/2^(int+1)) -- divide dB_per_vel_unit by 2 risen to the power equal to the number of full ranges plus 1 to account for the one the fractional part crosses into because in each next range dB_per_vel_unit value is halved, e.g. 6/8 = 0.75, 6/16 = 0.375, 6/32 = 0.1875; if fract is 0, dB_to_vel value won't change
+		end
+	vel_change = lower_limit*2 - vel + dB_to_vel -- OR (upper_limit - vel) + dB_to_vel; add the calculated velocity value to the difference between current vel value and the upper limit to then be added to the current velocity value to culculate the target velocity after dB addition
+	------------------------------------------
+	else -- dB value is within the current velocity range
+	vel_change = dB/dB_per_vel_unit
+	end
+
+local targ_vel = math.floor(vel + vel_change+0.5) -- round since velocity cannot be fractional
+
+return targ_vel >= 1 and targ_vel <= 127 and targ_vel or targ_vel < 1 and 1 or targ_vel > 127 and 127
+	
+end
+
+
+-- OPTIMIZED VERSION
+function Adjust_Velocity_By_dB2(vel, dB)
+-- vel is current velocity
+-- dB is negative or positive value to increase/reduce the current value by
+-- ReaPlugs velocity to amplitude
+-- Linear interpolation of gain (so if mapping 0..127 to -inf .. +0dB, 63 would be around -6dB (0.5), 32 would be around -12dB (0.25) etc. https://www.askjf.com/index.php?q=6883s
+-- confirmed with ReaSynth and 'Loudness Meter' JSFX
+-- thus the entire velocity range only covers dynamic range of 42 dB from -42 to 0 dB (7 velocity ranges 6 dB each)
+
+local vel = vel < 1  and 1 or vel > 127 and 127 or vel
+
+--[-[
+-- find the lower limit of the range the current velocity value belongs to
+local lower_limit, upper_limit
+	for i = 1, 7 do -- 7 since it's the max exponent in the range of 1 - 128
+	lower_limit, upper_limit = 2^i, 2^(i+1)
+--Msg(upper_limit, 'upper')
+--Msg(lower_limit, 'lower')
+		if vel < upper_limit and vel >= lower_limit then
+--Msg('TEST')
+		break end
+	end
+--]]
+--[[ WORKS
+local upper_limit, lower_limit = 128 -- 127 doesn't work in subtruction from lower limit values
+	for i = 1, 7 do -- 7 since it's the max exponent in the range of 1 - 128 which is the initial upper limit value
+--Msg(upper_limit, 'upper')
+	lower_limit = upper_limit/2 -- divide each next lower limit by 2 to get the next -6 dB range which is getting shorter as the level becomes lower until the range becomes shorter than the caclulated value
+--Msg(lower_limit, 'lower')
+		if vel < upper_limit and vel >= lower_limit then
+--Msg('TEST')
+	--	dB_per_vel_unit = 6/lower_limit -- 6 because each range corresponds to 6 dB; the lover limit value is equal to the total velocity units in the range, e.g. 2 -> 4 = 2, 4 -> 8 = 4, 8 -> 16 = 8, 16 -> 32 = 16, 32 -> 64 = 32, 64 -> 127 = 63 (almost 64)
+		break
+		end
+	upper_limit = lower_limit
+	end
+--]]
+	
+-- calculate dB per velocity unit in the velocity range the current velocity value belongs to 
+local dB_per_vel_unit = 6/lower_limit -- 6 because each range corresponds to 6 dB; the lover limit value is equal to the total velocity units in the range, e.g. 2 -> 4 = 2, 4 -> 8 = 4, 8 -> 16 = 8, 16 -> 32 = 16, 32 -> 64 = 32, 64 -> 127 = 63 (almost 64)
+
+-- calculate dB value of the current velocity within the given velocity range (from the lower limit) if dB arg is negative or 0 and from the upper limit if dB arg is positive (neither of which is an absolute value above vel 0) to then be able to find out how much of the dB value is already covered within the current velocity range
+local current_dB = (dB <= 0 and vel - lower_limit or lower_limit*2 - vel) * dB_per_vel_unit
+
+	local function convert_dB_to_vel(diff, lower_limit, dB)
+	local dB_to_vel = 0
+		if diff <= 6 then -- only spans one other range
+	 -- dB_to_vel = dB < 0 and diff/(6/(lower_limit/2)) or diff/(6/lower_limit*2)
+     -- OR
+		dB_to_vel = dB < 0 and diff/(dB_per_vel_unit*2) -- because in each previous range dB_per_vel_unit value is doubled, e.g. 6/32 = 0.1875, 6/16 = 0.375, 6/8 = 0.75
+		or diff/(dB_per_vel_unit/2) -- because in each next range dB_per_vel_unit value is halved, e.g. 6/8 = 0.75, 6/16 = 0.375, 6/32 = 0.1875
+		else -- spans several ranges
+		local int, fract = math.modf(diff/6) -- 6 because each velocity range equals 6 dB
+		local new_lower_limit = lower_limit
+			for i = 1, int do -- traverse full ranges if int is not 0
+			new_lower_limit = dB < 0 and new_lower_limit/2 or new_lower_limit*2
+		--	dB_to_vel = dB_to_vel + (diff-(6*i))/(6/new_lower_limit) -- WORKS, too complicated and not completely sure why it works
+		--	OR
+		--	dB_to_vel = dB_to_vel + 6/(6/new_lower_limit) -- WORKS
+		--	OR
+			dB_to_vel = dB_to_vel + new_lower_limit -- ALTERNATIVE TO THE LINE ABOVE, adding full velocity ranges because they match the lower limit value			
+			end
+		-- account for the range the fractional part crosses into
+		-- dB_to_vel = dB_to_vel + and fract / (6 /(dB < 0 and new_lower_limit/2 or new_lower_limit*2) -- if fract is 0, dB_to_vel value won't change // WORKS
+		-- OR
+		dB_to_vel = dB_to_vel + fract / (dB < 0 and dB_per_vel_unit*2^(int+1) or dB_per_vel_unit/2^(int+1)) -- multiply or divide dB_per_vel_unit by 2 risen to the power equal to the number of full ranges plus 1 to account for the one the fractional part crosses into because in each prev range dB_per_vel_unit value is doubled, e.g. 6/32 = 0.1875, 6/16 = 0.375, 6/8 = 0.75 and in each next range dB_per_vel_unit value is halved e.g. 6/8 = 0.75, 6/16 = 0.375, 6/32 = 0.1875; if fract is 0, dB_to_vel value won't change		
+		end
+	return dB_to_vel
+	end
+
+local vel_change = 0
+
+	if dB < 0 and dB+current_dB < 0 -- as positive value dB is greater than the current dB which means that subtraction will cross into the previous 6 dB velocity range(s) with different dB_per_vel_unit value(s)
+	then
+	-- calculate the number of velocity ranges the difference between dB and current dB spans
+	local diff = math.abs(dB+current_dB) -- part which crosses into another range with different dB_per_vel_unit value
+	local dB_to_vel = convert_dB_to_vel(diff, lower_limit, dB)
+	vel_change = ((vel - lower_limit) + dB_to_vel)*-1 -- add the calculated velocity value to the difference between current vel value and the lower limit to then be subtracted from the current velocity value to culculate the target velocity after dB reduction; *-1 because dB_to_vel was calculated as a positive number whereas this value must be subtracted
+	elseif dB > 0 and dB > current_dB -- dB is greater than the distance between current value and the upper limit represented by lower_limit*2 or upper_limit which means that addition will cross into the next 6 dB velocity range(s) with different dB_per_vel_unit value(s)
+	then
+	local diff = dB-current_dB -- part which crosses into another range with different dB_per_vel_unit value
+	local dB_to_vel = convert_dB_to_vel(diff, lower_limit, dB)
+	vel_change = lower_limit*2 - vel + dB_to_vel -- OR (upper_limit - vel) + dB_to_vel; add the calculated velocity value to the difference between current vel value and the upper limit to then be added to the current velocity value to culculate the target velocity after dB addition
+	else -- dB value is within the current velocity range
+	vel_change = dB/dB_per_vel_unit
+	end
+
+local targ_vel = math.floor(vel + vel_change+0.5) -- round since velocity cannot be fractional
+
+return targ_vel >= 1 and targ_vel <= 127 and targ_vel or targ_vel < 1 and 1 or targ_vel > 127 and 127
+	
+end
+
+
+
+
+function Vel_To_dB1(vel) -- relevant to ReaPlugs first of all
+-- ReaPlugs velocity to amplitude
+-- Linear interpolation of gain (so if mapping 0..127 to -inf .. +0dB, 63 would be around -6dB (0.5), 32 would be around -12dB (0.25) etc. https://www.askjf.com/index.php?q=6883s
+-- confirmed with ReaSynth and 'Loudness Meter' JSFX
+
+	if vel < 1 then return end
+	
+local vel = vel > 127 and 127 or vel
+
+local upper_limit, dB_per_vel_unit = 128
+	for i = 1, 7 do -- 7 since it's the max exponent in the range of 1 - 128 which is the initial upper limit value
+	local lower_limit = upper_limit/2 -- divide each next lower limit by 2 to get the next -6 dB range which is getting shorter as the level becomes lower until the range becomes shorter than the caclulated value
+		if vel < upper_limit and vel >= lower_limit then
+		dB_per_vel_unit = 6/lower_limit -- 6 because each range corresponds to 6 dB; the lover limit value is equal to the total velocity units in the range, e.g. 2 -> 4 = 2, 4 -> 8 = 4, 8 -> 16 = 8, 16 -> 32 = 16, 32 -> 64 = 32, 64 -> 127 = 63 (almost 64)
+		break
+		end
+	upper_limit = lower_limit
+	end
+	
+-- count the number of full 6 dB ranges	
+--[[
+local ranges_cnt, new_lower_limit = 0, lower_limit
+	for i = 1, 7 do
+	new_lower_limit = new_lower_limit/2
+		if new_lower_limit >= 1 then ranges_cnt = ranges_cnt+1 
+		else break end
+	end
+]]
+local ranges_cnt = math.log(lower_limit)/math.log(2) -- log of the lower limit val to the base 2
+	
+return -42 + ((vel - lower_limit) * dB_per_vel_unit + ranges_cnt * 6) -- because it's a value relative to the range bottom which is -42 dB (7 ranges 6 dB each in velocity range of 1 - 127 which equals -42 - 0 dB)
+
+--[[ OR
+
+local ranges_cnt = 7 - math.log(upper_limit)/math.log(2) -- calculate number of ranges between the current upper_limit and 0 dB (127), 7 is the total number of ranges; log of the lower limit val to the base 2
+
+return 0 - ((upper_limit - vel) * dB_per_vel_unit + ranges_cnt * 6) -- because it's a value relative to the range top which is 0 dB (7 ranges 6 dB each in velocity range of 1 - 127)
+
+]]
+
+--[[ OR
+
+local ranges_cnt = math.log(upper_limit)/math.log(2) - 7 -- calculate number of ranges between the current lower limit and 0 dB (127), 7 is the total number of ranges, -7 to get neg value; log of the lower limit val to the base 2;
+
+return ((vel - upper_limit) * dB_per_vel_unit + ranges_cnt * 6) -- vel - upper_limit to get neg value
+
+]]
+
+end
+
+
+function Vel_To_dB2(vel) -- relevant to ReaPlugs first of all
+-- ReaPlugs velocity to amplitude
+-- Linear interpolation of gain (so if mapping 0..127 to -inf .. +0dB, 63 would be around -6dB (0.5), 32 would be around -12dB (0.25) etc. https://www.askjf.com/index.php?q=6883s
+-- confirmed with ReaSynth and 'Loudness Meter' JSFX
+
+	if vel < 1 then return end
+	
+local vel = vel > 127 and 127 or vel
+
+local dB_per_vel_unit, lower_limit, upper_limit
+	for i = 0, 7 do -- 7 since it's the max exponent in the range of 1 - 128 which is the initial upper limit value
+	lower_limit, upper_limit = 2^i, 2^(i+1)
+		if vel < upper_limit and vel >= lower_limit then
+		dB_per_vel_unit = 6/lower_limit -- 6 because each range corresponds to 6 dB; the lover limit value is equal to the total velocity units in the range, e.g. 2 -> 4 = 2, 4 -> 8 = 4, 8 -> 16 = 8, 16 -> 32 = 16, 32 -> 64 = 32, 64 -> 127 = 63 (almost 64)
+		break
+		end
+	end
+
+local ranges_cnt = math.log(lower_limit)/math.log(2) -- log of the lower limit val to the base 2
+	
+return -42 + ((vel - lower_limit) * dB_per_vel_unit + ranges_cnt * 6) -- because it's a value relative to the range bottom which is -42 dB (7 ranges 6 dB each in velocity range of 1 - 127 which equals -42 - 0 dB)
+
+--[[ OR
+
+local ranges_cnt = 7 - math.log(upper_limit)/math.log(2) -- calculate number of ranges between the current upper_limit and 0 dB (127), 7 is the total number of ranges; log of the lower limit val to the base 2
+
+return 0 - ((upper_limit - vel) * dB_per_vel_unit + ranges_cnt * 6) -- because it's a value relative to the range top which is 0 dB (7 ranges 6 dB each in velocity range of 1 - 127)
+
+]]
+
+--[[ OR
+
+local ranges_cnt = math.log(upper_limit)/math.log(2) - 7 -- calculate number of ranges between the current lower limit and 0 dB (127), 7 is the total number of ranges, -7 to get neg value; log of the lower limit val to the base 2;
+
+return ((vel - upper_limit) * dB_per_vel_unit + ranges_cnt * 6) -- vel - upper_limit to get neg value
+
+]]
+
+	
+end
+
+
+
 --====================== M E A S U R E M E N T S   E N D =======================================
 
 
