@@ -322,7 +322,7 @@ Msg(t.a) Msg(t.b) Msg(t.c)
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
 -- https://forum.cockos.com/showthread.php?t=280658&page=2#44
-local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82 -- or '[%d%.]+'
+local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 local init = old and gfx.init('', 0, 0)
 -- open menu at the mouse cursor
 gfx.x = gfx.mouse_x
@@ -339,10 +339,9 @@ local x, y = r.GetMousePosition()
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
 -- https://forum.cockos.com/showthread.php?t=280658&page=2#44
-	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82 -- or '[%d%.]+'
+	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 	local init = old and gfx.init('', 0, 0)
-	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
-	
+	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position	
 		-- ensure that if OPTION is enabled the menu opens every time at the same spot
 		if OPTION and not coord_t then -- OPTION is the one which enables menu reload
 		coord_t = {x = gfx.mouse_x, y = gfx.mouse_y}
@@ -365,10 +364,9 @@ local x, y = r.GetMousePosition()
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
 -- https://forum.cockos.com/showthread.php?t=280658&page=2#44
-	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82 -- or '[%d%.]+'
+	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 	local init = old and gfx.init('', 0, 0)
 	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
-	
 		-- ensure that if OPTION is enabled the menu opens every time at the same spot
 		if OPTION and not coord_t then -- OPTION is the one which enables menu reload
 		coord_t = {x = gfx.mouse_x, y = gfx.mouse_y}
@@ -612,8 +610,8 @@ r.MarkTrackItemsDirty(tr, item)
 end
 
 
-function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, pass, want_chain) 
--- Due to REAPER bug https://forum.cockos.com/showthread.php?t=281778
+function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, pass, want_chain)
+-- Due to REAPER bug https://forum.cockos.com/showthread.php?t=281778, which was fixed in build 7.01
 -- undo point for all RS5k instances is only created with open FX chain window
 -- to create an undo point for a single instance it suffices to open it in a floating window
 -- the function must be run in two passes within the Undo blocks
@@ -625,6 +623,7 @@ function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last
 -- last_sel_idx and last_sel_fx_floats in the 1st pass aren't needed, only needed in the 2nd pass if want_chain is true;
 -- pass is integer, 1 or 2;
 -- want_chain is boolean if the entire chain has to be opened because multiple RS5k instances are affected, in this case relies on GetObjChunk() function
+-- to evaluate build: tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.01
 
 	if pass == 1 then
 	local chain_vis = r.TrackFX_GetChainVisible(tr) ~= -1
@@ -1612,11 +1611,15 @@ function sort_tableA_by_tableB(tA, tB) -- indexed tables; table lengths may diff
 end
 
 
-function merge_2_arrays_at_index(t1,t2,index) -- the result is updated t1
+function merge_2_arrays_at_index(t1,t2,index) 
+-- the result is updated t1
+-- index applies to t1
+-- ommitted or excessive index defaults to last+1
+local index = (not index or index > #t1) and #t1+1 or index
 local offset = 1-index
-  for i = index, #t2+index-1 do
-  table.insert(t1, i, t2[i+offset])
-  end
+	for i = index, #t2+index-1 do
+	table.insert(t1, i, t2[i+offset])
+	end
 end
 
 
@@ -1812,6 +1815,20 @@ local fin = #t
 		if t[i] == value then return i end
 	end
 end
+
+
+function collect_numbers(first, last)
+-- first and last must be sequential numbers
+local t = {}
+	for i = first, last do
+	t[#t+1] = i
+	end
+return t
+end
+
+
+
+
 
 --=========================== T A B L E S  E N D ==============================
 
@@ -5624,14 +5641,28 @@ local fx_num = retval == 2 and src_fx_num&0xFFFF or retval == 1 and src_fx_num -
 --	local mon_fx = retval == 0 and src_mon_fx_idx >= 0
 --	local fx_num = mon_fx and src_mon_fx_idx + 0x1000000 or fx_num -- mon fx index
 
-local fx_name
+local fx_alias, fx_GUID
 	if take then
-	fx_name = select(2, r.TakeFX_GetFXName(take, fx_num))
+	fx_GUID = r.TakeFX_GetFXGUID(take, fx_num)
+	fx_alias = select(2, r.TakeFX_GetFXName(take, fx_num))
 	elseif tr then
-	fx_name = select(2, r.TrackFX_GetFXName(tr, fx_num))
+	fx_alias = select(2, r.TrackFX_GetFXName(tr, fx_num))
+	fx_GUID = r.TrackFX_GetFXGUID(tr, fx_num)
 	end
 
-return retval, src_track_num-1, tr, src_item_num, item, take_num, take, fx_num, fx_name -- src_track_num = -1 means Master;
+local fx_name, _ = fx_alias
+-- if older version fx_name return value will be indentical to fx_alias
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.31 then
+	local obj = take or tr
+	local GetNamedConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
+		if obj then
+		_, fx_name = GetNamedConfigParm(obj, fx_idx, 'fx_name')
+		fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
+		or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name == 'Video processor' and fx_name
+		end
+	end
+
+return retval, src_track_num-1, tr, src_item_num, item, take_num, take, fx_num, fx_alias, fx_name, fx_GUID -- src_track_num = -1 means Master;
 
 end
 
@@ -5655,16 +5686,36 @@ local fx_num = retval == 2 and take_fx_num or retval == 1 and fx_num or mon_fx_n
 --	local mon_fx = retval == 0 and mon_fx_num >= 0
 --	local fx_num = mon_fx and mon_fx_num + 0x1000000 or fx_num -- mon fx index
 
-local fx_name
+local fx_alias, fx_GUID
 	if take then
-	fx_name = select(2, r.TakeFX_GetFXName(take, fx_num))
+	fx_GUID = r.TakeFX_GetFXGUID(take, fx_num)
+	fx_alias = select(2, r.TakeFX_GetFXName(take, fx_num))
 	elseif tr then
-	fx_name = select(2, r.TrackFX_GetFXName(tr, fx_num))
+	fx_alias = select(2, r.TrackFX_GetFXName(tr, fx_num))
+	fx_GUID = r.TrackFX_GetFXGUID(tr, fx_num)
 	end
+	
+local fx_name, _ = fx_alias
+-- if older version fx_name return value will be indentical to fx_alias
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.31 then
+	local obj = take or tr
+	local GetNamedConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
+		if obj then
+		_, fx_name = GetNamedConfigParm(obj, fx_idx, 'fx_name')
+		fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
+		or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name == 'Video processor' and fx_name
+		end
+	end	
 
-return retval, tr_num-1, tr, itm_num, item, take_num, take, fx_num, mon_fx_num >= 0, fx_name -- tr_num = -1 means Master;
+return retval, tr_num-1, tr, itm_num, item, take_num, take, fx_num, mon_fx_num >= 0, fx_alias, fx_name, fx_GUID -- tr_num = -1 means Master;
 
 end
+-- USE:
+-- local retval, tr_num, tr, itm_num, item, take_num, take, fx_num, mon_fx, fx_alias, fx_name, fx_GUID = GetFocusedFX()
+-- if retval == 0 and not mon_fx then return end -- no focused FX
+-- not fx_name means no focused
+
+
 
 
 function GetOrigFXName(obj_chunk, fx_GUID)
@@ -6042,6 +6093,7 @@ is_last_touched, tr_idx, tr, item_idx, item, take_idx, take, fx_idx, parm_idx = 
 
 
 function Collect_FX_Output_Data(tr) -- fx index and output channels // blueprint of dealing with output channels
+-- since version 7, 128 channels per track are supported, the function only respects 64
 -- this function is tailored for RS5k
 local t, rs5k_cnt = {}, 0
 	for fx_idx = 0, r.TrackFX_GetCount(tr)-1 do
@@ -6050,7 +6102,7 @@ local t, rs5k_cnt = {}, 0
 		local retval, parm_name = r.TrackFX_GetParamName(tr, fx_idx, parm_idx, '')
 			if parm_name == 'Gain for minimum velocity' then RS5k = 1 break end
 		end
-		if RS5k then
+		if RS5k then -- condition which limits the function to RS5k
 		rs5k_cnt = rs5k_cnt+1
 		t[fx_idx+1] = {} -- storing 1-based fx index as key
 		local tr_ch_cnt = r.GetMediaTrackInfo_Value(tr, 'I_NCHAN')
@@ -6641,7 +6693,7 @@ end
 
 
 function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, pass, want_chain) 
--- Due to REAPER bug https://forum.cockos.com/showthread.php?t=281778
+-- Due to REAPER bug https://forum.cockos.com/showthread.php?t=281778, which was fixed in build 7.01
 -- undo point for all RS5k instances is only created with open FX chain window
 -- to create an undo point for a single instance it suffices to open it in a floating window
 -- the function must be run in two passes within the Undo blocks
@@ -6653,6 +6705,7 @@ function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last
 -- last_sel_idx and last_sel_fx_floats in the 1st pass aren't needed, only needed in the 2nd pass if want_chain is true;
 -- pass is integer, 1 or 2;
 -- want_chain is boolean if the entire chain has to be opened because multiple RS5k instances are affected, in this case relies on GetObjChunk() function
+-- to evaluate build: tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.01
 
 	if pass == 1 then
 	local chain_vis = r.TrackFX_GetChainVisible(tr) ~= -1
@@ -6693,6 +6746,14 @@ end
 -- DO STUFF
 -- Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- targ_fx_idx, targ_fx_floats and nil, last_sel_idx is integer, last_sel_fx_floats is boolean, pass is 2, want_chain true
 -- Undo_EndBlock('',2) -- the flag MUST be 2 (UNDO_STATE_FX), NOT -1 which works only once if the plugin UI is originally open
+
+
+function Get_FX_Selected_In_FX_Chain(chunk)
+	for line in chunk:gmatch('[^\n\r]+') do
+		if line:match('LASTSEL') then return line:match('%d+') end 
+	end
+end
+
 
 
 --================================================  F X  E N D  ==============================================
@@ -10812,13 +10873,16 @@ end
 
 
 
-function Adjust_Velocity_By_dB(vel, dB)
+function Adjust_Velocity_By_dB(vel, dB) 
+-- only relevant for plugins using normalized scale (0 - 1) for gain interpolation
+-- first or all ReaPlugs (RS5k, ReaSynth)
 -- https://dobrian.github.io/cmp/topics/linear-mapping-and-interpolation/1.IntroductionToLinearInterpolation&LinearMapping.html
 -- Thanks to Justin
 -- https://www.askjf.com/index.php?q=6883s
 -- ReaPlugs velocity to amplitude
 -- Linear interpolation of gain (so if mapping 0..127 to -inf .. +0dB, 63 would be around -6dB (0.5), 32 would be around -12dB (0.25) etc. 
 -- https://www.askjf.com/index.php?q=6925s
+-- the code snippet converts velocity units to dB units
 --[[
 max_sc = 1; // +0 dB, aka 10^(0/20)
 min_sc = 0; // -inf dB
@@ -10831,11 +10895,25 @@ gain_db = log10(sc)*20; // convert scale to dB
 -- dB is negative or positive value to increase/reduce the current value by
 -- thus the entire velocity range only covers dynamic range of 42 dB from -42 to 0 dB (7 velocity ranges 6 dB each)
 -- the accuracy confirmed with ReaSynth and RS5k against 'Loudness Meter' JSFX output
-local vel_to_dB = math.log(vel/127,10)*20 -- vel/127 calculates the scale which is the same as (vel - min val) / (max val - min val), formula for calculation of linear interpolation, (vel - 0) / (127 - 0)
+
+local vel_to_dB = math.log(vel/127,10)*20 -- vel/127 calculates the scale or the percentage of the full scale taken up by the current value or their ratio, which is the same as (vel - min val) / (max val - min val), formula for calculation of linear interpolation, (vel - 0) / (127 - 0)
 local new_dB_val = vel_to_dB + dB
 local dB_to_vel = 10^(new_dB_val/20)*127
-return math.floor(dB_to_vel+0.5) -- round since velocity cannot be fractional
+local target_vel = math.floor(dB_to_vel+0.5) -- round since velocity cannot be fractional
+-- return accounting for NaN (not a number) and infinity, resulting from division by 0
+-- which can be represented as -1.#IND and +/-1.#INF and is not equal to itself, 
+-- so as long as a value is equal to itself it's valid
+-- https://stackoverflow.com/questions/19107302/in-lua-what-is-inf-and-ind
+-- https://stackoverflow.com/questions/37753694/lua-check-if-a-number-value-is-nan
+return target_vel == target_vel and target_vel or 0
+end
 
+
+function Measure_Note_In_Ms(take, start, fin, val1, val2)
+local st_sec = r.MIDI_GetProjTimeFromPPQPos(take, start)
+local end_sec = r.MIDI_GetProjTimeFromPPQPos(take, fin)
+local len_sec =  math.floor((end_sec-st_sec)*1000+0.5)/1000 -- simple subtraction for some reason results in a value with 19 decimal places which is smaller than the expected value by a minute amount unless rounded up and throws the equality evaluation off even though the parts of the subtraction don't seem to be affected by this tiny deviation, so rounding down to 3 (1000) decimal places which is as many as needed for milliseconds; relevant for notes which aren't snapped to grid		
+return len_sec >= val1 and len_sec <= val2
 end
 
 
