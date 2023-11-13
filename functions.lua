@@ -5587,7 +5587,7 @@ function Get_AI_Env_Segment_At_Cursor(cur_pos, AI_idx)
 -- returns indices of cursor start and end points which then can be gotten with
 -- r.GetEnvelopePointEx(env, AI_idx|0x10000000, i)
 -- and set with r.SetEnvelopePointEx(env, AI_idx, i, timeIn, valueIn, shapeIn, tensionIn, true, noSortIn) -- here adding 0x10000000 isn't necessary
--- the routine can be re-purposed to getting AI point under cursor
+-- the routine can be re-purposed to getting AI point under cursor, within time selection or razor edit area
 
 local st = r.GetSetAutomationItemInfo(env, AI_idx, 'D_POSITION', -1, false) -- value -1, is_set false
 local len = r.GetSetAutomationItemInfo(env, AI_idx, 'D_LENGTH', -1, false)-- value -1, is_set false
@@ -5979,6 +5979,8 @@ end
 
 
 function Get_FX_Chain_Chunk(chunk, path, sep, type, take_GUID) -- isolate object fx chain, for track main fx chain exclude items/input fx, for track input fx exclude items, for items exclude takes other than the active one; type arg is set within the routine: 0 - track main fx, 1 - track input fx or Mon FX for the Master track; if take_GUID arg is valid, then take fx
+-- since REAPER 7 'WAK 0 0' may be followed by PARALLEL 1 or PARALLEL 2 if 'Run selected FX in parallel with previous FX' or 'Run selected FX in parallel with previous FX (merge MIDI)' options are enabled respectively
+-- due to introduction of FX containers in REAPER 7 'WAK 0 0' and 'PARALLEL X' tokens can be found in FX container chunk and the function may return incomlete chunk not having reached the end of the chain
 
 local take_GUID = Esc(take_GUID)
 local fx_chain_chunk
@@ -6006,7 +6008,9 @@ return fx_chain_chunk
 end
 
 
-function Get_FX_Chunk(obj, obj_chunk, fx_idx, take_idx) -- obj is track or item pointer; if no take_idx arg is supplied, the active take will be used // for track input FX and Mon FX fx_idx argument must look like fx_idx+0x1000000 or fx_idx+16777216; uses Esc() function
+function Get_FX_Chunk(obj, obj_chunk, fx_idx, take_idx) -- obj is track or item pointer; if no take_idx arg is supplied, the active take will be used // for track input FX and Mon FX fx_idx argument must look like fx_idx+0x1000000 or fx_idx+16777216; relies on Esc() function
+-- since REAPER 7 'WAK 0 0' may be followed by PARALLEL 1 or PARALLEL 2 if 'Run selected FX in parallel with previous FX' or 'Run selected FX in parallel with previous FX (merge MIDI)' options are enabled respectively
+-- due to introduction of FX containers in REAPER 7 'WAK 0 0' and 'PARALLEL X' tokens can be found in FX container chunk and the function may return incomlete chunk not having reached the end of the chain
 
 local track = r.ValidatePtr(obj, 'MediaTrack*')
 local item = r.ValidatePtr(obj, 'MediaItem*')
@@ -6909,6 +6913,28 @@ function Get_FX_Selected_In_FX_Chain(chunk)
 	end
 end
 
+
+function Set_FX_Selected_In_FX_Chain(obj, fx_idx, chunk)
+local take, tr = r.ValidatePtr(obj, 'MediaItem_Take*'), r.ValidatePtr(obj, 'MediaItem_Track*')
+local FX_Chain_Vis, FX_Open = table.unpack(take and {r.TakeFX_GetChainVisible, r.TakeFX_SetOpen} or tr and {r.TrackFX_GetChainVisible, r.TrackFX_SetOpen} or {})
+	if take or tr then
+		if FX_Chain_Vis(obj) ~= -1 -- -1 chain hidden, -2 chain visible but no effect selected
+		then -- FX chain open
+		FX_Open(obj, fx_idx, true) -- open true
+		else -- to select FX in a closed FX chain technically it can be done wirh FX_SetOpen after opening the chain and then closing it, but you're running the risk of removing the focus from any currently focused windows whch is a bad practice
+		local cur_sel_idx
+			for line in chunk:gmatch('[^\n\r]+') do
+				if line:match('LASTSEL') then 
+				cur_sel_idx == line:match('%d+') 
+				break end
+			end
+			if cur_sel_idx then
+			local chunk_new = chunk:gsub('LASTSEL '..cur_sel_idx, 'LASTSEL '..fx_idx)
+			SetObjChunk(item, chunk_new)
+			end
+		end
+	end
+end
 
 
 --================================================  F X  E N D  ==============================================
@@ -12721,4 +12747,4 @@ proj_full_path = select(2,r.EnumProjects(-1))
 
 
 -- Detect undo
--- Set FX UI active in FX chain (via chunk)
+
