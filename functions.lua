@@ -3381,7 +3381,9 @@ function re_store_sel_trks(t) -- with deselection; t is the stored tracks table 
 end
 
 
-function ReStoreSelectedItems(t)
+function ReStoreSelectedItems(t, keep_last_selected)
+-- keep_last_selected is boolean relevant for the restoration stage
+-- to add last selected items to the original selection
 	if not t then -- Store selected items
 	local sel_itms_cnt = r.CountSelectedMediaItems(0)
 		if sel_itms_cnt > 0 then
@@ -3394,15 +3396,18 @@ function ReStoreSelectedItems(t)
 			i = i - 1
 			end
 		return t end
-	elseif t and #t > 0 then -- Restore selected items
---	r.Main_OnCommand(40289,0) -- Item: Unselect all items // not needed because deselection was done at the storage state
+	elseif t then -- Restore selected items
+		if not keep_last_selected then
+	--	r.Main_OnCommand(40289,0) -- Item: Unselect all items
+		r.SelectAllMediaItems(0, false) -- selected false // deselect all
+		end
 	local i = 0
 		while i < #t do
 		r.SetMediaItemSelected(t[i+1],true) -- +1 since item count is 1 based while the table is indexed from 1
 		i = i + 1
-		end
-	r.UpdateArrange()
+		end	
 	end
+r.UpdateArrange()
 end
 
 
@@ -5189,10 +5194,57 @@ end
 tr, take = Envelopes_Locked() -- booleans
 
 
+function Deselect_All_Env_Points(env) -- incl. automation items
+
+	local function Deselect_Points_In_Env_All_AIs(env, AI_idx)
+	-- accounting for points in all loop iterations, visible or not
+		for i = 0, r.CountEnvelopePointsEx(env, AI_idx|0x10000000)-1 do
+		r.SetEnvelopePointEx(env, AI_idx, i, timeIn, valueIn, shapeIn, tensionIn, false, noSortIn) -- selectedIn false, deselect
+		end
+	end
+	-- in the envelope
+	for i = 0, r.CountEnvelopePoints(env)-1 do -- ignoring automation items
+	r.SetEnvelopePointEx(env, -1, i, timeIn, valueIn, shapeIn, tensionIn, false, noSortIn) -- autoitem_idx -1, ignore, selectedIn false, deselect
+	end
+	-- in the automation items
+	for AI_idx = 0, r.CountAutomationItems(env)-1 do -- accounting for all points in all loop iterations, visible or not
+	Deselect_Points_In_Env_All_AIs(env, AI_idx)
+	end
+
+end
+
+
 --============================ E N V E L O P E S   E N D ==================================
 
 
 --============================ A U T O M A T I O N  I T E M S ================================
+
+--[[
+
+DEALING WITH AI ENVELOPE POINTS
+
+AI startoffset affects points count
+
+When startoffset is not 0 (which is always just to be on the safe side) the count 
+must be based on one full loop iteration including hidden points in case AI is trimmed, i.e.
+CountEnvelopePointsEx(env, AI_idx|0x10000000)
+
+this naturally applies to getting an AI env pount, i.e.
+GetEnvelopePointEx(env, AI_idx|0x10000000, pt_idx)
+
+as it turns out for setting this isn't necessary and AI_idx doesn't have to be added 0x10000000 (decimal 268435456)
+
+When the count is based on the number of visible points incl. all loop iterations, i.e.
+CountEnvelopePointsEx(env, AI_idx)
+if there're hidden points due to trimming the visible point count will be smaller
+than the count based on one full loop iteration and as a result loop iteration
+which starts from 0 won't reach the last visible point or more (depending on 
+how many are hidden)
+So for now not sure when getting visible point count is useful
+
+]]
+
+
 
 function UnTrim_AutomItem_LeftEdge(env, autoitem_idx, val) -- rather mimics trim by shifting contents, changing length and position
 -- val in sec, positive val trim [->, negative val untrim <-[
@@ -5475,6 +5527,108 @@ return AI
 end
 
 
+function Deselect_Points_In_Env_All_AIs1(tr_env, AI_idx) -- see version 2 below
+	-- respecting points in full loop iteration incl. hidden
+	for i = 0, r.CountEnvelopePointsEx(tr_env, AI_idx|0x10000000)-1 do
+	r.SetEnvelopePointEx(tr_env, AI_idx, i, timeIn, valueIn, shapeIn, tensionIn, false, noSortIn) -- selectedIn false, deselect
+	end
+	-- only respecting visible points incl. all loop iterations
+	for i = 0, r.CountEnvelopePointsEx(tr_env, AI_idx)-1 do
+	r.SetEnvelopePointEx(tr_env, AI_idx, i, timeIn, valueIn, shapeIn, tensionIn, false, noSortIn) -- selectedIn false, deselect
+	end
+end
+-- USE:
+--[[
+	for AI_idx = 0, r.CountAutomationItems(env)-1 do
+	Deselect_Points_In_Env_All_AIs1(env, AI_idx)
+	end
+]]
+
+
+function Deselect_Points_In_Env_All_AIs2(tr_env)
+	for AI_idx = 0, r.CountAutomationItems(tr_env)-1 do
+		-- respecting points in full loop iteration incl. hidden
+		for i = 0, r.CountEnvelopePointsEx(tr_env, AI_idx|0x10000000)-1 do
+		r.SetEnvelopePointEx(tr_env, AI_idx, i, timeIn, valueIn, shapeIn, tensionIn, false, noSortIn) -- selectedIn false, deselect // when setting 0x10000000 addition isn't needed
+		end
+		-- only respecting visible points incl. all loop iterations
+		for i = 0, r.CountEnvelopePointsEx(tr_env, AI_idx)-1 do
+		r.SetEnvelopePointEx(tr_env, AI_idx, i, timeIn, valueIn, shapeIn, tensionIn, false, noSortIn) -- selectedIn false, deselect
+		end
+	end
+end
+
+
+function Get_Props_Of_AI_Intersecting_Cur_Pos(env, cur_pos)
+-- AI start is considered intersecting cursor while its end isn't
+	for i = 0, r.CountAutomationItems(env)-1 do
+	local pos = r.GetSetAutomationItemInfo(env, i, 'D_POSITION', -1, false) -- value -1, is_set false
+	local fin = pos + r.GetSetAutomationItemInfo(env, i, 'D_LENGTH', -1, false) -- value -1, is_set false
+		if pos <= cur_pos and fin > cur_pos then -- only AI start is considered belonging to AI
+		return i, pos, fin
+		end
+	end
+
+end
+
+
+function Get_Props_Of_AI_Overlapping_Env_Pt(env, pt_pos)
+	for i = 0, r.CountAutomationItems(env)-1 do
+	local pos = r.GetSetAutomationItemInfo(env, i, 'D_POSITION', -1, false) -- value -1, is_set false
+	local fin = pos + r.GetSetAutomationItemInfo(env, i, 'D_LENGTH', -1, false) -- value -1, is_set false
+		if pos <= pt_pos and fin >= pt_pos then
+		return i, pos, fin
+		end
+	end
+end
+
+
+function Get_AI_Env_Segment_At_Cursor(cur_pos, AI_idx)
+-- returns indices of cursor start and end points which then can be gotten with
+-- r.GetEnvelopePointEx(env, AI_idx|0x10000000, i)
+-- and set with r.SetEnvelopePointEx(env, AI_idx, i, timeIn, valueIn, shapeIn, tensionIn, true, noSortIn) -- here adding 0x10000000 isn't necessary
+-- the routine can be re-purposed to getting AI point under cursor
+
+local st = r.GetSetAutomationItemInfo(env, AI_idx, 'D_POSITION', -1, false) -- value -1, is_set false
+local len = r.GetSetAutomationItemInfo(env, AI_idx, 'D_LENGTH', -1, false)-- value -1, is_set false
+local fin = st + len
+local startoffs = r.GetSetAutomationItemInfo(env, AI_idx, 'D_STARTOFFS', -1, false) -- value -1, is_set false
+local loop_len_QN = r.GetSetAutomationItemInfo(env, AI_idx, 'D_POOL_QNLEN', -1, false) -- value -1, is_set false
+local playrate = r.GetSetAutomationItemInfo(env, AI_idx, 'D_PLAYRATE', -1, false) -- value -1, is_set false
+local loop_len = r.TimeMap_QNToTime(loop_len_QN)/playrate -- convert to sec
+local loop_cnt = len/loop_len < 1 and 1 or math.floor(len/loop_len) -- count number of loop iterations within AI length; only integer is required
+
+-- calculate loop iteration which falls under the cursor, 
+-- if loop is disabled or AI length < one loop iteration, loop_iter var will be 0
+local loop_iter
+	for i=0,loop_cnt do
+		if cur_pos >= st-startoffs+loop_len*i and cur_pos < fin
+		then loop_iter = i
+		end
+	end
+	
+	-- look for segment points
+	for i = 0, r.CountEnvelopePointsEx(env, AI_idx|0x10000000)-1 -- points in full loop iteration incl. hidden
+	local retval, end_pos, val, shape, tens, sel = r.GetEnvelopePointEx(env, AI_idx|0x10000000, i) -- respecting points in full loop iteration incl. hidden
+	end_pos = end_pos+loop_len*loop_iter -- offset by the number of loop iterations before the cursor retrieved above
+		if not end_pt_idx and end_pos > cur_pos and end_pos <= fin then -- making sure that the end_pos is within view
+		end_pt_idx, st_pt_idx = i, i-1
+			if st_pt_idx > -1 then -- make sure that start point is within view
+			local retval, st_pos, val, shape, tens, sel = r.GetEnvelopePointEx(env, AI_idx|0x10000000, st_pt_idx) -- respecting points in full loop iteration incl. hidden
+			st_pos = st_pos+loop_len*loop_iter -- offset by the number of loop iterations before the cursor retrieved above
+				if st_pos < st then
+				end_pt_idx, st_pt_idx = nil -- reset as if the points weren't found 
+				end
+			end
+		break end
+	end
+
+return st_pt_idx, end_pt_idx
+
+end
+	
+	
+	
 --=========================== A U T O M A T I O N  I T E M S  E N D ==========================
 
 
@@ -5656,7 +5810,7 @@ local fx_name, _ = fx_alias
 	local obj = take or tr
 	local GetNamedConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
 		if obj then
-		_, fx_name = GetNamedConfigParm(obj, fx_idx, 'fx_name')
+		_, fx_name = GetNamedConfigParm(obj, fx_num, 'fx_name')
 		fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
 		or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name == 'Video processor' and fx_name
 		end
@@ -5701,7 +5855,7 @@ local fx_name, _ = fx_alias
 	local obj = take or tr
 	local GetNamedConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
 		if obj then
-		_, fx_name = GetNamedConfigParm(obj, fx_idx, 'fx_name')
+		_, fx_name = GetNamedConfigParm(obj, fx_num, 'fx_name')
 		fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
 		or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name == 'Video processor' and fx_name
 		end
@@ -5711,7 +5865,7 @@ return retval, tr_num-1, tr, itm_num, item, take_num, take, fx_num, mon_fx_num >
 
 end
 -- USE:
--- local retval, tr_num, tr, itm_num, item, take_num, take, fx_num, mon_fx, fx_alias, fx_name, fx_GUID = GetFocusedFX()
+-- local retval, tr_num, tr, itm_num, item, take_num, take, fx_num, mon_fx, fx_alias, fx_name, fx_GUID = GetFocusedFX2()
 -- if retval == 0 and not mon_fx then return end -- no focused FX
 -- not fx_name means no focused
 
@@ -5747,7 +5901,8 @@ end
 function Get_Focused_FX_Orig_Name() -- regardless of a user custom name displayed in the FX chain; if non-JSFX plugin name was changed in the FX browser, then it's this name which will be retrieved since this is what's displayed in the chunk
 -- relies on GetFocusedFX() and GetObjChunk() functions
 
--- SINCE 6.31 r.Track/TakeFX_GetNamedConfigParm() can be used
+-- SINCE 6.31 r.Track/TakeFX_GetNamedConfigParm() can be used, but keep in mind
+-- https://forum.cockos.com/showthread.php?t=282139
 
 -- non-JSFX plugin name changes in the FX browser are reflected in reaper-vstplugins(64).ini file
 -- JSFX plugin names can't be changed in the FX browser but can in the NAME entries inside reaper-jsfx.ini
@@ -6308,7 +6463,7 @@ end
 
 
 
-function Check_If_FX_Selected_In_FX_Browser()
+function Check_If_FX_Selected_In_FX_Browser1()
 
 r.PreventUIRefresh(1)
 r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false // insert new track at end of track list and hide it
@@ -6332,7 +6487,7 @@ return fx_list:sub(3) -- removing leading line break // mainly for display in a 
 end
 
 
-function Check_FX_Selected_In_FX_Browser() -- whether any is selected and whether at least 1 contains presets using temporary track
+function Check_FX_Selected_In_FX_Browser2() -- whether any is selected and whether at least 1 contains presets using temporary track
 
 r.PreventUIRefresh(1)
 
@@ -6660,7 +6815,7 @@ function FX_Exists1(obj, fx_name, fx_parm_cnt, parmA_idx, parmA_name, parmB_idx,
 -- the function currently doesn't support Input/Monitoring FX chains
 -- NOT failproof because if at least 1 parameter has an alias, its name won't match 
 -- the default one if this is what's passed as an argument
--- currently the original name can only be verified via chunk
+-- currently the original parm name can only be verified via chunk
 -- feature request for doing this with FX_GetNamedConfigParm():
 -- https://forum.cockos.com/showthread.php?t=282037
 local tr, take = r.ValidatePtr(obj,'MediaTrack*'), r.ValidatePtr(obj,'MediaItem_Take*')
@@ -6750,7 +6905,7 @@ end
 
 function Get_FX_Selected_In_FX_Chain(chunk)
 	for line in chunk:gmatch('[^\n\r]+') do
-		if line:match('LASTSEL') then return line:match('%d+') end 
+		if line:match('LASTSEL') then return line:match('%d+') end
 	end
 end
 
@@ -7730,7 +7885,7 @@ if its position in source is used, its position in item is already relative to t
 
 
 function Proj_Time_2_Item_Time(proj_time, item, take)
--- e.g. edit/play cursor, proj markers/regions time to take, stretch markers and transient guides time
+-- e.g. edit/play cursor, proj markers/regions time to take envelope points, take/stretch markers and transient guides time
 
 --local cur_pos = r.GetCursorPosition()
 local item_pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
@@ -7745,8 +7900,9 @@ return item_time
 end
 
 
-function Item_Time_2_Proj_Time(item_time, item, take) -- such as take, stretch markers and transient guides time, item_time is their position within take media source returned by the corresponding functions
--- e.g. take, stretch markers and transient guides time to edit/play cursor, proj markers/regions time
+function Item_Time_2_Proj_Time(item_time, item, take) 
+-- such as take envelope points, take/stretch markers and transient guides time, item_time is their position within take media source returned by the corresponding functions
+-- e.g. take envelope points, take/stretch markers and transient guides time to edit/play cursor, proj markers/regions time
 
 --local cur_pos = r.GetCursorPosition()
 local item_pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
@@ -7755,7 +7911,7 @@ local item_end = item_pos + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
 --local item_pos = r.GetMediaItemInfo_Value(r.GetMediaItemTake_Item(take), 'D_POSITION')
 local offset = r.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
 local playrate = r.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE') -- affects take start offset and take marker pos
-local proj_time = item_pos + (item_time - offset)/
+local proj_time = item_pos + (item_time - offset)/playrate
 
 return proj_time >= item_pos and proj_time <= item_end and proj_time -- ignoring content outside of item bounds -- OPTIONAL
 end
@@ -8174,7 +8330,7 @@ function Is_Item_Under_Mouse()
 -- same as r.GetItemFromPoint(x,y,allow_locked)
 local GetCnt = r.CountSelectedMediaItems
 local sel_t = {}
-	for i = 0, GetCnt(0)-1 do	-- store selected items
+	for i = 0, GetCnt(0)-1 do -- store selected items
 	sel_t[#sel_t+1] = r.GetSelectedMediaItem(0,i)
 	end
 r.SelectAllMediaItems(0,false) -- selected false // deselect all
@@ -8189,6 +8345,12 @@ r.UpdateArrange()
 return found
 end
 
+
+function Is_Item_Under_Mouse_Locked()
+local x, y = r.GetMousePosition()
+local item = r.GetItemFromPoint(x,y, true) -- allow_locked true
+return item and r.GetMediaItemInfo_Value(item, 'C_LOCK') & 1 == 1
+end
 
 
 --================================ I T E M S   E N D ==================================
@@ -10972,6 +11134,7 @@ local time_init = r.time_precise()
 repeat
 until condition and r.time_precise()-time_init >= 0.7 or not condition
 ]]
+r.UpdateTimeline() -- might be needed because tooltip can sometimes affect graphics
 end
 
 
@@ -11019,6 +11182,7 @@ local time_init = r.time_precise()
 repeat
 until condition and r.time_precise()-time_init >= 0.7 or not condition
 ]]
+r.UpdateTimeline() -- might be needed because tooltip can sometimes affect graphics
 end
 
 
@@ -11027,6 +11191,7 @@ function Error_Tooltip3(text, format) -- format must be true
 local x, y = r.GetMousePosition()
 local text = text and type(text) == 'string' and (format and text:upper():gsub('.','%0 ') or text) or 'not a valid "text" argument'
 r.TrackCtl_SetToolTip(text, x, y, true) -- topmost true
+r.UpdateTimeline() -- might be needed because tooltip can sometimes affect graphics
 end
 
 
@@ -11868,6 +12033,73 @@ local x, y = r.GetMousePosition()
 end
 Ad_Hoc_Setting()
 return r.defer(function() do return end end) end
+
+
+function Get_Lock_Settings1() -- see Get_Lock_Settings2() below which doesn't rely on SWS extension
+-- thanks to Mespotine https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
+-- https://github.com/mespotine/ultraschall-and-reaper-docs/blob/master/Docs/Reaper-ConfigVariables-Documentation.txt
+
+	if not r.APIExists('SNM_GetIntConfigVar') then return end -- no SWS extension
+	
+local bitfield = r.SNM_GetIntConfigVar('projsellock', -1)
+
+local disabled = bitfield < 16384 -- OR 2^14, global lock is disabled, if no flag is set it cannot be enabled
+local no_flags = bitfield == 16384 -- 'Enable locking' flag is set with no other flags checked, in this case lock (Options: Toggle locking) cannot be enabled; when at least one other flag is set 'Enable locking' flag is toggled with 'Options: Toggle locking' action
+
+local t = {}	
+	for i = 0, 12 do
+	t[#t+1] = bitfield & 2^i == 2^i
+	end
+
+-- 1 time selection, 2 items full, 4 track envelopes, 8 markers, 16 regions, 32 time sig markers
+-- 64 items (left/right move), 128 items (up/down move), 256 item edges, 512 item fade/vol handles
+-- 1024 loop points, 2048 take envelopes, 4096 item stretch markers
+
+return disabled, no_flags, table.unpack(t) -- 15 return values
+
+end
+-- GETTING OUTPUT:
+-- local disabled, no_flags, time_sel, itms_full, tr_env, proj_mrk, rgn, time_sig_mrk, itm_horiz_move, itm_vert_move, itm_edges, itm_fade_vol_hand, loop_pts, take_env, stretch_mrk = Get_Lock_Settings()
+
+
+function Get_Lock_Settings2()
+local cmd_t = {
+1135, -- Options: Toggle locking // always Off when there're no set flags 
+-- and cannot be set to On without at least one flag being set
+
+-- 0, -- placeholder for no_flags var // USELESS because when lock (above action)
+-- isn't enabled the following toggle actions don't report the state of their flags
+-- so it's impossible to find which flags are set unless lock is enabled,
+-- when no flag is set lock cannot be enabled
+
+-- all following actions are On ONLY if 'Options: Toggle locking' is On
+-- they don't report On state when their flag is set but the lock isn't enabled
+-- when lock isn't enabled toggling them to On automatically enables lock
+40573, -- Locking: Toggle time selection locking mode
+40576, -- Locking: Toggle full item locking mode
+40585, -- Locking: Toggle track envelope locking mode
+40591, -- Locking: Toggle marker locking mode
+40588, -- Locking: Toggle region locking mode
+40594, -- Locking: Toggle time signature marker locking mode
+40579, -- Locking: Toggle left/right item locking mode
+40582, -- Locking: Toggle up/down item locking mode
+40597, -- Locking: Toggle item edges locking mode
+40600, -- Locking: Toggle item fade/volume handles locking mode
+40629, -- Locking: Toggle loop points locking mode
+41851, -- Locking: Toggle take envelope locking mode
+41854 -- Locking: Toggle item stretch marker locking mode
+}
+
+	for i, cmd_ID in ipairs(cmd_t) do
+	cmd_t[i] = r.GetToggleCommandStateEx(0, cmd_ID) == 1
+	end
+
+return table.unpack(cmd_t) -- 14 return values
+	
+end
+-- GETTING OUTPUT:
+-- local enabled, time_sel, itms_full, tr_env, proj_mrk, rgn, time_sig_mrk, itm_horiz_move, itm_vert_move, itm_edges, itm_fade_vol_hand, loop_pts, take_env, stretch_mrk = Get_Lock_Settings2()
+
 
 
 ---- VALIDATE VARIABLES
