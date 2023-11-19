@@ -336,11 +336,14 @@ function Reload_Menu_at_Same_Pos1(menu, OPTION)
 ::RELOAD::
 local x, y = r.GetMousePosition()
 	if x+0 <= 100 then -- 100 px within the screen left edge
+	
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
 -- https://forum.cockos.com/showthread.php?t=280658&page=2#44
-	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
-	local init = old and gfx.init('', 0, 0)
+-- BUT LACK OF gfx WINDOW DOESN'T ALLOW RE-OPENING THE MENU AT THE SAME POSITION via ::RELOAD::
+-- therefore enabled when OPTION is valid
+local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+local init = (old or not old and OPTION) and gfx.init('', 0, 0)
 	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position	
 		-- ensure that if OPTION is enabled the menu opens every time at the same spot
 		if OPTION and not coord_t then -- OPTION is the one which enables menu reload
@@ -364,8 +367,10 @@ local x, y = r.GetMousePosition()
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
 -- https://forum.cockos.com/showthread.php?t=280658&page=2#44
-	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
-	local init = old and gfx.init('', 0, 0)
+-- BUT LACK OF gfx WINDOW DOESN'T ALLOW RE-OPENING THE MENU AT THE SAME POSITION via ::RELOAD::
+-- therefore enabled with OPTION is valid
+local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+local init = (old or not old and OPTION) and gfx.init('', 0, 0)
 	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
 		-- ensure that if OPTION is enabled the menu opens every time at the same spot
 		if OPTION and not coord_t then -- OPTION is the one which enables menu reload
@@ -5214,6 +5219,65 @@ function Deselect_All_Env_Points(env) -- incl. automation items
 end
 
 
+
+function Get_Env_Segment_At_Cursor(env, cur_pos, item, take)
+-- relies on Item_Time_2_Proj_Time() for getting take env points
+-- returns indices of segment start and end points which then can be gotten with
+-- r.GetEnvelopePoint(env, i)
+-- and set with r.SetEnvelopePoint(env, -1, i, timeIn, valueIn, shapeIn, tensionIn, true, noSortIn)
+-- the routine can be re-purposed to getting env point under cursor, within time selection or razor edit area
+
+	local function Get_Props_Of_AI_Overlapping_Env_Segm(env, pt_pos_st, pt_pos_end, cur_pos)
+		for i = 0, r.CountAutomationItems(env)-1 do
+		local pos = r.GetSetAutomationItemInfo(env, i, 'D_POSITION', -1, false) -- value -1, is_set false
+		local fin = pos + r.GetSetAutomationItemInfo(env, i, 'D_LENGTH', -1, false) -- value -1, is_set false
+			if pos <= pt_pos_st and fin >= pt_pos_st -- start point is overlapped
+			or pos <= pt_pos_end and fin >= pt_pos_end -- end point is overlapped
+			-- segment is overlapped and the cursor is located within the AI bounds
+			or pos >= pt_pos_st and fin <= pt_pos_end
+			and pos <= cur_pos and fin > cur_pos
+			then
+			return i, pos, fin
+			end
+		end
+	end 
+
+	for i = 0, r.CountEnvelopePoints(env)-1 do -- look for segment points
+		local retval, pos_end, val, shape, tens, sel = r.GetEnvelopePointEx(env, -1, i) -- autoitem_idx -1, ignore // OR r.GetEnvelopePoint()
+		pos_end = take and Item_Time_2_Proj_Time(pos_end, item, take) or pos_end
+			if pos_end and not end_pt_idx and pos_end >= cur_pos then -- pos_end can be nil if take env and the item is trimmed, because only pos of points within view is returned by Item_Time_2_Proj_Time() function
+			end_pt_idx, st_pt_idx = i, i-1
+				-- for track env only return points which aren't overlapped by an automation item
+				if not take and st_pt_idx > -1 then -- more than 1 point in the track env
+			-------------------------------------------------------
+				--[[ THIS ROUTINE ALLOWS SELECTING MAIN ENV SEGMGENT POINTS EVEN IF ONE OF THEM IS OVERLAPPED BY AN AI
+				local AI_idx, AI_st, AI_end = Get_Props_Of_AI_Intersecting_Cur_Pos(env, cur_pos)
+					if AI_idx then -- overlapping AI found
+					local retval, pos_start, val, shape, tens, sel = r.GetEnvelopePointEx(env, -1, st_pt_idx) -- autoitem_idx -1, ignore // OR r.GetEnvelopePoint()
+						if pos_start >= AI_st or pos_end <= AI_end then
+						end_pt_idx, st_pt_idx = nil -- reset as if the points weren't found
+						end
+					end
+				]]
+				-- THIS ROUTINE ENSURES THAT SEGMENT WHOSE POINTS ARE OVELAPPED BY AN AUTOMATION ITEM IS IGNORED
+			--	local overlap = Get_Props_Of_AI_Overlapping_Env_Pt(env, pos_end)
+				local retval, pos_start, val, shape, tens, sel = r.GetEnvelopePointEx(env, -1, st_pt_idx) -- autoitem_idx -1, ignore // OR r.GetEnvelopePoint()
+				local overlap = Get_Props_Of_AI_Overlapping_Env_Segm(env, pos_start, pos_end, cur_pos)
+					if overlap then
+					end_pt_idx, st_pt_idx = nil -- reset as if the points weren't found
+					end
+				end
+			------------------------------------------------------
+			break end
+		end
+	end
+	
+return st_pt_idx, end_pt_idx	
+	
+end
+
+
+
 --============================ E N V E L O P E S   E N D ==================================
 
 
@@ -5583,8 +5647,8 @@ function Get_Props_Of_AI_Overlapping_Env_Pt(env, pt_pos)
 end
 
 
-function Get_AI_Env_Segment_At_Cursor(cur_pos, AI_idx)
--- returns indices of cursor start and end points which then can be gotten with
+function Get_AI_Env_Segment_At_Cursor(env, cur_pos, AI_idx)
+-- returns indices of segment start and end points which then can be gotten with
 -- r.GetEnvelopePointEx(env, AI_idx|0x10000000, i)
 -- and set with r.SetEnvelopePointEx(env, AI_idx, i, timeIn, valueIn, shapeIn, tensionIn, true, noSortIn) -- here adding 0x10000000 isn't necessary
 -- the routine can be re-purposed to getting AI point under cursor, within time selection or razor edit area
@@ -5626,6 +5690,7 @@ local loop_iter
 return st_pt_idx, end_pt_idx
 
 end
+	
 	
 	
 	
@@ -6915,6 +6980,7 @@ end
 
 
 function Set_FX_Selected_In_FX_Chain(obj, fx_idx, chunk)
+-- doesn't support containers
 local take, tr = r.ValidatePtr(obj, 'MediaItem_Take*'), r.ValidatePtr(obj, 'MediaItem_Track*')
 local FX_Chain_Vis, FX_Open = table.unpack(take and {r.TakeFX_GetChainVisible, r.TakeFX_SetOpen} or tr and {r.TrackFX_GetChainVisible, r.TrackFX_SetOpen} or {})
 	if take or tr then
@@ -6922,6 +6988,10 @@ local FX_Chain_Vis, FX_Open = table.unpack(take and {r.TakeFX_GetChainVisible, r
 		then -- FX chain open
 		FX_Open(obj, fx_idx, true) -- open true
 		else -- to select FX in a closed FX chain technically it can be done wirh FX_SetOpen after opening the chain and then closing it, but you're running the risk of removing the focus from any currently focused windows whch is a bad practice
+		-- Since 7.06 FX_GetNamedConfigParm() 'chain_sel' can be used, e.g.
+		-- r.TrackFX_GetNamedConfigParm(tr, -1, 'chain_sel') 
+		-- r.TrackFX_SetNamedConfigParm(tr, -1, 'chain_sel', fx_idx) -- fx_idx is a string
+		-- https://forum.cockos.com/showthread.php?t=285177#19
 		local cur_sel_idx
 			for line in chunk:gmatch('[^\n\r]+') do
 				if line:match('LASTSEL') then 
@@ -6935,6 +7005,96 @@ local FX_Chain_Vis, FX_Open = table.unpack(take and {r.TakeFX_GetChainVisible, r
 		end
 	end
 end
+
+
+function Apply_FX_Chain(obj, fx_chain, recFX)
+-- obj is track or item, fx_chain is path to fx chain file,
+-- recFX is boolean to apply fx chain to track input/Monitor fx chain
+-- for take fx only single-take items are supported, 
+-- in multi-take items the chain is applied to the last take
+-- if target chain already contains fx they're replaced
+-- for tracks existing track items aren't a problem
+
+local tr, item = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem*')
+  
+	if tr or item then
+
+	-- OR USE custom Get/SetObjChunk()
+	local GetChunk, SetChunk = table.unpack(tr and {r.GetTrackStateChunk, r.SetTrackStateChunk} 
+	or item and {r.GetItemStateChunk, r.SetItemStateChunk})
+
+	local retval, chunk = GetChunk(obj , '', false) -- isundo false
+
+	local f = io.open(fx_chain,'r')
+	local fx_chain = f:read('*a')
+	f:close()
+
+	local chunk1, chunk2 = chunk:match('(.+)(>)') -- split the chunk 
+	-- adding fx chain to track after items code isn't a problem,
+	-- REAPER then places them in correct order
+	local merged = chunk1..(item and '<TAKEFX' 
+	or ('<FXCHAIN'..(recFX and '_REC' or '')))..'\n'
+	..fx_chain..'>\n'..chunk2 -- concatenate a new one
+
+	SetChunk(obj, merged, false) -- isundo false
+
+	end
+  
+end
+
+
+function Process_FX_Incl_In_All_Containers(obj, recFX, parent_cntnr_idx, parents_fx_cnt)
+-- https://forum.cockos.com/showthread.php?t=282861
+-- https://forum.cockos.com/showthread.php?t=282861#18
+-- https://forum.cockos.com/showthread.php?t=284400
+
+-- obj is track or take, recFX is boolean to target input/Monitoring FX
+-- parent_cntnr_idx, parents_fx_cnt must be nil
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+-- OR
+-- local tr, take = r.ValidatePtr(obj, 'MediaTrack*') and obj, r.ValidatePtr(obj, 'MediaItem_Take*') and obj // may be required to pass into the sub-function which does the processing
+
+local FXCount, GetIOSize, GetConfig, SetConfig, GetFXName = 
+table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm, 
+r.TrackFX_SetNamedConfigParm, r.TrackFX_GetFXName}
+or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm, 
+r.TakeFX_SetNamedConfigParm, r.TakeFX_GetFXName} or {})
+
+local fx_cnt = not parent_cntnr_idx and (recFX and r.TrackFX_GetRecCount(obj) or FXCount(obj))
+fx_cnt = fx_cnt or ({GetConfig(obj, parent_cntnr_idx, 'container_count')})[2]
+
+	if tr or take then
+		for i = 0, fx_cnt-1 do
+		-- only add 0x1000000 to fx index to target input/Monitoring fx inside the outermost fx chain
+		-- (at this stage parent_cntnr_idx is nil)
+		local i = not parent_cntnr_idx and recFX and i+0x1000000 or i
+		-- only use formula to calculate indices of fx in containers once parent_cntnr_idx var is valid
+		-- to keep the indices of fx in the root (outermost) fx chain intact
+		i = parent_cntnr_idx and (i+1)*parents_fx_cnt+parent_cntnr_idx or i
+		local container = GetIOSize(obj, i) == 8
+			if container then
+			-- DO STUFF TO CONTAINER (if needed) and proceed to its FX;
+			-- the following vars must be local to not interfere with the current loop and break i expression above
+			-- only add 0x2000000+1 to the very 1st (belonging to the outermost FX chain) container index 
+			-- (at this stage parent_cntnr_idx is nil)
+			-- and then keep container index obtained via the formula above throughout the recursive loop
+			local parent_cntnr_idx = parent_cntnr_idx and i or 0x2000000+i+1
+			-- multiply fx counts of all (grand)parent containers by the fx count 
+			-- of the current one + 1 as per the formula;
+			-- accounting for the outermost fx chain where parents_fx_cnt is nil
+			local parents_fx_cnt = (parents_fx_cnt or 1) * (fx_cnt+1)
+			Process_FX_Incl_In_All_Containers(obj, recFX, parent_cntnr_idx, parents_fx_cnt) -- recFX can be nil/false
+			else
+			-- DO STUFF TO FX
+			-- SetConfig(obj, i, 'renamed_name', 'TEST') -- e.g. rename all fx to 'TEST'
+			end
+		end
+	end
+
+end
+
+
 
 
 --================================================  F X  E N D  ==============================================
@@ -8939,7 +9099,7 @@ end
 
 function GFX_SETFONT_FLAGS(flags)
 -- function to calculate multibyte character for gfx.setfont() flags argument
--- flags is a string consisting on up to 4 characters out of: B/b, I/i, O/o, R/r, S/s, U/u, V/v
+-- flags is a string consisting of up to 4 characters out of: B/b, I/i, O/o, R/r, S/s, U/u, V/v
 -- https://www.cuemath.com/numbers/decimal-to-binary/
 -- https://flexiple.com/developers/decimal-to-binary-conversion/
 -- https://stackoverflow.com/questions/9079853/lua-print-integer-as-a-binary
@@ -10818,6 +10978,8 @@ local val = cont:match(key..'=([%.%d]+)') == value -- OR '=(.-)\n'
 return val
 -- OR SIMPLY: return cont:match(key..'=([%.%d]+)') == value
 end
+-- same as the native
+-- retval, buf = reaper.get_config_var_string()
 
 
 function Extract_reaper_ini_val(key) -- the arg must be string
