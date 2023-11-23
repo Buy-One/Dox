@@ -3408,7 +3408,7 @@ function ReStoreSelectedItems(t, keep_last_selected)
 		end
 	local i = 0
 		while i < #t do
-		r.SetMediaItemSelected(t[i+1],true) -- +1 since item count is 1 based while the table is indexed from 1
+		r.SetMediaItemSelected(t[i+1],true) -- +1 since item count is 0 based while the table is indexed from 1
 		i = i + 1
 		end	
 	end
@@ -4008,6 +4008,8 @@ end
 
 
 function Temp_Track_For_FX(obj, fx_idx, take_GUID)
+-- instead of using take_GUID to condition selection of take related function use
+-- local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 
 r.PreventUIRefresh(1)
 
@@ -4018,7 +4020,7 @@ r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0) -- hide in Mixer
 r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
 
 r.TrackFX_AddByName(temp_track, 'Video processor', 0, -1) -- insert
-local copy = take_GUID and r.TakeFX_CopyToTrack(obj, fx_idx, temp_track, 0, false) or not take_GUID and r.TrackFX_CopyToTrack(obj, fx_idx, temp_track, 0, false) -- is_move false // difficult to work with r.TrackFX_AddByName() using plugin names as they can be renamed which will only be reflected in reaper-vstrenames(64).ini, not in the chunk; 'not take_GUID' cond is needed to avoid error when object is take which doesn't fit TrackFX_CopyToTrack() function // when copying FX envelopes don't follow, only when moving
+local copy = take_GUID and r.TakeFX_CopyToTrack(obj, fx_idx, temp_track, 0, false) or not take_GUID and r.TrackFX_CopyToTrack(obj, fx_idx, temp_track, 0, false) -- is_move false // difficult to work with r.TrackFX_AddByName() using plugin names as they can be renamed which will only be reflected in reaper-vstrenames(64).ini, not in the chunk; 'not take_GUID' cond is needed to avoid error when object is take which doesn't fit TrackFX_CopyToTrack() function // when copying FX envelopes don't follow, only when moving; since 6.37 TrackFX_AddByName() can be safely used after retrieving fx name displayed in the FX browser with r.Track/TakeFX_GetNamedConfigParm(obj, fx_idx, 'original_name') or 'fx_name'
 
 -- DO STUFF --
 
@@ -4320,7 +4322,7 @@ TOGGLE
 local bitfield = r.GetSetTrackGroupMembership(r.GetSelectedTrack(0,0), 'VOLUME_LEAD', 0, 32) -- query group 6
 --Msg(state&32==32)
 local set = bitfield&32==32 and 0 or 32
-r.GetSetTrackGroupMembership(r.GetSelectedTrack(0,0), 'VOLUME_LEAD', 32, set) -- set// setvalue 32 to set, 0 to unset
+r.GetSetTrackGroupMembership(r.GetSelectedTrack(0,0), 'VOLUME_LEAD', 32, set) -- set // setvalue 32 to set, 0 to unset
 --OR
 --r.GetSetTrackGroupMembership(r.GetSelectedTrack(0,0), 'VOLUME_LEAD', 32, bitfield~32) -- set if not set and vice versa
 ]]
@@ -4333,20 +4335,20 @@ local parm_t = {'VOLUME','VOLUME_VCA','PAN','WIDTH','MUTE','SOLO',
 	for i = 0, 32 do -- 32 bits, each represents 1 of the 64 groups
 	local bit = 2^i -- calculate the bit representing the group
 		for k, parm in ipairs(parm_t) do
-			if k <=9 then -- parms which have two roles
+			if k <=9 then -- parms which have two roles, master and slave
 			-- Master role
 			local bitfield = GetSet(tr, parm..m, 0, bit) -- setmask is 0, query, setvalue is the target bit, returns current bitfield
-				if bitfield&bit == bit then -- set // mask is used to query the state
+				if bitfield&bit == bit then -- is set // mask is used to query the state
 				GetSet(tr, parm..m, bit, bitfield~bit) -- setmask is the target bit, setvalue is 0, created with bitwise NOT
 				end
 			-- Slave role
 			local bitfield = GetSet(tr, parm..s, 0, bit) -- query
-				if bitfield&bit == bit then -- set
+				if bitfield&bit == bit then -- is set
 				GetSet(tr, parm..s, bit, bitfield~bit) -- unset
 				end
 			else -- parms which don't have roles and are additional
 			local bitfield = GetSet(tr, parm, 0, bit) -- query
-				if bitfield&bit == bit then -- set
+				if bitfield&bit == bit then -- is set
 				GetSet(tr, parm, bit, bitfield~bit) -- unset
 				end
 			end
@@ -4356,7 +4358,9 @@ local parm_t = {'VOLUME','VOLUME_VCA','PAN','WIDTH','MUTE','SOLO',
 end
 
 
-function Remove_Track_Master_Role_From_All_Groups(tr, high) -- high is boolean to target groups 33-64 // to remove from Slave role comment out Master and additional parameter routines
+function Remove_Track_Roles_From_All_Groups(tr, high, want_master, want_slave) 
+-- high is boolean to target groups 33-64 // to remove from Slave role comment out Master and additional parameter routines
+-- want_master, want_slave are booleans to chose which role to remove, or both
 -- the bits are counted as 1,2,4,8,16,32,64,128 etc. up to 4,294,967,295
 -- each bit represents one of the first 32 groups with the function GetSetTrackGroupMembership()
 -- and one of groups 33-64 with the function GetSetTrackGroupMembershipHigh()
@@ -4372,6 +4376,8 @@ r.GetSetTrackGroupMembership(r.GetSelectedTrack(0,0), 'VOLUME_LEAD', 32, set) --
 --OR
 --r.GetSetTrackGroupMembership(r.GetSelectedTrack(0,0), 'VOLUME_LEAD', 32, bitfield~32) -- set if not set and vice versa
 ]]
+	if not want_master and not_want_slave then return end
+	
 local GetSet = high and r.GetSetTrackGroupMembershipHigh or r.GetSetTrackGroupMembership
 local m, s = '_MASTER', '_SLAVE'
 local parm_t = {'VOLUME','VOLUME_VCA','PAN','WIDTH','MUTE','SOLO',
@@ -4381,20 +4387,25 @@ local parm_t = {'VOLUME','VOLUME_VCA','PAN','WIDTH','MUTE','SOLO',
 	for i = 0, 32 do -- 32 bits, each represents 1 of the 64 groups
 	local bit = 2^i -- calculate the bit representing the group
 		for k, parm in ipairs(parm_t) do
-			if k <=9 then -- parms which have two roles
-			-- Master role
-			local bitfield = GetSet(tr, parm..m, 0, bit) -- setmask is 0, query, setvalue is the target bit, returns current bitfield
-				if bitfield&bit == bit then -- set // mask is used to query the state
+			if k <=9 then -- parms which have two roles, master and slave
+				if want_master then
+				-- Master role
+				local bitfield = GetSet(tr, parm..m, 0, bit) -- setmask is 0, query, setvalue is the target bit, returns current bitfield
+					if bitfield&bit == bit then -- is set // mask is used to query the state
 				GetSet(tr, parm..m, bit, bitfield~bit) -- setmask is the target bit, setvalue is 0, created with bitwise NOT
+					end
 				end
-			--[[ Slave role
-			local bitfield = GetSet(tr, parm..s, 0, bit) -- query
-				if bitfield&bit == bit then -- set
-				GetSet(tr, parm..s, bit, bitfield~bit) -- unset
+				if want_slave then
+				-- Slave role
+				local bitfield = GetSet(tr, parm..s, 0, bit) -- query
+					if bitfield&bit == bit then -- is set
+					GetSet(tr, parm..s, bit, bitfield~bit) -- unset
+					end
 				end
+			--[[
 			else -- parms which don't have roles and are additional
 			local bitfield = GetSet(tr, parm, 0, bit) -- query
-				if bitfield&bit == bit then -- set
+				if bitfield&bit == bit then -- is set
 				GetSet(tr, parm, bit, bitfield~bit) -- unset
 				end
 			--]]
@@ -7084,7 +7095,7 @@ fx_cnt = fx_cnt or ({GetConfig(obj, parent_cntnr_idx, 'container_count')})[2]
 			-- of the current one + 1 as per the formula;
 			-- accounting for the outermost fx chain where parents_fx_cnt is nil
 			local parents_fx_cnt = (parents_fx_cnt or 1) * (fx_cnt+1)
-			Process_FX_Incl_In_All_Containers(obj, recFX, parent_cntnr_idx, parents_fx_cnt) -- recFX can be nil/false
+			Process_FX_Incl_In_All_Containers(obj, recFX, parent_cntnr_idx, parents_fx_cnt) -- recFX can be nil/false // go recursive
 			else
 			-- DO STUFF TO FX
 			-- SetConfig(obj, i, 'renamed_name', 'TEST') -- e.g. rename all fx to 'TEST'
@@ -7095,6 +7106,170 @@ fx_cnt = fx_cnt or ({GetConfig(obj, parent_cntnr_idx, 'container_count')})[2]
 end
 
 
+function Collect_All_Container_FX_Indices(t, obj, recFX, parent_cntnr_idx, parents_fx_cnt)
+-- t must be nil, obj is track or take, recFX is boolean to target input/Monitoring FX
+-- parent_cntnr_idx, parents_fx_cnt must be nil
+-- fx indices from the outermost fx chain (the object main fx chain) are of course stored as well
+-- see Loop_Over_FX_Container_Table() next
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+
+local FXCount, GetIOSize, GetConfig = table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, 
+r.TrackFX_GetNamedConfigParm} or take and {r.TakeFX_GetCount, r.TrackFX_GetIOSize, 
+r.TakeFX_GetNamedConfigParm} or {})
+
+local fx_cnt = not parent_cntnr_idx and (recFX and r.TrackFX_GetRecCount(obj) or FXCount(obj))
+fx_cnt = fx_cnt or ({GetConfig(obj, parent_cntnr_idx, 'container_count')})[2]
+
+local t = t or {} -- add table for the outermost FX chain on the very first run
+	
+	-- collect all fx instances in a chain, including containers
+	for i = 0, fx_cnt-1 do
+	local i = not parent_cntnr_idx and recFX and i+0x1000000 or i
+	i = parent_cntnr_idx and (i+1)*parents_fx_cnt+parent_cntnr_idx or i
+	t[#t+1] = i
+	end
+	
+	-- search for containers in the fx chain data stored above
+	-- and if found go recursive to collect fx instances inside them
+	for i, fx_idx in ipairs(t) do
+	local container = GetIOSize(obj, fx_idx) == 8
+	local retval, cont_fx_cnt = r.TrackFX_GetNamedConfigParm(obj, fx_idx, 'container_count') -- retval true even if container is empty
+		if container and cont_fx_cnt+0 > 0 then
+		t[i] = {fx_idx, {}} -- replace container index with a nested table containing its index and another nested table to collect indices of fx inside it
+		local parent_cntnr_idx = parent_cntnr_idx and fx_idx or 0x2000000+fx_idx+1
+		local parents_fx_cnt = (parents_fx_cnt or 1) * (#t+1) -- #t is equal to fx count in the parent container
+		-- the function must not return table, otherwise its structure will be reversed
+		-- starting from the innermost fx chain with no way to get higher
+		-- the table is the same througouht the entire recursive loop anyway
+		Collect_All_Container_FX_Indices(t[i][2], obj, recFX, parent_cntnr_idx, parents_fx_cnt) -- go recursive // t[i][2] is the address of the nested table for collecting container fx indices
+		end
+	end
+
+return t
+
+end
+
+
+function Loop_Over_FX_Container_Table(obj, t)
+-- obj is track or take, t is the table returned by Collect_All_Container_FX_Indices() above
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+
+-- add functions as necessary depending on the type of fx processing needed
+local FXCount, GetIOSize, GetConfig, SetConfig, GetFXName = 
+table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm, 
+r.TrackFX_SetNamedConfigParm, r.TrackFX_GetFXName}
+or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm, 
+r.TakeFX_SetNamedConfigParm, r.TakeFX_GetFXName} or {})
+
+	-- target fx instances in a chain ignoring containers
+	for k, fx_idx in ipairs(t) do
+		if tonumber(fx_idx) then -- fx instance // if container evaluation will be false since the value is table
+	--  DO STUFF TO FX INSTANCES
+	--	local ret, name = GetFXName(obj, fx_idx, '')
+	--	Msg(name, fx_idx)
+		end
+	end
+	-- target containers, ignoring fx instances
+	for k, cont in ipairs(t) do
+		if not tonumber(cont) then -- table storing container index and its fx list
+	-- 	DO STUFF TO CONTAINER IF NEEDED USING ITS INDEX AT cont[1]
+		Loop_Over_FX_Container_Table(obj, cont[2]) -- go recursive to loop over container fx, cont[2] is the address of the nested table with container fx indices list, at cont[1] container own index is stored
+		end
+	end
+
+end
+
+
+
+function Get_FX_Parm_Orig_Name(obj, fx_idx)
+-- in case it's been aliased by the user
+-- obj is track or take
+-- works with builds 6.37+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+local GetConfig = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
+-- get fx name displayed in fx browser
+local retval, fx_name = GetConfig(obj, fx_idx, 'original_name') -- or 'fx_name'
+-- insert temp track
+r.PreventUIRefresh(1)
+r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
+local temp_track = r.GetTrack(0,r.CountTracks(0)-1)
+r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0) -- hide in Mixer
+r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
+-- insert FX instance on the temp track
+-- the fx names retrieved with GetNamedConfigParm() always contains fx type prefix,
+-- the function FX_AddByName() supports fx type prefixing but in the retrieved fx name 
+-- the fx type prefix is followed by space which isn't allowed in FX_AddByName()
+-- so it must be removed, otherwise the function will fail
+-- https://forum.cockos.com/showthread.php?t=285430
+fx_name = fx_name:gsub(' ','',1) -- 1 is index of the 1st space in the string
+r.TrackFX_AddByName(temp_track, fx_name, 0, -1) -- insert // recFX 0 = false, instantiate is -1
+-- search for the name of parameter at the same index as the one being evaluated
+local retval, parm_name
+	for i = 0, r.TrackFX_GetNumParams(temp_track, 0)-1 do -- fx_idx 0
+	retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, i, '') -- fx_idx 0
+		if i == parm_idx then break end -- must break rather than return to allow deletion of the temp track before returning the value
+	end
+r.DeleteTrack(temp_track)
+r.PreventUIRefresh(-1)
+
+return parm_name
+
+end
+
+
+function Validate_FX_Identity(obj, fx_idx, parm_t) 
+-- the function is based on Get_FX_Parm_Orig_Name() above
+-- in case it's been aliased by the user
+-- obj is track or take
+-- parm_t is a table indexed by param indices whose fields hold corresponding original param names
+-- e.g. {[4] = 'parm name 4', [12] = 'parm name 12', [23] = 'parm name 23'}
+-- works with builds 6.37+
+-- elipsis is list of parm indices to get the names of
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+local GetFXName, GetConfig = 
+table.unpack(tr and {r.TrackFX_GetFXName, r.TrackFX_GetNamedConfigParm} 
+or take and {r.TakeFX_GetFXName, r.TakeFX_GetNamedConfigParm} or {})
+-- get name displayed in fx chain
+local retval, fx_chain_name = GetFXName(obj, fx_idx, '')
+-- get fx name displayed in fx browser
+local retval, orig_fx_name = GetConfig(obj, fx_idx, 'original_name') -- or 'fx_name' // returned with fx type prefix
+	if fx_chain_name == orig_fx_name then return true end
+
+-- if fx chain displayed name doesn't match fx browser displayed name, meaning was renamed
+-- validate using parameter names
+
+-- insert temp track
+r.PreventUIRefresh(1)
+r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
+local temp_track = r.GetTrack(0,r.CountTracks(0)-1)
+r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0) -- hide in Mixer
+r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
+-- insert FX instance on the temp track
+-- the fx names retrieved with GetNamedConfigParm() always contains fx type prefix,
+-- the function FX_AddByName() supports fx type prefixing but in the retrieved fx name 
+-- the fx type prefix is followed by space which isn't allowed in FX_AddByName()
+-- so it must be removed, otherwise the function will fail
+-- https://forum.cockos.com/showthread.php?t=285430
+orig_fx_name = orig_fx_name:gsub(' ','',1) -- 1 is index of the 1st space in the string
+r.TrackFX_AddByName(temp_track, orig_fx_name, 0, -1) -- insert // recFX 0 = false, instantiate is -1
+-- search for the name of parameter at the same index as the one being evaluated
+local name_match = true
+	for i = 0, r.TrackFX_GetNumParams(temp_track, 0)-1 do -- fx_idx 0
+	local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, i, '') -- fx_idx 0
+		if parm_t[i] and parm_t[i] ~= parm_name then
+		-- break rather than return to allow deletion of the temp track 
+		-- before returning the value
+		name_match = false break
+		end
+	end
+r.DeleteTrack(temp_track)
+r.PreventUIRefresh(-1)
+
+return name_match
+
+end
 
 
 --================================================  F X  E N D  ==============================================
@@ -11344,9 +11519,10 @@ r.TrackCtl_SetToolTip(text, x+x2, y+y2, true) -- topmost true
 -- r.TrackCtl_SetToolTip(text:upper():gsub('.','%0 '), x, y, true) -- spaced out // topmost true
 	if want_color then	
 	local color_init = r.GetThemeColor('col_tl_bg', 0)
+	-- 255<<8 green, 255 red, 255<<16 blue, 255<<8|32767 or 65535 yelow
 	local color = color_init ~= 255 and 255 or 65535 -- use red or yellow if red is taken
 		if want_blink then
-		    for i = 1, 100 do    
+		    for i = 1, 100 do
 				if i == 1 or i == 40 or i == 80 then
 				r.SetThemeColor('col_tl_bg', color, 0)
 				elseif i == 20 or i == 60 or i == 100 then
