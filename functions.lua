@@ -331,24 +331,31 @@ local input = gfx.showmenu(menu) -- menu string
 local quit = old and gfx.quit()
 
 
-function Reload_Menu_at_Same_Pos1(menu, OPTION)
+function Reload_Menu_at_Same_Pos1(menu, keep_menu_open, left_edge_dist)
+-- keep_menu_open is boolean
+-- left_edge_dist is integer to only display the menu 
+-- when the mouse cursor is within the sepecified distance in px from the screen left edge
 -- only useful for looking up the result of a toggle action, below see a more practical example
+
 ::RELOAD::
+
+left_edge_dist = left_edge_dist and left_edge_dist > 0 and math.floor(left_edge_dist)
 local x, y = r.GetMousePosition()
-	if x+0 <= 100 then -- 100 px within the screen left edge
+
+	if left_edge_dist and x <= left_edge_dist or not left_edge_dist then -- 100 px within the screen left edge
 	
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
 -- https://forum.cockos.com/showthread.php?t=280658&page=2#44
 -- BUT LACK OF gfx WINDOW DOESN'T ALLOW RE-OPENING THE MENU AT THE SAME POSITION via ::RELOAD::
--- therefore enabled when OPTION is valid
+-- therefore enabled when keep_menu_open is valid
 local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
-local init = (old or not old and OPTION) and gfx.init('', 0, 0)
+local init = (old or not old and keep_menu_open) and gfx.init('', 0, 0)
 	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position	
-		-- ensure that if OPTION is enabled the menu opens every time at the same spot
-		if OPTION and not coord_t then -- OPTION is the one which enables menu reload
+		-- ensure that if keep_menu_open is enabled the menu opens every time at the same spot
+		if keep_menu_open and not coord_t then -- keep_menu_open is the one which enables menu reload
 		coord_t = {x = gfx.mouse_x, y = gfx.mouse_y}
-		elseif not OPTION then
+		elseif not keep_menu_open then
 		coord_t = nil
 		end
 	gfx.x = coord_t and coord_t.x or gfx.mouse_x
@@ -360,39 +367,50 @@ local init = (old or not old and OPTION) and gfx.init('', 0, 0)
 	end
 end
 
+
 ::RELOAD::
-function Reload_Menu_at_Same_Pos2(menu, OPTION) -- still doesn't allow keeping the menu open after clicking away
+function Reload_Menu_at_Same_Pos2(menu, keep_menu_open, left_edge_dist) 
+-- keep_menu_open is boolean
+-- left_edge_dist is integer to only display the menu 
+-- when the mouse cursor is within the sepecified distance in px from the screen left edge
+
+left_edge_dist = left_edge_dist and left_edge_dist > 0 and math.floor(left_edge_dist)
 local x, y = r.GetMousePosition()
-	if x+0 <= 100 then -- 100 px within the screen left edge
+
+	if left_edge_dist and x <= left_edge_dist or not left_edge_dist then -- 100 px within the screen left edge
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
 -- https://forum.cockos.com/showthread.php?t=280658&page=2#44
 -- BUT LACK OF gfx WINDOW DOESN'T ALLOW RE-OPENING THE MENU AT THE SAME POSITION via ::RELOAD::
--- therefore enabled with OPTION is valid
+-- therefore enabled with keep_menu_open is valid
 local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
-local init = (old or not old and OPTION) and gfx.init('', 0, 0)
+local init = (old or not old and keep_menu_open) and gfx.init('', 0, 0)
 	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
-		-- ensure that if OPTION is enabled the menu opens every time at the same spot
-		if OPTION and not coord_t then -- OPTION is the one which enables menu reload
+		-- ensure that if keep_menu_open is enabled the menu opens every time at the same spot
+		if keep_menu_open and not coord_t then -- keep_menu_open is the one which enables menu reload
 		coord_t = {x = gfx.mouse_x, y = gfx.mouse_y}
-		elseif not OPTION then
+		elseif not keep_menu_open then
 		coord_t = nil
 		end
+
 	gfx.x = coord_t and coord_t.x or gfx.mouse_x
 	gfx.y = coord_t and coord_t.y or gfx.mouse_y
+
 	return gfx.showmenu(menu) -- menu string
+	
 	end
+	
 end
 -- USE:
 --[[
 local retval = Reload_Menu_at_Same_Pos2(menu)
-	if retval == xyz then -- returned menu item index other than 0
+	if retval and retval == xyz then -- returned menu item index other than 0
 -- 	DO STUFF
-	end
-	if retval > 0 then goto RELOAD
+	goto RELOAD
 	else return r.defer(function() do return end end)
 	end
 ]]
+
 
 function Re_Store_Ext_State(section, key, persist, val) -- section & key args are strings, persist is boolean if false/nil global ext state is only stored for the duration of REAPER session, only relevant for storage stage; presence of val arg is anything which needs storage, determines whether the state is loaded or stored
 	if not val then
@@ -3191,6 +3209,26 @@ return 	grid, swing, note
 end
 
 
+function Get_Track_MIDI_Note_Names(tr)
+local note_names = '<MIDINOTENAMES'
+	for note_idx = 0, 127 do -- note range
+		for chan_idx = -1, 15 do -- MIDI channel range, -1 is omni
+		local name = r.GetTrackMIDINoteNameEx(0, tr, note_idx, chan_idx)
+			if name then
+			-- enclose inside quotes if contains spaces as per REAPER format
+			name = name:match(' ') and '"'..name..'"' or name
+			-- concatenate <MIDINOTENAMES block line
+			note_names = note_names..'\n'..chan_idx..' '..note_idx..' '..name..' 0 '..note_idx
+			-- if name is found under onmi MIDI channel it will also be returned for all 16 channel
+			-- so no point in continuing because this is not how the code looks in the track chunk
+				if chan_idx == -1 then break end
+			end
+		end
+	end
+return note_names ~= '<MIDINOTENAMES' and note_names..'\n>'
+end
+
+
 --============================= M I D I  E N D =============================
 
 
@@ -4567,6 +4605,26 @@ end
 -- USE
 -- Update_Track_MIDI_Note_Names(tr, {[50]=48,[48]=46}, {0,1}) -- shift_by table, chan array
 -- Update_Track_MIDI_Note_Names(tr, 3, 2) -- shift_by 3, chan 2
+
+
+function Get_Track_MIDI_Note_Names(tr)
+local note_names = '<MIDINOTENAMES'
+	for note_idx = 0, 127 do -- note range
+		for chan_idx = -1, 15 do -- MIDI channel range, -1 is omni
+		local name = r.GetTrackMIDINoteNameEx(0, tr, note_idx, chan_idx)
+			if name then
+			-- enclose inside quotes if contains spaces as per REAPER format
+			name = name:match(' ') and '"'..name..'"' or name
+			-- concatenate <MIDINOTENAMES block line
+			note_names = note_names..'\n'..chan_idx..' '..note_idx..' '..name..' 0 '..note_idx
+			-- if name is found under onmi MIDI channel it will also be returned for all 16 channel
+			-- so no point in continuing because this is not how the code looks in the track chunk
+				if chan_idx == -1 then break end
+			end
+		end
+	end
+return note_names ~= '<MIDINOTENAMES' and note_names..'\n>'
+end
 
 
 --================================ T R A C K S  E N D ================================
@@ -7183,7 +7241,7 @@ end
 
 
 
-function Get_FX_Parm_Orig_Name(obj, fx_idx)
+function Get_FX_Parm_Orig_Name(obj, fx_idx, parm_idx)
 -- in case it's been aliased by the user
 -- obj is track or take
 -- works with builds 6.37+
@@ -7219,42 +7277,35 @@ return parm_name
 end
 
 
-function Validate_FX_Identity(obj, fx_idx, parm_t) 
+function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t) 
 -- the function is based on Get_FX_Parm_Orig_Name() above
 -- in case it's been aliased by the user
 -- obj is track or take
+-- fx_name is the original name of the plugin being validated
 -- parm_t is a table indexed by param indices whose fields hold corresponding original param names
 -- e.g. {[4] = 'parm name 4', [12] = 'parm name 12', [23] = 'parm name 23'}
 -- works with builds 6.37+
--- elipsis is list of parm indices to get the names of
+-- relies on Esc() function
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-local GetFXName, GetConfig = 
-table.unpack(tr and {r.TrackFX_GetFXName, r.TrackFX_GetNamedConfigParm} 
-or take and {r.TakeFX_GetFXName, r.TakeFX_GetNamedConfigParm} or {})
+local GetFXName, GetConfig, CopyFX = 
+table.unpack(tr and {r.TrackFX_GetFXName, r.TrackFX_GetNamedConfigParm, r.TrackFX_CopyToTrack} 
+or take and {r.TakeFX_GetFXName, r.TakeFX_GetNamedConfigParm, r.TakeFX_CopyToTrack} or {})
 -- get name displayed in fx chain
 local retval, fx_chain_name = GetFXName(obj, fx_idx, '')
--- get fx name displayed in fx browser
-local retval, orig_fx_name = GetConfig(obj, fx_idx, 'original_name') -- or 'fx_name' // returned with fx type prefix
-	if fx_chain_name == orig_fx_name then return true end
-
--- if fx chain displayed name doesn't match fx browser displayed name, meaning was renamed
+	if fx_chain_name:match(Esc(fx_name)) then return true end -- ignoring fx type prefix
+	
+-- if fx chain displayed name doesn't match the user supplied name, meaning was renamed
 -- validate using parameter names
 
--- insert temp track
+-- add temp track and copy the fx instance to it
 r.PreventUIRefresh(1)
 r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
 local temp_track = r.GetTrack(0,r.CountTracks(0)-1)
 r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0) -- hide in Mixer
 r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
--- insert FX instance on the temp track
--- the fx names retrieved with GetNamedConfigParm() always contains fx type prefix,
--- the function FX_AddByName() supports fx type prefixing but in the retrieved fx name 
--- the fx type prefix is followed by space which isn't allowed in FX_AddByName()
--- so it must be removed, otherwise the function will fail
--- https://forum.cockos.com/showthread.php?t=285430
-orig_fx_name = orig_fx_name:gsub(' ','',1) -- 1 is index of the 1st space in the string
-r.TrackFX_AddByName(temp_track, orig_fx_name, 0, -1) -- insert // recFX 0 = false, instantiate is -1
--- search for the name of parameter at the same index as the one being evaluated
+-- search for the name of fx parameter at the same index as the one being evaluated, in the copy of the fx
+-- on the temp track
+CopyFX(obj, fx_idx, temp_track, 0)
 local name_match = true
 	for i = 0, r.TrackFX_GetNumParams(temp_track, 0)-1 do -- fx_idx 0
 	local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, i, '') -- fx_idx 0
@@ -7264,6 +7315,32 @@ local name_match = true
 		name_match = false break
 		end
 	end
+
+-- if name_match ends up being false there's possibility that it has been aliased
+-- in which case collate parm names in the clean instance of the fx loaded from the fx browser in builds 6.37+
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.37 then -- instead of '< 6.37 then return name_match' to allow deletion of the temp track
+	-- get fx name displayed in fx browser
+	local retval, orig_fx_name = GetConfig(obj, fx_idx, 'original_name') -- or 'fx_name' // returned with fx type prefix
+	-- insert temp track
+	-- insert FX instance on the temp track
+	-- the fx names retrieved with GetNamedConfigParm() always contains fx type prefix,
+	-- the function FX_AddByName() supports fx type prefixing but in the retrieved fx name 
+	-- the fx type prefix is followed by space which isn't allowed in FX_AddByName()
+	-- so it must be removed, otherwise the function will fail
+	-- https://forum.cockos.com/showthread.php?t=285430
+	orig_fx_name = orig_fx_name:gsub(' ','',1) -- 1 is index of the 1st space in the string	
+	r.TrackFX_AddByName(temp_track, orig_fx_name, 0, -1000) -- insert // recFX 0 = false, instantiate at index 0
+	name_match = true
+		for i = 0, r.TrackFX_GetNumParams(temp_track, 0)-1 do -- fx_idx 0
+		local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, i, '') -- fx_idx 0
+			if parm_t[i] and parm_t[i] ~= parm_name then
+			-- break rather than return to allow deletion of the temp track 
+			-- before returning the value
+			name_match = false break
+			end
+		end
+	end
+		
 r.DeleteTrack(temp_track)
 r.PreventUIRefresh(-1)
 
@@ -11440,6 +11517,59 @@ local end_sec = r.MIDI_GetProjTimeFromPPQPos(take, fin)
 local len_sec =  math.floor((end_sec-st_sec)*1000+0.5)/1000 -- simple subtraction for some reason results in a value with 19 decimal places which is smaller than the expected value by a minute amount unless rounded up and throws the equality evaluation off even though the parts of the subtraction don't seem to be affected by this tiny deviation, so rounding down to 3 (1000) decimal places which is as many as needed for milliseconds; relevant for notes which aren't snapped to grid		
 return len_sec >= val1 and len_sec <= val2
 end
+
+
+
+function Offset_Shift_Value_To_Land_On_Natural_Keys(curr_val, shift_by_val, normalized)
+-- returns actual MIDI note number, not the one used by RS5k 'Note range start/end' parameters
+-- shift_by_val is treated as white (natural) keys count
+-- normalized is boolean to condition processing curr_val as RS5k internal pitch values in the range of 0-1
+-- identifyng normalized values by their format alone isn't a completelly reliable method
+-- because values 0 and 1 are part of the range as they're part of 0-127 range
+-- even though the likelihood of reaching the range limits in the settings isn't very high
+-- the Offset in the name doesn't apply to this version of the function
+
+local unit = 1/127 -- normalized value used by Note range start/end parameters in the range of 0-1
+local curr_val = normalized and math.floor(curr_val/unit + 0.5) or curr_val -- convert to conventional 0-based note number to be able to use modulo below
+local sign = shift_by_val < 0 and -1 or shift_by_val > 0 and 1 or 0
+local natural_keys_cnt = 0
+	for i = 1, 127 do -- shift original note number counting how many natural (white) keys have been passed along the way
+	dest_val = curr_val+i*sign
+		if dest_val == 0 or dest_val%12 == 0 or dest_val == 2 or dest_val%12 == 2 -- C or D
+		or dest_val == 4 or dest_val%12 == 4 or dest_val == 5 or dest_val%12 == 5 -- E or F
+		or dest_val == 7 or dest_val%12 == 7 or dest_val == 9 or dest_val%12 == 9 -- G or A
+		or dest_val == 11 or dest_val%12 == 11 then -- B
+		natural_keys_cnt = natural_keys_cnt+1*sign
+		end
+		if natural_keys_cnt == shift_by_val then return dest_val end -- return as soon as the number of counted white keys equals shift_by_val
+	end
+end
+
+
+function Offset_Shift_Value_To_Land_On_Natural_Keys(curr_val, shift_by_val, prev_note, normalized)
+-- returns actual MIDI note number, not the one used by RS5k 'Note range start/end' parameters
+-- shift_by_val is treated as chromatic notes count
+-- normalized is boolean to condition processing curr_val as RS5k internal pitch values in the range of 0-1
+-- identifyng normalized values by their format alone isn't a completelly reliable method
+-- because values 0 and 1 are part of the range as they're part of 0-127 range
+-- even though the likelihood of reaching the range limits in the settings isn't very high
+
+local unit = 1/127 -- normalized value used by Note range start/end parameters in the range of 0-1
+local dest_val = (normalized and math.floor(curr_val/unit + 0.5) or curr_val) + shift_by_val -- convert to conventional 0-based note number to be able to use modulo below
+--Msg(dest_val)
+-- offset in case the note ends up being an accidental rather than a natural (white) key
+local offset_val = shift_by_val < 0 and -1 or shift_by_val > 0 and 1 or 0
+local dest_val = (dest_val == 1 or dest_val%12 == 1 or dest_val == 3 or dest_val%12 == 3
+or dest_val == 6 or dest_val%12 == 6 or dest_val == 8 or dest_val%12 == 8
+or dest_val == 10 or dest_val%12 == 10) -- accidentals (black keys) relative to C key
+and dest_val+offset_val or dest_val
+-- offset in case note clashes with the previous one which may happen due to adjustment of notes which end up as accidentals after initial shifting above
+local offset_val = shift_by_val < 0 and -2 or shift_by_val > 0 and 2 or 0
+local dest_val = prev_note and dest_val == prev_note and dest_val+offset_val or dest_val
+return dest_val
+
+end
+
 
 
 --====================== M E A S U R E M E N T S   E N D =======================================
