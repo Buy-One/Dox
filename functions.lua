@@ -42,6 +42,8 @@ F I L E S
 
 M E A S U R E M E N T S
 
+U T I L I T Y
+
 B A S E 6 4  E N / D E C O D E R
 
 U N I C O D E  --  U T F - 8   C O N V E R T E R
@@ -403,11 +405,22 @@ local init = (old or not old and keep_menu_open) and gfx.init('', 0, 0)
 end
 -- USE:
 --[[
+::RELOAD::
 local retval = Reload_Menu_at_Same_Pos2(menu)
 	if retval and retval == xyz then -- returned menu item index other than 0
 -- 	DO STUFF
 	goto RELOAD
 	else return r.defer(function() do return end end)
+	end
+-- OR
+	if retval == 0 then return r.defer(function() do return end end)
+	else
+		if retval == abc then
+		-- DO STUFF
+		elseif retval == xyz then
+		-- DO OTHER STUFF
+		end
+	goto RELOAD
 	end
 ]]
 
@@ -1015,12 +1028,43 @@ function literalize(str) -- same as Esc()
 end
 
 
-local function replace(str, what, with)
+function replace(str, what, with)
 -- https://stackoverflow.com/a/29379912/8883033
     what = string.gsub(what, "[%(%)%.%+%-%*%?%[%]%^%$%%]", "%%%1") -- escape pattern
     with = string.gsub(with, "[%%]", "%%%%") -- escape replacement
     return string.gsub(str, what, with)
 end
+
+
+function remove_all_bar_some(str, ...)
+-- the elipsis represents both literals and char classes
+-- mind special characters which must be escaped as arguments
+local keep = {...}
+local str = str:gsub('.', 
+			function(c)
+				for _, char in ipairs(keep) do
+					if c:match(char) or c == char 
+					then return c end	
+				end
+			return '' end
+			)
+--[[ OR
+	local function thin_out(c)
+		return function(c)
+			for _, char in ipairs(keep) do
+				if c == char or c:match(char)
+				then return c end	
+			end
+		return ''
+		end
+	end
+local str =	str:gsub('.', thin_out(c))	
+]]			
+return str
+end
+--[[USE:
+remove_remove_all_bar_some(str, '%.', '%d+') -- remove all bar dots and numerals
+]]
 
 
 function spaceout(str)
@@ -1465,15 +1509,6 @@ local date = not US_order and
 or date
 local date = not Roman_month and dot and date:gsub('/','.') or date
 return date
-end
-
-
-function Get_Type_Of_Action(str)
-local native = str ~= '0' and tonumber(str)
-local script = str:match('_?RS') and (#str == 43 or #str == 42)
-local cust_act = str:match('^_?[%l%d]+$') and (#str == 33 or #str == 32)
-local sws_act = str:match('^_?[%u%p%d]+$')
-return native, cust_act, sws_act, script
 end
 
 
@@ -1931,6 +1966,8 @@ local dock_pos = r.DockGetPosition(dockermode_idx) -- -1=not found, 0=bottom, 1=
 	then return ME, dock_pos
 -- the MIDI Editor is docked in an open floating docker
 	elseif ME and floating then
+		-- INSTEAD OF THE LOOP the following function can be used
+		-- local ret, val = r.get_config_var_string('dockermode'..dockermode_idx) can be used
 		for line in io.lines(r.get_ini_file()) do
 			if line:match('dockermode'..dockermode_idx)
 			and line:match('32768') -- open floating docker
@@ -4627,6 +4664,29 @@ return note_names ~= '<MIDINOTENAMES' and note_names..'\n>'
 end
 
 
+function GetTrackState(tr)
+--[[
+&1=folder, &2=selected, &4=has fx enabled, &8=muted, &16=soloed, &32=SIP'd (with &16),
+&64=rec armed, &128=rec monitoring on, &256=rec monitoring auto, &512=hide from TCP,
+&1024=hide from MCP
+]]
+local name, flags = r.GetTrackState(tr) -- if not named returns empty string, if master returns 'MASTER'
+local t = {name}
+	for i = 0, 10 do
+	t[#t+1] = flags&2^i == 2^i
+	end
+-- fx_On is false both if no FX and if FX chain is disabled, doesn't apply to input/monitor FX
+-- add new parm after fx_On, fx_exist
+table.insert(t, 5, r.TrackFX_GetCount(tr) > 0)
+-- solo in place (SIP), only valid if solo is also true
+-- it's false if Solo (ignore routing) is enabled
+return table.unpack(t)
+end
+-- USE:
+-- local name, folder, sel, fx_On, fx_exist, mute, solo, SIP, rec_arm, rec_mon, rec_mon_auto, TCP_hid, MCP_hid = GetTrackState(tr)
+
+
+
 --================================ T R A C K S  E N D ================================
 
 
@@ -6370,7 +6430,7 @@ local is_last_touched, tr_bitfield, fx_bitfield, parm_idx = r.GetLastTouchedFX()
 
 	if is_last_touched then
 	local item_idx = tr_bitfield>>16 > 0 and tr_bitfield>>16 -- If the high word of tr_bitfield is nonzero, it refers to the 1-based item index (1 is the first item on the track, etc)
-	local tr_idx = tr_bitfield&0xFFFF or -1 -- The low word of tr_bitfield is the 1-based track index -- 0 means the master track, 1 means track 1, etc // 0xFFFF = binary 1111111111111111 (16 bit mask) // 'or -1' to simplify next statement
+	local tr_idx = tr_bitfield&0xFFFF or -1 -- The low word of tr_bitfield is the 1-based track index -- 0 means the master track, 1 means track 1, etc // 0xFFFF = binary 1111111111111111 (16 bit mask) // 'or -1' to simplify next expression
 	local tr = tr_idx == 0 and r.GetMasterTrack(0) or tr_idx > 0 and r.GetTrack(0, tr_idx-1)
 	local item = item_idx and r.GetTrackMediaItem(tr, item_idx-1)
 	local fx_idx = item and fx_bitfield&0xFFFF or tr and fx_bitfield&0xFFFFFF -- For item FX, the low word of fx_bitfield defines the FX index in the chain; For track FX, the low 24 bits of fx_bitfield refer to the FX index in the chain, and if the next 8 bits are 01, then the FX is record FX; 0xFFFF = binary 1111111111111111 = dec 65535 (16 bit mask), 0xFFFFFF = binary 111111111111111111111111 = dec 16777215 (24 bit mask); each hexadecimal digit stands for four bits
@@ -9050,7 +9110,7 @@ end
 
 
 
-function GetRegion()
+function GetRegionAtCursor()
 local cur_pos = r.GetCursorPosition()
 local _, regionidx = r.GetLastMarkerAndCurRegion(0, cur_pos)
 	if regionidx == -1 then
@@ -11575,6 +11635,58 @@ end
 --====================== M E A S U R E M E N T S   E N D =======================================
 
 
+--====================================== U T I L I T Y =========================================
+
+
+function GetUserInputs(title, field_cnt, field_names, field_cont, comment_field, comment)
+-- title string, field_cnt integer, field_names string comma delimited
+-- the length of field names list should obviously match field_cnt arg
+-- it's more reliable to contruct a table of names and pass the two vars as #t, t
+-- field_cont empty string unless they must be initially filled
+-- to fill out only specific fields precede them with as many commas 
+-- as the number of fields which must stay empty
+-- in which case it's a comma delimited list
+-- comment_field is boolean, comment is string to be displayed in the comment field
+	if field_cnt == 0 then return end
+
+	local function add_commas(field_cnt, field_prop) 
+	-- add delimiting commas when they're fewer than field_cnt
+	-- due to lacking field names or field content
+	local _, comma_cnt = field_prop:gsub(',','')
+	return comma_cnt == field_cnt-1 and field_prop
+	or comma_cnt < field_cnt-1 and field_prop..(','):rep(field_cnt-1-comma_cnt)
+	end
+
+local field_names = type(field_names) == 'table' and table.concat(field_names,',') or field_names
+field_names = add_commas(field_cnt, field_names)
+local field_cont = add_commas(field_cnt, field_cont)
+local comment = comment_field and #comment > 0 and comment or ''
+local field_cnt = #comment > 0 and field_cnt+1 or field_cnt
+field_names = #comment > 0 and field_names..',Comment:' or field_names
+field_cont = #comment > 0 and field_cont..','..comment or field_cont
+local ret, output = r.GetUserInputs(title, field_cnt, field_names..',extrawidth=150', field_cont)
+output = #comment > 0 and output:match('(.+,)') or output -- exclude comment field keeping delimiter (comma) to simplify captures in the loop below
+field_cnt = #comment > 0 and field_cnt-1 or field_cnt -- adjust for the next statement
+	if not ret or (field_cnt > 1 and #output:gsub(' ','') == (','):rep(field_cnt-1)
+	or #output:gsub(' ','') == 0) then return end
+local t = {}
+	for s in output:gmatch('(.-),') do
+		if s then t[#t+1] = s end
+	end
+return t, output:match('(.+),') or output -- remove hanging comma if there was a comment field, to simplify re-filling the dialogue in case of reload, when there's a comment the comma will be added with it
+end
+
+
+function Get_Type_Of_Action(str)
+local native = str ~= '0' and tonumber(str)
+local script = str:match('_?RS') and (#str == 43 or #str == 42)
+local cust_act = str:match('^_?[%l%d]+$') and (#str == 33 or #str == 32)
+local sws_act = str:match('^_?[%u%p%d]+$')
+return native, cust_act, sws_act, script
+end
+
+
+
 function timed_tooltip(tooltip, x, y, time) -- local x, y = r.GetMousePosition()
 -- sticks for the duration of time in sec if the script is run from a floating toolbar button
 -- so it's overrides button own tooltip which interferes
@@ -11680,6 +11792,7 @@ r.UpdateTimeline() -- might be needed because tooltip can sometimes affect graph
 end
 
 
+
 function Error_Tooltip3(text, format) -- format must be true
 -- the tooltip sticks under the mouse within Arrange but quickly disappears over the TCP, to make it stick just a tad longer there it must be directly under the mouse
 local x, y = r.GetMousePosition()
@@ -11712,6 +11825,7 @@ end
 
 
 function Get_Tooltip_Settings()
+-- r.get_config_var_string() can be used instead
 -- Preferences -> Appearance - Appearance settings - Tooltips:
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
@@ -11730,7 +11844,8 @@ end
 
 
 -- for keeping user stored parameter a limited amount of time, e.g. when two script runs must follow each other in close succession so that if the follow-up run isn't performed the value is invalid for the next run
-function Keep_ExtState_For_X_Mins1(Sect, Key, Val, Minutes, Set) -- Minutes is number, Set is boolean whether to set or get
+function Keep_ExtState_For_X_Mins1(Sect, Key, Val, Minutes, Set) 
+-- Minutes is number, Set is boolean whether to set or get
 	if Set then
 	r.SetExtState(Sect, Key, Val..':'..os.clock(), false) -- persist false
 	else
@@ -11744,7 +11859,8 @@ function Keep_ExtState_For_X_Mins1(Sect, Key, Val, Minutes, Set) -- Minutes is n
 end
 
 -- this version is to be used as a boolean to determine whether to run GetExtState() to retrieve the stored value
-function Keep_ExtState_For_X_Mins2(Minutes, Set) -- Minutes is number, Set is boolean whether to set or get
+function Keep_ExtState_For_X_Mins2(Minutes, Set) 
+-- Minutes is number, Set is boolean whether to set or get
 	if Set then
 	r.SetExtState('KEEP EXT STATE FOR X MINS', 'TIME INIT', os.clock(), false) -- persist false
 	else
@@ -11757,17 +11873,43 @@ function Keep_ExtState_For_X_Mins2(Minutes, Set) -- Minutes is number, Set is bo
 end
 --[[ USASE EXAMPLE:
 Keep_ExtState_For_X_Mins2(1, true) -- Set true, Minutes argument isn't used at this stage
-local elapsed = Keep_ExtState_For_X_Mins2(1) -- Set is false, Minutes argument is used
+local elapsed = Keep_ExtState_For_X_Mins2(1) -- Set is false, Minutes argument is 1
 	if elapsed then (some message) return end
-local state = not elapsed and r.GetExtState(section, key)
+local state = not elapsed and r.GetExtState(section, key) -- get the stored data since the storage time hasn't elapsed
 --]]
 
 
-function Set_Get_Delete_ExtState_Series(Set, Get, Del, t) -- all args are booleans, t is a table containing values to be stored, ommission of t argument disables Set arg
+function Expiry_Timer(cmd_ID, threshold)
+-- threshold is integer, time in seconds
+-- useful for limiting the time of data storage in the buffer
+-- used in Import metadata from media into the Project Render Metadata.lua
+local timestamp = tonumber(r.GetExtState(cmd_ID, 'EXPIRY TIMER'))
+	if not timestamp and not threshold then -- this conditions timer setting after import
+	r.SetExtState(cmd_ID, 'EXPIRY TIMER', r.time_precise(), false) -- persist false
+	elseif timestamp and threshold and r.time_precise()-timestamp >= threshold then -- this conditions greyed out Undo menu item after time has elapsed
+	r.DeleteExtState(cmd_ID, 'EXPIRY TIMER', true) -- persist true
+	Process_Undo(cmd_ID, true) -- clear_undo_data true
+	return true
+	elseif not timestamp and threshold then
+	return true -- this conditions greyed out Undo menu item when the script hasn't been run yet and so the timer hasn't been set
+	end
+end
+--[[USE:
+Expiry_Timer(cmd_ID) -- store
+	if not Expiry_Timer(cmd_ID, 60) then -- 60 sec haven't elapsed
+	-- DO STAFF
+	end
+]]
+
+
+
+function Set_Get_Delete_ExtState_Series(Set, Get, Del, t) 
+-- all args are booleans, t is a table containing values to be stored, 
+-- ommission of t argument disables Set arg
 local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
 local named_ID = r.ReverseNamedCommandLookup(cmd_ID)
 	if Set and t and type(t) == 'table' then
-		for k, v in ipairs(itm_t) do
+		for k, v in ipairs(t) do
 		r.SetExtState(named_ID, k, v, false) -- persist false
 		end
 	elseif Get then
@@ -12639,6 +12781,8 @@ local rnd = math.random(11000)/10000
 if rnd > 1 then return rnd = 1 else return rnd = math.random(10000)/10000 end
 end
 
+
+--=================================== U T I L I T Y  E N D ======================================
 
 
 function Mespotine_Base64_Encoder(source_string, remove_newlines, remove_tabs)
