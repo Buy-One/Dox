@@ -218,15 +218,19 @@ function ACT(ID, ME) -- supports MIDI Editor actions, get MIDI editor pointer ME
 end
 
 
-function ACT1(comm_ID, midi) -- midi is boolean
-local act = midi and r.MIDIEditor_LastFocused_OnCommand(r.NamedCommandLookup(comm_ID), false) -- islistviewcommand false
+function ACT1(comm_ID, islistviewcommand, midi) -- islistviewcommand, midi are boolean
+-- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
+-- e.g. sectionID == 32061
+local act = midi and r.MIDIEditor_LastFocused_OnCommand(r.NamedCommandLookup(comm_ID), islistviewcommand) -- islistviewcommand false
 or not midi and r.Main_OnCommand(r.NamedCommandLookup(comm_ID), 0) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything
 end
 
 
-function ACT2(comm_ID, midi) -- midi is boolean
+function ACT2(comm_ID, islistviewcommand, midi) -- islistviewcommand, midi are boolean
+-- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
+-- e.g. sectionID == 32061
 local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
-local act = comm_ID and comm_ID ~= 0 and (midi and r.MIDIEditor_LastFocused_OnCommand(comm_ID, false) -- islistviewcommand false
+local act = comm_ID and comm_ID ~= 0 and (midi and r.MIDIEditor_LastFocused_OnCommand(comm_ID, islistviewcommand) -- islistviewcommand false
 or not midi and r.Main_OnCommand(comm_ID, 0)) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything // only if valid command_ID
 end
 
@@ -1049,11 +1053,13 @@ local str = str:gsub('.',
 			return '' end
 			)
 --[[ OR
+-- the table doesn't have to be passed as argument
+-- because gsub doesn't seem to support functions with more than 1 argument
 	local function thin_out(c)
 		return function(c)
 			for _, char in ipairs(keep) do
 				if c == char or c:match(char)
-				then return c end	
+				then return c end
 			end
 		return ''
 		end
@@ -1123,6 +1129,27 @@ function count_captures(str,capt) -- capt is a pattern or a literal string
 local cntr = str
 local cntr = {cntr:gsub(capt, '%0')}
 return cntr[2] -- 2nd return value of gsub is the number of replaced captures
+-- OR
+-- local _, cnt = str:gsub(capt,'')
+-- return cnt
+end
+
+
+function count_specific_chars(str, char) -- or clusters
+local i, cnt = 0, 0
+	while i < #str do -- reverse loop
+		if str:sub(#str-i,#str-i) == char then 
+		cnt = cnt+1 end
+	i=i+1
+	end
+	--[[ -- forward loop
+	while i <= #str do
+		if str:sub(i,i) == char then 
+		cnt = cnt+1 end
+	i=i+1
+	end
+	]]
+return cnt
 end
 
 
@@ -2335,14 +2362,24 @@ local take = r.MIDIEditor_GetTake(ME)
 function Cursor_outside_pianoroll(take)
 
 r.PreventUIRefresh(1)
+local ACT = r.MIDIEditor_LastFocused_OnCommand
 local stored_edit_cur_pos = r.GetCursorPosition()
 local item = r.GetMediaItemTake_Item(take)
-ACT(40443, ME) -- View: Move edit cursor to mouse cursor
+ACT(40443, false) -- View: Move edit cursor to mouse cursor // islistviewcommand false
 local edit_cur_pos = r.GetCursorPosition()
-ACT(40037, ME) -- View: Go to end of file
+
+-----------------------------------------------------
+ACT(40037, false) -- View: Go to end of file // islistviewcommand false
 local item_end = r.GetCursorPosition()
-ACT(40036, ME) -- View: Go to start of file
+ACT(40036, false) -- View: Go to start of file // islistviewcommand false
 local item_start = r.GetCursorPosition()
+--[[ OR
+local edit_cur_pos = r.GetCursorPosition()
+local item_start = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+local item_end = item_start + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+]]
+-----------------------------------------------------
+
 r.SetEditCurPos(stored_edit_cur_pos, 0, 0) -- restore edit cursor pos; moveview is 0, seekplay is 0
 r.PreventUIRefresh(-1)
 
@@ -2354,7 +2391,7 @@ end
 
 function Get_Mouse_Coordinates_MIDI(wantSnapped) -- wantsnapped is boolean
 -- inserts a note at mouse cursor, gets its pitch and start position and then deletes it
--- advised to use with Get_Note_Under_Mouse() to avoid other notes, that is only run this function if that function returns nil to be sure that there's no note under mouse
+-- advised to use with Get_Note_Under_Mouse() to avoid other notes, that is only run this function if that function returns nil to be sure that there's no note under mouse and Cursor_outside_pianoroll() to make sure than the mouse cursor if within the piano roll because 'Edit: Insert note at mouse cursor' which is used here inserts notes even if the cursor is outside of the MIDI item bounds, see details in the comment to the action below
 
 local ME = r.MIDIEditor_GetActive()
 local take = r.MIDIEditor_GetTake(ME)
@@ -2378,13 +2415,14 @@ local sel_note_t = {}
 
 r.MIDI_SelectAll(take, false) -- deselect all notes so the inserted one is the only selected and can be gotten hold of
 
-ACT(40001, false) -- Edit: Insert note at mouse cursor // islistviewcommand false
+ACT(40001, false) -- Edit: Insert note at mouse cursor // islistviewcommand false // inserts a note even if mouse cursor already points at a note; if outside of the MIDI item left edge inserts a note at the item start, if outside of the right edge - inserts and extends the item if 'Loop item source' option is OFF or inserts in the parallel position within the item if this option is ON
 
 local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take) -- re-count after insertion
+local idx, x_coord, y_coord
 
 		for i = 0, notecnt-1 do -- get index and cordinates of the inserted note which is selected by default and the only one selected since the rest have been deselected above; the coordinates correspond to the mouse cursor position wihtin piano roll
 		local retval, sel, mute, startpos, endpos, chan, pitch, vel = r.MIDI_GetNote(take, i) -- only targets notes in the current MIDI channel if Channel filter is enabled, if looking for genuine false or 0 values must be validated with retval which is only true for notes from current channel // if looking for all notes use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
-			if sel then idx, x_cord, y_coord = i, startpos, pitch break end
+			if sel then idx, x_coord, y_coord = i, startpos, pitch break end
 		end
 
 --r.MIDI_DeleteNote(take, idx) -- delete the inserted note // buggy, lengthens the note overlaped by the one being deleted
@@ -2406,15 +2444,22 @@ ACT(40002, false) -- Edit: Delete notes // islistviewcommand false
 r.PreventUIRefresh(-1)
 r.Undo_EndBlock('',-1) -- to prevent creation of undo point by 'Edit: Insert note at mouse cursor' and 'Edit: Delete notes'
 
-return x_coord, y_coord, r.MIDI_GetProjTimeFromPPQPos(take, x_coord)
--- OR return {x_coord, y_coord, r.MIDI_GetProjTimeFromPPQPos(take, x_coord)}
+	if idx then
+	return x_coord, y_coord, r.MIDI_GetProjTimeFromPPQPos(take, x_coord)
+	-- OR return {x_coord, y_coord, r.MIDI_GetProjTimeFromPPQPos(take, x_coord)}
+	end
+
 end
 
 
 local hwnd = r.MIDIEditor_GetActive()
 local midi_take = r.MIDIEditor_GetTake(hwnd)
 
-function Get_Note_Under_Mouse(hwnd, midi_take) -- returns note index or nil if no note under mouse cursor
+function Get_Note_Under_Mouse(hwnd, midi_take) 
+-- returns note index or nil if no note under mouse cursor
+-- advised to use with Cursor_outside_pianoroll() because if mouse is outside of the MIDI item
+-- the result will be nil as when there's no note under mouse
+
 r.PreventUIRefresh(1)
 r.Undo_BeginBlock() -- to prevent creation of undo point by 'Edit: Split notes at mouse cursor'
 local retval, notecntA, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(midi_take)
@@ -3926,7 +3971,7 @@ end
 
 
 function Get_Track_At_Mouse_Cursor_Y() -- covers the entire track timeline
-local x, y = reaper.GetMousePosition()
+local x, y = r.GetMousePosition()
 local tr, info_code = reaper.GetTrackFromPoint(x, y)
 return tr and info_code < 1 and tr -- not envelope and not docked FX window
 end
@@ -11805,7 +11850,7 @@ end
 
 function Center_Message_Text(mess, spaced) 
 -- to be used before Error_Tooltip()
--- spaced is boolean, must be true if the same argument is true in  Error_Tooltip()
+-- spaced is boolean, must be true if the same argument is true in Error_Tooltip()
 local t, max = {}, 0
 	for line in mess:gmatch('[^%c]+') do
 		if line then
@@ -12098,7 +12143,7 @@ return target
 end
 
 
-function Is_Mouse_Over_Arrange1() -- SEE Is_Mouse_Over_Arrange2() for version without limitations
+function Is_Mouse_Over_Arrange1() -- SEE Is_Mouse_Over_Arrange2() for version without limitations AND a streamlined version Is_Mouse_Over_Arrange3()
 -- if no items or tracks temp objects are added
 -- set up to only detect Arrange when the mouse cursor is placed opposite of a track with Arrange
 -- so won't detect Arrange without tracks in the project
@@ -12211,10 +12256,10 @@ end
 
 
 
-function Is_Mouse_Over_Arrange2()
+function Is_Mouse_Over_Arrange2() -- SEE streamlined Is_Mouse_Over_Arrange3() below
 -- if no items or tracks temp objects are added
 local x, y = r.GetMousePosition()
-	if r.GetItemFromPoint(x, y, true)-- allow_locked true
+	if r.GetItemFromPoint(x, y, true) -- allow_locked true
 	then return true end -- if there's item under mouse it's surely over Arrange
 
 local item, tr
@@ -12260,7 +12305,7 @@ local arrange = GetCount(0) < itm_cnt
 -- in theory the action above may not affect selection if the mouse was hovering over a lone selected item to begin with, but this possibility is eliminated with GetItemFromPoint() above which in itself is enough to determine that the mouse is over Arrange, still adding the option for completeness, will make the function work even without GetItemFromPoint()
 	if GetCount(0) == itm_cnt then
 	r.SelectAllMediaItems(0,false) -- selected false // deselect all
-	ACT(40528, 0) -- repeat action // if the item wasn't re-selected, the the mouse is not within Arrange
+	ACT(40528, 0) -- repeat action // if the item wasn't re-selected, the mouse is not within Arrange
 	arrange = GetCount(0) == itm_cnt -- indeed the cursor already pointed at an item
 	end
 	if tr then r.DeleteTrack(tr) -- temp track // isn't used due to 'not tr_at_mouse' condition above
@@ -12283,6 +12328,47 @@ r.SelectAllMediaItems(0,false) -- selected false // deselect all
 r.UpdateArrange()
 return arrange
 end
+
+
+function Is_Mouse_Over_Arrange3(ignore_items)
+-- relies on Is_TCP_Under_Mouse()
+-- ignore_items is boolean, if true, only cursor outside of items in Arrange is respected
+
+local x, y = r.GetMousePosition()
+
+	-- if there's item under mouse it's surely over Arrange unless ignore_items is true
+	if r.GetItemFromPoint(x, y, true) -- allow_locked true	
+	then return not ignore_items end
+
+local tr, info = r.GetTrackFromPoint(x, y)
+	if tr and info ~= 2 and not Is_TCP_Under_Mouse() then return tr end
+
+	if not tr then -- info 2 is FX
+--	r.PreventUIRefresh(1) -- doesn't help much
+	local tr_idx = not r.GetTrack(0,0) and 0 or r.GetNumTracks()-1 -- insert temp track if no tracks or cursor is lower than the last track in which case tr cannot be valid
+	r.InsertTrackAtIndex(tr_idx, false) -- wantDefaults false
+	local temp_tr = r.GetTrack(0, tr_idx) -- track to be deleted
+		if r.GetTrackFromPoint(x, y) and not Is_TCP_Under_Mouse()
+		then
+		r.DeleteTrack(temp_tr) -- temp track
+	--	r.PreventUIRefresh(-1)
+		return true
+	--	else
+	--	r.PreventUIRefresh(-1)
+		end
+	-- if not found at cursor, encrease height
+	r.SetMediaTrackInfo_Value(temp_tr, 'I_HEIGHTOVERRIDE', 800)
+	r.TrackList_AdjustWindows(true) -- isMinor is true // updates TCP only https://forum.cockos.com/showthread.php?t=208275
+--	r.PreventUIRefresh(1)	
+	local tr  = r.GetTrackFromPoint(x, y)
+	r.DeleteTrack(temp_tr) -- temp track
+--	r.PreventUIRefresh(-1)
+	r.CSurf_OnScroll(0,1000) -- scroll back to the track list end since expansion of the last makes the list scroll up	
+	return not Is_TCP_Under_Mouse() and tr
+	end
+
+end
+
 
 
 
@@ -12746,6 +12832,8 @@ function validate_global_var(var_name, typ)
 local var = _G[var_name]
 return (not typ or typ and type(var) == typ) and var
 end
+-- EXAMPLE
+-- local func = validate_global_var('func_name', 'function') -- look for global function referenced as a string
 
 -- validate local variable
 -- https://stackoverflow.com/questions/2834579/print-all-local-variables-accessible-to-the-current-scope-in-lua
