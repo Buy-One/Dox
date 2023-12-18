@@ -202,22 +202,6 @@ local act = comm_ID and comm_ID ~= 0 and r.Main_OnCommand(r.NamedCommandLookup(c
 end
 
 
-local ME = r.MIDIEditor_GetActive() -- UNRELIABLE if script is run from the Main section of the action list, see MIDIEditor_GetActiveAndVisible()
-function ACT(ID, ME) -- supports MIDI Editor actions, get MIDI editor pointer ME and add as argument otherwise can be left out
--- ID - string or integer
-	if ID then
-	local ID = r.NamedCommandLookup(ID) -- works with srings and integers
-		if ID ~= 0 then -- valid command_ID
-			if not ME then r.Main_OnCommand(ID, 0)
-			else
-			r.MIDIEditor_LastFocused_OnCommand(ID, false) -- islistviewcommand is false
-		--	r.MIDIEditor_OnCommand(ME, ID)
-			end
-		end
-	end
-end
-
-
 function ACT1(comm_ID, islistviewcommand, midi) -- islistviewcommand, midi are boolean
 -- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
 -- e.g. sectionID == 32061
@@ -232,6 +216,23 @@ function ACT2(comm_ID, islistviewcommand, midi) -- islistviewcommand, midi are b
 local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
 local act = comm_ID and comm_ID ~= 0 and (midi and r.MIDIEditor_LastFocused_OnCommand(comm_ID, islistviewcommand) -- islistviewcommand false
 or not midi and r.Main_OnCommand(comm_ID, 0)) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything // only if valid command_ID
+end
+
+
+
+local ME = r.MIDIEditor_GetActive() -- UNRELIABLE if script is run from the Main section of the action list, see MIDIEditor_GetActiveAndVisible()
+function ACT(ID, ME) -- supports MIDI Editor actions, get MIDI editor pointer ME and add as argument otherwise can be left out
+-- ID - string or integer
+	if ID then
+	local ID = r.NamedCommandLookup(ID) -- works with srings and integers
+		if ID ~= 0 then -- valid command_ID
+			if not ME then r.Main_OnCommand(ID, 0)
+			else
+			r.MIDIEditor_LastFocused_OnCommand(ID, false) -- islistviewcommand is false
+		--	r.MIDIEditor_OnCommand(ME, ID)
+			end
+		end
+	end
 end
 
 
@@ -5362,8 +5363,33 @@ return is_tr_env ~= 0 and is_tr_env,  is_take_env ~= 0 and is_take_env
 -- env and r.GetEnvelopeInfo_Value(env, 'P_TAKE') ~= 0 and env
 end
 -- OR
--- env, fx_idx, parm_idx = r.Envelope_GetParentTake(env)
--- env, fx_idx, parm_idx = r.Envelope_GetParentTrack(env)
+-- take, fx_idx, parm_idx = r.Envelope_GetParentTake(env)
+-- tr, fx_idx, parm_idx = r.Envelope_GetParentTrack(env)
+
+
+function Is_Selected_Track_Or_Take_Env()
+local env = r.GetSelectedEnvelope(0)
+local take_env = r.GetSelectedTrackEnvelope(0) ~= env
+return env and not take_env, env and take_env -- track env, take env // 2 return values
+-- OR
+-- return env and (not take_env and 'track' or 'take') -- track env, take env // 1 return value
+end
+
+
+function FX_Or_Native_Envelope(env)
+-- if env arg isn't valid, selected env is evaluated
+local env = not env and r.GetSelectedEnvelope(0) or env
+local take_env = r.GetSelectedTrackEnvelope(0) ~= env
+-- after getting return values use r.ValidatePtr() to find out whether track or take
+	if env and not take_env then -- track env
+	local tr, fx_idx, parm_idx = r.Envelope_GetParentTrack(env)
+	return tr, fx_idx, parm_idx -- if fx_idx is -1 native env
+	elseif env and take_env then -- take env
+	local take, fx_idx, parm_idx = r.Envelope_GetParentTake(env)
+	return take, fx_idx, parm_idx
+	end
+end
+
 
 
 function Envelopes_Locked()
@@ -12369,6 +12395,57 @@ local tr, info = r.GetTrackFromPoint(x, y)
 
 end
 
+
+
+function Get_Cursor_Contexts(allow_locked, sectionID, cmd_ID)
+-- uses Cursor_outside_pianoroll(), Get_Mouse_Coordinates_MIDI(),
+-- Is_TCP_Under_Mouse() and Is_Mouse_Over_Arrange()
+
+local allow_locked = not allow_locked and false or true
+local x, y = r.GetMousePosition()
+local item, take = r.GetItemFromPoint(x, y, allow_locked) -- allow_locked boolean
+local build_6_36 = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.36 -- build since which GetThingFromPoint() is supported
+local tr, info = table.unpack(build_6_36 and {r.GetThingFromPoint(x, y)} or {r.GetTrackFromPoint(x, y)})
+	if item then
+	local env = r.GetSelectedEnvelope(0)
+	local parent_take, fx_idx, parm_idx = table.unpack(env and {r.Envelope_GetParentTake(env)} or {})
+	return parent_take == take and 'envelope' or r.CountTakes(item) == 1 and 'item' or 'take'
+	elseif tr then
+		if build_6_36 then
+		local tcp, mcp, fx, env, arrange = info:match('tcp'), info:match('mcp'), info:match('fx'),
+		info:match('env'), -- regardless of env selection
+		info:match('arrange') -- arrange excluding items because items are evaluated earlier
+		return arrange or fx or env and 'envelope' or tcp or mcp -- in this order because when env and fx, tcp or mcp are also true
+		else
+		local env, fx = info == 1 and 'envelope', info == 2 and 'fx' -- env regardless of env selection
+		return env or fx or tr and (Is_TCP_Under_Mouse() and 'tcp' or 'arrange')
+		end
+	elseif sectionID == 32060 then
+	local ME = r.MIDIEditor_GetActive()
+	local ctx = r.MIDIEditor_GetSetting_int(ME, 'last_clicked_cc_lane') -- click context, returns -1 if Piano roll/Event list, > -1 if any lane
+		if ctx and ctx > -1 then return 'cc' -- ctx may be false if the Main section script instance is triggered
+		elseif not Cursor_outside_pianoroll(r.MIDIEditor_GetTake(ME))
+		and Get_Mouse_Coordinates_MIDI() -- wantSnapped false
+		then return 'pianoroll'
+		elseif Is_Mouse_Over_Arrange() then return 'arrange'
+		end
+--	elseif not tr and Is_Mouse_Over_Arrange() then return 'arrange' -- either no tracks in the project or mouse is lower than the last track // WORKS BUT IF THE SCRIPT IS RUN FROM A TOOLBAR OR A MENU MOUSE CONTEXT IS ALWAYS INVALID WHICH TRIGGERS Is_Mouse_Over_Arrange() AND TEMP TRACK FLASHES BECAUSE PreventUIRefresh() IS UNUSED AS IT PREVENTS TRACK HEIGHT UPDATE INSIDE Is_Mouse_Over_Arrange() PLUS 'arrange' CONTEXT IS STILL NOT RETURNED, THEREFORE THE CONDITION HAS BEEN DISABLED
+	else
+	local trans = info:match('trans')
+	return trans and 'transport'
+--	return trans and 'transport' or Is_TCP_Under_Mouse() and 'tcp' or 'arrange' // WORKS BUT FOREGOING THIS OPTION IN FAVOR OF OPENING LAST STORED LAYER WHEN NO VALID CONTEXT, OTHERWISE IF THE SCRIPT IS RUN FROM A TOOLBAR/MENU THE CONTEXT ALWAYS WILL BE EITHER TCP OR ARRANGE DEPENDING ON THE TOOLBAR/MENU LOCATION
+	end
+
+--[[UNUSED, FOR INFO
+local cur_ctx = r.GetCursorContext2(x,y, true) -- click context, want_last_valid true meaning returns last context if current is invalid which seems mostly relevant over windows while the script is run with a global shortcut, because if the shortcut scope isn't global it's simply ignored over windows and the script doesn't run // 1 is transport as well
+local tr, arrange, env = cur_ctx == 0, cur_ctx == 1, cur_ctx == 2
+]]
+-- item, take
+-- mcp, tcp, fxlist, sendlist, fx, io, env, recmode, arrange (track level in Arrange), trans (trans.),
+-- env 0, 1, 2, 3 etc - active (not selected) track or fx envelopes in the order of appearence; take envelopes aren't supported
+-- fx_chain (over FX windows shortcut with Win modidier only works in global scope), fx_0, fx_1 (floating fx windows index accoridng to their order in the fx chain
+-- MIDI piano roll, MIDI lanes
+end
 
 
 
