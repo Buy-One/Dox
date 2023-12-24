@@ -338,6 +338,19 @@ local input = gfx.showmenu(menu) -- menu string
 local quit = old and gfx.quit()
 
 
+function Show_Menu_Dialogue(menu)
+-- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
+-- https://forum.cockos.com/showthread.php?t=280658#25
+-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+local init = old and gfx.init('', 0, 0)
+-- open menu at the mouse cursor
+gfx.x = gfx.mouse_x
+gfx.y = gfx.mouse_y
+return gfx.showmenu(menu)
+end
+
+
 function Reload_Menu_at_Same_Pos1(menu, keep_menu_open, left_edge_dist)
 -- keep_menu_open is boolean
 -- left_edge_dist is integer to only display the menu 
@@ -5150,7 +5163,7 @@ end
 
 
 function Is_Env_Bypassed(env)
-	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes
+	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation is enabled without any actual envelope, such ghost envelopes don't have points
 	local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 	return env_chunk:match('\nACT 0 ')
 	end
@@ -5373,6 +5386,9 @@ local take_env = r.GetSelectedTrackEnvelope(0) ~= env
 return env and not take_env, env and take_env -- track env, take env // 2 return values
 -- OR
 -- return env and (not take_env and 'track' or 'take') -- track env, take env // 1 return value
+-- OR
+-- local take_env = env and r.GetSelectedTrackEnvelope(0) ~= env
+-- return env, take_env
 end
 
 
@@ -5513,9 +5529,10 @@ So for now not sure when getting visible point count is useful
 function UnTrim_AutomItem_LeftEdge(env, autoitem_idx, val) -- rather mimics trim by shifting contents, changing length and position
 -- val in sec, positive val trim [->, negative val untrim <-[
 	if not env or not autoitem_idx or not val then return end
-local props = {['D_POSITION'] = 0, ['D_LENGTH'] = 0, ['D_STARTOFFS'] = 0, ['D_PLAYRATE'] = 0}
+local props = {D_POSITION = 0, D_LENGTH = 0, D_STARTOFFS = 0, D_PLAYRATE = 0}
+local GetSetAI = r.GetSetAutomationItemInfo
 	for k in pairs(props) do
-	props[k] = r.GetSetAutomationItemInfo(env, autoitem_idx, k, -1, false)
+	props[k] = GetSetAI(env, autoitem_idx, k, -1, false) -- value -1, is_set false
 	end
 	for k, v in pairs(props) do
 		if props.D_LENGTH <= val then return end -- don't apply if AI is too short, otherwise it will keep changing position
@@ -5523,17 +5540,17 @@ local props = {['D_POSITION'] = 0, ['D_LENGTH'] = 0, ['D_STARTOFFS'] = 0, ['D_PL
 		local val = k == 'D_LENGTH' and v-val
 		or k == 'D_STARTOFFS' and v+val*props.D_PLAYRATE -- minus val*playrate is shift rightwards (forward), plus is shift leftwards (backwards)
 		or v+val -- D_POSITION
-		r.GetSetAutomationItemInfo(env, autoitem_idx, k, val, true)
+		GetSetAI(env, autoitem_idx, k, val, true)
 		end
 	end
 --[[ OR
-local pos = r.GetSetAutomationItemInfo(env, autoitem_idx, 'D_POSITION', -1, false) -- val -1, is_set false
-local len = r.GetSetAutomationItemInfo(env, autoitem_idx, 'D_LENGTH', -1, false)
-local startoffs = r.GetSetAutomationItemInfo(env, autoitem_idx, 'D_STARTOFFS', -1, false)
-local playrate = r.GetSetAutomationItemInfo(env, autoitem_idx, 'D_PLAYRATE', -1, false)
-r.GetSetAutomationItemInfo(env, autoitem_idx, 'D_STARTOFFS', startoffs+val*playrate, true) -- is_set true
-r.GetSetAutomationItemInfo(env, autoitem_idx, 'D_LENGTH', len-val, true)
-r.GetSetAutomationItemInfo(env, autoitem_idx, 'D_POSITION', pos+val, true)
+local pos = GetSetAI(env, autoitem_idx, 'D_POSITION', -1, false) -- val -1, is_set false
+local len = GetSetAI(env, autoitem_idx, 'D_LENGTH', -1, false)
+local startoffs = GetSetAI(env, autoitem_idx, 'D_STARTOFFS', -1, false)
+local playrate = GetSetAI(env, autoitem_idx, 'D_PLAYRATE', -1, false)
+GetSetAI(env, autoitem_idx, 'D_STARTOFFS', startoffs+val*playrate, true) -- is_set true
+GetSetAI(env, autoitem_idx, 'D_LENGTH', len-val, true)
+GetSetAI(env, autoitem_idx, 'D_POSITION', pos+val, true)
 ]]
 end
 
@@ -5584,7 +5601,7 @@ end
 
 
 local Re_Store_Sel_AIs(sel_AI)
-
+-- sel_AI is a table storing indices of originally selected AI
 local is_AI_sel
 	if not sel_AI then
 	local sel_AI = {}
@@ -10909,8 +10926,8 @@ end
 
 
 
-function Get_Script_Name(scr_name)
-local t = {'top','bottom','all up','all down','next','previous','explode','implode','crop'} -- EXAMPLE
+function Parse_Script_Name(scr_name)
+local t = {'top','bottom','all up','all down','next','previous','explode','implode','crop'} -- EXAMPLE, the table can come as an argument from oustside
 local t_len = #t -- store here since with nils length will be harder to get
 	for k, elm in ipairs(t) do
 	t[k] = scr_name:match(Esc(elm)) --or false -- to avoid nils in the table, although still works with the method below
@@ -10928,8 +10945,8 @@ end
 
 function Invalid_Script_Name1(scr_name,...)
 -- check if necessary elements are found in script name
--- if more than 1 match is needed run twice with different sets of elements which are supposed to appear in the same name, but elements within each set must not be expected to appear in the same name
--- if running twice the error message and Rep() function must be used outside of this function after expression 'if no_elm1 or no_elm2 then'
+-- if more than 1 match is needed run twice or more times with different sets of elements which are supposed to appear in the same name, but elements within each set must not be expected to appear in the same name, that is they must be mutually exclusive
+-- if running twice or more times the error message and Rep() function must be used outside of this function after expression 'if no_elm1 or no_elm2 then'
 
 local t = {...}
 
@@ -10952,8 +10969,8 @@ local found
 end
 -- USAGE EXAMPLE:
 -- Invalid_Script_Name(scr_name, 'right', 'left', 'tracks', 'items')
--- EXAMPLE when several matches are required:
 --[[
+-- EXAMPLE when several matches are required:
 -- validate script name
 local no_elm1 = Invalid_Script_Name(scr_name,table.unpack(type_t))
 local no_elm2 = Invalid_Script_Name(scr_name,'left','right')
@@ -10968,8 +10985,8 @@ local no_elm2 = Invalid_Script_Name(scr_name,'left','right')
 
 function Invalid_Script_Name2(scr_name,...)
 -- check if necessary elements are found in script name
--- if more than 1 match is needed, run twice with different sets of elements which are supposed to appear in the same name, but elements within each set must not be expected to appear in the same name
--- if running twice the error message and Rep() function must be used outside of this function after expression 'if no_elm1 or no_elm2 then'
+-- if more than 1 match is needed, run twice or more times with different sets of elements which are supposed to appear in the same name, but elements within each set must not be expected to appear in the same name, that is they must be mutually exclusive
+-- if running twice or more times the error message and Rep() function must be used outside of this function after expression 'if no_elm1 or no_elm2 then'
 
 local t = {...}
 
