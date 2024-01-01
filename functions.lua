@@ -40,7 +40,7 @@ W I N D O W S
 
 F I L E S
 
-M E A S U R E M E N T S
+M E A S U R E M E N T S / C A L C U L A T I O N S
 
 U T I L I T Y
 
@@ -995,6 +995,32 @@ local bit_cnt = 0
 return bit_cnt
 end
 
+
+
+function Get_Closest_Prev_Multiple(dividend, int_divisor)
+-- https://math.stackexchange.com/questions/2179579/how-can-i-find-a-mod-with-negative-number modulo of negative numbers
+-- charactertic of Lua in particular https://torstencurdt.com/tech/posts/modulo-of-negative-numbers/
+-- not in all languages modulo of a negative number differs from its positive countepart; in Lua to have the same modulo for negative numbers the divisor must be negative as well
+	if math.abs(dividend) >= 1 and -- allowing for numbers smaller than 1
+	( math.abs(dividend) < math.abs(int_divisor) -- accounting for negative values
+	or dividend ~= math.floor(dividend) ) -- dividend is a decimal number
+	or dividend == 0
+	or int_divisor ~= math.floor(int_divisor) -- divisor is a decimal number
+	or int_divisor == 0
+	then return false
+	else
+		if math.abs(dividend) < 1 then
+		local dec_places = 10^#tostring(dividend):match('%.(%d+)')
+	--	return (dividend*dec_places - dividend*dec_places%int_divisor)/dec_places
+		return (dividend*dec_places - (dividend < 0 and math.abs(dividend)*dec_places%int_divisor*-1 or dividend*dec_places%int_divisor))/dec_places -- to get the multiple mirroring positive dividend, that is one closer to 0, otherwise the multiple is the next value smaller than the dividend which for negative numbers is farther from 0
+		else
+	--	return dividend - dividend%int_divisor
+		return dividend - (dividend < 0 and math.abs(dividend)%int_divisor*-1 or dividend%int_divisor) -- to get the multiple mirroring positive dividend, that is one closer to 0, otherwise the multiple is the next value smaller than the dividend which for negative numbers is farther from 0
+		end
+	end
+end
+
+
 --================================ M A T H  E N D ===================================
 
 
@@ -1795,6 +1821,14 @@ local i = 0
 	end
 end
 
+
+function Randomize_Array(t)
+math.randomseed(math.floor(r.time_precise()*1000)) -- math.floor() because the seeding number must be integer; seems to facilitate greater randomization at fast rate thanks to milliseconds count, not necessary in this script though
+	for k, v in ipairs(t) do
+	local r = math.random(1, #t)
+	t[r], t[k] = t[k], t[r]
+	end
+end
 
 
 -- local t = {'Bb1','E3','D2','B4','F#5','G#1','Db2','C4','A5','B3','Eb3','G1'}
@@ -3196,6 +3230,36 @@ r.MIDI_Sort(take)
 end
 
 
+
+function Delete_Notes(take, chan, want_active_ch)
+-- only deletes notes in the active MIDI channel when channel filter is enabled
+-- otherwise in all channels
+-- chan is integer, 0-15, to only delete notes in particular channel
+-- want_active_ch is boolean to only delete notes in the channel currently selected in the channel filter
+-- if both chan and want_active_ch are valid, chan has proirity
+local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take)
+local ME = r.MIDIEditor_GetActive()
+local def_chan = want_active_ch and r.MIDIEditor_GetSetting_int(ME, 'default_note_chan') -- channel selected in the channel filter regardless of the filter being enabled, Omni is 0, same as channel 1
+local ch = chan or def_chan
+
+	for i=notecnt-1,0,-1 do -- in reverse due to deletion
+	local retval, sel, muted, startppq, endppq, chan, pitch, vel = r.MIDI_GetNote(take, i)
+		if ch and chan == ch -- delete from specific channel
+		or not ch then -- delete from all channels
+		r.MIDI_DeleteNote(take, i)
+		end
+	end
+
+end
+--[[ USE for deletion in muliple channels
+local ch_t = {2,5,13,15} -- channels to delete from
+	for _, ch in ipairs(ch_t) do
+	Delete_Notes(take, ch, want_active_ch)	
+	end
+]]
+
+
+
 function CC_Evts_Exist(ME, take)
 local ME = not ME and r.MIDIEditor_GetActive() or ME
 local take = not take and r.MIDIEditor_GetTake(ME) or take
@@ -3323,6 +3387,23 @@ local note_names = '<MIDINOTENAMES'
 	end
 return note_names ~= '<MIDINOTENAMES' and note_names..'\n>'
 end
+
+
+function Get_Default_MIDI_Chan(take, sectID)
+-- the one selected in the channel filter regardless of its being enabled
+-- 'All channels' option defaults to channel 1
+r.PreventUIRefresh(1)
+	if sectID ~= 32060 then -- script isn't run from the MIDI Editor section // open MIDI Editor
+	r.Main_OnCommand(40153,0) -- Item: Open in built-in MIDI editor (set default behavior in preferences)	
+	end
+local chan = r.MIDIEditor_GetSetting_int(r.MIDIEditor_GetActive(), 'default_note_chan')
+	if sectID ~= 32060 then -- script isn't run from the MIDI Editor section // close MIDI editor
+	r.MIDIEditor_LastFocused_OnCommand(2, false) -- islistviewcommand false // File: Close window
+	end
+r.PreventUIRefresh(-1)
+return chan
+end
+
 
 
 --============================= M I D I  E N D =============================
@@ -8694,6 +8775,8 @@ end
 
 
 function Get_Take_Phase(take, item) -- relies on GetObjChunk2() function
+-- the function redundant because it can be evaluated with
+-- r.GetMediaItemTakeInfo_Value(take, 'D_VOL') < 0 -- when polarity is flipped
 
 local idx = r.GetMediaItemTakeInfo_Value(take, 'IP_TAKENUMBER')
 local _, GUID = r.GetSetMediaItemTakeInfo_String(take, 'GUID', '', false) -- setNewValue false
@@ -8939,6 +9022,17 @@ return item and r.GetMediaItemInfo_Value(item, 'C_LOCK') & 1 == 1
 end
 
 
+-- math.randomseed(math.floor(r.time_precise()*1000)) -- math.floor() because the seeding number must be integer; seems to facilitate greater randomization at fast rate thanks to milliseconds count
+function rand_active_take_idx(take_cnt, cur_take_idx, ALLOW_REPEATS)
+	repeat
+	cur_take_new_idx = math.random(take_cnt)
+	until ALLOW_REPEATS and cur_take_new_idx or cur_take_new_idx-1 ~= cur_take_idx
+
+return cur_take_new_idx-1 -- -1 since math.random's range begins with 1 while take count is 0 based
+end
+
+
+
 --================================ I T E M S   E N D ==================================
 
 
@@ -8982,7 +9076,7 @@ end
 
 
 function RANDOM_RGB_COLOR()
-math.randomseed(math.floor(r.time_precise()*1000)) -- math.floor() because the seeding number musr be integer; seems to facilitate greater randomization at fast rate thanks to milliseconds count
+math.randomseed(math.floor(r.time_precise()*1000)) -- math.floor() because the seeding number must be integer; seems to facilitate greater randomization at fast rate thanks to milliseconds count
 --[[
 local RGB = {}
 	for i = 1, 3 do
@@ -9001,14 +9095,14 @@ return RGB
 end
 
 
-function Generate_Radom_Color_Val()
+function Generate_Random_Color_Val()
 -- https://stackoverflow.com/questions/36756331/js-generate-random-boolean
 -- https://stackoverflow.com/questions/29851873/convert-a-number-between-1-and-16777215-to-a-colour-value
 math.randomseed(math.floor(r.time_precise()*1000)) -- seems to facilitate greater randomization at fast rate thanks to milliseconds count; math.floor() because the seeding number must be integer
 return math.random(0, 16777215) -- the range of values returned by GR_SelectColor()
 end
 -- USE:
--- local rand = Generate_Radom_Color_Val()
+-- local rand = Generate_Random_Color_Val()
 -- local color = math.random(0, rand)|0x1000000 -- gives greater randomization
 -- r.SetMediaTrackInfo_Value(tr, 'I_CUSTOMCOLOR', color, true) -- for example
 
@@ -10834,6 +10928,7 @@ local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
 local scr_name = scr_name:match('([^\\/]+)%.%w+') -- without path and extension
 local scr_name = scr_name:match('([^\\/_]+)%.%w+') -- without path & scripter name
 local scr_name = scr_name:match('[^\\/]+_(.+)%.%w+') -- without path, scripter name & ext
+local scr_name = scr_name:match('.+[\\/].-_(.+)%.%w+') -- without path, scripter name and file ext
 local scr_name = scr_name:match('.+[\\/](.+)') -- whole script name without path
 local named_ID = r.ReverseNamedCommandLookup(cmd_ID) -- to ensure more unique extended state section name, diff sections may probably have identical numeric cmd_IDs // script aplhanumeic command IDs in different Action list sections differ in the alphabetic prefix
 local path = r.GetResourcePath()
@@ -10927,10 +11022,11 @@ end
 
 
 function Parse_Script_Name(scr_name)
+-- case agnostic
 local t = {'top','bottom','all up','all down','next','previous','explode','implode','crop'} -- EXAMPLE, the table can come as an argument from oustside
 local t_len = #t -- store here since with nils length will be harder to get
 	for k, elm in ipairs(t) do
-	t[k] = scr_name:match(Esc(elm)) --or false -- to avoid nils in the table, although still works with the method below
+	t[k] = scr_name:lower():match(Esc(elm:lower())) --or false -- to avoid nils in the table, although still works with the method below
 	end
 -- return table.unpack(t) -- without nils
 return table.unpack(t,1,t_len) -- not sure why this works, not documented anywhere, but does return all values if some of them are nil even without the n value (table length) in the 1st field
@@ -10944,7 +11040,7 @@ end
 
 
 function Invalid_Script_Name1(scr_name,...)
--- check if necessary elements are found in script name
+-- check if necessary elements are found in script name, case agnostic
 -- if more than 1 match is needed run twice or more times with different sets of elements which are supposed to appear in the same name, but elements within each set must not be expected to appear in the same name, that is they must be mutually exclusive
 -- if running twice or more times the error message and Rep() function must be used outside of this function after expression 'if no_elm1 or no_elm2 then'
 
@@ -10952,7 +11048,7 @@ local t = {...}
 
 local found
 	for k, elm in ipairs(t) do
-		if scr_name:match(Esc(elm)) then found = 1 end
+		if scr_name:lower():match(Esc(elm:lower())) then found = 1 end
 	end
 
 	if #t > 0 and not found then -- no keyword was found in the script name
@@ -10984,14 +11080,14 @@ local no_elm2 = Invalid_Script_Name(scr_name,'left','right')
 
 
 function Invalid_Script_Name2(scr_name,...)
--- check if necessary elements are found in script name
+-- check if necessary elements are found in script name, case agnostic
 -- if more than 1 match is needed, run twice or more times with different sets of elements which are supposed to appear in the same name, but elements within each set must not be expected to appear in the same name, that is they must be mutually exclusive
 -- if running twice or more times the error message and Rep() function must be used outside of this function after expression 'if no_elm1 or no_elm2 then'
 
 local t = {...}
 
 	for k, elm in ipairs(t) do
-		if scr_name:match(Esc(elm)) then return end -- at least one match was found
+		if scr_name:lower():match(Esc(elm:lower())) then return end -- at least one match was found
 	end
 
 	local function Rep(n) -- number of repeats, integer
@@ -11009,12 +11105,12 @@ end
 
 
 function Invalid_Script_Name3(scr_name,...)
--- check if necessary elements are found in script name and return the one found
+-- check if necessary elements, case agnostic, are found in script name and return the one found
 -- only execute once
 local t = {...}
 
 	for k, elm in ipairs(t) do
-		if scr_name:match(Esc(elm)) then return elm end -- at least one match was found
+		if scr_name:lower():match(Esc(elm:lower())) then return elm end -- at least one match was found
 	end
 
 	local function Rep(n) -- number of repeats, integer
@@ -11423,9 +11519,125 @@ return dummy_proj
 end
 
 
+function META_Spawn_Scripts(fullpath, scr_name, names_t)
+-- fullpath is get_action_context() return value
+-- scr_name is META script name
+-- names_t is a table containing individual script names
+-- if not supplied or empty the names are searched in the script header
+-- names in the header must not have trailing spaces
+
+	local function Dir_Exists(path) -- short
+	local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces
+	local sep = path:match('[\\/]')
+	local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed to return 1 (valid)
+	local _, mess = io.open(path)
+	return mess:match('Permission denied') and path..sep -- dir exists // this one is enough
+	end
+
+	local function Esc(str)
+		if not str then return end -- prevents error
+	-- isolating the 1st return value so that if vars are initialized in a row outside of the function the next var isn't assigned the 2nd return value
+	local str = str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0')
+	return str
+	end
+	
+	if not fullpath:match(Esc(scr_name)) then return true end -- will allow to continue the script execution outside, since it's not a META script
+	
+local names_t, content = names_t
+	
+	if not names_t or names_t == 0 then -- if names table isn't supplied search names list in the header
+	-- load this script
+	local this_script = io.open(fullpath, 'r')
+	content = this_script:read('*a')
+	this_script:close()
+	names_t, found = {}
+		for line in content:gmatch('[^\n\r]+') do
+			if line and line:match('Provides') then found = 1 end
+			if found and line:match('%.lua') then
+			names_t[#names_t+1] = line:match('.+[/](.+)') or line:match('BuyOne.+[%w]') -- in case the new script name line includes a subfolder path, the subfolder won't be created
+			elseif found and #names_t > 0 then			
+			break -- the list has ended
+			end
+		end
+	end
+
+	if names_t and #names_t > 0 then
+
+	r.MB('              This meta script will spawn '..#names_t
+	..'\n\n     individual scripts included in the package'
+	..'\n\n     after you supply a path to the directory\n\n\t    they will be placed in'
+	..'\n\n\twhich can be temporary.\n\n           After that the spawned scripts'
+	..'\n\n will have to be imported into the Action list.','META',0)
+
+	local ret, output -- to be able to autofill the dialogue with last entry on RELOAD
+
+	::RETRY::
+	ret, output = r.GetUserInputs('Scripts destination folder', 1,
+	'Full path to the dest. folder, extrawidth=200', output or '')
+
+		if not ret or #output:gsub(' ','') == 0 then return end -- must be aborted outside of the function
+
+	local user_path = Dir_Exists(output) -- validate user supplied path
+		if not user_path then Error_Tooltip('\n\n invalid path \n\n', 1, 1) -- caps, spaced true
+		goto RETRY end
+
+		-- load this script if wasn't loaded above to parse the header for file names list
+		if not content then
+		local this_script = io.open(fullpath, 'r')
+		content = this_script:read('*a')
+		this_script:close()
+		end
+
+		local prefix, insert = 'BuyOne_', 'selected automation item' -- script specific
+		-- spawn scripts
+		for k, scr_name in ipairs(names_t) do
+		--[[ --- script specific
+			if scr_name:match('edge') then
+			scr_name = scr_name:gsub('edge', '%0 of '..insert)
+			elseif scr_name:match('Move contents') then
+			scr_name = scr_name:gsub('Move contents', '%0 of '..insert)
+			elseif scr_name:match('Move') then
+			scr_name = scr_name:gsub('Move', '%0 '..insert)
+			end
+		scr_name = prefix..scr_name..'.lua'
+		content = content:gsub('ReaScript name:.-\n', 'ReaScript name: '..scr_name..'\n', 1) -- replace script name in the About tag
+		]]
+		local new_script = io.open(user_path..scr_name, 'w') -- create new file
+		content = content:gsub('ReaScript name:.-\n', 'ReaScript name: '..scr_name..'\n', 1) -- replace script name in the About tag
+		new_script:write(content)
+		new_script:close()
+		end
+	end
+
+end
+--[[
+USE:
+	-- doesn't run in non-META scripts
+	if not META_Spawn_Scripts(fullpath, FULL_META_SCRIPT_NAME, names_t) -- fullpath stems from get_action_context()
+	then return r.defer(no_undo) end -- abort if META script but continue if not
+]]
+
+
+
+
 --=================================== F I L E S   E N D =========================================
 
---===============================  M E A S U R E M E N T S  =====================================
+--============  M E A S U R E M E N T S / C A L C U L A T I O N S  =================
+
+--[[
+HOW FUNCTION GetSet_ArrangeView2() works
+
+start_time, number end_time = reaper.GetSet_ArrangeView2(ReaProject proj, boolean isSet, integer screen_x_start, integer screen_x_end, number start_time, number end_time)
+
+https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+
+When setting Arrange with screen_x_start and screen_x_end being 0, the start will be set to start_time and end to end_time, the zoom level with adjust automatically.
+
+When setting with screen_x_end val greater than 0, the screen_x_end val is divided by the diff between end_time and start_time values which sets zoom level, being equal to the value returned by GetHZoomLevel(). The resulting start and end times change
+
+When setting screen_x_start value is ignored
+
+]]
 
 
 function Get_Vis_Arrange_Len_In_Pixels()
@@ -11719,8 +11931,7 @@ return dest_val
 end
 
 
-
---====================== M E A S U R E M E N T S   E N D =======================================
+--========== M E A S U R E M E N T S / C A L C U L A T I O N S   E N D ===============
 
 
 --====================================== U T I L I T Y =========================================
@@ -11753,7 +11964,7 @@ local field_cnt = #comment > 0 and field_cnt+1 or field_cnt
 field_names = #comment > 0 and field_names..',Comment:' or field_names
 field_cont = #comment > 0 and field_cont..','..comment or field_cont
 local ret, output = r.GetUserInputs(title, field_cnt, field_names..',extrawidth=150', field_cont)
-output = #comment > 0 and output:match('(.+,)') or output -- exclude comment field keeping delimiter (comma) to simplify captures in the loop below
+output = #comment > 0 and output:match('(.+,)') or output -- exclude comment field (must be only one and the last) keeping delimiter (comma) to simplify captures in the loop below // if several fields and ret is false only the 1st field is returned
 field_cnt = #comment > 0 and field_cnt-1 or field_cnt -- adjust for the next statement
 	if not ret or (field_cnt > 1 and #output:gsub(' ','') == (','):rep(field_cnt-1)
 	or #output:gsub(' ','') == 0) then return end
@@ -12092,6 +12303,12 @@ os.date('%x %X',os.time()) -- current date & time in current locale format
 end
 -- USE:
 -- local sec, mins, hrs, days, timestamp_save, timestamp_cur = how_recently_the_project_was_saved()
+
+
+function Time_Sel_Or_Loop_Exist(want_loop)
+local start, fin = r.GetSet_LoopTimeRange(false, want_loop, 0, 0, false) -- isSet, allowautoseek false
+return start ~= fin
+end
 
 
 
@@ -12739,7 +12956,7 @@ end
 
 
 function Mouse_Wheel_Direction(val, mousewheel_reverse) -- mousewheel_reverse is boolean
-local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // val seems to not be able to co-exist with itself retrieved outside of the function, in such cases inside the function it's returned as 0; if there's another function which includes this function in one of them it won't work properly so the val will have to be take outiside of both functions and used as an argument in them
+local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // val seems to not be able to co-exist with itself retrieved outside of the function, in such cases inside the function it's returned as 0; if there's another function which includes this function in one of them it won't work properly so the val will have to be taken outiside of both functions and used as an argument in them
 	if mousewheel_reverse then
 	return val > 0 and -1 or val < 0 and 1 -- wheel up (forward) - leftwards/downwards or wheel down (backwards) - rightwards/upwards
 	else -- default
@@ -12753,19 +12970,56 @@ end
 -- end
 
 
-function Process_Mousewheel_Sensitivity(val, cmdID, MOUSEWHEEL_SENSITIVITY)
+function Process_Mouse_Wheel_Direction1(val, mousewheel_reverse) -- mousewheel_reverse is boolean
+local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context() -- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // val seems to not be able to co-exist with itself retrieved outside of the function, in such cases inside the function it's returned as 0; if there's another function which includes this function in one of them it won't work properly so the val will have to be taken outiside of both functions and used as an argument in them
+-- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards
+return mousewheel_reverse and val > 0 or val < 0, -- wheel in/down/backwards = leftwards/downwards
+mousewheel_reverse and val < 0 or val > 0 -- -- wheel out/up/forward = rightwards/upwards
+end
+-- USE:
+-- left_down, right_up = Process_Mouse_Wheel_Direction(val, mousewheel_reverse)
+
+
+function Process_Mouse_Wheel_Direction2(val, mousewheel_reverse) 
+-- val comes from r.get_action_context()
+-- mousewheel_reverse is boolean
+-- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards
+--[[INEFFICIENT
+return mousewheel_reverse and val > 0 or not mousewheel_reverse and val < 0, -- wheel in/down/backwards = leftwards/downwards
+mousewheel_reverse and val < 0 or not mousewheel_reverse and val > 0 -- -- wheel out/up/forward = rightwards/upwards
+end
+]]
+local left_down, right_up = table.unpack(mousewheel_reverse and {val > 0, val < 0} or {val < 0, val > 0}) -- left/down, right/up
+return left_down, right_up
+
+end
+
+
+
+function Process_Mousewheel_Sensitivity(val, cmdID, MOUSEWHEEL_SENSITIVITY, percent, MOUSEWHEEL)
 -- val & cmdID stem from r.get_action_context()
 -- MOUSEWHEEL_SENSITIVITY unit is one mousewheel nudge, normally a single scroll consists of 5-6 nudges
-	if MOUSEWHEEL_SENSITIVITY == 1 then return true end
+-- percent is boolean if the sensitivity is measured in pecentage rather than in mousewheel nudges count, 
+-- i.e. 1 = 100% (1 nudge), 0.5 = 50% (2 nudges), 0.3 = 30% (3 nudges), 0.25 = 25% (4 nudges), 0.2 = 20% (5 nudges) etc
+-- the lower the less sensitive in contrast with nudges count
+local MW_sens = MOUSEWHEEL_SENSITIVITY
+MW_sens = MW_sens:gsub(' ','')
+MW_sens = tonumber(MW_sens) and (percent and MW_sens+0 < 1 and math.abs(MW_sens+0)
+or not percent and MW_sens+0 > 1 and math.floor(math.abs(MW_sens+0)))
+MW_sens = MW_sens and (percent and 1/MW_sens or MW_sens) or 1
+--MW_sens = MOUSEWHEEL and val == 63 and 1 or MW_sens -- if mousewheel and mousewheel sensitivity are enabled but the script is run via a shortcut (val returned by get_action_context() is 63), disable the mousewheel sensitivity otherwise if it's greater than 4 the script won't be triggered at the first run because the expected value will be at least 5x15 = 75 (val returned by get_action_context() is ±15) while val will only produce 63 per execution, it will only be triggered on the next run since 63x2 = 126 > 75
+	if MOUSEWHEEL_SENSITIVITY == 1 then return true end -- no scaling
 local cmdID = r.ReverseNamedCommandLookup(cmdID) -- command ID differs in different Action list sections
 local data = r.GetExtState(cmdID, 'MOUSEWHEEL')
+data = #data == 0 and 0 or data+0
+local diff_sign = data > 0 and val < 0 or data < 0 and val > 0
+local val = diff_sign and val or data+val -- when the stored and current vals have diff signs, reset to prevent values offsetting which results in higher sensitivity when scroll direction is reversed, e.g. when sensitivity is 10, if scroll direction after 5 changes, the script will be triggered after only 5 nudges (5-5=0) instead of 10
 --[[ WORKS, substituted with 2 lines below marked NEW, to prevent frequent deletion of the ext state as it seems unnecessary
 	if #data ~= 0 and math.abs((data+val)/MOUSEWHEEL_SENSITIVITY) >= 15 then -- +val to accound for the latest event, otherwise the switch will only occur on the next
 	r.DeleteExtState(cmdID, 'MOUSEWHEEL', true) -- persist true
 	return true end -- 1 mousewheel nudge equals 15 or -15 depending on direction
 --]]
-local val = #data == 0 and val or data+0 + val
-local val = math.abs(val/MOUSEWHEEL_SENSITIVITY) >= 15 and 0 or val -- NEW instead of the statement commented out above 
+val = math.abs(val/MOUSEWHEEL_SENSITIVITY) >= 15 and 0 or val -- NEW instead of the statement commented out above 
 r.SetExtState(cmdID, 'MOUSEWHEEL', val, false) -- persist false
 return val == 0 -- NEW instead of the statement commented out above
 end
@@ -12773,9 +13027,10 @@ end
 
 MOUSEWHEEL_SENSITIVITY = MOUSEWHEEL_SENSITIVITY:gsub(' ','')
 MOUSEWHEEL_SENSITIVITY = tonumber(MOUSEWHEEL_SENSITIVITY) and tonumber(MOUSEWHEEL_SENSITIVITY) > 1 and math.floor(math.abs(tonumber(MOUSEWHEEL_SENSITIVITY))) or 1
+
 MOUSEWHEEL_SENSITIVITY = not MOUSEWHEEL and val == 63 and nil or MOUSEWHEEL_SENSITIVITY = MOUSEWHEEL and val == 63 and 1 or MOUSEWHEEL_SENSITIVITY -- if mousewheel and mousewheel sensitivity are enabled but the script is run via a shortcut (val returned by get_action_context() is 63), disable the mousewheel sensitivity otherwise if it's greater than 4 the script won't be triggered at the first run because the expected value will be at least 5x15 = 75 (val returned by get_action_context() is ±15) while val will only produce 63 per execution, it will only be triggered on the next run since 63x2 = 126 > 75 -------- IF THIS EXPRESSION IS USED THE WARNING MESSAGE BELOW IS REDUNDANT, BECAUSE IT DISABLES SENSITIVITY IF SCRIPT IS RUN WITH A SHORTCUT
 
-	if MOUSEWHEEL and MOUSEWHEEL_SENSITIVITY > 4 and val == 63 then -- val stems from r.get_action_context() // val is ±15 when mousewheel is used and 63 in all other cases, when mousewheel is enabled and its sensitivity setting is 5 the expected sum to trigger action is 15x5 = 75, therefore if the script is not run with the mousewheel the action won't be triggered due to 63 being less than 75, but it will on the next run since 63x2 = 126 > 75, if the sensitivity is 4, that is 15x4 = 60, and the first run produces 63 this will be enough to trigger action
+	if MOUSEWHEEL and MOUSEWHEEL_SENSITIVITY > 4 and val == 63 then -- val stems from r.get_action_context() // val is ±15 when mousewheel is used and 63 in all other cases (excluding MIDI), when mousewheel is enabled and its sensitivity setting is 5 the expected sum to trigger action is 15x5 = 75, therefore if the script is not run with the mousewheel the action won't be triggered due to 63 being less than 75, but it will on the next run since 63x2 = 126 > 75, if the sensitivity is 4, that is 15x4 = 60, and the first run produces 63 this will be enough to trigger action
 	local function s(n) return (' '):rep(n) end
 	Error_Tooltip('\n\n'..s(4)..'since the script is executed \n\n\t'..s(6)..'with a shortcut \n\n while the mousewheel is enabled \n\n\t'..s(4)..'and its sensitivity \n\n\t'..s(5)..'is greater than 4, \n\n  it won\'t work at the first run \n\n',1,1) -- caps, spaced true
 	end
