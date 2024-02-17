@@ -328,7 +328,7 @@ and you are left with a pre fx editable volume ride
 https://forum.cockos.com/showpost.php?p=534624&postcount=30
 
 
-. insert js: utility:volume_pan on the track you wish to automatically automate (sic)
+1. insert js: utility:volume_pan on the track you wish to automatically automate (sic)
 2. click the tracks ENV button: set automation to WRITE
 a. check the VOLUME DB box
 b. click MOD (yes, the txt)
@@ -353,6 +353,11 @@ Max vol 0.00 dB
 Strength 60%
 Direction Negative
 Audio control signal shaping - red dot is close to the bottom right
+
+
+https://www.youtube.com/watch?v=fDPsGAWgeo8
+https://www.youtube.com/watch?v=tjnrGU83PB4
+https://www.youtube.com/watch?v=t6k8fqmm2NM
 
 ================================================================
 
@@ -2790,6 +2795,12 @@ It shows up as "no-op" instead of unassigned because if whatever it was bound to
 https://forums.cockos.com/showthread.php?t=52167
 
 
+It goes back to the old way of setting up macros, where it was necessary to blank out unused slots. 
+Seems so long ago.... I suspect it's left in for backwards compatibility.
+
+
+https://forums.cockos.com/showthread.php?t=25445#4
+
 ==============================================================
 
 -- Using JS plugin sliders to do the math
@@ -3472,10 +3483,61 @@ can be used to detect toggle state and set CC param to refer to downstream with 
 
 Custom: REAPERMania_Seek by clicking the item during playback (assign to mouse modifier)
   Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
-  Transport: Play
+  Transport: Play <------------------------------------------ the action reports toggle state, single skip, see next custom action example
   View: Move edit cusor to mouse cursor
   Action: Skip next action if CC parameter <=0/mid
   Transport: Play
+
+
+Custom: Toggle alternate M shortcut
+  Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+  SWS/S&M: Dummy toggle 1 <------------------------------------ can be toggled from a toolbar or a menu item
+  Action: Skip next action if CC parameter >0/mid
+  Markers: Insert marker at current position <----------------- the action doesn't report toggle state therefore is preceded with 2 modifier actions, double skip
+  Action: Skip next action if CC parameter <0/mid
+  Track: Toggle mute for selected tracks
+
+
+Custom: Toggle alternate M shortcut
+  Action: Skip next action, set CC parameter to relative +1 if action armed, 0 otherwise.
+  Action: Skip next action if CC parameter >0/mid <----------------- any action can be used for arming as long as it itself doesn't perform a specific action, can be  armed from a toolbar button, toggle actions cannot be armed
+  Action: Skip next action if CC parameter >0/mid
+  Markers: Insert marker at current position
+  Action: Skip next action if CC parameter ==0/mid
+  Track: Toggle mute for selected tracks
+
+Still conditioning behavior on a toggle state is preferable over armed state because armed state hinders free usage of Arrange
+
+Custom: Toggle alternate M shortcut (proof of concept) -- activate 'Toggle show track icons in mixer' from toolbar button
+  Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+  Mixer: Toggle show track icons in mixer <--------------------- conditional toggle action, seem pretty innocuous setting which doesn't interfere with the workflow
+  Action: Skip next action if CC parameter >0/mid
+  Markers: Insert marker at current position
+  Action: Skip next action if CC parameter <0/mid
+  Track: Toggle mute for selected tracks
+
+-- In the following custom action the toggle state is automatically set to Off once the action which depends on its being On has been executed
+-- If a series of actions depend on the toggle state each must be preceded with the corresponding 'Skip next action' action
+
+Custom: Toggle alternate M shortcut MOMENTARY (proof of concept) -- activate 'Toggle show track icons in mixer' from toolbar button
+  Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+  Mixer: Toggle show track icons in mixer <--------------------- conditional toggle action
+  Action: Skip next action if CC parameter >0/mid
+  Markers: Insert marker at current position
+  Action: Skip next action if CC parameter <0/mid
+  Track: Toggle mute for selected tracks
+  Action: Skip next action if CC parameter <0/mid
+  Mixer: Toggle show track icons in mixer
+
+- Or a dummy Lua script with the following code can be used to toggle the state:
+
+/////////////////////////////////////////////////////////
+
+local is_new_value, fullpath, sectionID, cmdID, mode, resolution, val = reaper.get_action_context()
+local state = reaper.GetToggleCommandStateEx(sectionID, cmdID) < 1
+reaper.SetToggleCommandState(sectionID, cmdID, state and 1 or 0)
+
+////////////////////////////////////////////////////////
 
 
 sources:
@@ -4050,10 +4112,141 @@ https://forums.cockos.com/showthread.php?p=2477735
 
 ==============================================================
 
+-- Action Options: Automatically insert automation item when activating envelope that is bypassed outside of automation items and not displayed in envelope lane
+
+Schwa
+
+...the behavior is complex!
+
+In general, existing envelope points that exist outside of automation items are hidden if you then enable "bypass envelope outside of automation items", regardless of whether or not the envelope is displayed in its own lane. Toggling that option doesn't create new automation items.
+
+When envelopes are displayed in their own lanes by default, and envelopes are bypassed outside of automation items, activating a new envelope does not automatically create an automation item on the envelope, because it's obvious the new envelope exists.
+
+When envelopes are not displayed in their own lanes by default, and envelopes are bypassed outside of automation items, you have a problem when you activate a brand-new envelope: you have no way to see that the envelope exists. The option "Options: Automatically insert automation item when activating envelope that is bypassed outside of automation items and not displayed in envelope lane" exists to handle that problem, by automatically inserting an automation item in the media lane when you create a new envelope in that situation.
 
 
+https://forum.cockos.com/showthread.php?p=1975784#5
+
+==============================================================
+
+-- Changing some of the theme's fonts via Theme Development settings
+
+Open Theme Development settings with the action Theme development: Show theme tweak/configuration window, search for font
+
+You'll find 16 'WALTER font' slots, some are already taken, most are not.
+
+In the theme's rtconfig.txt file locate section
+
+; ----------------- WALTER -------------------
+; font #1 - MCP Track Numbers
+
+; font #2 - Extended Mixer
+
+; font #3 - Transport Selection
+
+; font #4 - Envcp labels
+
+; font #5 - Transport Rate
+
+; font #6 - Extended Mixer - Large layouts
+; -------------------------------------------
+
+This section only serves as a reminder what is what because it's commented out.
+
+These font numbers correspond to WALTER font slots in the Theme Development settings
+and are assigned to UI elements inside the code, e.g. trans.rate.font (#5), trans.sel.font (#3),
+tcp.fxparm.font (#2) as of v5 default theme. So in the rtconfig.txt file you search for any
+elements which end with '.font' and collate their font setting with the reminder list above.
+SInce there're 16 WALTER font slots and only 6 are enganed by default, the non-engaged slots can
+be linked to other elements or used to changed the font setting without affecting the original
+WALTER font slot setting.
+
+based on White Tie's suggestions:
+
+Make one of your theme editor 'WALTER font' settings into a big bold fella, 
+then set its number for 'trans.bpm.edit.font' within your theme's WALTER.
+
+https://forum.cockos.com/showthread.php?t=131790#4
+
+The theme's maker changes that using trans.bpm.tap.font in the rtconfig file, 
+which points to an entry that you should be able to change in the theme tweak/configuration window
+
+https://forums.cockos.com/showthread.php?t=235369#2
 
 
+==============================================================
+
+You can work around gluing items by moving them to a sub-project as a way of non destructively consolidating item FX
+
+https://www.reddit.com/r/Reaper/comments/18od1v1/best_little_reaper_tips_and_tricks/
+
+
+==============================================================
+
+-- Setting up shortcuts for toggling with momentary MIDI buttons
+
+-- Script for muting 1st selected track which must be mapped to a momentary button 
+
+
+local is_new_value, filename, sectionID, cmdID, mode, resolution, val = reaper.get_action_context()
+
+local name, flags = reaper.GetTrackState(reaper.GetSelectedTrack(0,0))
+local track_muted = flags&8 == 8
+
+	if (val == 127 or val > 0) and track_muted then
+	reaper.Main_OnCommand(40731,0) -- Track: Unmute tracks
+	elseif (val == 127 or val > 0) and not track_muted then
+	reaper.Main_OnCommand(40730,0) -- Track: Mute tracks
+	end
+	
+do return reaper.defer(function() do return end end) end
+
+
+https://www.reddit.com/r/Reaper/comments/xryy58/use_momentary_midi_buttons_for_shortcuts_need_help/
+
+==============================================================
+
+-- Action shortcut behavior
+
+-- returned as mode, resolution and val:
+
+local is_new_value, fullpath, sectionID, cmdID, mode, resolution, val = r.get_action_context()
+
+-- Click (mode 0, resolution 127), mousewheel (mode 1, resolution 127)
+-- Absolute (mode 0, resolution 127) - rotary knob 0 - 127
+-- Relative 1 (mode 1, resolution 127) - rotary knob +1 -> +63 -> -64 -> -1
+-- Relative 2 (mode 2, resolution 127) - rotary knob -63 -> 0 -> +63
+-- Relative 3 (mode 3, resolution 127) - rotary knob +1 -> +63 -> 0 -> -1 -> -63
+
+resolution probably can be 14 bit which is 16,383
+
+==============================================================
+
+-- Inverse envelopes (when point value of one envelope is increased, on the other it's decreased and vice versa)
+
+1. Create an automation item (AI) under an envelope curve or create a new AI with an envelope
+2. Duplicate it creating a pooled copy
+3. Place the pulled copy on the envelope of another track, on another envelope of the same track
+   OR on the same envelope at another location on the timeline
+4. Open AI properties window of the second AI instance and set its Amplitude parameter to -100
+5. Change value of any point in either instance of these AIs, the value of the parallel point in another instance will be inverted.
+
+https://old.reddit.com/r/Reaper/comments/1akbqgj/is_there_a_way_to_entangle_to_points_on_say_pan/
+
+
+==============================================================
+
+-- Navigating item with the Edit cursor
+
+1. Right click the video item -> Item settings -> Display item ruler (select option which includes time line division you need)
+2. Open Edit -> Nudge/Set Items
+3. Select Edit cursor from the 2nd drop down menu of the Nudge/Set Items utility
+4. Select required time division from the last drop down menu
+5. And in the 3d (to:) field key in values to move the cursor to or by depending on the selection in the 1st drop down menu.
+
+Before starting run 'Item navigation: Move cursor to start of items' action to set edit cursor to the item start
+
+==============================================================
 
 
 
