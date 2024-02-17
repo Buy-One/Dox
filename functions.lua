@@ -24,6 +24,8 @@ A U T O M A T I O N  I T E M S
 
 C H U N K
 
+R A Z O R  E D I T
+
 F X
 
 I T E M S
@@ -329,6 +331,12 @@ Msg(t.a) Msg(t.b) Msg(t.c)
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
 -- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+-- the earliest appearence of a particular character in the menu can be used as a shortcut
+-- in this case they don't have to be preceded with ampersand '&'
+-- only if particular instance of a character should be used as a shortcut 
+-- such character must be preceded with ampresand '&' otherwise it will be overriden 
+-- by its earliest appearance in the menu
+-- some characters still do need ampresand, e.g. < and >
 local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 local init = old and gfx.init('', 0, 0)
 -- open menu at the mouse cursor
@@ -342,6 +350,12 @@ function Show_Menu_Dialogue(menu)
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
 -- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+-- the earliest appearence of a particular character in the menu can be used as a shortcut
+-- in this case they don't have to be preceded with ampersand '&'
+-- only if particular instance of a character should be used as a shortcut 
+-- such character must be preceded with ampresand '&' otherwise it will be overriden 
+-- by its earliest appearance in the menu
+-- some characters still do need ampresand, e.g. < and >
 local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 local init = old and gfx.init('', 0, 0)
 -- open menu at the mouse cursor
@@ -349,13 +363,19 @@ gfx.x = gfx.mouse_x
 gfx.y = gfx.mouse_y
 return gfx.showmenu(menu)
 end
-
+-- if output == 0 then return r.defer(no_undo) end -- IF RELOADING AFTER CLICK CRUCIAL TO PREVENT ENDLESS LOOP OR do if output > 0 then ... else return r.defer(no_undo) end
 
 function Reload_Menu_at_Same_Pos1(menu, keep_menu_open, left_edge_dist)
 -- keep_menu_open is boolean
 -- left_edge_dist is integer to only display the menu 
 -- when the mouse cursor is within the sepecified distance in px from the screen left edge
 -- only useful for looking up the result of a toggle action, below see a more practical example
+-- the earliest appearence of a particular character in the menu can be used as a shortcut
+-- in this case they don't have to be preceded with ampersand '&'
+-- only if particular instance of a character should be used as a shortcut 
+-- such character must be preceded with ampresand '&' otherwise it will be overriden 
+-- by its earliest appearance in the menu
+-- some characters still do need ampresand, e.g. < and >
 
 ::RELOAD::
 
@@ -393,6 +413,12 @@ function Reload_Menu_at_Same_Pos2(menu, keep_menu_open, left_edge_dist)
 -- keep_menu_open is boolean
 -- left_edge_dist is integer to only display the menu 
 -- when the mouse cursor is within the sepecified distance in px from the screen left edge
+-- the earliest appearence of a particular character in the menu can be used as a shortcut
+-- in this case they don't have to be preceded with ampersand '&'
+-- only if particular instance of a character should be used as a shortcut 
+-- such character must be preceded with ampresand '&' otherwise it will be overriden 
+-- by its earliest appearance in the menu
+-- some characters still do need ampresand, e.g. < and >
 
 left_edge_dist = left_edge_dist and left_edge_dist > 0 and math.floor(left_edge_dist)
 local x, y = r.GetMousePosition()
@@ -431,7 +457,7 @@ local retval = Reload_Menu_at_Same_Pos2(menu)
 	else return r.defer(function() do return end end)
 	end
 -- OR
-	if retval == 0 then return r.defer(function() do return end end)
+	if retval == 0 then return r.defer(function() do return end end) -- CRUCIAL TO PREVENT ENDLESS RELOAD LOOP
 	else
 		if retval == abc then
 		-- DO STUFF
@@ -809,7 +835,7 @@ local dec = tonumber(dec) and 10^math.floor(dec) -- preventing non-numbers and d
 return math.floor(num*dec+0.5)/dec
 end
 -- OR simply
--- math.floor(float*(10^5)+0.5)/10^5 -- truncating down to 5 (10^5) dec places
+-- math.floor(num*(10^5)+0.5)/10^5 -- truncating down to 5 (10^5) dec places
 
 
 math.randomseed(math.floor(r.time_precise()*1000)) -- seems to facilitate greater randomization at fast rate thanks to milliseconds count; math.floor() because the seeding number must be integer
@@ -1021,6 +1047,9 @@ function Get_Closest_Prev_Multiple(dividend, int_divisor)
 end
 
 
+-- a % b == a - math.floor(a/b)*b
+
+
 --================================ M A T H  E N D ===================================
 
 
@@ -1057,7 +1086,7 @@ end
 function Esc(str)
 	if not str then return end -- prevents error
 -- isolating the 1st return value so that if vars are initialized in a row outside of the function the next var isn't assigned the 2nd return value
-local str = str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0')
+local str = str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0'):gsub('\\','\\')
 return str
 end
 
@@ -1137,7 +1166,7 @@ end
 
 
 -- split string to multi-line by character count represented with line_len
-function split_to_multiple_lines(str, line_len) -- str is string, line_len is integer
+function split_into_multiple_lines(str, line_len) -- str is string, line_len is integer
 local line_len = math.floor(line_len) -- prevent decimals
 local w_cntr = 0
 local i = 0
@@ -1173,6 +1202,34 @@ return cntr[2] -- 2nd return value of gsub is the number of replaced captures
 -- local _, cnt = str:gsub(capt,'')
 -- return cnt
 end
+
+
+function insert_string_at_specific_position1(src_str, insert_str, pos_idx, move)
+-- relies on Esc() function
+-- returns nil if pos_idx is greater than src_str length
+-- move is boolean to delete the insert_str from its current location in the src_str,
+-- only reliable if there's single instance of the insert_str
+	for i = 1, #src_str do
+	local str = src_str:sub(1,i)
+		if i == pos_idx-1 then
+		local insert_str_esc = Esc(insert_str)
+		return (move and str:gsub(insert_str_esc, '',1) or str)..insert_str
+		..(move and src_str:sub(i+1):gsub(insert_str_esc, '',1)	or src_str:sub(i+1) )
+		end
+	end
+end
+-- EXAMPLE:
+-- insert_string_after_specific_position1('You see dogs and cats', ', humans', 13)
+-- returns 'You see dogs, humans and cats'
+
+function insert_string_at_specific_position2(src_str, insert_str, pos_idx, move)
+-- relies on Esc() function
+local insert_str_esc = Esc(insert_str)
+local str1, str2 = src_str:sub(1,pos_idx-1), src_str:sub(pos_idx,#src_str)
+return (move and str1:gsub(insert_str_esc, '',1) or str1)..insert_str
+..(move and str2:gsub(insert_str_esc, '',1)	or str2)
+end
+
 
 
 function count_specific_chars(str, char) -- or clusters
@@ -1474,7 +1531,7 @@ function Convert_Text_To_Menu(text, max_line_len, indent)
 -- relies on multibyte_str_len() function (see below) to accurately count UTF-8 characters; can be removed if the text is sure to only contain basic Latin, in which case the line 'multibyte_str_len(text_clean)' can be replaced with '#text_clean'
 
 
-local text = text:gsub('|', 'ㅣ') -- replace pipe, if any, with Hangul character for /i/ since its a menu special character
+local text = text:gsub('|', 'ㅣ') -- replace pipe, if any, with Hangul character for /i/ since its a menu special character, vertical line '│' (Unicode 2502), can be used indtead of Hangul
 local text = text:gsub('&', '+') -- convert ampersand to + because it's a menu special character used as a quick access shortuct hence not displayed in the menu
 local text = text:gsub('\n', '|')-- OR text:gsub('\r', '|') // convert user line breaks into pipes to divide lines by creating menu items, otherwise user line breaks aren't respected; multiple line break is created thanks to the space between pipes originally left after each \n character, if there's none a solid line is displayed instead or several thereof starting from 3 pipes and more
 local t = {}
@@ -1526,6 +1583,7 @@ end
 -- iterate over a UTF-8 string by character
 -- https://stackoverflow.com/questions/22129516/string-sub-issue-with-non-english-characters
 for c in str:gmatch(".[\128-\191]*") do
+-- OR for c in str:gmatch('[\192-\255]*.[\128-\191]*') do -- with leading bytes
 -- DO STUFF
 end
 
@@ -1533,7 +1591,7 @@ end
 function utf8_len(str)
 -- REAPER stock lyrics.lua
 local a = utf8.len(str);
-  if a == nil then return str:len() end
+  if a == nil then return str:len() end -- or return #str
   return a;
 end
 
@@ -3344,7 +3402,7 @@ if #evts_t > 0 and events then Store_Insert_Notes_OR_Evts(ME, take, evts_t, even
 
 function Get_MIDI_Ed_Grid(take)
 
-local grid_QN, swing_val, note_len = r.MIDI_GetGrid(take) -- in QN, quarter note is 1, 1/8th is 0.5 and so on. Swing is between -1 and 1 (the API doc is inaccurate in saying 0 and 1), when swing is negative the grid is shifted leftwards. Note length is 0 if it follows the grid size.; triplet is 1.5 of the straight division, 1/4T = 1/4 / 1.5 = 1 / 1.5; dotted is 1.5 time straight, 1/4D = 1/4 * 1.5 = 1 * 1.5; swing doesn't affect grid_QN value because it's returned as swing_val
+local grid_QN, swing_val, note_len = r.MIDI_GetGrid(take) -- in QN, quarter note is 1, 1/8th is 0.5 and so on. Swing is between -1 and 1 (the API doc is inaccurate in saying 0 and 1), when swing is negative the grid is shifted leftwards. Note length is 0 if it follows the grid size.; triplet is 1.5 of the straight division, 1/4T = 1/4 / 1.5 = 1 / 1.5; dotted is 1.5 times straight, 1/4D = 1/4 * 1.5 = 1 * 1.5; swing doesn't affect grid_QN value because it's returned as swing_val
 local t = {['Grid'] = 0, ['1'] = 4, -- Grid is used in note_len evaluation
 ['1/2'] = 2, ['1/2T'] = 2/1.5, ['1/2D'] = 2*1.5,
 ['1/4'] = 1, ['1/4T'] = 1/1.5, ['1/4D'] = 1.5, 
@@ -3621,9 +3679,9 @@ function ReStoreSelectedItems(t, keep_last_selected)
 	--	r.Main_OnCommand(40289,0) -- Item: Unselect all items
 		r.SelectAllMediaItems(0, false) -- selected false // deselect all
 		end
-	local i = 0
-		while i < #t do
-		r.SetMediaItemSelected(t[i+1],true) -- +1 since item count is 0 based while the table is indexed from 1
+	local i = 1
+		while i <= #t do
+		r.SetMediaItemSelected(t[i],true) -- if in between function runs any item pointers become invalid due to item deletion or split, the function doesn't throw an error, because the data type it expects remains valid
 		i = i + 1
 		end	
 	end
@@ -3901,7 +3959,7 @@ local get_info_string = TRACK and r.GetSetMediaTrackInfo_String or ITEM and r.Ge
 				for fx_idx = 0, r.TakeFX_GetCount(take)-1 do
 					for parm_idx = 0, r.TakeFX_GetNumParams(take, fx_idx)-1 do
 					local env = r.TakeFX_GetEnvelope(take, fx_idx, parm_idx, false) -- create false
-					-- TakeFX_GetEnvelope() returns env even if there's none but parameter mudulation was enabled at least once for the corresponding fx parameter hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
+					-- in REAPER builds prior to 7.06 TakeFX_GetEnvelope() returns env even if there's none but parameter mudulation was enabled at least once for the corresponding fx parameter hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
 						if env and r.CountEnvelopePoints(env) > 0 then -- real, not ghost envelope
 						local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 							if chunk:match('GUID ({.-})') == GUID then
@@ -3909,7 +3967,7 @@ local get_info_string = TRACK and r.GetSetMediaTrackInfo_String or ITEM and r.Ge
 						end
 					end
 				end
-				-- CountTakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
+				-- in REAPER builds prior to 7.06 CountTakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
 				for env_idx = 0, r.CountTakeEnvelopes(take)-1 do
 				local env = r.GetTakeEnvelope(take, env_idx)
 					if r.CountEnvelopePoints(env) > 0 then -- real, not ghost envelope
@@ -3976,8 +4034,8 @@ function Get_Obj_By_GUID2(GUID) -- GUID is a string
 			local fx_GUID = r.TakeFX_GetFXGUID(take, fx_idx)
 				if fx_GUID == GUID then return tr, item, take, take_idx, fx_idx, parm_id, env, env_id end
 			-- CountTakeEnvelopes() lists both take and take fx envelopes hence fx envelopes should be targeted separately first to avoid mixing up envelopes in different contexts;
-			-- it lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
-			-- TakeFX_GetEnvelope() returns env even if there's none but parameter mudulation was enabled at least once for the corresponding fx parameter hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
+			-- in REAPER builds prior to 7.06 it lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
+			-- in REAPER builds prior to 7.06 TakeFX_GetEnvelope() returns env even if there's none but parameter mudulation was enabled at least once for the corresponding fx parameter hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
 				for parm_idx = 0, r.TakeFX_GetNumParams(take, fx_idx)-1 do
 				local env = r.TakeFX_GetEnvelope(take, fx_idx, parm_idx, false) -- create false
 					if env and r.CountEnvelopePoints(env) > 0 then -- real, not ghost envelope
@@ -4826,6 +4884,111 @@ end
 -- local name, folder, sel, fx_On, fx_exist, mute, solo, SIP, rec_arm, rec_mon, rec_mon_auto, TCP_hid, MCP_hid = GetTrackState(tr)
 
 
+function Is_Send_Dest_Track(src_tr, dest_tr)
+-- returns true if dest_tr is found
+	for snd_idx=0,r.GetTrackNumSends(src_tr, 0)-1 do -- category 0 send
+	local tr = r.GetTrackSendInfo_Value(src_tr, 0, snd_idx, 'P_DESTTRACK') -- category 0 send
+		if tr == dest_tr then return true
+		end
+	end
+end
+
+
+-- alternative to Is_Send_Dest_Track(), instead of the src sends, dest receives are evaluated
+function Is_Recv_Src_Track(src_tr, dest_tr)
+-- returns true if src_tr is found
+	for rcv_idx=0,r.GetTrackNumSends(dest_tr, -1)-1 do -- category -1 receive
+	local tr = r.GetTrackSendInfo_Value(dest_tr, 0, rcv_idx, 'P_SRCTRACK') -- category -1 receive
+		if tr == src_tr then return true
+		end
+	end
+end
+
+
+function Remove_Track_Receives(tr)
+-- single loop isn't enough, if more than 2 receives 
+-- after the loop GetTrackNumSends() still returns a number greater than 0
+-- probably due to sluggish update
+-- the result is duplcation of send from the some tracks
+-- since original send couldn't be deleted fast enough, before another one was created
+	for i=0, r.GetTrackNumSends(tr, -1)-1 do -- category -1 receives
+	r.RemoveTrackSend(tr, -1, i) -- category -1 receives
+	end
+	if r.GetTrackNumSends(tr, -1) > 0 then
+	Remove_Track_Receives(tr)
+	end
+end
+
+
+function Get_Track_MIDI_Send_Recv_Channels(tr, idx, send)
+-- tr arg depends on the send arg, if true track is the send src track
+-- otherwise it's send dest track
+-- idx is index of send or receive
+local category = send and 0 or -1 -- either send or receive
+local data = r.GetTrackSendInfo_Value(tr, category, idx, 'I_MIDIFLAGS')
+return
+data&31, -- src ch
+(data>>14)&255, -- OR &0xFF // src bus
+data>>5&31, -- dest ch
+(data>>22)&255 -- OR &0xFF // dest bus
+end
+-- USE:
+-- src_ch, src_bus, dest_ch, dest_bus = Get_Track_MIDI_Send_Recv_Channels(tr, idx, send)
+
+
+function Set_Track_MIDI_Send_Recv_Channels(tr, idx, src_ch, src_bus, dest_ch, dest_bus, send)
+-- whether send or receive is the target depends on send arg, which is boolean
+-- tr arg depends on the send arg, if true track is the send src track
+-- otherwise it's send dest track
+-- idx is index of send or receive
+-- src_ch, dest_ch are 1-based MIDI channel indices, 0 is Omni
+-- if either of them is -1 or both are nil MIDI send will be disabled
+-- to disable first 3 arguments suffice
+-- src_bus, dest_bus are 1-based MIDI bus indices, 0 no bus
+	local function Get(tr, category, idx)
+	return r.GetTrackSendInfo_Value(tr, category, idx, 'I_MIDIFLAGS')
+	end
+	local function Set(tr, category, idx, val)
+	r.SetTrackSendInfo_Value(tr, category, idx, 'I_MIDIFLAGS', val)
+	end
+local category = send and 0 or -1 -- either send or receive
+-- low 5 bits - src channel (midi_snd&31), next 5 bits - dest channel (midi_snd>>5&31) -- to get
+local disable = (src_ch == -1 or dest_ch == -1) or not src_ch and not dest_ch
+	if disable then
+	-- https://forum.cockos.com/showthread.php?t=287292#2
+	Set(tr, category, idx, 31) -- or -1<<5
+	return end
+	
+local midi_snd = Get(tr, category, idx)
+
+	if src_ch then
+		if src_bus then -- must come before channel setting
+		-- must be cleared before setting
+		-- otherwise set bits are added to the newly set ones
+		Set(tr, category, idx, (midi_snd&~(255<<14))|src_bus<<14)
+		midi_snd = Get(tr, category, idx) -- for the next stage
+		end
+	-- midi_snd&~31|src_ch -- 'set new' syntax, before setting must be cleared
+	-- otherwise set bits are added to the newly set ones
+	-- 31 is low 5 bits mask, e.g. : 0000 0000 0001 1111 (the actual number is 32 bit)
+	Set(tr, category, idx, (midi_snd&~31)|src_ch)
+	midi_snd = Get(tr, category, idx) -- for the next stage
+	end
+	if dest_ch then
+		if dest_bus then -- must come before channel setting
+		Set(tr, category, idx, (midi_snd&~(255<<22))|dest_bus<<22)
+		midi_snd = Get(tr, category, idx) -- for the next stage
+		end
+	-- (midi_snd&~992)|dest_ch<<5 -- 'set new' syntax, before setting must be cleared
+	-- 992 is next 5 bits mask: 0000 0011 1110 0000 (the actual number is 32 bit)
+	Set(tr, category, idx, (midi_snd&~992)|dest_ch<<5) -- shifting 5 places left ensures that low 5 bits of the src chan are not affected because with bitwise OR when zeros are applied set bits are retained
+	--    0000 0000 0001 1111 -- src chan low 5 bits
+	-- OR 0000 0011 1110 0000 -- dest chan next 5 bits
+	end
+
+end
+
+
 
 --================================ T R A C K S  E N D ================================
 
@@ -5228,15 +5391,27 @@ end
 
 --================================ E N V E L O P E S ==================================
 
-
 function Get_Env_GUID(env)
-local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
-return env_chunk:match('EGUID (.-)\n')
+local build_6_24 = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.24
+local retval, GUID, chunk
+	if build_6_24 then
+	retval, GUID = r.GetSetEnvelopeInfo_String(env, 'GUID', '', false) -- setNewValue false
+	else
+	retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+	GUID = chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
+	end
+return GUID and #GUID > 0 and GUID
+end
+
+
+function Get_Vis_Env_GUID(env)
+local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+return chunk:match('\nVIS 1 ') and chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
 end
 
 
 function Is_Env_Visible(env)
-	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes
+	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes in REAPER builds prior to 7.06
 	local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 	return env_chunk:match('\nVIS 1 ')
 	end
@@ -5244,7 +5419,7 @@ end
 
 
 function Is_Env_Bypassed(env)
-	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation is enabled without any actual envelope, such ghost envelopes don't have points
+	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation was enabled at least once without any actual envelope, such ghost envelopes don't have points
 	local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 	return env_chunk:match('\nACT 0 ')
 	end
@@ -5314,7 +5489,7 @@ local tr = r.GetMasterTrack(0)
 			for j = 0, r.TakeFX_GetCount(take)-1 do
 				for k = 0, r.TakeFX_GetNumParams(take, j)-1 do
 				local env = r.TakeFX_GetEnvelope(tr, j, k, false) -- create is false
-				env_cnt = r.CountEnvelopePoints(env) > 0 and env_cnt + 1 or env_cnt -- When param modulation is enabled, TakeFX_GetEnvelope() returns parameter envelope even if there's none, if it's a ghost envelope there're no points
+				env_cnt = r.CountEnvelopePoints(env) > 0 and env_cnt + 1 or env_cnt -- When param modulation was enabled at least once, in REAPER builds prior to 7.06 TakeFX_GetEnvelope() returns parameter envelope even if there's none, if it's a ghost envelope there're no points
 				end
 			end
 		end
@@ -5681,7 +5856,7 @@ r.PreventUIRefresh(-1)
 end
 
 
-local Re_Store_Sel_AIs(sel_AI)
+local Re_Store_Sel_AIs1(sel_AI)
 -- sel_AI is a table storing indices of originally selected AI
 local is_AI_sel
 	if not sel_AI then
@@ -5758,18 +5933,91 @@ end
 
 
 
-function Get_Sel_Items_St_And_End()
-local first_start = math.huge -- when note or repeats value is negative (leftward duplication) we search for the earliest pos value
-local last_end = math.huge*-1 -- when duplicating rightwards we search for the latest end value
-	for i = 0, r.CountSelectedMediaItems(0)-1 do
-	local item = r.GetSelectedMediaItem(0,i)
-	local item_pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
-	first_start = item_pos < first_start and item_pos or first_start -- get the earliest pos value amongst selected items because when copying/pasting multiple items which maintain their relative positions that's the defining value
-	local fin = item_pos + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
-	last_end = fin > last_end and fin or last_end -- get the latest end value amongst selected items to place cursor at to emulate duplicate action
+function Re_Store_Selected_AIs2(store, env) 
+-- !!! ONLY WORKS RELIABLY WITH NON-POOLED AIs because 'P_POOL_EXT' arg 
+-- stores selection mark within all pooled AIs regardless of their actual selection
+-- and on the restoration stage if one pooled was selected all pooled get selected;
+-- store is boolean to trigger storage routine;
+-- env is passed at the restoration stage
+-- stemming from the currently selected env pointer the function returns at the storage stage
+	if store then
+		for tr_idx = 0, r.CountTracks(0)-1 do
+		local tr = r.GetTrack(0,tr_idx)
+			for env_idx = 0, r.CountTrackEnvelopes(tr)-1 do
+			local env = r.GetTrackEnvelope(tr, env_idx)
+				for AI_idx = 0, r.CountAutomationItems(env)-1 do
+					if r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', -1, false) > 0 -- selected; is_set false
+					then -- mark as selected with extended data
+					r.GetSetAutomationItemInfo_String(env, AI_idx, 'P_POOL_EXT:D_UISEL', '1', true) -- is_set true
+					r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', 0, true) -- is_set true // de-select
+					end
+				end
+			end 
+		end
+	return r.GetSelectedEnvelope()
+	else -- restore
+		if env then r.SetCursorContext(2, env) end -- re-select originally selected ennvelope
+		for tr_idx = 0, r.CountTracks(0)-1 do
+		local tr = r.GetTrack(0,tr_idx)
+			for env_idx = 0, r.CountTrackEnvelopes(tr)-1 do
+			local env = r.GetTrackEnvelope(tr, env_idx)
+				for AI_idx = 0, r.CountAutomationItems(env)-1 do
+				local ret, sel = r.GetSetAutomationItemInfo_String(env, AI_idx, 'P_POOL_EXT:D_UISEL', '', false) -- is_set false
+					if ret then -- originally selected
+					-- !!! at this stage if the originally selected AI was pooled all other AIs in its pool
+					-- are also re-selected because 'P_POOL_EXT' data are pool-specific rather than AI specific
+					r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', 1, true) -- is_set true // re-select
+					end
+				end
+				-- deleted the mark				
+				for AI_idx = 0, r.CountAutomationItems(env)-1 do
+				local ret, sel = r.GetSetAutomationItemInfo_String(env, AI_idx, 'P_POOL_EXT:D_UISEL', '', false) -- is_set false
+					if ret then -- originally selected
+					r.GetSetAutomationItemInfo_String(env, AI_idx, 'P_POOL_EXT:D_UISEL', '', true) -- is_set true // clear mark
+					end
+				end				
+			end 
+		end 
 	end
-return first_start, last_end
 end
+-- USE:
+-- local curr_env = Re_Store_Selected_AIs2(1) -- store true // store
+-- DO STUFF
+-- local curr_env = Re_Store_Selected_AIs2(nil, curr_env) -- store false // restore
+
+
+function Delete_Or_Unpool_Selected_AI(env, AI_idx, tmp_pool_ID, delete, keep_points)
+-- MUST BE PRECEDED AND FOLLOWED BY Re_Store_Selected_AIs2(), see USE above,
+-- OR by Re_Store_Selected_AIs1() modified to offset AI indices on the target envelope
+-- in case AI was deleted
+-- that's needed because the actions only affect selected AI on selected envelope
+-- which requires de-selection of all other AIs and subsequent restoration of their selection;
+-- tmp_pool_ID stems from the table field tmp_data_t.tmp_pool_ID
+-- returned by Re_Store_Selected_AIs2() preceding this function;
+-- if delete is false AI will be unpooled
+-- in case AI was deleted;
+-- when unpooling the new pool ID will be greater by 1 than it's supposed to be 
+-- due to presence of the temp AI created by Re_Store_Selected_AIs2() which will
+-- will be assigned 1st available poold ID before unpooling
+local env = not env and r.GetSelectedTrackEnvelope() or env 
+r.SetCursorContext(2, env) -- in case it's not selected
+local cmd = delete and
+(keep_points and 42088 -- Envelope: Delete automation items, preserve points
+or 42086) -- Envelope: Delete automation items
+or 42084 -- Envelope: Remove automation items from pool (un-pool)
+--local pool_ID = r.GetSetAutomationItemInfo(env, AI_idx, 'D_POOL_ID', -1, false) -- is_set false
+local selected = r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', -1, false) -- is_set false
+r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', 1, true) -- is_set true // select in case not selected because the actions only affect selected AIs
+r.Main_OnCommand(cmd,0)
+	if not delete then -- de-select here, if was originally selected will be re-selected inside Re_Store_Selected_AIs2() using the return values
+	r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', 0, true) -- is_set true
+		if selected then 
+		return env, AI_idx -- to use in re-selection inside Re_Store_Selected_AIs2() at the restoration stage, essentially redundant due to the above condition, but just in case
+		end
+	end
+
+end
+
 
 
 function RESOLVE_AI_OVERLAPS()
@@ -6077,6 +6325,63 @@ local fx_chunk = fx_chunk:gsub('{[%-%w]+}', function() return r.genGuid('') end)
 
 
 --================================= C H U N K  E N D ========================================
+
+
+--===================================== R A Z O R  E D I T ======================================
+
+function Re_Store_Razor_Edit_Areas(t)
+
+--[[--only for storage as extended state
+local sect = '(Re)Store Razor edit areas'
+local slot = 'SLOT'..slot
+]]
+local tr_cnt = r.CountTracks(0)	
+	
+	if not t then
+	local t = {}
+--	local data = ''
+		for i=0, tr_cnt-1 do
+		local tr = r.GetTrack(0,i)
+		local retval, raz_edit = r.GetSetMediaTrackInfo_String(tr, 'P_RAZOREDITS_EXT', '', false) -- setNewValue false
+		-- retval is always true as long as the param name is correct so unreliable
+			if #raz_edit > 0 then
+		--	data = data..tostring(tr)..':'..raz_edit..';' -- only for storage as extended state
+			t[tostring(tr)] = raz_edit
+			end
+		end
+	--[[ -- only relevant for storage as extended state
+		if #data == 0 then
+		Error_Tooltip('\n\n no razor edit areas to store \n\n', 1, 1) -- caps, spaced true
+		return end
+	r.SetExtState(sect, slot, data, false) -- persist false
+	]]
+	elseif t and next(t) then
+	--[[ -- only relevant for storage as extended state
+	local data = r.GetExtState(sect, slot)
+		if #data == 0 then
+		Error_Tooltip('\n\n no stored razor edit \n\n    areas in the slot \n\n', 1, 1) -- caps, spaced true
+		end
+	local t = {}
+		for data in data:gmatch('(.-);') do
+			if #data > 0 then
+			local tr, raz_edits = data:match('(.+):'), data:match('.+:(.+)')
+			t[tr] = raz_edits
+			end
+		end
+	]]
+		for i=0, tr_cnt-1 do
+		local tr = r.GetTrack(0,i)
+			if t[tostring(tr)] then
+			r.GetSetMediaTrackInfo_String(tr, 'P_RAZOREDITS_EXT', t[tostring(tr)], true) -- setNewValue true
+			end
+		end		
+
+	end
+	
+end
+
+
+--================================= R A Z O R  E D I T  E N D ===================================
 
 
 --============================================ F X ===============================================
@@ -8192,6 +8497,21 @@ return left_edge, right_edge
 end
 
 
+
+function Get_Sel_Items_St_And_End()
+local first_start = math.huge -- when note or repeats value is negative (leftward duplication) we search for the earliest pos value
+local last_end = math.huge*-1 -- when duplicating rightwards we search for the latest end value
+	for i = 0, r.CountSelectedMediaItems(0)-1 do
+	local item = r.GetSelectedMediaItem(0,i)
+	local item_pos = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+	first_start = item_pos < first_start and item_pos or first_start -- get the earliest pos value amongst selected items because when copying/pasting multiple items which maintain their relative positions that's the defining value
+	local fin = item_pos + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+	last_end = fin > last_end and fin or last_end -- get the latest end value amongst selected items to place cursor at to emulate duplicate action
+	end
+return first_start, last_end
+end
+
+
 function is_same_track() -- whether all selected items belong to the same track
 local sel_itm_cnt = r.CountSelectedMediaItems(0)
 	if sel_itm_cnt > 0 then
@@ -8295,27 +8615,6 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 
 end
 
-
-function Is_Ctrl_And_Shift()
--- check if the script is bound to a shortcut containing both Ctrl & Shift
--- which is not advised when the version of Get_Arrange_and_Header_Heights() function is used which creates temporary project tab to fetch the Arrange height data because in this case if the key combination is long pressed a prompt will appear offering to load project with FX offline
--- only relevant if SWS and js_ReaScriptAPI extensions are not installed
--- because only in this case to get the Arrange height a track max zoom is used in a temp proj tab
-local is_new_value,filename,sectID,cmdID,mode,resol,val = r.get_action_context()
-local named_ID = r.ReverseNamedCommandLookup(cmdID) -- convert numeric returned by get_action_context to alphanumeric listed in reaper-kb.ini
-local res_path = r.GetResourcePath()..r.GetResourcePath():match('[\\/]') -- path with separator; or or package.config:sub(1,1) to get the separator
-local s,R = ' ', string.rep
-	for line in io.lines(res_path..'reaper-kb.ini') do
-		if line:match('_'..named_ID) then -- in the shortcut data section command IDs are preceded with the underscore
-		local modif = line:match('KEY (%d+)')
-			if modif == '13' or modif == '29' then -- Ctrl+Shift or Ctrl+Shift+Alt
-			r.MB(R(s,3)..'The script is bound to a shotrcut\n\n'..R(s,5)..'containing Ctrl and Shift keys.\n\n'..R(s,12)..'This will unfortunately\n\n intefere with the script performance.\n\n'..R(s,7)..'It\'s strongly advised to remap\n\n'..R(s,6)..'the script to another shortcut.\n\n\tSincere apologies!','ERROR',0)
-			return true
-			end
-		end
-	end
-end
--- if Is_Ctrl_And_Shift(cmdID) then return r.defer(no_undo) end
 
 
 function Get_Arrange_and_Header_Heights2()
@@ -9216,7 +9515,8 @@ for item in LoopOverSelectedItems(0) do -- if no items, the loop doesn't start
 end
 
 
-function return_captures(src_str, capt_str, patt) -- patt is boolean, true = pattern, false = literal string
+function return_captures(src_str, capt_str, patt) 
+-- patt is boolean, true = pattern, false = literal string
 local capt_str = patt and capt_str or capt_str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0') -- do not escape if pattern; escape if literal string
 local i = 1
 	return function()
@@ -11164,6 +11464,7 @@ end
 function Dir_Exists(path) -- short
 local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces
 local sep = path:match('[\\/]')
+	if not sep then return end -- likely not a string represening a path
 local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed to return 1 (valid)
 local _, mess = io.open(path)
 return mess:match('Permission denied') and path..sep -- dir exists // this one is enough
@@ -11236,7 +11537,7 @@ function ScanPath(path)
     local subdirindex, fileindex = 0,0
     local path_child
     repeat
-        path_child = reaper.EnumerateSubdirectories(path, subdirindex )
+        path_child = reaper.EnumerateSubdirectories(path, subdirindex)
         if path_child then
             table.insert(t,path_child)
             local tmp = ScanPath(path .. "/" .. path_child)
@@ -11554,8 +11855,8 @@ local names_t, content = names_t
 		for line in content:gmatch('[^\n\r]+') do
 			if line and line:match('Provides') then found = 1 end
 			if found and line:match('%.lua') then
-			names_t[#names_t+1] = line:match('.+[/](.+)') or line:match('BuyOne.+[%w]') -- in case the new script name line includes a subfolder path, the subfolder won't be created
-			elseif found and #names_t > 0 then			
+			names_t[#names_t+1] = line:match('.+[/](.+[%w])') or line:match('BuyOne.+[%w]') -- in case the new script name line includes a subfolder path, the subfolder won't be created, trimming trailing spaces if any because they invalidate file path
+			elseif found and #names_t > 0 then
 			break -- the list has ended
 			end
 		end
@@ -11619,6 +11920,39 @@ USE:
 
 
 
+function GetActionCommandIDByFilename(filename)
+-- https://github.com/ReaTeam/ReaScripts/pull/1301/files#diff-fcda7b077c9cd946c72884da52892a3e7a9eef2277562fd92630388cd55fd2a2
+	for k in io.lines(r.GetResourcePath() .. "/reaper-kb.ini") do
+		if k:match("SCR") and k:match(filename) then
+		  return "_" .. k:match("SCR %d+ %d+ (%S*) ")
+		end
+	end
+end
+
+
+function Get_Set_Script_Cont(scr_path, new_cont)
+-- either retrieve script content or update it if new_cont arg is valid
+local mode = new_cont and 'w' or 'r' -- write or read
+local f = io.open(scr_path, mode)
+local cont = not new_cont and f:read('*a')
+	if new_cont then f:write(new_cont) end
+f:close()
+return not new_cont and cont
+end
+
+
+function Get_File_Size(path)
+-- https://www.lua.org/pil/21.3.html
+local f = io.open(path,'rb')
+	if f then
+	local curr = f:seek() -- get current position
+	local size = f:seek('end') -- get file size
+	f:seek('set', curr) -- restore position
+	f:close()
+	return size, size/1024, size/(1024^2) -- return bytes, kbytes and mbytes
+	end
+end
+
 
 --=================================== F I L E S   E N D =========================================
 
@@ -11674,6 +12008,7 @@ end
 
 
 function Music_Div_To_Sec(val)
+-- returns length of 1 bar in sec
 -- val is either integer (whole bars/notes) or quotient of a fraction x/x, i.e. 1/2, 1/3, 1/4, 2/6 etc
 	if not val or val == 0 then return end
 return 60/r.Master_GetTempo()*4*val -- multiply crotchet's length by 4 to get full bar length and then multiply the result by the note division
@@ -11681,6 +12016,7 @@ end
 
 
 function Music_Div_To_Pixels(val)
+-- returns length of 1 bar in whole pixels
 -- val is either integer (whole bars/notes) or quotient of a fraction x/x, i.e. 1/2, 1/3, 1/4, 2/6 etc
 	if not val or val == 0 then return end
 return math.floor(60/r.Master_GetTempo()*4*val*r.GetHZoomLevel()+0.5) -- multiply crotchet's length by 4 to get full bar length and then multiply the result by the note division
@@ -11976,7 +12312,7 @@ return t, output:match('(.+),') or output -- remove hanging comma if there was a
 end
 
 
-function Get_Type_Of_Action(str)
+function Get_Type_Of_Action(str) -- str stems from reaper-kb.ini
 local native = str ~= '0' and tonumber(str)
 local script = str:match('_?RS') and (#str == 43 or #str == 42)
 local cust_act = str:match('^_?[%l%d]+$') and (#str == 33 or #str == 32)
@@ -12098,6 +12434,18 @@ local x, y = r.GetMousePosition()
 local text = text and type(text) == 'string' and (format and text:upper():gsub('.','%0 ') or text) or 'not a valid "text" argument'
 r.TrackCtl_SetToolTip(text, x, y, true) -- topmost true
 r.UpdateTimeline() -- might be needed because tooltip can sometimes affect graphics
+end
+
+
+
+function Get_Mouse_Pos_Sec()
+r.PreventUIRefresh(1)
+local cur_pos = r.GetCursorPosition() -- store current edit cur pos
+r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping)
+local mouse_pos = r.GetCursorPosition()
+r.SetEditCurPos(cur_pos, false, false) -- moveview, seekplay false // restore edit cur pos
+r.PreventUIRefresh(-1)
+return mouse_pos
 end
 
 
@@ -12265,7 +12613,7 @@ end
 
 
 -- REAPER version check
-function REAPER_Ver_Check(build) -- build is REAPER build number, the function must be followed by 'do return end'
+function REAPER_Ver_Check1(build) -- build is REAPER build number, the function must be followed by 'do return end'
 	if tonumber(r.GetAppVersion():match('[%d%.]+')) < build then
 	local x,y = r.GetMousePosition()
 	local mess = '\n\n   THE SCRIPT REQUIRES\n\n  REAPER '..build..' AND ABOVE  \n\n '
@@ -12276,7 +12624,7 @@ function REAPER_Ver_Check(build) -- build is REAPER build number, the function m
 end
 
 
-function REAPER_Ver_Eval(some_build) -- some_build is a string/number
+function REAPER_Ver_Check2(some_build) -- some_build is a string/number
 local some_build = some_build and tonumber(some_build)
 local cur_build = tonumber(r.GetAppVersion():match('[%d%.]+'))
 	if some_build then -- return full table
@@ -12284,6 +12632,29 @@ local cur_build = tonumber(r.GetAppVersion():match('[%d%.]+'))
 	end
 	return {current = cur_build} -- if not some_build or it's not a number, only current build number
 end
+
+
+function REAPER_Ver_Check3(build, want_later, want_earlier, want_current) 
+-- build is REAPER build number or sring, the function must be followed by 'do return end'
+-- want_later, want_earlier and want_current are booleans
+-- obviously want_later and want_earlier are mutually exclusive
+-- want_later includes current, want_earlier is the up-to version
+local build = build and tonumber(build)
+cur_buld = tonumber(r.GetAppVersion():match('[%d%.]+'))
+local later, earlier, current = cur_buld >= build, cur_buld < build, cur_buld == build
+local err = '   the script requires \n\n  '
+local err = not later and err..'reaper '..build..' and later '
+or not earlier and err..'reaper not later than '..build
+	if err then
+	local x,y = r.GetMousePosition()
+	err = err:upper():gsub('.','%0 ')
+	r.TrackCtl_SetToolTip(err, x, y+10, true) -- topmost true
+	return true
+	end -- 'ReaScript:Run' caption is displayed in the menu bar but no actual undo point is created because Undo_BeginBlock() isn't yet initialized, here and elsewhere
+end
+-- USE:
+-- if REAPER_Ver_Check3(build, want_later, want_earlier, want_current)
+-- then return r.defer(function() do return end end) end -- OR use no_undo() function
 
 
 function how_recently_the_project_was_saved()
@@ -12309,6 +12680,28 @@ function Time_Sel_Or_Loop_Exist(want_loop)
 local start, fin = r.GetSet_LoopTimeRange(false, want_loop, 0, 0, false) -- isSet, allowautoseek false
 return start ~= fin
 end
+
+
+function Is_Ctrl_And_Shift()
+-- check if the script is bound to a shortcut containing both Ctrl & Shift
+-- which is not advised when the version of Get_Arrange_and_Header_Heights() function is used which creates temporary project tab to fetch the Arrange height data because in this case if the key combination is long pressed a prompt will appear offering to load project with FX offline
+-- only relevant if SWS and js_ReaScriptAPI extensions are not installed
+-- because only in this case to get the Arrange height a track max zoom is used in a temp proj tab
+local is_new_value,filename,sectID,cmdID,mode,resol,val = r.get_action_context()
+local named_ID = r.ReverseNamedCommandLookup(cmdID) -- convert numeric returned by get_action_context to alphanumeric listed in reaper-kb.ini
+local res_path = r.GetResourcePath()..r.GetResourcePath():match('[\\/]') -- path with separator; or or package.config:sub(1,1) to get the separator
+local s,R = ' ', string.rep
+	for line in io.lines(res_path..'reaper-kb.ini') do
+		if line:match('_'..named_ID) then -- in the shortcut data section command IDs are preceded with the underscore
+		local modif = line:match('KEY (%d+)')
+			if modif == '13' or modif == '29' then -- Ctrl+Shift or Ctrl+Shift+Alt
+			r.MB(R(s,3)..'The script is bound to a shotrcut\n\n'..R(s,5)..'containing Ctrl and Shift keys.\n\n'..R(s,12)..'This will unfortunately\n\n intefere with the script performance.\n\n'..R(s,7)..'It\'s strongly advised to remap\n\n'..R(s,6)..'the script to another shortcut.\n\n\tSincere apologies!','ERROR',0)
+			return true
+			end
+		end
+	end
+end
+-- if Is_Ctrl_And_Shift(cmdID) then return r.defer(no_undo) end
 
 
 
@@ -13364,6 +13757,24 @@ end
 --====================== B A S E 6 4  E N / D E C O D E R  E N D ==============================
 
 --====================== U N I C O D E  --  U T F - 8   C O N V E R T E R =====================
+
+function codepoint_to_utf8(n)
+-- http://scripts.sil.org/cms/scripts/page.php?site_id=nrsi&id=iws-appendixa
+-- https://github.com/ReaTeam/ReaScripts/pull/1293/files#diff-78b0f4d3cbf90aca99f8ca3e5749513f115cf0c09f1d3b752c21dba771f73a76R208
+local f = math.floor
+	if n <= 0x7f then
+	return string.char(n)
+	elseif n <= 0x7ff then
+	return string.char(f(n / 64) + 192, n % 64 + 128)
+	elseif n <= 0xffff then
+	return string.char(f(n / 4096) + 224, f(n % 4096 / 64) + 128, n % 64 + 128)
+	elseif n <= 0x10ffff then
+	return string.char(f(n / 262144) + 240, f(n % 262144 / 4096) + 128, f(n % 4096 / 64) + 128, n % 64 + 128)
+	end
+error( string.format("invalid unicode codepoint '%x'", n) )
+end
+
+
 
 -- functions from IvoDueblin's MC_CollabControl.lua
 -- https://github.com/ReaTeam/ReaScripts/Various/ivodblin_MusiCollaboration/MC_CollabControl.lua
