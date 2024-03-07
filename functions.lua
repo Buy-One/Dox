@@ -46,9 +46,7 @@ M E A S U R E M E N T S / C A L C U L A T I O N S
 
 U T I L I T Y
 
-B A S E 6 4  E N / D E C O D E R
-
-U N I C O D E  --  U T F - 8   C O N V E R T E R
+C O N V E R T I O N S
 
 ]]
 
@@ -340,6 +338,7 @@ Msg(t.a) Msg(t.b) Msg(t.c)
 local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 local init = old and gfx.init('', 0, 0)
 -- open menu at the mouse cursor
+-- https://www.reaper.fm/sdk/reascript/reascripthelp.html#lua_gfx_variables
 gfx.x = gfx.mouse_x
 gfx.y = gfx.mouse_y
 local input = gfx.showmenu(menu) -- menu string
@@ -359,6 +358,7 @@ function Show_Menu_Dialogue(menu)
 local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 local init = old and gfx.init('', 0, 0)
 -- open menu at the mouse cursor
+-- https://www.reaper.fm/sdk/reascript/reascripthelp.html#lua_gfx_variables
 gfx.x = gfx.mouse_x
 gfx.y = gfx.mouse_y
 return gfx.showmenu(menu)
@@ -398,6 +398,8 @@ local init = (old or not old and keep_menu_open) and gfx.init('', 0, 0)
 		elseif not keep_menu_open then
 		coord_t = nil
 		end
+	-- sets menu position to mouse
+	-- https://www.reaper.fm/sdk/reascript/reascripthelp.html#lua_gfx_variables
 	gfx.x = coord_t and coord_t.x or gfx.mouse_x
 	gfx.y = coord_t and coord_t.y or gfx.mouse_y
 	local retval = gfx.showmenu(menu) -- menu string
@@ -670,6 +672,9 @@ function undo_block(undo) -- undo arg is a string, which isn't used at the begin
 	else r.Undo_EndBlock(undo, -1)
 	end
 end
+
+
+r.Undo_EndBlock(r.Undo_CanUndo2(0) or '', -1) -- prevent display of the generic 'ReaScript: Run' message in the Undo readout generated when the script is aborted following  Undo_BeginBlock() (to display an error for example), this is done by getting the name of the last undo point to keep displaying it, if empty space is used instead the undo point name disappears from the readout in the main menu bar
 
 
 function Force_MIDI_Undo_Point1(take)
@@ -1086,7 +1091,7 @@ end
 function Esc(str)
 	if not str then return end -- prevents error
 -- isolating the 1st return value so that if vars are initialized in a row outside of the function the next var isn't assigned the 2nd return value
-local str = str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0'):gsub('\\','\\')
+local str = str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0')
 return str
 end
 
@@ -1161,7 +1166,8 @@ end
 
 
 function strip_spaces(str) -- keeps chars and punctuation, strips leading and trailing spaces and control chars
-return str:match('[%w%p].*[%w%p]*') -- accommodating both mutlti- and single char string
+--return str:match('[%w%p].*[%w%p]*') -- accommodating both mutlti- and single char string
+return str::match('^%s*(.-)%s*$') -- seems more reliable
 end
 
 
@@ -5010,6 +5016,7 @@ local cnt = 0
 	end
 end
 
+
 function Are_All_Children_Selected(tr)
 	for i = r.CSurf_TrackToID(tr, false), r.CountTracks(0)-1 do -- starting loop from the 1st child
 	local chld_tr = r.GetTrack(0, i)
@@ -5267,7 +5274,7 @@ local tr_idx, tr
 
 local depth = r.GetTrackDepth(tr)
 local child_t = {}
-	for i = tr_idx, r.CountTracks(0)-1 do
+	for i = tr_idx+1, r.CountTracks(0)-1 do -- starting from the next track
 	local tr = r.GetTrack(0,i)
 	local tr_depth = r.GetTrackDepth(tr)
 		if tr_depth > depth then
@@ -5391,23 +5398,23 @@ end
 
 --================================ E N V E L O P E S ==================================
 
-function Get_Env_GUID(env)
-local build_6_24 = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.24
-local retval, GUID, chunk
-	if build_6_24 then
-	retval, GUID = r.GetSetEnvelopeInfo_String(env, 'GUID', '', false) -- setNewValue false
-	else
-	retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
-	GUID = chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
+function Is_Valid_Envelope(env, want_state)
+-- want_state is boolean to get additional properties: visivile, bypassed, armed and GUID
+-- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless	
+	if env and tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.06
+	and r.CountEnvelopePoints(env) > 0
+	or env then 
+		if not want_state then return env
+		else
+		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+		return env, chunk:match('\nVIS 1'), chunk:match('\nACT 1'), chunk:match('\nARM 1'), 
+		chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
+		end
 	end
-return GUID and #GUID > 0 and GUID
 end
+-- USE:
+-- local env, vis, bypassed, armed, GUID = Is_Valid_Envelope(env, want_state)
 
-
-function Get_Vis_Env_GUID(env)
-local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
-return chunk:match('\nVIS 1 ') and chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
-end
 
 
 function Is_Env_Visible(env)
@@ -5424,6 +5431,40 @@ function Is_Env_Bypassed(env)
 	return env_chunk:match('\nACT 0 ')
 	end
 end
+
+
+function Get_Env_GUID(env, want_vis)
+-- want_vis is boolean to only get GUID if the env is visible
+
+-- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
+local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
+	if not env 
+	or env and build < 7.06 
+	and r.CountEnvelopePoints(env) == 0
+	then return end
+
+local retval, GUID, chunk
+	if build >= 24 then
+	retval, GUID = r.GetSetEnvelopeInfo_String(env, 'GUID', '', false) -- setNewValue false
+		if want_vis then
+		retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+		end
+	else
+	retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+	GUID = chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
+	end
+
+GUID = (want_vis and chunk:match('\nVIS 1 ') or not want_vis) and GUID
+return GUID and #GUID > 0 and GUID
+
+end
+
+
+function Get_Vis_Env_GUID(env)
+local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+return chunk:match('\nVIS 1 ') and chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
+end
+
 
 
 function Re_Store_Env_Selection(...)
@@ -5456,7 +5497,7 @@ end
 
 
 
-function Count_FX_Envelopes()
+function Count_FX_Envelopes() -- NO CONTAINER FX SUPPORT
 
 local env_cnt = 0
 -- Regular tracks
@@ -5611,7 +5652,7 @@ end
 
 
 
-function Is_FX_Envelope(env) -- 1st return val being nil means not an FX envelope
+function Is_Track_FX_Envelope(env) -- 1st return val being nil means not a track FX envelope
 -- to verify further the next function Is_Track_Or_Take_Env() can be used
 local tr, fx_idx, parm_idx = r.Envelope_GetParentTrack(env)
 	if fx_idx > -1 then return tr, fx_idx, parm_idx end
@@ -9515,7 +9556,7 @@ for item in LoopOverSelectedItems(0) do -- if no items, the loop doesn't start
 end
 
 
-function return_captures(src_str, capt_str, patt) 
+function return_captures(src_str, capt_str, patt)
 -- patt is boolean, true = pattern, false = literal string
 local capt_str = patt and capt_str or capt_str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0') -- do not escape if pattern; escape if literal string
 local i = 1
@@ -9529,11 +9570,32 @@ end
 
 -- USAGE
 -- if no captures the loop doesn't start
-for capt in count_captures(str, 'find') do
+for capt in return_captures(str, 'find') do
 -- OR
---for capt in count_captures(str, '%a+', 1) do -- with 3d argument to enable pattern '%a+'
+--for capt in return_captures(str, '%a+', 1) do -- with 3d argument to enable pattern '%a+'
 Msg(capt)
 end
+
+
+function gmatch_alt(str, ...)
+-- vararg is a list of alternative capture patterns
+local i = 1
+local t = {...}
+	return function()
+	local st, fin, retval
+		for _, capt in ipairs(t) do -- the t contains capture patterns, traverse until one of them produces valid capture
+		st, fin, retval = str:find('('..capt..')',i)
+			if retval then break end	
+		end
+	i = fin and fin+1 or i+1 -- advance only after all capture patterns have been tried
+	return retval
+	end
+end
+--[[ USE:
+local str = 'abcdefgh'
+for w in gmatch_alt(str, '%d','%p','%a') do
+end
+]]
 
 
 --================================ C L O S U R E S  E N D ==============================
@@ -11954,6 +12016,48 @@ local f = io.open(path,'rb')
 end
 
 
+-- if run via dofile() from another script in which case get_action_context() 
+-- returns host script properties
+-- local fullpath = debug.getinfo(1,'S').source:match('^@?(.+)')
+function Script_Is_Installed(fullpath)
+-- evaluate by the script full path being found in reaper-kb.ini
+local sep = r.GetResourcePath():match('[\\/]')
+	for line in io.lines(r.GetResourcePath()..sep..'reaper-kb.ini') do
+	local path = line and line:match('.-%.lua["%s]*(.-)"?')
+		if path and #path > 0 and fullpath:match(Esc(path)) then -- installed 
+		return true end
+	end
+end
+
+-- if run via dofile() from another script in which case get_action_context() 
+-- returns host script properties hence the script name evaluation will be false 
+-- and will only be true if the script is run directly,
+-- that's unless the host and the target script names are identical which is extremely unlikely
+-- local is_new_value, fullpath_init, sect_ID, cmd_ID, mode, resol, val = r.get_action_context()
+function Script_Is_Run_Via_dofile(fullpath_init, scr_name)
+return fullpath_init:match('.+[\\/](.+)') == scr_name
+end
+
+
+-- execute external file placing its global variables in a separate table
+-- from which the loaded file will retrieve them
+-- so they don't accidentally overwrite global variables of the host file
+-- if they occupy identical name space in the global table
+-- https://old.reddit.com/r/lua/comments/1az44mv/quick_question_about_dofile_and_namesake_functions/
+-- some background https://www.lua.org/pil/14.3.html
+-- https://stackoverflow.com/questions/9744693/how-can-i-pass-parameters-to-a-lua-file-when-loading-it-from-another-lua-file
+-- http://web.archive.org/web/20240105055546/http://lua-users.org/wiki/SandBoxes
+-- https://www.gammon.com.au/scripts/doc.php?lua=setfenv
+local func = assert( loadfile( path, 't', setmetatable({}, { __index = _G } ) ) )(...) -- load and create a function // the appended parentheses can be ommitted if no arguments need passing to the loaded file
+func() -- execute
+--[[ OR, which isn't supported by ReaScript
+local func = assert(loadfile(path)) -- load and create a function
+local env = {} -- declare new table
+setfenv(func,env) -- set loaded function envirinment to this custom table
+func() -- execute
+]]
+
+
 --=================================== F I L E S   E N D =========================================
 
 --============  M E A S U R E M E N T S / C A L C U L A T I O N S  =================
@@ -13614,6 +13718,9 @@ end
 
 --=================================== U T I L I T Y  E N D ======================================
 
+--============================ C O N V E R T I O N S ==============================
+
+-- BASE64 EN / DECODER
 
 function Mespotine_Base64_Encoder(source_string, remove_newlines, remove_tabs)
 --[[
@@ -13702,8 +13809,6 @@ optional integer remove_tabs     - 1, removes \t-tabs from the string
 end
 
 
---====================== B A S E 6 4  E N / D E C O D E R ==============================
-
 function Mespotine_Base64_Decoder(source_string)
 -- Meo-Ada Mespotine - licensed under MIT-license
 -- decodes a Base-64-string into its original representation
@@ -13754,9 +13859,9 @@ function Mespotine_Base64_Decoder(source_string)
   return decoded_string
 end
 
---====================== B A S E 6 4  E N / D E C O D E R  E N D ==============================
+-- BASE64 EN / DECODER END 
 
---====================== U N I C O D E  --  U T F - 8   C O N V E R T E R =====================
+-- UNICODE -- UTF-8  CONVERTER  END
 
 function codepoint_to_utf8(n)
 -- http://scripts.sil.org/cms/scripts/page.php?site_id=nrsi&id=iws-appendixa
@@ -13773,7 +13878,6 @@ local f = math.floor
 	end
 error( string.format("invalid unicode codepoint '%x'", n) )
 end
-
 
 
 -- functions from IvoDueblin's MC_CollabControl.lua
@@ -13915,7 +14019,15 @@ end
 -- http://lua-users.org/wiki/LuaUnicode
 
 
---=================== U N I C O D E  --  U T F - 8   C O N V E R T E R   E N D ==================
+-- UNICODE -- UTF-8  CONVERTER  END
+
+-- BASE64 to HEX
+-- https://github.com/EUGEN27771/ReaScripts/blob/master/FX/gen_Save%20Preset%20for%20last%20touched%20FX.lua
+-- https://gist.github.com/X-Raym/448e8afea7d91bce96b520ca12ddc698
+
+
+--========================= C O N V E R T I O N S   E N D ===========================
+
 
 
 --===================================================================================
