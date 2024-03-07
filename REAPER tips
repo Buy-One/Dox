@@ -4248,6 +4248,145 @@ Before starting run 'Item navigation: Move cursor to start of items' action to s
 
 ==============================================================
 
+-- Trigger random sample
+
+Besides resorting to RS5k round robin setup (see elsewhere in this doc) ...
+
+Populate RS5k with a bunch of samples as velocity layers under List button 
+(the limit i assume is 127 as the number of velocity levels) and then randomize 
+velocity with a plugin inserted upstream. The downside is that velocity cannot 
+be used to control their volume.
+
+Instead of a single dedicated plugin a plugin chain can be used:
+
+JS: schwa/midi_humanizer
+JS: MIDI/midi_velocitycontrol
+
+https://forum.cockos.com/showthread.php?t=127185
+
+OR 
+
+MIDI_Probalocity
+
+OR
+
+MIDI_Variant
+
+both by IXix
+
+https://forums.cockos.com/showthread.php?p=1978337
+https://github.com/IXix/JSFX/tree/master
+
+
+==============================================================
+
+-- Convert audio drums to MIDI
+
+https://www.reddit.com/r/Reaper/comments/1aurro9/audio_drums_to_midi/
+
+
+1. Insert the following plugins on a track in the following order:
+
+ReaEQ 1
+ReaGate 1
+ReaEQ 2
+ReaGate 2
+ReaEQ 3
+ReaGate 3
+JS: Volume/Pan Smoother
+
+2. Set their routing under '2 in 2 out' button as follows:
+
+ReaEQ 1 - 1/2 -> 3/4
+ReaGate 1 - 3/4 -> 3/4
+
+ReaEQ 2 - 1/2 -> 5/6
+ReaGate 2 - 5/6 -> 5/6
+
+ReaEQ 3 - 1/2 -> 7/8
+ReaGate 3 - 7/8 -> 7/8
+
+JS: Volume/Pan Smoother - 3/4 -> 1/2, 5/6 -> 1/2, 7/8 -> 1/2
+
+3. Configure these plugins as follows:
+
+----- Kick band
+ReaEQ 1 - One tab, Type: Low pass, Frequency: 150, Bandwidth: 0.88
+ReaGate 1 - Threshold -6 dB, Send MIDI on open/close enabled, note: 60, the rest is default
+
+----- Snare band
+ReaEQ 2 - Tab 1, Type: Band, Frequency: 1400, Gain: 8, Bandwidth: 1.40
+	  Tab 2, Type: Hi Pass, Frequency: 700, Gain: 0, Bandwidth: 2 (default)
+	  Tab 3, Type: Low Pass, Frequency: 2800, Gain: 0, Bandwidth: 2 (default)
+ReaGate 1 - Threshold -3.5 dB, Send MIDI on open/close enabled, note: 62, the rest is default
+
+----- Hats band
+ReaEQ 2 - One, Type: Hi Pass, Frequency: 9900, Gain: -4.6, Bandwidth: 0.34
+ReaGate 1 - Threshold -13.8 dB, Send MIDI on open/close enabled, note: 64, the rest is default
+
+4. Create a send from the track with the above chain to another empty track
+
+5. Disable Audio send, disable Record monitoring
+
+6. In the record button right click context menu select Record: output -> Record: output (MIDI)
+
+7. In the record button right click context menu select Track recording settings (Input Quantize, Format, etc.)
+
+Enable 'Quanitze track MIDI recording' option
+
+Set Quantize to: 1/16
+
+Enable 'Quantize note-offs'
+
+Strength 100%
+
+The rest is to taste but for the sake accuracy keep Swing at 0% and 'Quantize within' sliders at 0% and 100%
+
+8. Record on the second track
+
+9. While it's directly below the original audio item open the recorded MIDI file in the MIDI Editor 
+docked in the bottom docker and tweak the recording relative to the orgiginal audio.
+
+The options 'Sync Editor transport to project transport' and 'Use the same grid division in arrange view and MIDI Editor'
+
+under MIDI Editor Options can be enabled.
+
+
+OR DOWNLOAD THIS SETUP AS A TRACK TEMPLATE AT
+
+https://stash.reaper.fm/v/48244/Multi-band%20gate%20for%20audio%20drums%20to%20MIDI%20conversion.RTrackTemplate
+
+==============================================================
+
+-- Apply frequency curve of one audio source to another
+
+With Spectrum Matcher by Geraint Luff
+
+
+https://www.youtube.com/watch?v=3Cw3Z5L-h08
+https://geraintluff.github.io/jsfx/
+
+==============================================================
+
+-- Overlay spectra of different tracks to spot conflicts
+
+
+Multiple Tracks/Channels in 1 Frequency Analyzer -- In Reaper
+
+using Sai'ke (Joep Vanlier) Spectrum Analyzer
+https://github.com/JoepVanlier/JSFX/tree/master/SpectrumAnalyzer
+
+https://www.youtube.com/watch?v=n3haB4oCwMg
+
+
+==============================================================
+
+
+
+
+
+
+
 
 
 
