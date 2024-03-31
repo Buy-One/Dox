@@ -2222,6 +2222,25 @@ https://forum.cockos.com/showpost.php?p=2466618&postcount=5
 
 ===================================================================================
 
+-- Lua MIDI library
+
+MIDI Utils API by sockmonkey72
+
+https://forum.cockos.com/showthread.php?p=2630436
+
+
+===================================================================================
+
+-- Ultraschall Lua API by mespotine
+
+https://forum.cockos.com/showthread.php?t=214539
+https://ultraschall.fm/api/
+https://mespotin.uber.space/Ultraschall/US_Api_Introduction_and_Concepts.html
+https://github.com/Ultraschall/ultraschall-lua-api-for-reaper/
+
+
+===================================================================================
+
 -- Record from soundcard output
 
 
@@ -4332,7 +4351,7 @@ ReaGate 1 - Threshold -13.8 dB, Send MIDI on open/close enabled, note: 64, the r
 
 7. In the record button right click context menu select Track recording settings (Input Quantize, Format, etc.)
 
-Enable 'Quanitze track MIDI recording' option
+Enable 'Quantize track MIDI recording' option
 
 Set Quantize to: 1/16
 
@@ -4355,6 +4374,33 @@ under MIDI Editor Options can be enabled.
 OR DOWNLOAD THIS SETUP AS A TRACK TEMPLATE AT
 
 https://stash.reaper.fm/v/48244/Multi-band%20gate%20for%20audio%20drums%20to%20MIDI%20conversion.RTrackTemplate
+
+
+--------------------------------------------
+
+Method 2
+
+
+https://youtu.be/fZhU0HyLreI?t=47
+
+
+1. Duplicate the track with the drum stem/break as many times as there're elements you wish to convert to MIDI
+
+2. On each of these tracks insert 'Audio to MIDI Trigger' JSFX plugin
+
+3. Open 'Transient detection settings' dialogue from the main View menu and make sure the checkbox 'Display threshold in media items...' is ticked
+
+4. For each drum stem/break copy in turn while its selected set transient detection threshold using the dialogue and then paste the threshold value 
+
+into 'Audio to MIDI Trigger' JSFX plugin Threshold parameter field. The dialogue is only used as a visual aid.
+
+5. Set 'Audio to MIDI Trigger' JSFX plugin Retrigger parameter to around 60 ms, but the sweet spot is a matter of trial and error
+
+6. Once steps 1-5 are complete, select all drum stem/break copies and run the action 'Apply track/take FX to items as new take (MIDI)'
+
+available in the item context menu
+
+
 
 ==============================================================
 
@@ -4380,6 +4426,93 @@ https://www.youtube.com/watch?v=n3haB4oCwMg
 
 
 ==============================================================
+
+-- CC envelope colors
+
+These are colored by the MIDI channel
+
+
+https://forum.cockos.com/showthread.php?t=253182
+
+
+==============================================================
+
+-- MIDI banks navigation
+
+1. Insert ReaControlMIDI plugin upstream of a plugin whose bank needs switching
+
+2. Load a .reabank file into it
+
+3. Save each bank selection as a ReaControlMIDI preset
+
+4. To navigate between ReaControlMIDI presets Use 
+
+a script https://github.com/Buy-One/REAPER-scripts/tree/main/FX/BuyOne_FX%20preset%20navigation
+
+or SWS extension actions
+
+SWS/S&M: Trigger preset ...
+
+SWS/S&M: Trigger next preset ...
+
+SWS/S&M: Trigger previous preset ...
+
+==============================================================
+
+-- Accessing backups
+
+To get a backup history dialogue from an .rpp-bak file drag and drop it into the session
+
+If it's opened by double click, provided the file is associated with REAPER, the most recent backup will load instead
+
+
+==============================================================
+
+-- TCP custom action buttons (since v7)
+
+Changing the actions of custom buttons is quite simple: in the rtconfig file they are located in a separate block. 
+Find the text "CUSTOM BUTTONs, from here", this will be the beginning of the button code.
+In the first half, the sizes of the buttons and their positions are set (I do not recommend changing this, 
+the code there is quite complex even for me). And in the second half there are actions assigned to buttons. 
+On lines starting with "custom tcp.custom." there is what you need.
+For example, the width button code:
+
+custom tcp.custom.wdth "W" _RS8971d98edc3d0bbfc747e3717f63e4143b267fc2 "Toggle Width Knob" 
+
+
+The first W inside the quotes is the letter that shows on the button.
+_RS8971d98edc3d0bbfc747e3717f63e4143b267fc2 is the ID action command that this button launches.
+and
+Toggle Width Knob inside quotes is the tooltip text that appears when you hover the mouse over the button.
+
+You can change these three values at your discretion, getting different display and different bound actions. Same for other buttons.
+After making changes to the code, do not forget to reload the theme for the changes to take effect.
+
+
+https://forum.cockos.com/showthread.php?p=2758632#20
+https://forums.cockos.com/showthread.php?t=86084&page=3#109
+https://forum.cockos.com/showthread.php?t=275900#3
+
+
+==============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
