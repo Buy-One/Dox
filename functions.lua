@@ -10237,6 +10237,11 @@ Msg((i*-1-1000)..', '..retval..', '..desc..', '..value..', '..defValue..', '..mi
 		end
 	i = i+1
 	until not retval
+	
+-- GetThemeColor, SetThemeColor flags argument 1 (low bit set) 
+-- retrieves color value in native format modified by 
+-- controls in 'Option: Show theme color controls' dialogue
+-- and possibly by the version 6 Theme Adjuster
 
 Sources:
 https://forum.cockos.com/showthread.php?t=291551#6
