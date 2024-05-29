@@ -10216,7 +10216,7 @@ end
 -- Supported since last builds of the version 5, exact one is uknown since their addition
 -- isn't listed in the changelog
 -- In version 5 these are the only one supported
--- Since veresion 6 and the new default theme there're other parameters with positive indices
+-- Since version 6 and the new default theme there're other parameters with positive indices
 
  idx		retval				desc					value	defValue	minValue	maxValue
 -1000, __color_gamma, 			Gamma, 					1000 	1000 		250, 		2000
