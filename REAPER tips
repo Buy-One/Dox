@@ -780,6 +780,55 @@ The action toggle state is ON when there's no docker whose attach state was last
 -- 'View: Show docker' (40279) doesn't work with the toolbar docker, but does with individual toolbars floating docker
 
 
+
+-- Track: Insert new track at end of mixer (41147)
+
+Inserts a new track after the last visible track in the Mixer
+
+Only makes sense when the option 'Auto-arrange tracks in Mixer' in the Mixer settings is disabled, 
+
+i.e. tracks in the Mixer can be arranged independently of their order in the Arrange window.
+
+In this case in Arrange the new track will be inserted after whichever track that's currently the last in the Mixer
+
+and which isn't necessarily the same as the last in Arrange.
+
+
+
+-- Vertical scroll and zoom over the track list in Arrange
+
+Mousewheel is hard linked to vertical scroll
+
+Ctrl+Mousewheel is hard linked to vertical zoom
+
+Actions such as 
+
+View: Scroll vertically reversed (MIDI CC relative/mousewheel)
+View: Zoom vertically reversed (MIDI CC relative/mousewheel)
+View: Zoom vertically reversed, snap to theme-defined sizes (MIDI CC relative/mousewheel)
+View: Zoom vertically, snap to theme-defined sizes (MIDI CC relative/mousewheel)
+
+only work outside of the track list or over the track list with modifiers (scroll) and modifiers other than Ctrl (zoom)
+
+
+https://forum.cockos.com/showthread.php?t=256938
+
+
+----------------------------------------------------
+
+-- SWS: Toolbar solo/mute/arm toggle
+
+
+These actions are meant to go on the toolbar, once you have a button, they:
+1) Show you on the toolbar if you have any tracks soloed/muted/armed.
+2) If you have tracks soloed/muted/armed, and you click the toolbar button, it unsoloes/unmutes/unarms everything.
+3) If you click the button again, it "toggles" back to the previous track solo/mute/arm state.
+
+https://forum.cockos.com/showthread.php?p=753850#post753850
+OR
+https://forum.cockos.com/showpost.php?p=753850&postcount=1052
+
+
 ----------------------------------------------------
 
 MIDI Editor
@@ -801,15 +850,33 @@ that is dotted, triplet or straight, whereas actions of the 1st type always make
 
 --------------------------------------------------
 
-'Item navigation: Move cursor left/right to edge of item' only moves cursor to edges of selected items
+-- 'Item navigation: Move cursor left/right to edge of item' only moves cursor to edges of selected items
 
 if no item is selected it behaves exactly like 'Item navigation: Move cursor left/right to nearest item edge'
 
 'Item navigation: Move cursor left/right to nearest item edge' itself doesn't require item selection to work
 
-============================================================================
 
-Track: Go to next track
+--------------------------------------------------
+
+-- SWS: Set last touched track to match track selection (deprecated)
+
+
+Same as Track: Set first selected track as last touched track
+
+
+--------------------------------------------------
+
+-- Xenakios/SWS: Time selection adaptive delete
+
+Deletes part of selected item within time selection or selected item if it's not within time selection
+
+
+https://forum.cockos.com/showpost.php?p=2784154&postcount=3323
+
+--------------------------------------------------
+
+-- Track: Go to next track
 
 if selection is made from bottom to top, the track selected is the track after the last selected one
 if selection is made from top to bottom, the track selected is the track after the first selected one
@@ -1769,6 +1836,14 @@ F x 16 x 16 x 16 = 61440
 https://decimal.info/hex-to-decimal/F/how-to-convert-0XFFFF-to-decimal.html
 
 
+
+HOW BITS ARE COUNTED
+
+  0     1     2     3     4     5     6     7     8     9    10    11    12    13    14    15
+
+0000, 0001, 0010, 0011, 0100, 0101, 0110, 0111, 1000, 1001, 1010, 1011, 1100, 1101, 1110, 1111
+
+
 =========================================================================
 
 -- Switch FX presets at runtime with ReaControlMIDI
@@ -2201,6 +2276,8 @@ and renamed to match the abovementioned format
 Reaper Toolkit by tack https://forum.cockos.com/showthread.php?t=255897 ||  https://reapertoolkit.dev/
 
 Rea ImGUI by cfillion https://forums.cockos.com/showthread.php?t=250419
+
+ReaImGui Knobs https://github.com/AntoineBalaine/perken-reaper-scripts/tree/rack/imgui/knobs   https://forums.cockos.com/showthread.php?t=288811
 
 Scythe v3 by Lokasenna https://jalovatt.github.io/scythe/  || https://github.com/jalovatt/scythe || 
 Lokasenna v1
@@ -4496,11 +4573,62 @@ https://forum.cockos.com/showthread.php?t=275900#3
 
 ==============================================================
 
+-- Video processor tricks
+
+
+I just discovered by accident that there is an undocumented alternative syntax for "@param" line in presets. The alternate syntax is
+
+Code:
+//@param ParameterVariableName "ParamShownName" default_value minimum_val maximum_val medium_value step_size
+
+for example instead of:
+
+Code:
+//@param1:alpha 'alpha' 1 0 1 .5 .01
+//@param2:zoom 'zoom' 1 0.01 4 1 0.01
+//@param3:offX 'offset x' 0 -1 1 0 0.001
+//@param4:offY 'offset y' 0 -1 1 0 0.001
+
+you can write:
+
+Code:
+//@param alpha 'alpha' 1 0 1 .5 .01
+//@param zoom 'zoom' 1 0.01 4 1 0.01
+//@param offX 'offset x' 0 -1 1 0 0.001
+//@param offY 'offset y' 0 -1 1 0 0.001
+
+so you may reorder parameters or insert new ones without renumbering
+
+BTW did you know you can increase the precision of the "rotate" angle of the "Track opacity/zoom/pan - video processor" just by changing
+
+Code:
+//@param5:rotate 'rotate' 0 -360 360 0 1
+
+with
+
+Code:
+//@param5:rotate 'rotate' 0 -360 360 0 0.1
+
+
+https://forum.cockos.com/showthread.php?t=259354
+
+
+==============================================================
+
+
+-- Selecting all text in project / item notes / FX comments
+
+Since Ctr+A isn't supported, to select all place the cursor at the very beginning of the text
+
+and hit Ctr+Shift+End
+
+OR CONVERSELY
+
+place the cursor at the very end and hit Ctr+Shift+Home
 
 
 
-
-
+==============================================================
 
 
 
