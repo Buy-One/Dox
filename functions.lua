@@ -59,23 +59,25 @@ function Msg(param) -- X-Raym's
 reaper.ShowConsoleMsg(tostring(param).."\n")
 end
 
-
+local Debug = ""
 function Msg(param, cap) -- caption second or none
 local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
-	if Debug then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	if #Debug:gsub(' ','') > 0 -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
 	reaper.ShowConsoleMsg(cap..tostring(param)..'\n')
 	end
 end
 
 
+local Debug = ""
 function Msg(cap, param) -- caption always, if not needed can be empty string
 local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
-	if Debug then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	if #Debug:gsub(' ','') > 0 -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
 	reaper.ShowConsoleMsg(cap..tostring(param)..'\n')
 	end
 end
 
 
+local Debug = ""
 function Msg(...) -- caption first (must be string otherwise ignored) or none, accepts functions with only one return value
 local t = {...}
 	if #t > 1 then
@@ -85,7 +87,7 @@ local t = {...}
 	elseif #t == 1 then
 	displ = tostring(...)..'\n'
 	end
-	if Debug then -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
+	if #Debug:gsub(' ','') > 0 -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
 	r.ShowConsoleMsg(displ)
 	end
 end
@@ -119,15 +121,34 @@ return str and math.abs(str) > default and default or str and math.floor(str)
 end
 
 
-function validate_sett(sett) -- validate setting, can be either a non-empty string or any number
-return type(sett) == 'string' and #sett:gsub(' ','') > 0 or type(sett) == 'number'
+function validate_sett(sett, is_literal)
+-- validate setting, can be either a non-empty string or any number
+-- is_literal is boolean to determine the gsub pattern
+-- in case literal string is used for a setting, e.g. [[ ]]
+
+-- if literal string is used for a setting it may happen to contain 
+-- implicit new lines which should be accounted for in evaluation
+local pattern = is_literal and '[%s%c]' or ' '
+return type(sett) == 'string' and #sett:gsub(pattern,'') > 0 or type(sett) == 'number'
 end
 
 
-function validate_settings1(...) -- if actual setting value is immaterial
+function validate_multi_line_sett(sett)
+-- add trailing line break in case the setting closing square brackets have been moved
+-- to the line of the last track name, otherwise the last line won't be captured with the pattern
+-- in the gmatch loop below
+sett = sett:match('.+\n%s*$') and sett..'\n' or sett
+return #sett:gsub('[%s%c]','') > 0 and sett
+end
+
+
+function validate_settings1(is_literal, ...) -- if actual setting value is immaterial
+-- if literal string is used for all settinga they may happen to contain 
+-- implicit new lines which should be accounted for in evaluation
+local pattern = is_literal and '[%s%c]' or ' '
 local t = {...}
 	for k, sett in ipairs(t) do
-		if type(sett) == 'string' and #sett:gsub(' ','') > 0
+		if type(sett) == 'string' and #sett:gsub('[%s%c]','') > 0
 		or type(sett) == 'number' then t[k] = true
 		else t[k] = false
 		end
@@ -136,6 +157,7 @@ return table.unpack(t)
 end
 -- USE:
 -- local sett1, sett2, sett3 =  validate_settings(sett1, sett2, sett3)
+
 
 function validate_settings2(...) -- if numeric values matter
 local t = {...}
@@ -146,6 +168,7 @@ local t = {...}
 	end
 return table.unpack(t)
 end
+
 
 function validate_settings3(...) -- if numeric values matter
 local t = {...}
@@ -275,6 +298,7 @@ function Script_Not_Enabled(ENABLE_SCRIPT)
 end
 if Script_Not_Enabled(ENABLE_SCRIPT) then return r.defer(function() do return end end) end
 
+
 -- Enable this setting by inserting by inserting any alphanumeric
 -- character between the quotation marks
 -- to permanently prevent USER SETTINGS reminder pop-up
@@ -304,15 +328,22 @@ if not Reminder_Off(REMINDER_OFF) then return r.defer(function() do return end e
 
 -------------------------------------------
 
-function Validate_All_Global_Settings(...) -- global vars must be passed as arguments in string representation; in current form only suitable for validation of truth
+function Validate_All_Global_Settings(is_literal, ...) -- global vars must be passed as arguments in string representation; in current form only suitable for validation of truth
 -- https://stackoverflow.com/questions/59448334/convert-string-to-variable-name-in-lua
 -- https://love2d.org/forums/viewtopic.php?t=75392
 -- https://stackoverflow.com/questions/67407628/in-lua-having-found-a-variable-of-type-function-in-g-how-to-pass-a-paramete
+
+-- is_literal is boolean to determine the gsub pattern
+-- in case literal string is used for a setting, e.g. [[ ]]
+
+-- if literal string is used for a setting it may happen to contain 
+-- implicit new lines which should be accounted for in evaluation
+local pattern = is_literal and '[%s%c]' or ' '
 local t = {...}
 local t2 = {}
 	for k, setting in ipairs(t) do
 	local glob_var = t[k]
-	t2[setting] = #_G[glob_var]:gsub(' ','') > 0 -- or #_G[t[k]]...
+	t2[setting] = #_G[glob_var]:gsub('[%s%c]','') > 0 -- or #_G[t[k]]...
 	end
 return t2
 end
@@ -321,7 +352,7 @@ USAGE
 a = '.'
 b = ''
 c = ' 2'
-local t = Validate_All_Global_Settings('a','b','c')
+local t = Validate_All_Global_Settings(is_literal, 'a','b','c')
 Msg(t.a) Msg(t.b) Msg(t.c)
 ]]
 
@@ -374,6 +405,7 @@ gfx.y = gfx.mouse_y
 return gfx.showmenu(menu)
 end
 -- if output == 0 then return r.defer(no_undo) end -- IF RELOADING AFTER CLICK CRUCIAL TO PREVENT ENDLESS LOOP OR do if output > 0 then ... else return r.defer(no_undo) end
+
 
 function Reload_Menu_at_Same_Pos1(menu, keep_menu_open, left_edge_dist)
 -- keep_menu_open is boolean
@@ -845,6 +877,12 @@ end
 -- OR
 -- num = tonumber(string.format('%.f', num))
 
+-- ???????? dountfully correct
+function round4(num) -- works with all numbers negative and positive above 1 and below -1
+-- with negative values math.floor rounds towards the lesser value, i.e. -4.5 to -5 hence math.ceil instead
+return num >= 0 and math.floor(num+0.5) or math.ceil(num-0.5)
+end
+
 
 function round(num, idp) -- idp = number of decimal places, 0 means rounding to integer
 -- http://lua-users.org/wiki/SimpleRound
@@ -1226,6 +1264,40 @@ end
 
 
 
+function split_line_by_capture_count(line, pattern, count, backwards)
+-- pattern can be lireral string or regular expression, if it's literal
+-- make sure to escape it with Esc()
+-- splits the line as soon as the number of found captures equals count arg
+-- returns nil if count arg value exceeds the total of found closures
+-- relies on Esc() function
+-- if backards is true counting and line parsing is done from the end
+local counter = 0
+local start = backwards and #line or 1
+local fin = start
+	repeat
+	local window = line:sub(start, fin)
+	local capt = window:match(pattern)
+		if capt then
+		counter = counter+1
+			if counter == count then
+				if backwards then
+				return start == 1 and line or line:sub(1, start-1), -- accounting for cases when the number of captures on the line is equal to count arg to begin with
+				start == 1 and '' or start <= #line and line:sub(start, #line)
+				else
+				return line:sub(1, fin), fin < #line and line:sub(fin+1, #line)
+				end
+			end
+		start = backwards and start-#capt-1 or start+#capt+1
+		fin = backwards and fin-#capt-1 or fin+#capt+1
+		else -- advance or retreat by one position
+		start = backwards and start-1 or start
+		fin = backwards and fin or fin+1
+		end		
+	until backwards and start <= 0 or fin >= #line
+end
+
+
+
 function Are_Multiple_Captures(chunk, str) -- relies on Esc() function
 local cnt = 0
 	for w in chunk:gmatch(Esc(str)) do
@@ -1276,6 +1348,7 @@ end
 
 
 function count_specific_chars(str, char) -- or clusters
+-- doesn't account for multibyte characters
 local i, cnt = 0, 0
 	while i < #str do -- reverse loop
 		if str:sub(#str-i,#str-i) == char then 
@@ -1409,10 +1482,10 @@ local repl_str = 'ffsds'
 	-- result: 'one1 one one2 one one test'
 
 
-function replace_capture_by_capture_number(str, what, with, ...)
--- the elipsis represents a list of integers denoting the number of the what instance in the str
+function replace_capture_by_capture_number1(str, what, with, ...) -- OVERKILL, see versions 2 and 3 below
+-- the elipsis (vararg) represents a list of integers denoting the number of the what instance in the str
 -- if the what instance number is out of scope or it isn't found, returns the original str
--- this type of replacement is impossible with string.gsub()
+-- this type of replacement is impossible with string.gsub() --- WRONG, see versions 2 and 3 below
 local inst_t = {...}
 local t = {}
 local i = 1
@@ -1436,6 +1509,111 @@ end
 -- EXAMPLE
 -- local str = 'one two one two one two, two'
 -- local str = replace_capture_by_capture_number(str, 'two', 'three', 1, 3, 4) -- replaces 1st, 2nd and 4th instances of 'two' with 'three'
+
+
+function replace_capture_by_capture_number2(str, what, with, ...)
+-- the elipsis (vararg) represents a list of integers denoting the number of the what instance in the str
+-- if the what instance number is out of scope or it isn't found, returns the original str
+local t = {...}
+local i = 0
+	local function repl()
+	i=i+1
+		for _, v in ipairs(t) do
+			if v == i then return with end 		
+		end
+	end
+local str = str:gsub(what, repl)
+return str
+end
+
+
+function replace_capture_by_capture_number3(str, what, with, ...)
+-- the elipsis (vararg) represents a list of integers denoting the number of the what instance in the str
+-- if the what instance number is out of scope or it isn't found, returns the original str
+local t, t2 = {...}, {}
+-- construct table where the 'what' indices are keys rather than values
+	for k, v in ipairs(t) do
+	t2[v] = '' -- placeholder
+	end
+local i = 0
+	local function repl()
+	i=i+1
+		if t[i] then return with end
+	end
+local str = str:gsub(what, repl)
+return str
+end
+
+
+
+function replace_captures_with_table_vals1(str, capt, t)
+-- each capture is replaced with the next table value
+-- e.g. in the string 'test test test test', capture 'test' 
+-- and table {1,2,3,4} the result will be '1 2 3 4'
+local i = 0
+local str = str:gsub(capt, function() i=i+1 return t[i] end)
+return str
+end
+
+
+function replace_captures_with_table_vals2(str, capt, t)
+-- each capture is replaced with the next table value
+-- e.g. in the string 'test test test test', capture 'test' 
+-- and table {1,2,3,4} the result will be '1 2 3 4'
+local str = str
+	for k, v in ipairs(t) do
+	str = str:gsub(capt, v, 1)
+	end
+return str
+end
+
+
+
+function re_store_identical_captures(str, pattern, t)
+-- temporarily replace capture with a numbered placeholder
+-- and then restore the original substring
+-- pattern can be lireral string or regular expression, if it's literal
+-- make sure to escape it with Esc()
+local placeholder = [[placeholder]]:upper()reverse()
+	if not t then -- store
+	local t = {}
+		for w in str:gmatch(pattern) do
+			if w then
+			t[#t+1] = w
+			end
+		end
+	-- numbered placeholders allow managing them selectively
+	str = str:gsub(pattern, function() i=i+1 return ' '..placeholder..i..' ' end)
+	--[[ OR
+	local t, str_tmp = {}, str -- use copy line_tmp to traverse the input string to allow formatting the original string during the loop without lengthening the loop and complicating the capture
+		for w in str:gmatch(pattern) do
+			if w then
+			t[#t+1] = w
+			w = Esc(w)
+			str = str:gsub(w, ' '..placeholder..#t..' ', 1) -- only 1 replacement per gsub run to prevent replacing identical captures with identically numbered placeholders
+			end
+		end
+	]]
+	return str, t
+	elseif t and #t > 0 then -- restore
+	local s = ' '
+		for i = 1, #t do
+		local repl = t[i]:gsub('%%','%%%%')
+		str = str:gsub(s..placeholder..i..s, repl) -- only found placeholders are restored
+		end
+	--[[ OR
+		for k, v in ipairs(t) do
+		local v = v:gsub('%%','%%%%')
+		line = str:gsub(s..placeholder..k..s, v) -- only found placeholders are restored
+		end
+	]]
+	return str
+	end
+end
+-- USE:
+-- local t = re_store_identical_captures(str, pattern) -- t arg is nil // store
+-- re_store_identical_captures(str, pattern, t) -- restore
+-- str must be the same on both occasions
 
 
 
@@ -1619,6 +1797,7 @@ function multibyte_str_len(str)
 -- https://www.freecodecamp.org/news/what-is-utf-8-character-encoding/
 -- count string length in characters regardless of the number of bytes they're represented by, works for Korean, Japanese, Chinese
 -- Lua string library counts bytes, and UTF-8 characters produce inaccurate count because they're multi-byte, consisting also of leading (leader) bytes (192-254) and continuation (trailing) bytes (128-191), the continuation bytes must be discarded so only the basic ASCII (0-127) remain
+-- In Lua 5.3+, use utf8.len
 return #str:gsub('[\128-\191]','') -- OR #str:gsub('[\x80-\xbf]','') -- same in HEX
 end
 
@@ -1889,17 +2068,17 @@ end
 
 
 function merge_tables1(t,...)
--- elipsis represents a list of tables to be merged with t;
+-- elipsis (vararg) represents a list of tables to be merged with t;
 -- be aware that since the tables passed as elipsis will be merged with t
 -- after the merge it will contain all of them,
 -- so if you plan to use t afterwards with its original contents
 -- it's safer to pass an anonymous table {} as the 1st argument
 local to_merge = {...}
-	for _, table in ipairs(to_merge)do
-		for i = 1, #table do
-		t[#t+1] = table[i]
+	for _, tab in ipairs(to_merge)do
+		for i = 1, #tab do
+		t[#t+1] = tab[i]
 	--[[ OR
-		for _, v in ipairs(table) do
+		for _, v in ipairs(tab) do
 		t[#t+1] = v
 	--]]
 		end
@@ -1908,14 +2087,14 @@ return t
 end
 
 
-function merge_tables2(t, new, ...) -- new is boolean to indicate if to merge with t or create a new table, elipsis represents a list of tables to be merged with t
+function merge_tables2(t, new, ...) -- new is boolean to indicate if to merge with t or create a new table, elipsis (vararg) represents a list of tables to be merged with t
 local t = new and {table.unpack(t)} or t
 local to_merge = {...}
-	for _, table in ipairs(to_merge)do
-		for i = 1, #table do
-		t[#t+1] = table[i]
+	for _, tab in ipairs(to_merge)do
+		for i = 1, #tab do
+		t[#t+1] = tab[i]
 	--[[ OR
-		for _, v in ipairs(table) do
+		for _, v in ipairs(tab) do
 		t[#t+1] = v
 	--]]
 		end
@@ -1924,7 +2103,29 @@ return t -- required if merge_tables is used as an argument in another function,
 end
 
 
-function unpack(t, from, to)
+function merge_args_into_array(...)
+-- args can be variables and other arrays which are unpacked
+local t, t2 = {...}, {}
+	for _, tab in ipairs(t) do 
+		if type(tab) == 'table' then
+			for i = 1, #tab do
+			t2[#t2+1] = table.unpack(tab,i,i) -- same as tab[i]
+			end
+		else
+		t2[#t2+1] = tab
+		end
+	end
+return t2
+end
+
+
+-- table merger solutions
+-- https://stackoverflow.com/questions/1410862/concatenation-of-tables-in-lua
+-- https://stackoverflow.com/questions/1283388/how-to-merge-two-tables-overwriting-the-elements-which-are-in-both
+
+
+
+function unpack_alt(t, from, to)
 -- from & to are indices of fields
 -- if from is nil then from the 1st up until 'to'
 -- if 'to' is nil, then 'from' to the last
@@ -2099,6 +2300,20 @@ return t
 end
 
 
+
+function construct_char_array(up, low, both)
+-- up, low, both are booleans to choose case
+-- under one case there're 26 alphabetic chars in Latin basic
+local capt = both and '%a' or up and '%u' or low and '%l'
+local t = {}
+	for i = 0, 255 do
+	local char = string.char(i)
+		if char:match(capt) then
+		t[#t+1] = char
+		end
+	end
+return t
+end
 
 
 
@@ -4209,6 +4424,14 @@ return tcp_under_mouse and r.GetTrackFromPoint(r.GetMousePosition())
 end
 
 
+
+function Track_Visible_In_Arrange_Or_Mixer(tr)
+-- not suitable for all cases because the truth depends on Mixer window being open
+return r.IsTrackVisible(tr, r.GetToggleCommandState(40078) == 1) -- View: Toggle mixer visible // whether vis in the Mixer if mixer toggle state is ON or in Arrange if it's OFF
+end
+
+
+
 function Get_Track_At_Mouse_Cursor_Y() -- covers the entire track timeline
 local x, y = r.GetMousePosition()
 local tr, info_code = reaper.GetTrackFromPoint(x, y)
@@ -4445,10 +4668,16 @@ local tracklist_len, topmost_vis_tr
 return tracklist_len, topmost_vis_tr
 
 end
-r.CSurf_OnScroll(0, tracklist_len*-1) -- scroll the tracklist all the way up, without division by 8, to the very start to then be able to scroll down from 0 (I_TCPY value of the 1st visible track) searching for a specific track
-local topmost_vis_tr_I_TCPY = r.GetMediaTrackInfo_Value(topmost_vis_tr, 'I_TCPY')
-r.CSurf_OnScroll(0, round(topmost_vis_tr_I_TCPY/8))
+--[[ USE:
 
+local tracklist_len, topmost_vis_tr = Get_Vis_TCP_Tracklist_Length_px_X_Topmost_Track(unhide, exclusive_track_display)
+
+r.CSurf_OnScroll(0, tracklist_len*-1) -- scroll the tracklist all the way up, without division by 8, to the very start to then be able to scroll down from 0 (I_TCPY value of the 1st visible track) searching for a specific track
+
+local topmost_vis_tr_I_TCPY = r.GetMediaTrackInfo_Value(topmost_vis_tr, 'I_TCPY')
+
+r.CSurf_OnScroll(0, round(topmost_vis_tr_I_TCPY/8))
+]]
 
 
 function Scroll_Track_To_Top1(tr)
@@ -5640,7 +5869,7 @@ function Count_FX_Envelopes() -- NO CONTAINER FX SUPPORT
 
 local env_cnt = 0
 -- Regular tracks
-	for i = -1, r.CSurf_NumTracks(true)-1 do -- start from -1 to target the Master track
+	for i = -1, r.CSurf_NumTracks(false)-1 do -- mcpView false // start from -1 to target the Master track
 	local tr = r.GetTrack(0,i) or r.GetMasterTrack(0)
 --	env_cnt = env_cnt + r.CountTrackEnvelopes(tr)
 		for j = 0, r.TrackFX_GetCount(tr)-1 do
@@ -5956,6 +6185,25 @@ local path = path..sep..'reaper-env-colors.ini'
 	return t
 	end
 end
+
+
+
+function Check_env_scaling(src, dst, val)
+-- by Sexan https://forum.cockos.com/showpost.php?p=2275821&postcount=2002
+  local mode_s = reaper.GetEnvelopeScalingMode( src )
+  local mode_d = reaper.GetEnvelopeScalingMode( dst )
+
+  if mode_s ~= mode_d then
+    if mode_s == 1 and mode_d == 0 then
+      val = reaper.ScaleFromEnvelopeMode(1, val)
+    else
+      val = reaper.ScaleToEnvelopeMode(1, val)
+    end
+  end
+
+  return val
+end
+
 
 
 --============================ E N V E L O P E S   E N D ==================================
@@ -9635,8 +9883,8 @@ end
 
 --=================================== C O L O R =======================================
 
-function Validate_HEX_Color_Setting(HEX_COLOR)
-local HEX_COLOR = type(HEX_COLOR) == 'string' and HEX_COLOR:gsub('%s','') -- remove empty spaces just in case
+function Validate_HEX_Color_Setting1(HEX_COLOR) -- see streamlined version below
+local HEX_COLOR = type(HEX_COLOR) == 'string' and HEX_COLOR:gsub('[%s%c]','') -- remove empty spaces and control chars just in case
 
 -- default to black if color is improperly formatted
 local HEX_COLOR = (not HEX_COLOR or type(HEX_COLOR) ~= 'string' or HEX_COLOR == '' or #HEX_COLOR < 4 or #HEX_COLOR > 7) and '#000' or HEX_COLOR
@@ -9652,6 +9900,18 @@ return HEX_COLOR -- TO USE THE RETURN VALUE AS ARG IN hex2rgb() function UNLESS 
 --local R,G,B = hex2rgb(HEX_COLOR) -- R because r is already taken by reaper, the rest is for consistency
 --return R, G, B
 end
+
+
+function Validate_HEX_Color_Setting2(HEX_COLOR)
+local c = type(HEX_COLOR)=='string' and HEX_COLOR:gsub('[%s%c]','') -- remove empty spaces and control chars just in case
+c = c and (#c == 3 or #c == 4) and c:gsub('%w','%0%0') or c -- extend shortened (3 digit) hex color code, duplicate each digit
+c = c and #c == 6 and '#'..c or c -- adding '#' if absent
+	if not c or #c ~= 7 or c:match('[G-Zg-z]+')
+	or not c:match('#%w+') then return '#000000' -- black
+	end
+return c
+end
+
 
 function hex2rgb(HEX_COLOR)
 -- https://gist.github.com/jasonbradley/4357406
@@ -9950,6 +10210,41 @@ local tr_color_alt
 end
 
 
+--[[ 'Option: Show theme color controls' dialogue
+
+-- Parameters for use with ThemeLayout_GetParameter, ThemeLayout_SetParameter
+-- Supported since last builds of the version 5, exact one is uknown since their addition
+-- isn't listed in the changelog
+-- In version 5 these are the only one supported
+-- Since veresion 6 and the new default theme there're other parameters with positive indices
+
+ idx		retval				desc					value	defValue	minValue	maxValue
+-1000, __color_gamma, 			Gamma, 					1000 	1000 		250, 		2000
+-1001, __color_shadows, 		Shadows, 				0, 		0, 			-256, 		256
+-1002, __color_midtones, 		Midtones, 				0, 		0, 			-256, 		256
+-1003, __color_highlights, 		Highlights,				0, 		0, 			-256,		256
+-1004, __color_saturation, 		Saturation, 			256, 	256, 		0, 			512
+-1005, __color_tint, 			Tint, 					192, 	192, 		0, 			384
+-1006, __color_apply_project, 	Apply to project colors, 0, 	0, 			0, 			1
+
+-- Extracted with 
+
+local i = 0
+	repeat
+	local retval, desc, value, defValue, minValue, maxValue = reaper.ThemeLayout_GetParameter(i*-1-1000)
+		if retval then
+Msg((i*-1-1000)..', '..retval..', '..desc..', '..value..', '..defValue..', '..minValue..', '..maxValue)
+		end
+	i = i+1
+	until not retval
+
+Sources:
+https://forum.cockos.com/showthread.php?t=291551#6
+https://forum.cockos.com/showthread.php?t=242022 basic_theme_adjuster.lua
+
+]]
+
+
 
 
 --================================ C O L O R   E N D ==================================
@@ -9995,8 +10290,8 @@ local t = {...}
 	return function()
 	local st, fin, retval
 		for _, capt in ipairs(t) do -- the t contains capture patterns, traverse until one of them produces valid capture
-		st, fin, retval = str:find('('..capt..')',i)
-			if retval then break end	
+		st, fin, retval = str:find('('..capt..')',i) -- if the pattern already includes the parentheses they must be removed here
+			if retval then break end
 		end
 	i = fin and fin+1 or i+1 -- advance only after all capture patterns have been tried
 	return retval
@@ -10085,7 +10380,7 @@ function Get_Marker_Reg_At_Mouse_Or_EditCursor()
 		repeat
 		local retval, isrgn, pos, rgnend, name, ID, color = r.EnumProjectMarkers3(0, i) -- markers/regions are returned in the timeline order, if they fully overlap they're returned in the order of their displayed indices
 			if retval > 0 and (pos == cur_pos or isrgn and rgnend == cur_pos) then
-			return color, {idx=i, isrgn=isrgn, pos=pos, rgnend=rgnend, name=name, ID=ID}
+			return color, {idx=i, isrgn=isrgn, pos=pos, rgnend=rgnend, name=name, ID=ID, col=color}
 			end
 		i = i+1
 		until retval == 0 -- until no more markers/regions
@@ -10128,13 +10423,13 @@ local start, fin = r.GetSet_LoopTimeRange(false, false, 0, 0, false) -- isSet, i
 	if start == fin then return end -- no time selection
 	
 	repeat
-	local retval, isrgn, pos, rgnend, name, ID = r.EnumProjectMarkers3(0, i) -- markers/regions are returned in the timeline order, if they fully overlap they're returned in the order of their displayed indices
+	local retval, isrgn, pos, rgnend, name, ID, color = r.EnumProjectMarkers3(0, i) -- markers/regions are returned in the timeline order, if they fully overlap they're returned in the order of their displayed indices
 		if rgns and isrgn
 		and (pos >= start and pos <= fin or rgnend >= start and rgnend <= fin -- region start or end is within time sel
 		or pos >= start and rgnend <= fin) -- whole region is within time sel
 		or not isrgn and mrkrs and pos >= start and pos <= fin
 		then
-		t[#t+1] = {idx=i, isrgn=isrgn, pos=pos, rgnend=rgnend, name=name, ID=ID} -- color isn't needed because to markers/regions in time selection it's only applied
+		t[#t+1] = {idx=i, isrgn=isrgn, pos=pos, rgnend=rgnend, name=name, ID=ID, col=color}
 		end
 	i = i+1
 	until retval == 0 -- until no more markers/regions
@@ -10448,6 +10743,29 @@ function Get_Take_Mrkr_Default_Color()
 local key = want_region and 'region' or 'marker' 
 return r.GetThemeColor('take_marker', 0) -- flag 0 theme default color
 end
+
+
+
+function Get_Action_Marker_Data(cmd_ID)
+-- cmd_ID is integer, stems from get_action_context()
+-- looks for program/preset index or name in the action marker name
+
+local play_state = r.GetPlayState()
+	if r.GetToggleCommandStateEx(0, r.NamedCommandLookup('_SWSMA_TOGGLE')) == 1 -- SWS: Toggle marker actions enable
+	and (play_state & 1 == 1 -- playing
+	or play_state & 4 == 4) -- recording
+	then
+	local cmd_ID = r.ReverseNamedCommandLookup(cmd_ID)
+	local play_pos = r.GetPlayPosition()
+	local mrk_idx, reg_idx = r.GetLastMarkerAndCurRegion(0, play_pos)
+	local retval, isrgn, mrk_pos, rgnend, mrk_name, mrk_num = r.EnumProjectMarkers(mrk_idx)
+	local prog = mrk_name:match('!%s*_'..cmd_ID..'.-%s;.-%s(.+)$') -- accounting for mulitple leading empty spaces // the command ID and preset index/name must be separated by semi-colon ; padded with spaces, i.e. 'command_ID ; preset index/name', because action markers allow multiple space separated command IDs and preset index separated by a space only will be treated as another action command ID
+	prog = prog:match('.*[%w%p]') -- trimming trailing empty space if any, accounting for a single numeral
+	return tonumber(prog) and tonumber(prog) or prog -- either index or name
+	end
+
+end
+
 
 
 --========================== M A R K E R S  &  R E G I O N S  E N D =========================
@@ -11972,6 +12290,12 @@ local found
 	r.MB([[The script name has been changed]]..br..Rep(7)..[[which renders it inoperable.]]..br..
 	[[   please restore the original name]]..br..[[  referring to the list in the header,]]..br..
 	Rep(9)..[[or reinstall it.]], 'ERROR', 0)
+--[[ OR using Error_Tooltip()
+	local err = 'The script name has been changed\n\n    which renders it inoperable. \n\n'
+..' please restore the original name\n\n\t referring to the names\n\n\t\t in the header,\n\n'
+..'\tor reinstall the package.'
+	Error_Tooltip('\n\n '..err..' \n\n', 1, 1, -200, 20) -- caps, spaced true, x2 -200, y2 20 // display the value placing the tooltip away from mouse cursor in case the script is run with a click otherwise tooltip blocks next mouse event
+	]]
 	return true
 	end
 
@@ -11981,9 +12305,9 @@ end
 --[[
 -- EXAMPLE when several matches are required:
 -- validate script name
-local no_elm1 = Invalid_Script_Name(scr_name,table.unpack(type_t))
-local no_elm2 = Invalid_Script_Name(scr_name,'left','right')
-	if no_elm1 or no_elm2 then
+local elm1 = Invalid_Script_Name(scr_name,table.unpack(type_t))
+local elm2 = Invalid_Script_Name(scr_name,'left','right')
+	if not (elm1 or elm2) then
 	local br = '\n\n'
 	r.MB([[The script name has been changed]]..br..Rep(7)..[[which renders it inoperable.]]..br..
 	[[   please restore the original name]]..br..[[  referring to the list in the header,]]..br..
@@ -12040,7 +12364,7 @@ end
 -- USE:
 --[[
 local keyword = Invalid_Script_Name3(scr_name, 'right', 'left', 'up', 'down')
-	if not keyword then r.defer(no_undo) end
+	if not keyword then return r.defer(no_undo) end
 
 	if keyword == 'right' then
 	-- DO STUFF
@@ -12104,7 +12428,8 @@ end
 
 --[[ EXAMPLE OF USAGE to validate custom path
 
-CUSTOM_FX_CHAIN_DIR = #CUSTOM_FX_CHAIN_DIR:gsub(' ','') > 0 and CUSTOM_FX_CHAIN_DIR
+-- [%s%c] is used if the path setting if the path is formatted as literal string [[ ]]
+CUSTOM_FX_CHAIN_DIR = #CUSTOM_FX_CHAIN_DIR:gsub('[%s%c]','') > 0 and CUSTOM_FX_CHAIN_DIR
 
 local fx_chain_dir = CUSTOM_FX_CHAIN_DIR and Dir_Exists(Validate_Folder_Path(CUSTOM_FX_CHAIN_DIR)) or path..sep..'FXChains'..sep
 
@@ -12489,7 +12814,7 @@ local names_t, content = names_t
 	ret, output = r.GetUserInputs('Scripts destination folder', 1,
 	'Full path to the dest. folder, extrawidth=200', output or '')
 
-		if not ret or #output:gsub(' ','') == 0 then return end -- must be aborted outside of the function
+		if not ret or #output:gsub('[%s%c]','') == 0 then return end -- must be aborted outside of the function
 
 	local user_path = Dir_Exists(output) -- validate user supplied path
 		if not user_path then Error_Tooltip('\n\n invalid path \n\n', 1, 1) -- caps, spaced true
@@ -12601,12 +12926,83 @@ end
 -- https://www.gammon.com.au/scripts/doc.php?lua=setfenv
 local func = assert( loadfile( path, 't', setmetatable({}, { __index = _G } ) ) )(...) -- load and create a function // the appended parentheses can be ommitted if no arguments need passing to the loaded file
 func() -- execute
---[[ OR, which isn't supported by ReaScript
+--[[ OR, which isn't supported by ReaScript or the latest Lua version
 local func = assert(loadfile(path)) -- load and create a function
 local env = {} -- declare new table
-setfenv(func,env) -- set loaded function envirinment to this custom table
+setfenv(func,env) -- set loaded function environment to this custom table
 func() -- execute
 ]]
+
+
+function Parse_ReaBank_File(file_name)
+-- file_name is a .reabank file name with or without the extension
+-- the expected file location is /Data folder in the REAPER resource directory
+	if file_name then
+	local file_name = file_name:match('[%p%w].+[%p%w]') -- strip leading and trailing spaces
+	file_name = file_name:lower():match('%.reabank') and file_name
+	or file_name..'.reabank'
+	local sep = r.GetResourcePath():match('[\\/]')
+	local path = r.GetResourcePath()..sep..'Data'..sep..file_name
+		if not r.file_exists(path) then
+		Error_Tooltip('\n\n the .reabank file wasn\'t \n\n found in the /data folder \n\n', 1, 1) -- caps, spaced true
+		return end
+	local t, bank_MSB_init, bank_LSB_init = {}
+		for line in io.lines(path) do
+			if line:lower():match('^%s*bank') then -- this cond also ignores commented out lines
+			-- if bank header is malformed in the file the bank won't be listed in ReaControlMIDI
+			-- extra spaces are ignored
+			-- the order of bank numbers in the .reabank file is immaterial for ReaControlMIDI
+			local bank_MSB, bank_LSB, bank_name = line:match('[BbAaNnKk]+[%s\t]*(%d+)[%s\t]*(%d+)[%s\t]*(.*)')
+				if bank_MSB and bank_LSB then -- collect bank numbers
+					if bank_MSB ~= bank_MSB_init then -- new bank MSB number
+					t[bank_MSB+0] = {[bank_LSB+0] = {name = #bank_name > 0 and bank_name or 'no bank name'}}					
+					else -- same bank MSB number, add new LSB table
+					t[bank_MSB_init+0][bank_LSB+0] = {}
+					t[bank_MSB_init+0][bank_LSB+0].name = #bank_name > 0 and bank_name or 'no bank name'
+					end
+				bank_MSB_init, bank_LSB_init = bank_MSB, bank_LSB -- store/update
+				end
+			-- order of the program numbers in the .reabank file doesn't affect their order
+			-- in ReaControlMIDI, the numbering doesn't have to be sequential
+			elseif bank_MSB_init and #line > 0 and not line:match('^[%s\t]*//') then -- OR match('^[%s\t]*%d+'), collect programs props, ignoring empty and commented out lines
+			local prog_No, prog_name = line:match('^[%s\t]*(%d+)[%s\t]*(.*)')
+				if prog_No then
+				t[bank_MSB_init+0][bank_LSB_init+0][prog_No+0] = #prog_name > 0 and prog_name or 'no prog name'		
+				end
+			end
+		end
+	return next(t) and t -- return if table is likely populated, only evaluates bank MSB field hence not failproof
+	end
+end
+
+
+
+function Get_CommID_By_Script_Name(scriptName)
+-- https://raw.githubusercontent.com/NablaTools/Nabla/main/Looper%20A/Nabla%20Looper%20A%20-%20Settings.lua
+	if type(scriptName)~="string"then 
+	error("expects a 'string', got "..type(scriptName),2) 
+	end;
+	
+local file = io.open(reaper.GetResourcePath()..'/reaper-kb.ini','r'); 
+	
+	if not file then 
+	return -1 
+	end;
+	
+local scrName = string.gsub(string.gsub(scriptName, 'Script:%s+',''), "[%%%[%]%(%)%*%+%-%.%?%^%$]",function(s)return"%"..s;end);
+
+	for var in file:lines() do;
+		if match(var, scrName) then
+		id = "_"..gsub(gsub(match(var, ".-%s+.-%s+.-%s+(.-)%s"),'"',""), "'","")
+		return id
+		else
+		--
+		end
+	end;
+	
+return -1;
+
+end
 
 
 --=================================== F I L E S   E N D =========================================
@@ -12928,6 +13324,13 @@ end
 --====================================== U T I L I T Y =========================================
 
 
+function is_tbl_or_ptr_or_fnc(obj)
+-- same as type(obj) == 'table', type(obj) == 'userdata', type(obj) == 'function'
+local obj = tostring(obj)
+return obj:match('table: %w+'), obj:match('userdata: %w+'), obj:match('function: %w+')
+end
+
+
 function GetUserInputs(title, field_cnt, field_names, field_cont, separator, comment_field, comment)
 -- title string, field_cnt integer, field_names string separator delimited
 -- the length of field names list should obviously match field_cnt arg
@@ -12963,13 +13366,13 @@ local separator = separator and ',separator='..separator or ''
 local ret, output = r.GetUserInputs(title, field_cnt, field_names..',extrawidth=150'..separator, field_cont)
 output = #comment > 0 and output:match('(.+'..sep..')') or output -- exclude comment field keeping separator to simplify captures in the loop below
 field_cnt = #comment > 0 and field_cnt-1 or field_cnt -- adjust for the next statement
-	if not ret or (field_cnt > 1 and output:gsub(' ','') == (sep):rep(field_cnt-1)
-	or #output:gsub(' ','') == 0) then return end
+	if not ret or (field_cnt > 1 and output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)
+	or #output:gsub('[%s%c]','') == 0) then return end
 	--[[ OR
 	-- to condition action by the type of the button pressed
 	if not ret then return 'cancel'
-	elseif field_cnt > 1 and output:gsub(' ','') == (sep):rep(field_cnt-1)
-	or #output:gsub(' ','') == 0 then return 'empty' end
+	elseif field_cnt > 1 and output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)
+	or #output:gsub('[%s%c]','') == 0 then return 'empty' end
 	]]
 local t = {}
 	for s in output:gmatch('(.-)'..sep) do
@@ -13105,10 +13508,16 @@ end
 
 
 
-function Get_Mouse_Pos_Sec()
+function Get_Mouse_Pos_Sec(want_over_arrange, want_snapping)
+
+	if want_over_arrange and not r.GetTrackFromPoint(r.GetMousePosition()) -- look for the mouse cursor pos // GetTrackFromPoint() prevents getting mouse position if the script is run from a toolbar or the Action list window floating over Arrange or if mouse cursor is outside of Arrange because in this case GetTrackFromPoint() returns nil; usually in this case the script should fall back on getting edit cursor position; this condition doesn't apply to mouse over a Mixer track
+	then return end
+
+local comm_id = want_snapping and 40513 -- View: Move edit cursor to mouse cursor
+or 40514 -- View: Move edit cursor to mouse cursor (no snapping)
 r.PreventUIRefresh(1)
 local cur_pos = r.GetCursorPosition() -- store current edit cur pos
-r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping)
+r.Main_OnCommand(comm_id,0)
 local mouse_pos = r.GetCursorPosition()
 r.SetEditCurPos(cur_pos, false, false) -- moveview, seekplay false // restore edit cur pos
 r.PreventUIRefresh(-1)
@@ -13651,7 +14060,7 @@ end
 
 
 function Is_Mouse_Over_Arrange3(ignore_items)
--- relies on Is_TCP_Under_Mouse()
+-- relies on Get_TCP_Under_Mouse()
 -- ignore_items is boolean, if true, only cursor outside of items in Arrange is respected
 
 local x, y = r.GetMousePosition()
@@ -13661,14 +14070,14 @@ local x, y = r.GetMousePosition()
 	then return not ignore_items end
 
 local tr, info = r.GetTrackFromPoint(x, y)
-	if tr and info ~= 2 and not Is_TCP_Under_Mouse() then return tr end
+	if tr and info ~= 2 and not Get_TCP_Under_Mouse() then return tr end
 
 	if not tr then -- info 2 is FX
 --	r.PreventUIRefresh(1) -- doesn't help much
 	local tr_idx = not r.GetTrack(0,0) and 0 or r.GetNumTracks()-1 -- insert temp track if no tracks or cursor is lower than the last track in which case tr cannot be valid
 	r.InsertTrackAtIndex(tr_idx, false) -- wantDefaults false
 	local temp_tr = r.GetTrack(0, tr_idx) -- track to be deleted
-		if r.GetTrackFromPoint(x, y) and not Is_TCP_Under_Mouse()
+		if r.GetTrackFromPoint(x, y) and not Get_TCP_Under_Mouse()
 		then
 		r.DeleteTrack(temp_tr) -- temp track
 	--	r.PreventUIRefresh(-1)
@@ -13676,7 +14085,7 @@ local tr, info = r.GetTrackFromPoint(x, y)
 	--	else
 	--	r.PreventUIRefresh(-1)
 		end
-	-- if not found at cursor, encrease height
+	-- if not found at cursor, increase height
 	r.SetMediaTrackInfo_Value(temp_tr, 'I_HEIGHTOVERRIDE', 800)
 	r.TrackList_AdjustWindows(true) -- isMinor is true // updates TCP only https://forum.cockos.com/showthread.php?t=208275
 --	r.PreventUIRefresh(1)	
@@ -13684,7 +14093,7 @@ local tr, info = r.GetTrackFromPoint(x, y)
 	r.DeleteTrack(temp_tr) -- temp track
 --	r.PreventUIRefresh(-1)
 	r.CSurf_OnScroll(0,1000) -- scroll back to the track list end since expansion of the last makes the list scroll up	
-	return not Is_TCP_Under_Mouse() and tr
+	return not Get_TCP_Under_Mouse() and tr
 	end
 
 end
@@ -13693,7 +14102,7 @@ end
 
 function Get_Cursor_Contexts(allow_locked, sectionID, cmd_ID)
 -- uses Cursor_outside_pianoroll(), Get_Mouse_Coordinates_MIDI(),
--- Is_TCP_Under_Mouse() and Is_Mouse_Over_Arrange()
+-- Get_TCP_Under_Mouse() and Is_Mouse_Over_Arrange()
 
 local allow_locked = not allow_locked and false or true
 local x, y = r.GetMousePosition()
@@ -13712,7 +14121,7 @@ local tr, info = table.unpack(build_6_36 and {r.GetThingFromPoint(x, y)} or {r.G
 		return arrange or fx or env and 'envelope' or tcp or mcp -- in this order because when env and fx, tcp or mcp are also true
 		else
 		local env, fx = info == 1 and 'envelope', info == 2 and 'fx' -- env regardless of env selection
-		return env or fx or tr and (Is_TCP_Under_Mouse() and 'tcp' or 'arrange')
+		return env or fx or tr and (Get_TCP_Under_Mouse() and 'tcp' or 'arrange')
 		end
 	elseif sectionID == 32060 then
 	local ME = r.MIDIEditor_GetActive()
@@ -13727,7 +14136,7 @@ local tr, info = table.unpack(build_6_36 and {r.GetThingFromPoint(x, y)} or {r.G
 	else
 	local trans = info:match('trans')
 	return trans and 'transport'
---	return trans and 'transport' or Is_TCP_Under_Mouse() and 'tcp' or 'arrange' // WORKS BUT FOREGOING THIS OPTION IN FAVOR OF OPENING LAST STORED LAYER WHEN NO VALID CONTEXT, OTHERWISE IF THE SCRIPT IS RUN FROM A TOOLBAR/MENU THE CONTEXT ALWAYS WILL BE EITHER TCP OR ARRANGE DEPENDING ON THE TOOLBAR/MENU LOCATION
+--	return trans and 'transport' or Get_TCP_Under_Mouse() and 'tcp' or 'arrange' // WORKS BUT FOREGOING THIS OPTION IN FAVOR OF OPENING LAST STORED LAYER WHEN NO VALID CONTEXT, OTHERWISE IF THE SCRIPT IS RUN FROM A TOOLBAR/MENU THE CONTEXT ALWAYS WILL BE EITHER TCP OR ARRANGE DEPENDING ON THE TOOLBAR/MENU LOCATION
 	end
 
 --[[UNUSED, FOR INFO
@@ -14057,9 +14466,17 @@ end
 ]]
 local left_down, right_up = table.unpack(mousewheel_reverse and {val > 0, val < 0} or {val < 0, val > 0}) -- left/down, right/up
 return left_down, right_up
-
 end
 
+
+-- exclude mouse clicks or absolute mode as script trigger
+--[[
+local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context()
+	if mode == 0 then
+	Error_Tooltip('\n\n\tthe script must be \n\n    run with a mousewheel \n\n or MIDI CC in relative mode \n\n', 1, 1, -200, 20) -- caps, spaced true, x2 -200, y2 20 // placing the tooltip away from mouse cursor in case the script is run with a click otherwise tooltip blocks next mouse event
+	return r.defer(no_undo)
+	end
+]]
 
 
 function Process_Mousewheel_Sensitivity(val, cmdID, MOUSEWHEEL_SENSITIVITY, percent, MOUSEWHEEL)
@@ -14155,7 +14572,7 @@ function Ad_Hoc_Setting()
 local x, y = r.GetMousePosition()
 	if x <= 100 and y <= 100 then
 	local retval, output = r.GetUserInputs('AD-HOC INCREMENT SETTING, default: '..incr_default, 1, 'extrawidth=25,Type in value ( musical or sec )', (INCREMENT ~= incr_default and INCREMENT or '')) -- only autofill if the value is different from the default set in the USER SETTINGS
-	local output = output:gsub(' ','')
+	local output = output:gsub('[%s%c]','')
 		if #output > 0 then
 			if output:match('^[Xx]+') then -- remove ad-hoc INCREMENT setting to go back to the one defined in the script
 			r.DeleteExtState(cmdID, 'INCREMENT', true) -- persist true
@@ -14615,6 +15032,9 @@ reaper.CountTracks(0)
 reaper.GetNumTracks()
 
 reaper.CSurf_NumTracks(boolean mcpView)
+-- when mcpView is false returns total in the project regardless of track visibility
+-- when mcpView is true returns total in the project if none is visible in the Mixer
+-- (disregarding the Master track), if at least one is visible only returns the visible count
 
 --===================================================================================
 
