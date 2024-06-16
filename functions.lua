@@ -14,6 +14,8 @@ M I D I
 
 (R E) S T O R E
 
+O B J E C T S
+
 T R A C K S
 
 F O L D E R S
@@ -46,638 +48,17 @@ M E A S U R E M E N T S / C A L C U L A T I O N S
 
 U T I L I T Y
 
-C O N V E R T I O N S
+C O N V E R S I O N S
+
+R E A S C R I P T  F U N C T I O N S  F O R  V A R I O U S  T A S K S
+
+F U N C T I O N   L I S T
+
+
 
 ]]
 
 
-
-
-local r = reaper
-
-function Msg(param) -- X-Raym's
-reaper.ShowConsoleMsg(tostring(param).."\n")
-end
-
-local Debug = ""
-function Msg(param, cap) -- caption second or none
-local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
-	if #Debug:gsub(' ','') > 0 -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
-	reaper.ShowConsoleMsg(cap..tostring(param)..'\n')
-	end
-end
-
-
-local Debug = ""
-function Msg(cap, param) -- caption always, if not needed can be empty string
-local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
-	if #Debug:gsub(' ','') > 0 -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
-	reaper.ShowConsoleMsg(cap..tostring(param)..'\n')
-	end
-end
-
-
-local Debug = ""
-function Msg(...) -- caption first (must be string otherwise ignored) or none, accepts functions with only one return value
-local t = {...}
-	if #t > 1 then
-	local cap, param = table.unpack(t) -- assign arguments to vars
-	local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
-	displ = cap..tostring(param)..'\n'
-	elseif #t == 1 then
-	displ = tostring(...)..'\n'
-	end
-	if #Debug:gsub(' ','') > 0 -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
-	r.ShowConsoleMsg(displ)
-	end
-end
-
-
-local function printf(...) -- cfillion's from cfillion_Step sequencing (replace mode).lua
-	if debug then
-	reaper.ShowConsoleMsg(string.format(...))
-	end
-end
--- e.g. printf(">\tnote %d\tchan=%s vel=%s\n", note.pitch, note.chan, note.vel)
-
-
-local date = os.date('%H-%M-%S_%d.%m.%y') -- a convenient way to make file names unique and prevent clashes
-
-
-function Is_Project_Start()
-local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
---local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
-local proj_time_offset = r.GetProjectTimeOffset(0, false) -- rndframe false
-return start_time == proj_time_offset
-end
-
-
-function Validate_Positive_Integer(str, type) -- str is a numeric string, type is a string, script specific to distinguish between 2 modes
-local default = type and (type:lower() == 'bend' and 12 or type:lower() == 'offset' and 80)
-	if not default then return end
-local str = str:gsub(' ','') -- remove all spaces
-local str = #str == 0 and default or tonumber(str)
-return str and math.abs(str) > default and default or str and math.floor(str)
-end
-
-
-function validate_sett(sett, is_literal)
--- validate setting, can be either a non-empty string or any number
--- is_literal is boolean to determine the gsub pattern
--- in case literal string is used for a setting, e.g. [[ ]]
-
--- if literal string is used for a setting it may happen to contain 
--- implicit new lines which should be accounted for in evaluation
-local pattern = is_literal and '[%s%c]' or ' '
-return type(sett) == 'string' and #sett:gsub(pattern,'') > 0 or type(sett) == 'number'
-end
-
-
-function validate_multi_line_sett(sett)
--- add trailing line break in case the setting closing square brackets have been moved
--- to the line of the last track name, otherwise the last line won't be captured with the pattern
--- in the gmatch loop below
-sett = sett:match('.+\n%s*$') and sett..'\n' or sett
-return #sett:gsub('[%s%c]','') > 0 and sett
-end
-
-
-function validate_settings1(is_literal, ...) -- if actual setting value is immaterial
--- if literal string is used for all settinga they may happen to contain 
--- implicit new lines which should be accounted for in evaluation
-local pattern = is_literal and '[%s%c]' or ' '
-local t = {...}
-	for k, sett in ipairs(t) do
-		if type(sett) == 'string' and #sett:gsub('[%s%c]','') > 0
-		or type(sett) == 'number' then t[k] = true
-		else t[k] = false
-		end
-	end
-return table.unpack(t)
-end
--- USE:
--- local sett1, sett2, sett3 =  validate_settings(sett1, sett2, sett3)
-
-
-function validate_settings2(...) -- if numeric values matter
-local t = {...}
-	for k, sett in ipairs(t) do
-		if type(sett) == 'string' and not tonumber(sett)
-		or not type(sett) == 'number' then t[k] = false
-		end
-	end
-return table.unpack(t)
-end
-
-
-function validate_settings3(...) -- if numeric values matter
-local t = {...}
-	for k, sett in ipairs(t) do
-	t[k] = tonumber(sett) and math.floor(math.abs(tonumber(sett))) or false -- false is to prevent storing nil and thereby impeding table.unpack because without saved n value (number of fields) it will only unpack up until the first nil
-	end
-return table.unpack(t)
-end
-
-
-
-function validate_output(string) -- with GetUserInputs()
-local string = string:gsub(' ','')
-return #string > 0 and string ~= ',,' -- 3 field user dialogue if separator is a comma
-end
--- USE:
--- if not retval or not validate_output(output) then return r.defer(function() do return end end) end
-
-
----------------------------------------------------------------------------------------------
--- Get command ID of the executed action, the action must be run
--- for its command ID to be returned by the function
-local comm_id
-
-function Get_Action_ID()
---local t = {0,32060,32061,32062,32063} -- UNUSED
-comm_id = r.PromptForAction(0, 0, 0) -- session_mode 0, init_id 0, section_id 0 // POLL
---Msg(comm_id)
-	if comm_id > 0 then
-	r.PromptForAction(-1, 0, 0) -- session_mode -1, init_id 0, section_id 0 // STOP
-	return end
-r.defer(Get_Action_ID)
-end
-
-r.PromptForAction(1, 0, 0) -- session_mode 1, init_id 0, section_id 0 // LAUNCH
-Get_Action_ID()
-r.atexit(function() r.ShowConsoleMsg(r.ReverseNamedCommandLookup(comm_id)) end)
-
-----------------------------------------------------------------------------------------
-
--- do something in X sec
-local cur_time = os.time() -- in sec
-local duration = 300 -- in sec
-function do_in_X_mins(cur_time, duration)
-	if select(2, math.modf((os.time() - cur_time)/duration)) == 0 then -- when the difference can be divided by duration without remainder it means exactly the duration value
-		-- DO STUFF --
-	end
-end
-
-
-function ACT(comm_ID) -- both string and integer work
-local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
-local act = comm_ID and comm_ID ~= 0 and r.Main_OnCommand(r.NamedCommandLookup(comm_ID),0)
-end
-
-
-function ACT1(comm_ID, islistviewcommand, midi) -- islistviewcommand, midi are boolean
--- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
--- e.g. sectionID == 32061
-local act = midi and r.MIDIEditor_LastFocused_OnCommand(r.NamedCommandLookup(comm_ID), islistviewcommand) -- islistviewcommand false
-or not midi and r.Main_OnCommand(r.NamedCommandLookup(comm_ID), 0) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything
-end
-
-
-function ACT2(comm_ID, islistviewcommand, midi) -- islistviewcommand, midi are boolean
--- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
--- e.g. sectionID == 32061
-local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
-local act = comm_ID and comm_ID ~= 0 and (midi and r.MIDIEditor_LastFocused_OnCommand(comm_ID, islistviewcommand) -- islistviewcommand false
-or not midi and r.Main_OnCommand(comm_ID, 0)) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything // only if valid command_ID
-end
-
-
-
-local ME = r.MIDIEditor_GetActive() -- UNRELIABLE if script is run from the Main section of the action list, see MIDIEditor_GetActiveAndVisible()
-function ACT(ID, ME) -- supports MIDI Editor actions, get MIDI editor pointer ME and add as argument otherwise can be left out
--- ID - string or integer
-	if ID then
-	local ID = r.NamedCommandLookup(ID) -- works with srings and integers
-		if ID ~= 0 then -- valid command_ID
-			if not ME then r.Main_OnCommand(ID, 0)
-			else
-			r.MIDIEditor_LastFocused_OnCommand(ID, false) -- islistviewcommand is false
-		--	r.MIDIEditor_OnCommand(ME, ID)
-			end
-		end
-	end
-end
-
-
-function get_tog_state(sect_ID, comm_ID)
--- supports string command IDs
-return r.GetToggleCommandStateEx(sect_ID, r.NamedCommandLookup(comm_ID))
-end
-
-
-function capture_command(input, str) -- weed out illegal entries in the Profile console
-
-	for cmd in input:gmatch('[^,]*') do -- check all slots; if dot were added here it would help to catch decimal numbers, but opted for error in the main routine
-		if cmd ~= '' and cmd ~= '0' and cmd ~= '1' and not cmd:match('^h+$') and not cmd:match('oo?ut') and cmd ~= 'quit' and not cmd:match('oo?pen') and cmd ~= 'reload' and not cmd:match('toolbar[0-9]+') and not cmd:match('toolbar[0-8]m') and not cmd:match('auto[0-9]+') and cmd ~= 'auto0' then input = nil break end
-	end
-
-	if input and str then
-	input = input:match('^('..str..'),') or input:match(',('..str..'),') or input:match(',('..str..')$')
-	end
-
-return input
-
-end
-
-
---------------------------------------------
-
--- Enable this setting by inserting any QWERTY alphanumeric
--- character between the quotation marks so the script can be used
--- then configure the settings below
-ENABLE_SCRIPT = ""
-function Script_Not_Enabled(ENABLE_SCRIPT)
-	if #ENABLE_SCRIPT:gsub(' ','') == 0 then
-	local emoji = [[
-		_(ツ)_
-		\_/|\_/
-	]]
-	r.MB('  Please enable the script in its USER SETTINGS.\n\nSelect it in the Action list and click "Edit action...".\n\n'..emoji, 'PROMPT', 0)
-	return true
-	end
-end
-if Script_Not_Enabled(ENABLE_SCRIPT) then return r.defer(function() do return end end) end
-
-
--- Enable this setting by inserting by inserting any alphanumeric
--- character between the quotation marks
--- to permanently prevent USER SETTINGS reminder pop-up
-REMINDER_OFF = ""
-function Reminder_Off(REMINDER_OFF)
-	local function gap(n) -- number of repeats, integer
-	local n = not n and 0 or tonumber(n) and math.abs(math.floor(n)) or 0
-	return string.rep(' ',n)
-	-- return (' '):rep(n)
-	end
-local _, scr_name, scr_sect_ID, cmd_ID, _,_,_ = r.get_action_context()
-local scr_name = scr_name:match('([^\\/]+)%.%w+') -- without path and extension
---local cmd_ID = r.ReverseNamedCommandLookup(cmd_ID) -- to use instead of scr_name // just an idea
-local ret, state = r.GetProjExtState(0, scr_name, 'REMINDER_OFF')
-	if #REMINDER_OFF:gsub(' ','') == 0 and ret == 0 then
-	local resp = r.MB('\t'..gap(7)..'This is to make you aware\n\n'..gap(12)..'that the script includes USER SETTINGS\n\n'..gap(10)..'you might want to tailor to your workflow.\n\n'..gap(17)..'Clicking "OK" disables this prompt\n\n'..gap(8)..'for the current project (which will be saved).\n\n\t'..gap(6)..'To disable it permanently\n\n change the REMINDER_OFF setting inside the script.\n\n   Select it the the Action list and click "Edit action..."', 'REMINDER', 1)
-		if resp == 1 then
-		r.SetProjExtState(0, scr_name, 'REMINDER_OFF', '1')
-		r.Main_SaveProject(0, false) -- forceSaveAsIn false
-		return true
-		end
-	else return true
-	end
-end
-if not Reminder_Off(REMINDER_OFF) then return r.defer(function() do return end end) end
-
-
--------------------------------------------
-
-function Validate_All_Global_Settings(is_literal, ...) -- global vars must be passed as arguments in string representation; in current form only suitable for validation of truth
--- https://stackoverflow.com/questions/59448334/convert-string-to-variable-name-in-lua
--- https://love2d.org/forums/viewtopic.php?t=75392
--- https://stackoverflow.com/questions/67407628/in-lua-having-found-a-variable-of-type-function-in-g-how-to-pass-a-paramete
-
--- is_literal is boolean to determine the gsub pattern
--- in case literal string is used for a setting, e.g. [[ ]]
-
--- if literal string is used for a setting it may happen to contain 
--- implicit new lines which should be accounted for in evaluation
-local pattern = is_literal and '[%s%c]' or ' '
-local t = {...}
-local t2 = {}
-	for k, setting in ipairs(t) do
-	local glob_var = t[k]
-	t2[setting] = #_G[glob_var]:gsub('[%s%c]','') > 0 -- or #_G[t[k]]...
-	end
-return t2
-end
---[[
-USAGE
-a = '.'
-b = ''
-c = ' 2'
-local t = Validate_All_Global_Settings(is_literal, 'a','b','c')
-Msg(t.a) Msg(t.b) Msg(t.c)
-]]
-
-
--- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
--- https://forum.cockos.com/showthread.php?t=280658#25
--- https://forum.cockos.com/showthread.php?t=280658&page=2#44
--- the earliest appearence of a particular character in the menu can be used as a shortcut
--- in this case they don't have to be preceded with ampersand '&'
--- only if particular instance of a character should be used as a shortcut 
--- such character must be preceded with ampresand '&' otherwise it will be overriden 
--- by its earliest appearance in the menu
--- some characters still do need ampresand, e.g. < and >
-local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
--- screen reader used by blind users with OSARA extension may be affected 
--- by the absence if the gfx window herefore only disable it in builds 
--- newer than 6.82 if OSARA extension isn't installed
--- ref: https://github.com/Buy-One/REAPER-scripts/issues/8#issuecomment-1992859534
-local OSARA = r.GetToggleCommandState(r.NamedCommandLookup('_OSARA_CONFIG_reportFx')) >= 0 -- OSARA extension is installed
-local init = (old or OSARA) and gfx.init('', 0, 0)
--- open menu at the mouse cursor
--- https://www.reaper.fm/sdk/reascript/reascripthelp.html#lua_gfx_variables
-gfx.x = gfx.mouse_x
-gfx.y = gfx.mouse_y
-local input = gfx.showmenu(menu) -- menu string
-local quit = old and gfx.quit()
-
-
-function Show_Menu_Dialogue(menu)
--- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
--- https://forum.cockos.com/showthread.php?t=280658#25
--- https://forum.cockos.com/showthread.php?t=280658&page=2#44
--- the earliest appearence of a particular character in the menu can be used as a shortcut
--- in this case they don't have to be preceded with ampersand '&'
--- only if particular instance of a character should be used as a shortcut 
--- such character must be preceded with ampresand '&' otherwise it will be overriden 
--- by its earliest appearance in the menu
--- some characters still do need ampresand, e.g. < and >
-local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
--- screen reader used by blind users with OSARA extension may be affected 
--- by the absence if the gfx window herefore only disable it in builds 
--- newer than 6.82 if OSARA extension isn't installed
--- ref: https://github.com/Buy-One/REAPER-scripts/issues/8#issuecomment-1992859534
-local OSARA = r.GetToggleCommandState(r.NamedCommandLookup('_OSARA_CONFIG_reportFx')) >= 0 -- OSARA extension is installed
-local init = (old or OSARA) and gfx.init('', 0, 0)
--- open menu at the mouse cursor
--- https://www.reaper.fm/sdk/reascript/reascripthelp.html#lua_gfx_variables
-gfx.x = gfx.mouse_x
-gfx.y = gfx.mouse_y
-return gfx.showmenu(menu)
-end
--- if output == 0 then return r.defer(no_undo) end -- IF RELOADING AFTER CLICK CRUCIAL TO PREVENT ENDLESS LOOP OR do if output > 0 then ... else return r.defer(no_undo) end
-
-
-function Reload_Menu_at_Same_Pos1(menu, keep_menu_open, left_edge_dist)
--- keep_menu_open is boolean
--- left_edge_dist is integer to only display the menu 
--- when the mouse cursor is within the sepecified distance in px from the screen left edge
--- only useful for looking up the result of a toggle action, below see a more practical example
--- the earliest appearence of a particular character in the menu can be used as a shortcut
--- in this case they don't have to be preceded with ampersand '&'
--- only if particular instance of a character should be used as a shortcut 
--- such character must be preceded with ampresand '&' otherwise it will be overriden 
--- by its earliest appearance in the menu
--- some characters still do need ampresand, e.g. < and >
-
-::RELOAD::
-
-left_edge_dist = left_edge_dist and left_edge_dist > 0 and math.floor(left_edge_dist)
-local x, y = r.GetMousePosition()
-
-	if left_edge_dist and x <= left_edge_dist or not left_edge_dist then -- 100 px within the screen left edge
-	
--- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
--- https://forum.cockos.com/showthread.php?t=280658#25
--- https://forum.cockos.com/showthread.php?t=280658&page=2#44
--- BUT LACK OF gfx WINDOW DOESN'T ALLOW RE-OPENING THE MENU AT THE SAME POSITION via ::RELOAD::
--- therefore enabled when keep_menu_open is valid
-local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
--- screen reader used by blind users with OSARA extension may be affected 
--- by the absence if the gfx window herefore only disable it in builds 
--- newer than 6.82 if OSARA extension isn't installed
--- ref: https://github.com/Buy-One/REAPER-scripts/issues/8#issuecomment-1992859534
-local OSARA = r.GetToggleCommandState(r.NamedCommandLookup('_OSARA_CONFIG_reportFx')) >= 0 -- OSARA extension is installed
-local init = (old or OSARA or not old and not OSARA and keep_menu_open) and gfx.init('', 0, 0)
-	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position	
-		-- ensure that if keep_menu_open is enabled the menu opens every time at the same spot
-		if keep_menu_open and not coord_t then -- keep_menu_open is the one which enables menu reload
-		coord_t = {x = gfx.mouse_x, y = gfx.mouse_y}
-		elseif not keep_menu_open then
-		coord_t = nil
-		end
-	-- sets menu position to mouse
-	-- https://www.reaper.fm/sdk/reascript/reascripthelp.html#lua_gfx_variables
-	gfx.x = coord_t and coord_t.x or gfx.mouse_x
-	gfx.y = coord_t and coord_t.y or gfx.mouse_y
-	local retval = gfx.showmenu(menu) -- menu string
-		if retval > 0 then
-		goto RELOAD
-		end
-	end
-end
-
-
-::RELOAD::
-function Reload_Menu_at_Same_Pos2(menu, keep_menu_open, left_edge_dist) 
--- keep_menu_open is boolean
--- left_edge_dist is integer to only display the menu 
--- when the mouse cursor is within the sepecified distance in px from the screen left edge
--- the earliest appearence of a particular character in the menu can be used as a shortcut
--- in this case they don't have to be preceded with ampersand '&'
--- only if particular instance of a character should be used as a shortcut 
--- such character must be preceded with ampresand '&' otherwise it will be overriden 
--- by its earliest appearance in the menu
--- some characters still do need ampresand, e.g. < and >
-
-left_edge_dist = left_edge_dist and left_edge_dist > 0 and math.floor(left_edge_dist)
-local x, y = r.GetMousePosition()
-
-	if left_edge_dist and x <= left_edge_dist or not left_edge_dist then -- 100 px within the screen left edge
--- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
--- https://forum.cockos.com/showthread.php?t=280658#25
--- https://forum.cockos.com/showthread.php?t=280658&page=2#44
--- BUT LACK OF gfx WINDOW DOESN'T ALLOW RE-OPENING THE MENU AT THE SAME POSITION via ::RELOAD::
--- therefore enabled with keep_menu_open is valid
-local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
--- screen reader used by blind users with OSARA extension may be affected 
--- by the absence if the gfx window herefore only disable it in builds 
--- newer than 6.82 if OSARA extension isn't installed
--- ref: https://github.com/Buy-One/REAPER-scripts/issues/8#issuecomment-1992859534
-local OSARA = r.GetToggleCommandState(r.NamedCommandLookup('_OSARA_CONFIG_reportFx')) >= 0 -- OSARA extension is installed
-local init = (old or OSARA or not old and not OSARA and keep_menu_open) and gfx.init('', 0, 0)
-	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
-		-- ensure that if keep_menu_open is enabled the menu opens every time at the same spot
-		if keep_menu_open and not coord_t then -- keep_menu_open is the one which enables menu reload
-		coord_t = {x = gfx.mouse_x, y = gfx.mouse_y}
-		elseif not keep_menu_open then
-		coord_t = nil
-		end
-
-	gfx.x = coord_t and coord_t.x or gfx.mouse_x
-	gfx.y = coord_t and coord_t.y or gfx.mouse_y
-
-	return gfx.showmenu(menu) -- menu string
-	
-	end
-	
-end
--- USE:
---[[
-::RELOAD::
-local retval = Reload_Menu_at_Same_Pos2(menu)
-	if retval and retval == xyz then -- returned menu item index other than 0
--- 	DO STUFF
-	goto RELOAD
-	else return r.defer(function() do return end end)
-	end
--- OR
-	if retval == 0 then return r.defer(function() do return end end) -- CRUCIAL TO PREVENT ENDLESS RELOAD LOOP
-	else
-		if retval == abc then
-		-- DO STUFF
-		elseif retval == xyz then
-		-- DO OTHER STUFF
-		end
-	goto RELOAD
-	end
-]]
-
-
-function Re_Store_Ext_State(section, key, persist, val) -- section & key args are strings, persist is boolean if false/nil global ext state is only stored for the duration of REAPER session, only relevant for storage stage; presence of val arg is anything which needs storage, determines whether the state is loaded or stored
-	if not val then
-	local ret, state = r.GetProjExtState(0, section, key)
-	local state = (not ret or #state == 0) and r.GetExtState(section, key) or state
-	return state
-	else
-	r.SetExtState(section, key, val, persist)
-	r.SetProjExtState(0, section, key, val)
-	end
-end
-
--- USAGE:
--- local state = Re_Store_Ext_State(section, key) -- load
--- Re_Store_Ext_State(section, key, persist, val) -- store
-
-
---------------------- T O G G L E S -------------------------
-
--- (re)setting toggle state and updating toolbar button, see also Re_Set_Toggle_State() below
-local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
-
-r.SetToggleCommandState(sect_ID, cmd_ID, 1)
-r.RefreshToolbar(cmd_ID)
-
--- CODE (mainly for defer functions)
-
-r.atexit(function() r.SetToggleCommandState(sect_ID, cmd_ID, 0); r.RefreshToolbar(cmd_ID) end)
-
-
-function EMERGENCY_TOGGLE()
-local t = {reaper.get_action_context()}
-reaper.SetToggleCommandState(t[3], t[4], 0)
-end
----------------- EMERGENCY -------------------
-
--- EMERGENCY_TOGGLE() do return end
-
----------------------------------------------
-
-local function Wrapper1(func,...)
--- wrapper for a 3d function with arguments
--- to be used with defer() and atexit()
--- thanks to Lokasenna, https://forums.cockos.com/showthread.php?t=218805 -- defer with args
--- func is function name, the elipsis represents the list of function arguments
--- Lokasenna's code didn't work because func(...) produced an error 
--- " cannot use '...' outside a vararg function near '...' "
--- without there being elipsis in function() as well, but gave direction;
--- if original function has arguments they MUST be passed to the Wrapper() function 
--- regardless of their scope (global or local); 
--- if it doesn't, the upvalues must all be global and it doesn't matter 
--- whether they're passed to the Wrapper() function
-local t = {...}
-return function() func(table.unpack(t)) end
-end
--- USE:
---[[
-function MY_FUNCTION(arg1, arg2)
-r.defer(Wrapper(MY_FUNCTION, arg1, arg2))
-end
-MY_FUNCTION(arg1, arg2)
-
-function My_Function(arg1, arg2, arg3) -- some routine -- end
-r.atexit(Wrapper(My_Function, arg1, arg2, arg3)
-]]
-
-
-
-local function Wrapper2(...) -- more wordy
--- to be used with defer() and atexit()
--- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
-local t = {...}
-local func = t[1] -- assign function name val
-table.remove(t,1) -- remove function name arg
-return function() func(table.unpack(t)) end
-end
-
-
-
-local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
-function Re_Set_Toggle_State(sect_ID, cmd_ID, toggle_state) -- in deferred scripts can be used to set the toggle state on start and then with r.atexit and At_Exit_Wrapper() to reset it on script termination
-r.SetToggleCommandState(sect_ID, cmd_ID, toggle_state)
-r.RefreshToolbar(cmd_ID)
-end
--- USAGE:
--- Re_Set_Toggle_State(sect_ID, cmd_ID, 1)
--- defer routine
--- r.atexit(At_Exit_Wrapper(Re_Set_Toggle_State, sect_ID, cmd_ID, 0))
-
--- TOGGLE MODE AND ARMABILITY ARE NOT COMPATIBLE
-
-
---------------------- T O G G L E S  E N D -------------------------
-
--- STORE DEFERRED SCRIPT DATA -----------------------------------------------------------
-function defer_store()
-local is_new_value, fullpath, sectionID, cmdID, mode, resolution, val = reaper.get_action_context()
--- Find first available slot
-local i = 1
-	repeat
-	local state = r.GetExtState(os.date('%x'), 'defer'..i)
-		if #state == 0 then break end
-	i = i+1
-	until #state == 0
-r.SetExtState(os.date('%x'), 'defer'..i, table.concat({sectionID, cmdID, fullpath:match('.+[\\/](.+)'), fullpath}, ';'), false)
-return i
-end
-
-local defer_data_slot = defer_store()
-
--- EXTRACT STORED DEFERRED SCTIPT DATA
-local i = 1
-	repeat
-	local sectionID, cmdID, name, fullpath = r.GetExtState(os.date('%x'), 'defer'..i):match('(.+);(.+);(.+);(.+)')
-		if not sectionID then break end
-	i = i+1
-	until not sectionID
-
--- DELETE STORED DEFERRED SCRIPT DATA
-r.atexit(r.DeleteExtState(os.date('%x'), 'defer'..defer_data_slot, true))
-
---------------------------------------------------------------------------------------------------
-
-
-function Temp_Proj_Tab()
--- relies on Create_Dummy_Project_File() if current tab isn't linked to a saved project
-local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer
-r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
--- DO STUFF
-local dummy_proj = Create_Dummy_Project_File()
-r.Main_openProject('noprompt:'..projfn) -- open dummy proj in the newly open tab without save prompt
-r.Main_OnCommand(40860, 0) -- Close current (temp) project tab // save prompt won't appear either because nothing has changed in the dummy proj
-r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
-end
-
-
-function Is_Win()
-local OS = r.GetAppVersion()
-return not OS:match('/') or OS:match('/x')
-end
-
-
-function Get_OS()
-local OS = r.GetAppVersion()
-return (not OS:match('/') or OS:match('/x')) and 'win'
-or OS:match('OS') and 'mac' or OS:match('linux')
--- OR
--- local OS = r.GetOS()
--- return OS:match('Win') or OS:match('OSX') and 'Mac' or 'Other'
-end
-
-
-function Bump_Proj_Change_Cnt() -- API functions seems to not update project change count, most of them anyway
-r.Main_OnCommand(41156,0) -- Options: Selecting one grouped item selects group
-r.Main_OnCommand(41156,0)
-end
 
 
 --========================= U N D O  S T A R T =========================
@@ -724,6 +105,10 @@ function undo_block(undo) -- undo arg is a string, which isn't used at the begin
 	else r.Undo_EndBlock(undo, -1)
 	end
 end
+
+
+-- Undo with only the script name
+r.Undo_EndBlock(({r.get_action_context()})[2]:match('([^\\/_]+)%.%w+$'), -1)
 
 
 r.Undo_EndBlock(r.Undo_CanUndo2(0) or '', -1) -- prevent display of the generic 'ReaScript: Run' message in the Undo readout generated when the script is aborted following  Undo_BeginBlock() (to display an error for example), this is done by getting the name of the last undo point to keep displaying it, if empty space is used instead the undo point name disappears from the readout in the main menu bar
@@ -807,6 +192,7 @@ function GetUndoSettings()
 -- Checking settings at Preferences -> General -> Undo settings -> Include selection:
 -- thanks to Mespotine https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
 -- https://github.com/mespotine/ultraschall-and-reaper-docs/blob/master/Docs/Reaper-ConfigVariables-Documentation.txt
+-- get_config_var_string() can be used instead of io.open()
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
@@ -826,15 +212,12 @@ return t
 end
 
 
+-- see also Force_MIDI_Undo_Point1, Force_MIDI_Undo_Point1 in M I D I
+-- Force_RS5k_Undo_With_Closed_Chain() in FX
+
 
 --========================= U N D O  E N D =======================================
 
-
-function PAUSE()
-do r.MB('PAUSE','PAUSE',0) return end
-end
-
-do r.MB('PAUSE','PAUSE',0) return end
 
 --================================ M A T H  S T A R T ===================================
 
@@ -877,7 +260,7 @@ end
 -- OR
 -- num = tonumber(string.format('%.f', num))
 
--- ???????? dountfully correct
+-- ???????? doubtfully correct
 function round4(num) -- works with all numbers negative and positive above 1 and below -1
 -- with negative values math.floor rounds towards the lesser value, i.e. -4.5 to -5 hence math.ceil instead
 return num >= 0 and math.floor(num+0.5) or math.ceil(num-0.5)
@@ -971,6 +354,15 @@ return t
 end
 
 
+function gener_numer_seq(start, fin)
+local t = {}
+	for i = start, fin do
+	t[#t+1] = i
+	end
+return t
+end
+
+
 function mod(a, b) -- same as math.fmod(a,b) since Lua 5.1 and math.mod in Lua 5.0
 -- https://stackoverflow.com/a/20858039/8883033
     return a - (math.floor(a/b)*b)
@@ -1016,7 +408,7 @@ return wantString and (num..''):match('(.+)%.') or math.floor(num)
 end
 
 
-function toBits(num) -- represent integer as binary
+function toBits1(num) -- represent integer as binary
 -- returns a table of bits, least significant first
 -- https://stackoverflow.com/questions/9079853/lua-print-integer-as-a-binary
 local t={} -- will contain the bits
@@ -1031,7 +423,21 @@ end
 --bits = toBits(num)
 
 
-function toBits(num, bits)
+function toBits2(num, bits) -- represent integer as binary // bits is the number of required bits
+-- returns a table of bits, most significant first
+-- https://stackoverflow.com/questions/9079853/lua-print-integer-as-a-binary
+local num = num
+local bits = bits or math.max(1, select(2, math.frexp(num)))
+local t = {} -- will contain the bits
+	for b = bits, 1, -1 do
+	t[b] = math.fmod(num, 2)
+	num = math.floor((num - t[b]) / 2)
+	end
+return t
+end
+
+
+function toBits3(num, bits)
 -- returns a table of bits
 local t={} -- will contain the bits
     for b=bits,1,-1 do
@@ -1046,35 +452,6 @@ end
 --bits=toBits(num, bits)
 
 
-function toBits(num, bits) -- represent integer as binary // bits is the number of required bits
--- returns a table of bits, most significant first
--- https://stackoverflow.com/questions/9079853/lua-print-integer-as-a-binary
-local num = num
-local bits = bits or math.max(1, select(2, math.frexp(num)))
-local t = {} -- will contain the bits
-	for b = bits, 1, -1 do
-	t[b] = math.fmod(num, 2)
-	num = math.floor((num - t[b]) / 2)
-	end
-return t
-end
-
-
-function gener_numer_seq(start, fin)
-local t = {}
-	for i = start, fin do
-	t[#t+1] = i
-	end
-return t
-end
-
-
-function hex2dec(str)
--- https://stackoverflow.com/questions/27294310/convert-hexadecimal-to-decimal-number
-return str:match('0x') and tonumber(str) or tonumber(str,16)
-end
-
-
 function count_bits_in_number(integer)
 local integer = tonumber(integer)
 local base = 1
@@ -1087,28 +464,9 @@ return bit_cnt
 end
 
 
-
-function Get_Closest_Prev_Multiple(dividend, int_divisor)
--- https://math.stackexchange.com/questions/2179579/how-can-i-find-a-mod-with-negative-number modulo of negative numbers
--- charactertic of Lua in particular https://torstencurdt.com/tech/posts/modulo-of-negative-numbers/
--- not in all languages modulo of a negative number differs from its positive countepart; in Lua to have the same modulo for negative numbers the divisor must be negative as well
-	if math.abs(dividend) >= 1 and -- allowing for numbers smaller than 1
-	( math.abs(dividend) < math.abs(int_divisor) -- accounting for negative values
-	or dividend ~= math.floor(dividend) ) -- dividend is a decimal number
-	or dividend == 0
-	or int_divisor ~= math.floor(int_divisor) -- divisor is a decimal number
-	or int_divisor == 0
-	then return false
-	else
-		if math.abs(dividend) < 1 then
-		local dec_places = 10^#tostring(dividend):match('%.(%d+)')
-	--	return (dividend*dec_places - dividend*dec_places%int_divisor)/dec_places
-		return (dividend*dec_places - (dividend < 0 and math.abs(dividend)*dec_places%int_divisor*-1 or dividend*dec_places%int_divisor))/dec_places -- to get the multiple mirroring positive dividend, that is one closer to 0, otherwise the multiple is the next value smaller than the dividend which for negative numbers is farther from 0
-		else
-	--	return dividend - dividend%int_divisor
-		return dividend - (dividend < 0 and math.abs(dividend)%int_divisor*-1 or dividend%int_divisor) -- to get the multiple mirroring positive dividend, that is one closer to 0, otherwise the multiple is the next value smaller than the dividend which for negative numbers is farther from 0
-		end
-	end
+function hex2dec(str)
+-- https://stackoverflow.com/questions/27294310/convert-hexadecimal-to-decimal-number
+return str:match('0x') and tonumber(str) or tonumber(str,16)
 end
 
 
@@ -1139,12 +497,6 @@ local x = not n and 0 or tonumber(x) and math.abs(math.floor(x)) or 0
 return string.rep(' ', x)
 -- OR
 -- return (' '):rep(x)
-end
-
-
--- removes spaces for settings evaluation
-function is_set(sett) -- sett is a string
-return #sett:gsub(' ','') > 0
 end
 
 
@@ -1231,7 +583,7 @@ return str::match('^%s*(.-)%s*$') -- seems more reliable
 end
 
 
-function trunc_hanging_dec_zero1(num) 
+function trunc_hanging_dec_zero(num) 
 -- in integers represented as floats, i.e. 0.0
 -- for convertion into string
 local trunc = math.floor(num)
@@ -1243,6 +595,23 @@ local trunc = math.floor(num)
 -- OR
 -- string.format('%d',num) // string.format('%i',num) -- less reliable in case num is genuine float, in which case the function will error out
 end
+
+
+
+function split_into_lines(input, want_empty_lines)
+-- add trailing line break otherwise the last line 
+-- won't be captured with the pattern in the gmatch loop below
+local input = input:match('.+\n%s*$') or input..'\n'
+local t = {}
+	for line in input:gmatch('(.-)\n') do
+		if want_empty_lines and #line:gsub(' ','') == 0
+		or not want_empty_lines then
+		t[#t+1] = line
+		end
+	end
+return t
+end
+
 
 
 -- split string to multi-line by character count represented with line_len
@@ -1316,6 +685,9 @@ return cntr[2] -- 2nd return value of gsub is the number of replaced captures
 -- local _, cnt = str:gsub(capt,'')
 -- return cnt
 end
+-- OR
+-- select(2, str:gsub(capt,''))
+
 
 
 function insert_string_at_specific_position1(src_str, insert_str, pos_idx, move)
@@ -1618,7 +990,7 @@ end
 
 
 -- !!!! OVER 26 captures may make the system freeze (could also depend on the length of each capture) // same with string.find()
-function list_2_table(str, pattern, delimiter) -- pattern e.g. '(%d+);?' to extract semicolon delimited numbers; if using the included tables pattern and delimiter must be numbers else delimiter arg isn't needed
+function list_2_table1(str, pattern, delimiter) -- pattern e.g. '(%d+);?' to extract semicolon delimited numbers; if using the included tables pattern and delimiter must be numbers else delimiter arg isn't needed
 local pattern = {'(%a+)', -- mixed case words = 1
 				 '(%l+)' -- only lower case words = 2
 				 '(%u+)' -- only upper case words = 3
@@ -1645,7 +1017,7 @@ end
 
 
 -- !!!! OVER 26 caprures may make the system freeze (could also depend on the length of each capture) // same with string.find()
-function list_2_table(str, pattern) -- pattern e.g. '(%d+);?' to extract semicolon delimited numbers;
+function list_2_table2(str, pattern) -- pattern e.g. '(%d+);?' to extract semicolon delimited numbers;
 local counter = str -- a safety measure to avoid accidental ovewriting the orig. string, although this shouldn't happen thanks to %0
 local counter = {counter:gsub(pattern, '%0')} -- 2nd return value is the number of replaced captures
 local t = {str:match(string.rep(pattern, counter[2]))} -- captures the pattern as many times as there're pattern repetitions in the string
@@ -1899,15 +1271,7 @@ png_to_lua("triplet.png")
 end
 
 
-function EvaluateTAG(fx_name,TAG) 
--- in FX/track/item/take/marker/region names
-return fx_name:match('^('..Esc(TAG)..')%s')
-or fx_name:match('%s('..Esc(TAG)..')%s') 
-or fx_name:match('%s('..Esc(TAG)..')$')
-or fx_name:match('^%s*'..Esc(TAG)..'%s*$') -- when the TAG is the whole name
-end
-TAG = TAG:match('[%w%p].+[%w%p]') or TAG:match('[%w%p]+') -- strip leading/trailing spaces, account for single character
-
+-- see also gmatch_alt in C L O S U R E S
 
 
 --=========================== S T R I N G S  E N D ==============================
@@ -2015,11 +1379,11 @@ local tab = type(val) == 'table'
 end
 
 
-function filter_inplace(t, val, func)
+function filter_inplace1(t, val, func)
    for k, v in ipairs(t) do
        if v == val then
        table.remove(t,k)
-       func(t, val, filter_inplace)
+       func(t, val, filter_inplace1)
 	   -- OR
 	   -- filter_inplace(t, val) and use example is filter_inplace(t, 1)
        end
@@ -2029,7 +1393,7 @@ end
 -- filter_inplace(t, 1, filter_inplace)
 
 -- OR
-function filter_inplace(t, val)
+function filter_inplace2(t, val)
    for k, v in ipairs(t) do
        if v = val then
        table.remove(t,k)
@@ -2254,7 +1618,7 @@ local table_len = #t -- to be used in removing all nested tables, there're fewer
 end
 
 
-function binary_search(t, value)
+function binary_search1(t, value)
 -- https://stackoverflow.com/questions/19522451/binary-search-of-an-array-of-arrays-in-lua
 local lo = 1
 local hi = #t
@@ -2271,7 +1635,7 @@ local mid
 end
 
 
-function binary_search(t, value) -- my implementation, isn't the classic method
+function binary_search2(t, value) -- my implementation, isn't the classic method
 -- the speed advantage over simple iteration only starts to be felt from about 100,000 array entries
 -- https://github.com/ReaTeam/ReaScripts/blob/master/MIDI%20Editor/js_Notation%20-%20Set%20displayed%20length%20of%20selected%20notes%20to%20custom%20value.lua -- idea source
 -- https://github.com/Roblox/Wiki-Lua-Libraries/blob/master/StandardLibraries/BinarySearch.lua
@@ -2486,7 +1850,7 @@ function Clear_Restore_MIDI_Channel_Filter(enabled_ID, is_open) -- must be appli
 	r.MIDIEditor_LastFocused_OnCommand(enabled_ID, false) -- islistviewcommand false // Re-enable filter
 		if not is_open then r.MIDIEditor_LastFocused_OnCommand(2, false) end -- File: Close window;  islistviewcommand false // close if wasn't initially open
 	else
-	-- for the MIDI Editor action GetToggleCommandStateEx() only works if its open
+	-- for the MIDI Editor action GetToggleCommandStateEx() only works if its active
 	local is_open = r.MIDIEditor_GetActive() -- check if MIDI Editor is open
 	local open = not is_open and r.Main_OnCommand(40153, 0) -- Item: Open in built-in MIDI editor (set default behavior in preferences)
 	local enabled_ID
@@ -3759,6 +3123,33 @@ return chan
 end
 
 
+function Re_Store_MIDI_Editor_Mode(mode_init)
+-- the modes are Named Notes (Drum Map), Piano roll, Event List, Notation
+-- the mode seems to be MIDI Editor window specific so if temp track and temp MIDI item
+-- are used changing the mode in the temp MIDI item won't affect the mode active elsewhere
+-- if the project is empty on startup Notation mode which was last used 
+-- cannot be restored when temp track and temp MIDI items are used
+-- because its toggle state is not stored, instead the mode last active before Notaton 
+-- is returned with GetToggleCommandStateEx() even though all modes are mutually exclusive
+	local function get()
+	local get_togg_state = r.GetToggleCommandStateEx
+		for _, mode_ID in ipairs({40042, 40043, 40056, 40954}) do -- mode action command IDs
+			if get_togg_state(32060, mode_ID) == 1 then -- OR get_togg_state(32060, 40056) == 1 since mode action IDs are the same in both MIDI Editor and Event List sections
+			return mode_ID
+			end
+		end
+	end
+	if not mode_init then
+	return get()
+	else
+	local mode_cur = get()
+	r.MIDIEditor_LastFocused_OnCommand(mode_init, mode_cur == 40056) -- islistviewcommand is true if mode_cur equals Event List mode command ID // restore the initial MIDI Editor mode
+	end
+end
+-- USE:
+-- mode_init = Re_Store_MIDI_Editor_Mode() -- store
+-- Re_Store_MIDI_Editor_Mode(mode_init) -- restore
+
 
 --============================= M I D I  E N D =============================
 
@@ -4018,6 +3409,9 @@ function re_store_obj_selection(t1, t2)
 end
 
 
+--========================= (R E) S T O R E   O B J E C T S   E N D ============================
+
+--========================= O B J E C T S ============================
 
 function Find_And_Get_New_Objects(t, wantItems) -- wantItems is boolean
 local Count, Get = table.unpack(not wantItems and {r.CountTracks, r.GetTrack} or {r.CountMediaItems,r.GetMediaItem})
@@ -4038,9 +3432,6 @@ local Count, Get = table.unpack(not wantItems and {r.CountTracks, r.GetTrack} or
 	return #t2 > 0 and t2
 	end
 end
-
-
---========================= (R E) S T O R E   O B J E C T S   E N D ============================
 
 
 function Get_Object_Under_Mouse_Curs() -- used in 'FX presets menu script'
@@ -4389,7 +3780,7 @@ Msg(env, 'ENV')
 Msg(env_id, 'ENV ID')
 --]]
 
-
+--========================= O B J E C T S   E N D ============================
 
 
 --=================================== T R A C K S ==================================
@@ -4615,6 +4006,32 @@ r.PreventUIRefresh(-1)
 return -- STUFF
 
 end
+
+
+function Insert_Temp_Track(want_midi_editor)
+
+r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
+local temp_tr = r.GetTrack(0,r.CountTracks(0)-1)
+r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINMIXER', 0) -- hide in Mixer
+	if not want_midi_editor then
+	-- Must not be hidden in Arrange if a temp item on the temp track must be opened
+	-- in the MIDI Editor, otherwise it may end up not being deleted after opening the MIDI Editor,
+	-- it doesn't if the function is run on REAPER starup, may need testing in other scenarios
+	r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINTCP', 0) -- hide in Arrange
+	else -- insert temp MIDI item
+	local ACT = reaper.Main_OnCommand
+	ACT(40914, 0) -- Track: Set first selected track as last touched track (to make it the target for temp MIDI item insertion)
+	ACT(40214, 0) -- Insert new MIDI item...
+	ACT(40153, 0) -- Item: Open in built-in MIDI editor (set default behavior in preferences)
+	end
+
+-- DO STUFF --
+	
+r.DeleteTrack(temp_tr)
+	
+end
+
+
 
 
 function Get_Vis_TCP_Tracklist_Length_px_X_Topmost_Track(unhide, exclusive_track_display) -- return values are used to scroll tracklist all the way up and then, if needed, to restore the position of the track which was the topmost prior to that thereby restoring tracklist scroll position
@@ -5037,15 +4454,6 @@ function Is_TrackList_Hidden()
 	end
 end
 
-
-
-function Parse_Razor_Edit_Data(data)
-local t = {}
-	for st, fin in data:gmatch('([%.%d]+) ([%.%d]+)') do
-	t[#t+1] = {st, fin}
-	end
-return t
-end
 
 
 function Collect_Razor_Edit_Areas() -- relies on Parse_Razor_Edit_Data() function
@@ -5679,7 +5087,7 @@ end
 
 
 
-function Track_Is_Child_Of_Collapsed_Folder1(tr, wantMixer) -- wantMixer is boolean // visibility is not evaluated
+function Track_Is_Child_Of_Collapsed_Folder(tr, wantMixer) -- wantMixer is boolean // visibility is not evaluated
 	local function get_first_collapsed_tcp_fldr(tr) -- for Arrange
 	local parent = r.GetParentTrack(tr)
 		if parent and r.GetMediaTrackInfo_Value(parent, 'I_FOLDERCOMPACT') == 2 -- tiny children
@@ -5693,7 +5101,7 @@ or not wantMixer and get_first_collapsed_tcp_fldr(tr) -- in Arrange
 end
 
 
-function Track_Is_Vis_And_Child_Of_Collapsed_Folder2(tr, wantMixer) -- wantMixer is boolean // visibility IS evaluated
+function Track_Is_Vis_And_Child_Of_Collapsed_Folder(tr, wantMixer) -- wantMixer is boolean // visibility IS evaluated
 
 	local function get_first_collapsed_tcp_fldr(tr) -- for Arrange
 	--	if r.IsTrackVisible(tr, false) then -- mixer false // not needed here, evaluated in the main routine
@@ -5971,6 +5379,7 @@ end
 
 function Get_Take_Pitch_Env_Snap()
 -- Preferences -> Editing behavior -> Envelope display -> Default per take pitch envelope ... snap:
+-- get_config_var_string() can be used instead of io.open
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
@@ -6000,6 +5409,7 @@ end
 
 function Get_Vol_Env_Range()
 -- Preferences -> Editing behavior -> Envelope display -> Volume envelope range
+-- get_config_var_string() can be used instead of io.open
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
@@ -6361,34 +5771,6 @@ end
 
 
 
-function Deselect_Selected_AIs(sel_AI) -- arg is a table from prev function
-	for env in pairs(sel_AI) do
-		for _, AI_idx in ipairs(sel_AI[env].idx) do
-		r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', 0, true) -- is_set true
-		end
-	end
-end
-
-
-function Get_Sel_AI_St_And_End(t) -- t from previous function
--- get the start of the first and the end of the last amongst selected AIs
-local first_start = math.huge
-local last_end = math.huge*-1
-	for env in pairs(t) do
-		for _, AI_idx in ipairs(t[env].idx) do
-			if r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', -1, false) > 0 then -- selected; is_set false
-			local pos = r.GetSetAutomationItemInfo(env, AI_idx, 'D_POSITION', -1, false) -- is_set false
-			local fin = pos + r.GetSetAutomationItemInfo(env, AI_idx, 'D_LENGTH', -1, false) -- is_set false
-			first_start = pos < first_start and pos or first_start
-			last_end = fin > last_end and fin or last_end
-			end
-		end
-	end
-return first_start, last_end
-end
-
-
-
 function Re_Store_Selected_AIs2(store, env) 
 -- !!! ONLY WORKS RELIABLY WITH NON-POOLED AIs because 'P_POOL_EXT' arg 
 -- stores selection mark within all pooled AIs regardless of their actual selection
@@ -6440,6 +5822,35 @@ end
 -- local curr_env = Re_Store_Selected_AIs2(1) -- store true // store
 -- DO STUFF
 -- local curr_env = Re_Store_Selected_AIs2(nil, curr_env) -- store false // restore
+
+
+
+function Deselect_Selected_AIs(sel_AI) -- arg is a table from prev function
+	for env in pairs(sel_AI) do
+		for _, AI_idx in ipairs(sel_AI[env].idx) do
+		r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', 0, true) -- is_set true
+		end
+	end
+end
+
+
+function Get_Sel_AI_St_And_End(t) -- t from previous function
+-- get the start of the first and the end of the last amongst selected AIs
+local first_start = math.huge
+local last_end = math.huge*-1
+	for env in pairs(t) do
+		for _, AI_idx in ipairs(t[env].idx) do
+			if r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', -1, false) > 0 then -- selected; is_set false
+			local pos = r.GetSetAutomationItemInfo(env, AI_idx, 'D_POSITION', -1, false) -- is_set false
+			local fin = pos + r.GetSetAutomationItemInfo(env, AI_idx, 'D_LENGTH', -1, false) -- is_set false
+			first_start = pos < first_start and pos or first_start
+			last_end = fin > last_end and fin or last_end
+			end
+		end
+	end
+return first_start, last_end
+end
+
 
 
 function Delete_Or_Unpool_Selected_AI(env, AI_idx, tmp_pool_ID, delete, keep_points)
@@ -6757,7 +6168,7 @@ local resp = r.MB(sws_ext_err_mess,'ERROR',0)
 end
 
 
-local function SetObjChunk(retval, obj, obj_type, obj_chunk) -- retval stems from r.GetFocusedFX(), value 0 is only considered at the pasting stage because in the copying stage it's error caught before the function
+local function SetObjChunk1(retval, obj, obj_type, obj_chunk) -- retval stems from r.GetFocusedFX(), value 0 is only considered at the pasting stage because in the copying stage it's error caught before the function
 	if not (obj and obj_chunk) then return end
 	if retval == 0 then retval = tonumber(obj_type) end -- for pasting stage when fx chains/floating windows are closed or not in focus
 return retval == 1 and r.SetTrackStateChunk(obj, obj_chunk, false) or r.SetItemStateChunk(obj, obj_chunk, false) -- isundo is false // https://forum.cockos.com/showthread.php?t=181000#9
@@ -6778,6 +6189,9 @@ function Replace_GUIDs_in_Chunk(chunk)
 end
 -- OR
 local fx_chunk = fx_chunk:gsub('{[%-%w]+}', function() return r.genGuid('') end) -- replace GUIDs making them unique
+
+
+-- see also Get_FX_Chain_Chunk and Get_FX_Chunk in F X
 
 
 --================================= C H U N K  E N D ========================================
@@ -6837,6 +6251,16 @@ local tr_cnt = r.CountTracks(0)
 end
 
 
+
+function Parse_Razor_Edit_Data(data)
+local t = {}
+	for st, fin in data:gmatch('([%.%d]+) ([%.%d]+)') do
+	t[#t+1] = {st, fin}
+	end
+return t
+end
+
+
 function Collect_Raz_Edit_Data(razor_edit)
 -- razor_edit is a string returned by 
 -- r.GetSetMediaTrackInfo_String(tr, 'P_RAZOREDITS', '', false) -- setNewValue false
@@ -6880,8 +6304,6 @@ function Find_And_Remove_Raz_Edit_Overlaps(t1, t2, tr, raz_edit)
 	r.GetSetMediaTrackInfo_String(tr, 'P_RAZOREDITS', raz_edit, true) -- setNewValue true
 	end
 end
-
-
 
 
 --================================= R A Z O R  E D I T  E N D ===================================
@@ -7047,6 +6469,9 @@ function GetOrigFXName(obj_chunk, fx_GUID)
 
 -- Get original FX name regardless of a custom plugin name assigned by the user which is returned by r.TrackFX_GetFXName()
 
+-- SINCE 6.31 r.Track/TakeFX_GetNamedConfigParm() can be used, but keep in mind
+-- https://forum.cockos.com/showthread.php?t=282139
+
 local fx_GUID = fx_GUID:gsub('[%-]','%%%0') -- escape dashes for capture inside string.match below
 
 		local t = {} -- split chunk into lines and save each to table
@@ -7149,6 +6574,56 @@ end
 
 
 
+function Retrieve_Orig_Plugin_Names(chunk) -- relies on GetObjChunk()
+-- for non-JSFX plugins get name currently applied in the FX browser
+-- which may differ from plugin original name
+local t = {}
+	for line in chunk:gmatch('[^\n\r]+') do
+	local name = line and ( line:match('<.-"([ACDLPSTUVX23i:]+ .-)"') -- AU,CLAP,DX,LV2,VST
+	or line:match('<JS "(.-)" ') or line:match('<JS (.-) ') -- spaces or no spaces in the path
+	or line:match('<VIDEO_EFFECT "(Video processor)"') )
+		if name then
+			if line:match('<JS') then -- JSFX bank header will include the name from 'desc:' tag inside of the JSFX file and the file path or only the file path if the name couldn't be retrived
+			local path = r.GetResourcePath()
+			local sep = path:match('[\\/]') -- or package.config:sub(1,1)
+				if name:match('<Project>') then -- JSFX local to the project only if project is saved; for the local JSFX to load presets its file in the /presets folder must be named js-_Project__(JSFX file name).ini
+				local retval, proj_path = r.EnumProjects(-1) -- -1 active project
+				local proj_path = proj_path:match('.+[\\/]') -- excluding the file name // OR proj_path:match('.+'..Esc(r.GetProjectName(0, '')))
+				local file_name = name:match('<Project>/(.+)')
+				local path = proj_path..'Effects'..sep..file_name -- proj_path includes the separator
+					if r.file_exists(path) then
+						for line in io.lines(path) do
+						local name_local = line:match('^desc:') and line:match('desc:%s*(.+)') -- ignoring commented out 'desc:' tags if any // isolate name in this routine so that in case the actual name isn't found in the JSFX file the file name fetched from the chunk will be used
+							if name_local then name = 'JS '..name_local..' ['..path..']' break end
+						end
+				--	else name = '' -- if wishing to exclude JSFX which has been deleted during the session without updating the FX browser or the FX chain // should be evaluated in Collect_FX_Preset_Names() with string length count
+					end
+				elseif r.file_exists(path..sep..'Effects'..sep..name) then -- JSFX at the regular location
+				-- if JSFX name was changed in the plugin file but REAPER wasn't re-started
+				-- or FX browser wasn't refreshed with F5, reaper-jsfx.ini will still contain the old name
+					for line in io.lines(path..sep..'reaper-jsfx.ini') do
+					local name_local = line and line:match(Esc(name)) and line:match('NAME.+ "(.+)"') -- name_local to prevent clash with name
+						if name_local then name = name_local break end
+					end
+			--	else name = '' -- if wishing to exclude JSFX which has been deleted during the session without updating the FX browser or the FX chain // should be evaluated in Collect_FX_Preset_Names() with string length count
+				end
+			end
+		t[#t+1] = name -- the table indexing must match FX indices in the FX chain so all must be collected with no skips
+		end
+	end
+-- disable duplicate entries, will be evaluated in the preset extraction routine in Check_Selected_FX() and in Collect_FX_Preset_Names()
+	for k1, v1 in pairs(t) do
+		for k2, v2 in pairs(t) do -- pairs because the table will contain nils
+			if v1 == v2 and k1 ~= k2 then
+			t[k2] = nil -- keeping indices intact so that correspondence with fx indices in the FX chain is maintained
+			end
+		end
+	end
+return t
+end
+
+
+
 function Get_FX_Chain_Chunk(chunk, path, sep, type, take_GUID) -- isolate object fx chain, for track main fx chain exclude items/input fx, for track input fx exclude items, for items exclude takes other than the active one; type arg is set within the routine: 0 - track main fx, 1 - track input fx or Mon FX for the Master track; if take_GUID arg is valid, then take fx
 -- since REAPER 7 'WAK 0 0' may be followed by PARALLEL 1 or PARALLEL 2 if 'Run selected FX in parallel with previous FX' or 'Run selected FX in parallel with previous FX (merge MIDI)' options are enabled respectively
 -- due to introduction of FX containers in REAPER 7 'WAK 0 0' and 'PARALLEL X' tokens can be found in FX container chunk and the function may return incomlete chunk not having reached the end of the chain
@@ -7236,6 +6711,8 @@ end
 function Collect_VST3_Instances(fx_chain_chunk) -- -- fx chain chunk is obtained with Get_FX_Chain_Chunk()// replicates Collect_VideoProc_Instances()
 
 -- required to get hold of .vstpreset file names stored in the plugin dedicated folder and list those in the menu
+
+-- probably r.Track/TakeFX_GetNamedConfigParm() can be used instead
 
 local vst3_t = {} -- collect indices of vst3 plugins instances, because detection by fx name is unreliable as it can be changed by user in the FX browser
 local counter = 0 -- to store indices of vst3 plugin instances
@@ -7491,7 +6968,7 @@ return GetOpen(obj, fx_index), GetFloatingWindow(obj,fx_index)
 end
 
 
-local function Count_FX(sel_trk_cnt, sel_itms_cnt)
+function Count_FX(sel_trk_cnt, sel_itms_cnt)
 -- Count all FX in selected objects to determine if FX were added
 -- provided destination objects were initially empty
 -- idea borrowed from MPL's 'Open FX browser and close FX browser when FX is inserted.lua'
@@ -7755,56 +7232,6 @@ return fx_list:sub(2), valid_fx_cnt, _129 -- removing leading line break from fx
 end
 
 
-function Retrieve_Orig_Plugin_Names(chunk) -- relies on GetObjChunk()
--- for non-JSFX plugins get name currently applied in the FX browser
--- which may differ from plugin original name
-local t = {}
-	for line in chunk:gmatch('[^\n\r]+') do
-	local name = line and ( line:match('<.-"([ACDLPSTUVX23i:]+ .-)"') -- AU,CLAP,DX,LV2,VST
-	or line:match('<JS "(.-)" ') or line:match('<JS (.-) ') -- spaces or no spaces in the path
-	or line:match('<VIDEO_EFFECT "(Video processor)"') )
-		if name then
-			if line:match('<JS') then -- JSFX bank header will include the name from 'desc:' tag inside of the JSFX file and the file path or only the file path if the name couldn't be retrived
-			local path = r.GetResourcePath()
-			local sep = path:match('[\\/]') -- or package.config:sub(1,1)
-				if name:match('<Project>') then -- JSFX local to the project only if project is saved; for the local JSFX to load presets its file in the /presets folder must be named js-_Project__(JSFX file name).ini
-				local retval, proj_path = r.EnumProjects(-1) -- -1 active project
-				local proj_path = proj_path:match('.+[\\/]') -- excluding the file name // OR proj_path:match('.+'..Esc(r.GetProjectName(0, '')))
-				local file_name = name:match('<Project>/(.+)')
-				local path = proj_path..'Effects'..sep..file_name -- proj_path includes the separator
-					if r.file_exists(path) then
-						for line in io.lines(path) do
-						local name_local = line:match('^desc:') and line:match('desc:%s*(.+)') -- ignoring commented out 'desc:' tags if any // isolate name in this routine so that in case the actual name isn't found in the JSFX file the file name fetched from the chunk will be used
-							if name_local then name = 'JS '..name_local..' ['..path..']' break end
-						end
-				--	else name = '' -- if wishing to exclude JSFX which has been deleted during the session without updating the FX browser or the FX chain // should be evaluated in Collect_FX_Preset_Names() with string length count
-					end
-				elseif r.file_exists(path..sep..'Effects'..sep..name) then -- JSFX at the regular location
-				-- if JSFX name was changed in the plugin file but REAPER wasn't re-started
-				-- or FX browser wasn't refreshed with F5, reaper-jsfx.ini will still contain the old name
-					for line in io.lines(path..sep..'reaper-jsfx.ini') do
-					local name_local = line and line:match(Esc(name)) and line:match('NAME.+ "(.+)"') -- name_local to prevent clash with name
-						if name_local then name = name_local break end
-					end
-			--	else name = '' -- if wishing to exclude JSFX which has been deleted during the session without updating the FX browser or the FX chain // should be evaluated in Collect_FX_Preset_Names() with string length count
-				end
-			end
-		t[#t+1] = name -- the table indexing must match FX indices in the FX chain so all must be collected with no skips
-		end
-	end
--- disable duplicate entries, will be evaluated in the preset extraction routine in Check_Selected_FX() and in Collect_FX_Preset_Names()
-	for k1, v1 in pairs(t) do
-		for k2, v2 in pairs(t) do -- pairs because the table will contain nils
-			if v1 == v2 and k1 ~= k2 then
-			t[k2] = nil -- keeping indices intact so that correspondence with fx indices in the FX chain is maintained
-			end
-		end
-	end
-return t
-end
-
-
-
 function Re_Store_Float_FX_Wnds(obj, t, idx)
 -- idx comes from FX loop and serves as a storage routine condition
 local tr = r.ValidatePtr(obj, 'MediaTrack*')
@@ -7828,6 +7255,84 @@ end
 -- t = Re_Store_Float_FX_Wnds(obj, t, i)
 -- end
 -- Re_Store_Float_FX_Wnds(obj,t) -- restore
+
+
+
+function Re_Store_FX_Windows_Visibility(t)
+-- restores positions if screenset wasn't changed
+-- doesn't restore focus and z-order
+-- take fx windows are linked to track to be able to ignore them when the track is hidden
+-- to restore positions and focus use Re_Store_Windows_Props_By_Names()
+-- see implementation in Restore FX windows after screenset change.lua
+	if not t then
+	local t = {}
+		for i = -1, r.CountTracks(0)-1 do
+		local tr = r.GetTrack(0,i) or r.GetMasterTrack(0)
+		t[tr] = {trackfx = {}, takefx = {}}
+			for i = 0, r.TrackFX_GetCount(tr)-1 do
+				if r.TrackFX_GetOpen(tr, i) then -- is open in the FX chain window or a floating window
+				local len = #t[tr].trackfx+1
+				-- storing floating status and fx chain UI visibility status even if the UI is floating
+				t[tr].trackfx[len] = {idx=i, float=r.TrackFX_GetFloatingWindow(tr, i), ui=r.TrackFX_GetChainVisible(tr)==i}
+				end
+			end
+			for i = 0, r.TrackFX_GetRecCount(tr)-1 do
+			local i = i+0x1000000
+			local open_fx_idx = Get_InputMonFX_Chain_Truely_SelectedFX(tr)
+				if r.TrackFX_GetOpen(tr, i) then -- is open in the FX chain window or a floating window
+				local len = #t[tr].trackfx+1
+				t[tr].trackfx[len] = {idx=i, float=r.TrackFX_GetFloatingWindow(tr, i), ui=open_fx_idx==i}
+				end
+			end
+			for i = 0, r.GetTrackNumMediaItems(tr)-1 do
+			local itm = r.GetTrackMediaItem(tr,i)
+			t[tr].takefx[itm] = {}
+				for i = 0, r.CountTakes(itm)-1 do
+				local take = r.GetTake(itm, i)
+				t[tr].takefx[itm][take] = {}
+					for i = 0, r.TakeFX_GetCount(take)-1 do
+						if r.TakeFX_GetOpen(take, i) then -- is open in the FX chain window or a floating window
+						local len = #t[tr].takefx[itm][take]+1
+						t[tr].takefx[itm][take][len] = {idx=i, float=r.TakeFX_GetFloatingWindow(take, i), ui=r.TakeFX_GetChainVisible(take)==i}
+						end
+					end
+				end
+			end
+		end
+	return t
+	elseif t then
+		for tr in pairs(t) do
+	--[[script specific
+		local mixer_vis = r.GetToggleCommandStateEx(0, 40078) == 1 -- View: Toggle mixer visible
+		local master_vis_flag = r.GetMasterTrackVisibility()
+		local master_vis_TCP, master_vis_MCP = master_vis_flag&1 == 1, master_vis_flag&2 == 2
+		local is_master_tr = tr == r.GetMasterTrack(0)
+	--]]
+			if r.ValidatePtr(tr, 'MediaTrack*')
+			--[[ script specific
+			and (not mixer_vis and (is_master_tr and master_vis_TCP or r.IsTrackVisible(tr, false)) -- mixer false // visible in the TCP // IsTrackVisible DOESN'T APPLY TO MASTER TRACK, always returns true
+			or mixer_vis and (is_master_tr and master_vis_MCP or r.IsTrackVisible(tr, true)) ) -- mixer true // visible in the MCP // IsTrackVisible DOESN'T APPLY TO MASTER TRACK, always returns true
+			or IGNORE_VISIBILITY
+			--]]
+			then
+				for _, fx_data in ipairs(t[tr].trackfx) do
+					if fx_data.ui then r.TrackFX_Show(tr, fx_data.idx, 1) end -- showFlag 1 (open FX chain with fx ui shown) // OR r.TrackFX_SetOpen(tr, fx_idx, true) -- open true
+					if fx_data.float then r.TrackFX_Show(tr, fx_data.idx, 3) end -- showFlag 3 (open in a floating window)
+				end
+				for itm, takes_t in pairs(t[tr].takefx) do
+					for take, fx_t in pairs(takes_t) do
+						for _, fx_data in ipairs(fx_t) do
+							if fx_data.ui then r.TakeFX_Show(take, fx_data.idx, 1) end -- showFlag 1 (open FX chain with fx ui shown) // OR r.TakeFX_SetOpen(take, fx_data.idx, true) -- open true
+							if fx_data.float then r.TakeFX_Show(take, fx_data.idx, 3) end -- showFlag 3 (open in a floating window)
+						end
+					end
+				end
+			end
+		end
+	end
+
+end
+
 
 
 
@@ -7909,84 +7414,7 @@ end
 
 
 
-function Re_Store_FX_Windows_Visibility(t)
--- restores positions if screenset wasn't changed
--- doesn't restore focus and z-order
--- take fx windows are linked to track to be able to ignore them when the track is hidden
--- to restore positions and focus use Re_Store_Windows_Props_By_Names()
--- see implementation in Restore FX windows after screenset change.lua
-	if not t then
-	local t = {}
-		for i = -1, r.CountTracks(0)-1 do
-		local tr = r.GetTrack(0,i) or r.GetMasterTrack(0)
-		t[tr] = {trackfx = {}, takefx = {}}
-			for i = 0, r.TrackFX_GetCount(tr)-1 do
-				if r.TrackFX_GetOpen(tr, i) then -- is open in the FX chain window or a floating window
-				local len = #t[tr].trackfx+1
-				-- storing floating status and fx chain UI visibility status even if the UI is floating
-				t[tr].trackfx[len] = {idx=i, float=r.TrackFX_GetFloatingWindow(tr, i), ui=r.TrackFX_GetChainVisible(tr)==i}
-				end
-			end
-			for i = 0, r.TrackFX_GetRecCount(tr)-1 do
-			local i = i+0x1000000
-			local open_fx_idx = Get_InputMonFX_Chain_Truely_SelectedFX(tr)
-				if r.TrackFX_GetOpen(tr, i) then -- is open in the FX chain window or a floating window
-				local len = #t[tr].trackfx+1
-				t[tr].trackfx[len] = {idx=i, float=r.TrackFX_GetFloatingWindow(tr, i), ui=open_fx_idx==i}
-				end
-			end
-			for i = 0, r.GetTrackNumMediaItems(tr)-1 do
-			local itm = r.GetTrackMediaItem(tr,i)
-			t[tr].takefx[itm] = {}
-				for i = 0, r.CountTakes(itm)-1 do
-				local take = r.GetTake(itm, i)
-				t[tr].takefx[itm][take] = {}
-					for i = 0, r.TakeFX_GetCount(take)-1 do
-						if r.TakeFX_GetOpen(take, i) then -- is open in the FX chain window or a floating window
-						local len = #t[tr].takefx[itm][take]+1
-						t[tr].takefx[itm][take][len] = {idx=i, float=r.TakeFX_GetFloatingWindow(take, i), ui=r.TakeFX_GetChainVisible(take)==i}
-						end
-					end
-				end
-			end
-		end
-	return t
-	elseif t then
-		for tr in pairs(t) do
-	--[[script specific
-		local mixer_vis = r.GetToggleCommandStateEx(0, 40078) == 1 -- View: Toggle mixer visible
-		local master_vis_flag = r.GetMasterTrackVisibility()
-		local master_vis_TCP, master_vis_MCP = master_vis_flag&1 == 1, master_vis_flag&2 == 2
-		local is_master_tr = tr == r.GetMasterTrack(0)
-	--]]
-			if r.ValidatePtr(tr, 'MediaTrack*')
-			--[[ script specific
-			and (not mixer_vis and (is_master_tr and master_vis_TCP or r.IsTrackVisible(tr, false)) -- mixer false // visible in the TCP // IsTrackVisible DOESN'T APPLY TO MASTER TRACK, always returns true
-			or mixer_vis and (is_master_tr and master_vis_MCP or r.IsTrackVisible(tr, true)) ) -- mixer true // visible in the MCP // IsTrackVisible DOESN'T APPLY TO MASTER TRACK, always returns true
-			or IGNORE_VISIBILITY
-			--]]
-			then
-				for _, fx_data in ipairs(t[tr].trackfx) do
-					if fx_data.ui then r.TrackFX_Show(tr, fx_data.idx, 1) end -- showFlag 1 (open FX chain with fx ui shown) // OR r.TrackFX_SetOpen(tr, fx_idx, true) -- open true
-					if fx_data.float then r.TrackFX_Show(tr, fx_data.idx, 3) end -- showFlag 3 (open in a floating window)
-				end
-				for itm, takes_t in pairs(t[tr].takefx) do
-					for take, fx_t in pairs(takes_t) do
-						for _, fx_data in ipairs(fx_t) do
-							if fx_data.ui then r.TakeFX_Show(take, fx_data.idx, 1) end -- showFlag 1 (open FX chain with fx ui shown) // OR r.TakeFX_SetOpen(take, fx_data.idx, true) -- open true
-							if fx_data.float then r.TakeFX_Show(take, fx_data.idx, 3) end -- showFlag 3 (open in a floating window)
-						end
-					end
-				end
-			end
-		end
-	end
-
-end
-
-
-
-function FX_Exists1(obj, fx_name, fx_parm_cnt, parmA_idx, parmA_name, parmB_idx, parmB_name, parmC_idx, parmC_name, fx_idx)
+function FX_Exists(obj, fx_name, fx_parm_cnt, parmA_idx, parmA_name, parmB_idx, parmB_name, parmC_idx, parmC_name, fx_idx)
 -- fx_name is original fx name, will be used in builds 6.37 onwards
 -- fx_idx is optional, if passed the function will evaluate whether the FX with this particular index is the sought one
 -- otherwise it searches for ar least one matching FX in the entire FX chain
@@ -8021,6 +7449,18 @@ local supported = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.37 -- since 
 			end
 		end
 	end
+end
+
+
+
+function Enum_RS5k_files(tr, fx_idx)
+local i = 0
+	repeat
+	local retval, name = r.TrackFX_GetNamedConfigParm(tr, fx_idx, "FILE"..i)
+	local name = name:match('.+[\\/](.+)')
+		if name then ... end -- if retval then .... end // ... means some operation
+	i = i + 1
+	until not retval or not name or name == ''
 end
 
 
@@ -8423,6 +7863,7 @@ return name_match
 
 end
 
+
 --================================================  F X  E N D  ==============================================
 
 
@@ -8473,7 +7914,7 @@ r.ShowConsoleMsg('NAME = '..({r.GetSetMediaItemTakeInfo_String(r.GetActiveTake(i
 end
 
 
-function Rename_Item_Take_Src_File(item, ACT)
+function Rename_Item_Take_Src_File1(item, ACT) -- see a more reliable version 2 below
 
 local take = r.GetActiveTake(item)
 local old_fn = r.GetMediaSourceFileName(r.GetMediaItemTake_Source(take), '') -- extract file path and name
@@ -8495,13 +7936,14 @@ local ok, message = #r.GetPeakFileName(f_path..f_name, '') > 0 and os.remove(f_p
 end
 
 
-function Rename_Item_Take_Src_File(take)
+function Rename_Item_Take_Src_File2(take)
 -- Thanks to cfillion and MPL
 -- https://forum.cockos.com/showthread.php?t=211250 file rename
 -- https://forum.cockos.com/showthread.php?p=1889202 file rename
 
 local old_src = r.GetMediaItemTake_Source(take)
-local old_src = r.GetMediaSourceParent(src) or src -- in case the item is a section or a reversed source
+local old_src = r.GetMediaSourceParent(src) or old_src -- in case the item is a section or a reversed source
+
 local old_fn = r.GetMediaSourceFileName(old_src, "") -- extract rendered file path and name
 --local rend_file_ext = old_fn:match("%.%w+") -- extract rendered file extension
 --local rend_file_path = old_fn:match("^(.+[\\/])") -- extract rendered file path
@@ -9058,7 +8500,7 @@ return first_start, last_end
 end
 
 
-function is_same_track() -- whether all selected items belong to the same track
+function Is_Same_Items_Track() -- whether all selected items belong to the same track
 local sel_itm_cnt = r.CountSelectedMediaItems(0)
 	if sel_itm_cnt > 0 then
 	local ref_tr = r.GetMediaItemTrack(r.GetSelectedMediaItem(0,0))
@@ -9920,7 +9362,7 @@ function hex2rgb(HEX_COLOR)
 end
 
 
-function HexToNormRGB(color) -- by FTC
+function FTC_HexToNormRGB(color) -- by FTC
 -- https://github.com/iliaspoulakis/Reaper-Tools/blob/master/Media%20explorer/MX%20Tuner.lua
     local r, g, b = r.ColorFromNative(color)
     return {r / 255, g / 255, b / 255}
@@ -10040,6 +9482,19 @@ function RGB_To_From_Integer2(r,g,b,integer)
 	return r, g, b
 	end
 end
+
+
+function RGB_To_Normalized(R,G,B)
+local unit = 1/255
+return R and unit*R or 255, G and unit*G or 255, B and unit*B or 255
+end
+--[[EXAMPLE
+
+local R,G,B = table.unpack((not R and not G and not B) and {255,255,255} or {R,G,B}) -- defaults to white if none is supplied
+gfx.r, gfx.g, gfx.b = RGB_To_Normalized(R, G, B)
+
+]]
+
 
 
 function Split_Integer_To_RGB_And_Combine(color)
@@ -10180,8 +9635,9 @@ local color
 local tr_color_alt
 
 	if color and not is_env then -- process color of objects other than envelope
-	-- col_mi_bg (Media item odd tracks, in fact even, bug report https://forum.cockos.com/showthread.php?t=289479)
-	-- col_mi_bg2 (Media item even tracks, in fact odd, same bug)
+	-- col_mi_bg (Media item odd tracks) until 7.15 was officially referring to odd tracks when in fact refers to even	
+	-- col_mi_bg2 (Media item even tracks) until 7.15 was officially referring to even tracks when in fact refers to odd
+	-- bug report https://forum.cockos.com/showthread.php?t=289479
 	-- col_tr1_itembgsel (Media item selected odd tracks)
 	-- col_tr2_itembgsel (Media item selected even tracks)
 	-- col_seltrack : Selected track control panel background
@@ -10193,7 +9649,7 @@ local tr_color_alt
 		elseif (is_take or is_itm) and color == 0 then -- default theme settings dependent color
 		local obj = is_take and r.GetMediaItemTake_Item(obj) or obj
 		local tr_No = r.CSurf_TrackToID(r.GetMediaItemTrack(obj), false) -- mcpView false // get track number because default item color may differ on odd and even tracks if changed in the 'Theme development/tweaker' dialogue and will be displayed if their track color isn't custom
-		key = tr_No%2 > 0 and 'col_mi_bg2' or tr_No%2 == 0 and 'col_mi_bg' -- non-selected on odd or even track, as of build 7.11 these are mixed up, see link to bug report above
+		key = tr_No%2 > 0 and 'col_mi_bg2' or tr_No%2 == 0 and 'col_mi_bg' -- non-selected on odd or even track, until build 7.15 these were mixed up in the 'Theme development/tweaker', see link to bug report above, the bug fix was cosmetic with no change in the keys association
 		end
 	color = key and r.GetThemeColor(key, 0) -- get default theme color, determined by the setting in the 'Theme development/tweaker' dialogue: Media item background (odd, even), Unselected track control panel background
 	or color -- either default theme color or custom
@@ -10843,17 +10299,6 @@ return integer
 
 end
 
-
-function RGB_To_Normalized(R,G,B)
-local unit = 1/255
-return R and unit*R or 255, G and unit*G or 255, B and unit*B or 255
-end
---[[EXAMPLE
-
-local R,G,B = table.unpack((not R and not G and not B) and {255,255,255} or {R,G,B}) -- defaults to white if none is supplied
-gfx.r, gfx.g, gfx.b = RGB_To_Normalized(R, G, B)
-
-]]
 
 
 function Prevent_Floating_Window_Resize1(w,h)	-- auto-restore GUI window dimensions
@@ -12152,9 +11597,6 @@ end
 require("X-Raym_Functions - console debug messages")
 
 
--- Undo with only the script name
-r.Undo_EndBlock(({r.get_action_context()})[2]:match('([^\\/_]+)%.%w+$'), -1)
-
 
 function Get_Script() -- by name elements, by command ID, by section, from reaper-kb.ini
 local sep = r.GetResourcePath():match('[\\/]') -- or package.config:sub(1,1)
@@ -12181,6 +11623,7 @@ end
 
 function set_script_instances_mode(path, sep, cmd_ID, scr_name, Esc)
 -- set script mode to 260 to terminate deferred instances without the pop-up dialogue
+-- since build 7.03 this can be done from the API with reaper.set_action_options()
 local cmd_ID = r.ReverseNamedCommandLookup(cmd_ID)
 local cmd_ID = cmd_ID:match('RS.-_') and cmd_ID:sub(8) or cmd_ID:sub(3) -- only look for ID without the prefix and the infix
 local cont
@@ -12380,7 +11823,7 @@ local keyword = Invalid_Script_Name3(scr_name, 'right', 'left', 'up', 'down')
 ]]
 
 
-function Dir_Exists(path)
+function Dir_Exists1(path) -- see version 2 below
 -- check if directory exists, if not returns nil, if yes and no files - empty string
 -- 2nd return value error message, if no match then nil
 
@@ -12403,7 +11846,7 @@ return result
 end
 
 
-function Dir_Exists(path) -- short
+function Dir_Exists2(path) -- short
 local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces
 local sep = path:match('[\\/]')
 	if not sep then return end -- likely not a string represening a path
@@ -12474,7 +11917,7 @@ end
 
 
 local path = reaper.GetResourcePath()
-function ScanPath(path)
+function ScanPath1(path)
 -- Recursve fetching of directory structure and files // MPL, Lokasenna // https://forum.cockos.com/showthread.php?t=206933 // the path must not end with a separator
     local t = {} -- must be clean otherwise the path will each time be added twice, as a main path and as a subdir
     local subdirindex, fileindex = 0,0
@@ -12540,6 +11983,20 @@ local sep = path:match('[\\/]') and path:match('[\\/]') or '' -- extract the sep
 end
 
 
+function scandir(dir) -- not for Mac; REAPER API already has r.EnumerateSubdirectories()
+-- https://forum.cockos.com/showthread.php?t=159547
+-- A less elegant solution to get a directory list in lua without additional libraries is to use the os.execute and write the lines to a buffer. Works like a charm but you do get a very quick terminal window popping open to execute it. I used it a few times on my File Manager script if you want to see an example. This works on Mac. Instead of os.execute the native r.ExecProcess() could probably be used
+local i, t, popen = 0, {}, io.popen
+    for filename in popen('dir "'..dir..'" /b'):lines() do
+        msg(filename)
+        i = i + 1
+        t[i] = filename
+    end
+    return t
+end
+
+
+
 function Count_Files_In_Folder(path,ext)
 --r.EnumerateFiles(path..'..', 0) -- reset EnumerateFiles() cache by accessing a valid dummy dir, e.g. r.EnumerateFiles(r.GetResourcePath(), 0)
 --r.EnumerateFiles(path, -1) -- -1 to clear the cache, or pass another directory (invalid one is suppported), since 6.20
@@ -12568,7 +12025,7 @@ end
 
 
 
-function get_file_timestamp(file_name) -- without seconds // Windows only
+function get_file_timestamp1(file_name) -- without seconds // Windows only
 -- https://superuser.com/questions/1277743/fast-built-in-command-to-get-the-last-modified-date-of-a-file-in-windows
 -- https://stackoverflow.com/questions/33296834/how-can-i-get-last-modified-timestamp-in-lua
 -- https://stackoverflow.com/questions/2111333/how-to-get-last-modified-date-on-windows-command-line-for-a-set-of-files
@@ -12585,7 +12042,7 @@ return r.ExecProcess('cmd.exe /C dir \tw '..file, 0):match('.+\n(.-%d+:%d+)') --
 end
 
 
-function get_file_timestamp(file_name, dir) -- both args are strings // dir MUST NOT end with separator, if dir isn't provided file arg must be full path // Windows only // special chars in args must either be escaped or the args inclosed in [[]]
+function get_file_timestamp2(file_name, dir) -- both args are strings // dir MUST NOT end with separator, if dir isn't provided file arg must be full path // Windows only // special chars in args must either be escaped or the args inclosed in [[]]
 -- https://www.dostips.com/forum/viewtopic.php?t=6063#p38222 which helped to figure out the forfiles syntax
 	if not dir then -- time without seconds
 	return r.ExecProcess('cmd.exe /C dir \tw "'..file_name..'"', 0):match('.+\n(.-%d+:%d+)')
@@ -12595,8 +12052,9 @@ function get_file_timestamp(file_name, dir) -- both args are strings // dir MUST
 	end
 end
 
+
 -- streamlined
-function get_file_timestamp(file_name, dir) -- both args are strings // dir MUST NOT end with separator, if dir isn't provided file arg must be full path // Windows only // special chars in args must either be escaped or the args inclosed in [[]]
+function get_file_timestamp3(file_name, dir) -- both args are strings // dir MUST NOT end with separator, if dir isn't provided file arg must be full path // Windows only // special chars in args must either be escaped or the args inclosed in [[]]
 local command
 local capt
 	if not dir then -- time without seconds
@@ -12611,7 +12069,7 @@ return r.ExecProcess(command, 0):match(capt)
 end
 
 -- streamlined +
-function get_file_timestamp(full_file_path) -- time with seconds
+function get_file_timestamp4(full_file_path) -- time with seconds
 local dir, file_name = full_file_path:match('(.+)[\\/](.+)') -- makes sure that dir doesn't end with separator
 local dir = #dir == 3 and dir or '"'..dir..'"' -- when not root as root doesn't allow quotes
 return r.ExecProcess('forfiles /P '..dir..' /M "'..file_name..'" /C "cmd /c echo @fdate @ftime"', 0):match('.+\n(.+)\n') -- excluding trailing empty line
@@ -12735,19 +12193,6 @@ local f = io.open(f_path,'r')
 local cont = f:read('*a')
 f:close()
 return cont
-end
-
-
-function scandir(dir) -- not for Mac; REAPER API already has r.EnumerateSubdirectories()
--- https://forum.cockos.com/showthread.php?t=159547
--- A less elegant solution to get a directory list in lua without additional libraries is to use the os.execute and write the lines to a buffer. Works like a charm but you do get a very quick terminal window popping open to execute it. I used it a few times on my File Manager script if you want to see an example. This works on Mac. Instead of os.execute the native r.ExecProcess() could probably be used
-local i, t, popen = 0, {}, io.popen
-    for filename in popen('dir "'..dir..'" /b'):lines() do
-        msg(filename)
-        i = i + 1
-        t[i] = filename
-    end
-    return t
 end
 
 
@@ -13272,7 +12717,7 @@ end
 
 
 
-function Offset_Shift_Value_To_Land_On_Natural_Keys(curr_val, shift_by_val, normalized)
+function Offset_Shift_Value_To_Land_On_Natural_Keys1(curr_val, shift_by_val, normalized)
 -- returns actual MIDI note number, not the one used by RS5k 'Note range start/end' parameters
 -- shift_by_val is treated as white (natural) keys count
 -- normalized is boolean to condition processing curr_val as RS5k internal pitch values in the range of 0-1
@@ -13298,7 +12743,7 @@ local natural_keys_cnt = 0
 end
 
 
-function Offset_Shift_Value_To_Land_On_Natural_Keys(curr_val, shift_by_val, prev_note, normalized)
+function Offset_Shift_Value_To_Land_On_Natural_Keys2(curr_val, shift_by_val, prev_note, normalized)
 -- returns actual MIDI note number, not the one used by RS5k 'Note range start/end' parameters
 -- shift_by_val is treated as chromatic notes count
 -- normalized is boolean to condition processing curr_val as RS5k internal pitch values in the range of 0-1
@@ -13327,6 +12772,743 @@ end
 
 
 --====================================== U T I L I T Y =========================================
+
+
+local r = reaper
+
+
+for key in pairs(reaper) do _G[key] = reaper[key] end  -- MPL: get rid of 'reaper.' table key in functions
+
+
+function Msg(param) -- X-Raym's
+reaper.ShowConsoleMsg(tostring(param).."\n")
+end
+
+local Debug = ""
+function Msg(param, cap) -- caption second or none
+local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
+	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	reaper.ShowConsoleMsg(cap..tostring(param)..'\n')
+	end
+end
+
+
+local Debug = ""
+function Msg(cap, param) -- caption always, if not needed can be empty string
+local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
+	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	reaper.ShowConsoleMsg(cap..tostring(param)..'\n')
+	end
+end
+
+
+local Debug = ""
+function Msg(...) -- caption first (must be string otherwise ignored) or none, accepts functions with only one return value
+local t = {...}
+	if #t > 1 then
+	local cap, param = table.unpack(t) -- assign arguments to vars
+	local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
+	displ = cap..tostring(param)..'\n'
+	elseif #t == 1 then
+	displ = tostring(...)..'\n'
+	end
+	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
+	r.ShowConsoleMsg(displ)
+	end
+end
+
+
+local function printf(...) -- cfillion's from cfillion_Step sequencing (replace mode).lua
+	if debug then
+	reaper.ShowConsoleMsg(string.format(...))
+	end
+end
+-- e.g. printf(">\tnote %d\tchan=%s vel=%s\n", note.pitch, note.chan, note.vel)
+
+
+local date = os.date('%H-%M-%S_%d.%m.%y') -- a convenient way to make file names unique and prevent clashes
+
+
+function Is_Project_Start() -- for use with time selection / loop / edit cursor / item pos values to prevent them getting aligned with the project start and ruining their position relative to the grid when moving leftwards (the concept is used in scripts 'Move edit cursor left by one grid unit' and 'Scroll horizontally and;or move loop and;or time selection by user defined interval')
+-- proj end cannot be reached by the cursor hence alignment with it isn't a problem
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+--local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
+local proj_time_offset = r.GetProjectTimeOffset(0, false) -- rndframe false
+return start_time == proj_time_offset
+end
+
+
+---- VALIDATE VARIABLES
+
+
+function Validate_Positive_Integer(str, type) -- str is a numeric string, type is a string, script specific to distinguish between 2 modes
+local default = type and (type:lower() == 'bend' and 12 or type:lower() == 'offset' and 80)
+	if not default then return end
+local str = str:gsub(' ','') -- remove all spaces
+local str = #str == 0 and default or tonumber(str)
+return str and math.abs(str) > default and default or str and math.floor(str)
+end
+
+
+-- removes spaces for settings evaluation
+function is_set(sett, is_literal) 
+-- sett is a string
+-- is_literal is boolean to determine the gsub pattern
+-- in case literal string is used as sett, e.g. [[ ]]
+
+-- if literal string is used as sett it may happen to contain 
+-- implicit new lines which should be accounted for in evaluation
+local pattern = is_literal and '[%s%c]' or ' '
+return #sett:gsub(pattern,'') > 0
+end
+
+
+function validate_sett(sett, is_literal)
+-- validate setting, can be either a non-empty string or any number
+-- is_literal is boolean to determine the gsub pattern
+-- in case literal string is used for a setting, e.g. [[ ]]
+
+-- if literal string is used for a setting it may happen to contain 
+-- implicit new lines which should be accounted for in evaluation
+local pattern = is_literal and '[%s%c]' or ' '
+return type(sett) == 'string' and #sett:gsub(pattern,'') > 0 or type(sett) == 'number'
+end
+
+
+function validate_multi_line_sett(sett)
+-- add trailing line break in case the setting closing square brackets have been moved
+-- to the last line, otherwise the last line won't be captured with the pattern
+-- in the gmatch loop below
+sett = sett:match('.+\n%s*$') and sett..'\n' or sett
+return #sett:gsub('[%s%c]','') > 0 and sett
+end
+
+
+function validate_settings1(is_literal, ...) -- if actual setting value is immaterial
+-- if literal string is used for all settings they may happen to contain 
+-- implicit new lines which should be accounted for in evaluation
+local pattern = is_literal and '[%s%c]' or ' '
+local t = {...}
+	for k, sett in ipairs(t) do
+		if type(sett) == 'string' and #sett:gsub('[%s%c]','') > 0
+		or type(sett) == 'number' then t[k] = true
+		else t[k] = false
+		end
+	end
+return table.unpack(t)
+end
+-- USE:
+-- local sett1, sett2, sett3 =  validate_settings(sett1, sett2, sett3)
+
+
+function validate_settings2(...) -- if numeric values matter
+local t = {...}
+	for k, sett in ipairs(t) do
+		if type(sett) == 'string' and not tonumber(sett)
+		or not type(sett) == 'number' then t[k] = false
+		end
+	end
+return table.unpack(t)
+end
+
+
+function validate_settings3(...) -- if numeric values matter
+local t = {...}
+	for k, sett in ipairs(t) do
+	t[k] = tonumber(sett) and math.floor(math.abs(tonumber(sett))) or false -- false is to prevent storing nil and thereby impeding table.unpack because without saved n value (number of fields) it will only unpack up until the first nil
+	end
+return table.unpack(t)
+end
+
+
+
+function validate_global_var(var_name, typ)
+-- var_name is a string
+-- typ is a string supported by the Lua type() function, optional
+local var = _G[var_name]
+return (not typ or typ and type(var) == typ) and var
+end
+-- EXAMPLE
+-- local func = validate_global_var('func_name', 'function') -- look for global function referenced as a string
+
+-- validate local variable
+-- https://stackoverflow.com/questions/2834579/print-all-local-variables-accessible-to-the-current-scope-in-lua
+-- https://www.gammon.com.au/scripts/doc.php?lua=debug.getlocal
+-- this loop must not be enclosed in a function otherwise only variables local to the function will be traversed
+local i = 1
+local var_name, typ, var = '', '' -- type in var name and type supported by the Lua type() function which is optional
+	repeat
+	local name, val = debug.getlocal(1, i) -- 1 is stack level
+		if name == var_name and (not typ or typ and type(val) == typ) then var = val break end
+	i = i+1
+	until not name
+
+
+function Validate_All_Global_Settings(is_literal, ...) -- global vars must be passed as arguments in string representation; in current form only suitable for validation of truth
+-- https://stackoverflow.com/questions/59448334/convert-string-to-variable-name-in-lua
+-- https://love2d.org/forums/viewtopic.php?t=75392
+-- https://stackoverflow.com/questions/67407628/in-lua-having-found-a-variable-of-type-function-in-g-how-to-pass-a-paramete
+
+-- is_literal is boolean to determine the gsub pattern
+-- in case literal string is used for a setting, e.g. [[ ]]
+
+-- if literal string is used for a setting it may happen to contain 
+-- implicit new lines which should be accounted for in evaluation
+local pattern = is_literal and '[%s%c]' or ' '
+local t = {...}
+local t2 = {}
+	for k, setting in ipairs(t) do
+	local glob_var = t[k]
+	t2[setting] = #_G[glob_var]:gsub(pattern,'') > 0 -- or #_G[t[k]]...
+	end
+return t2
+end
+--[[
+USAGE
+a = '.'
+b = ''
+c = ' 2'
+local t = Validate_All_Global_Settings(is_literal, 'a','b','c')
+Msg(t.a) Msg(t.b) Msg(t.c)
+]]
+
+
+
+
+function validate_output1(string) -- with GetUserInputs()
+local string = string:gsub(' ','')
+return #string > 0 and string ~= ',,' -- 3 field user dialogue if separator is a comma
+end
+-- USE:
+-- if not retval or not validate_output(output) then return r.defer(function() do return end end) end
+
+
+function validate_output2(str, separator, field_cnt) -- with GetUserInputs()
+-- str and separator are strings
+-- field_cnt is integer
+local string = string:gsub(' ','')
+return #string > 0 and string ~= separator:rep(field_cnt)
+end
+
+
+---------------------------------------------------------------------------------------------
+-- Get command ID of the executed action, the action must be run
+-- for its command ID to be returned by the function
+local comm_id
+
+function Get_Action_ID()
+--local t = {0,32060,32061,32062,32063} -- UNUSED
+comm_id = r.PromptForAction(0, 0, 0) -- session_mode 0, init_id 0, section_id 0 // POLL
+--Msg(comm_id)
+	if comm_id > 0 then
+	r.PromptForAction(-1, 0, 0) -- session_mode -1, init_id 0, section_id 0 // STOP
+	return end
+r.defer(Get_Action_ID)
+end
+
+r.PromptForAction(1, 0, 0) -- session_mode 1, init_id 0, section_id 0 // LAUNCH
+Get_Action_ID()
+r.atexit(function() r.ShowConsoleMsg(r.ReverseNamedCommandLookup(comm_id)) end)
+
+----------------------------------------------------------------------------------------
+
+-- do something in X sec
+local cur_time = os.time() -- in sec
+local duration = 300 -- in sec
+function do_in_X_mins(cur_time, duration)
+	if select(2, math.modf((os.time() - cur_time)/duration)) == 0 then -- when the difference can be divided by duration without remainder it means exactly the duration value
+		-- DO STUFF --
+	end
+end
+
+
+function ACT1(comm_ID) -- both string and integer work
+local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
+local act = comm_ID and comm_ID ~= 0 and r.Main_OnCommand(r.NamedCommandLookup(comm_ID),0)
+end
+
+
+function ACT2(comm_ID, islistviewcommand, midi) -- islistviewcommand, midi are boolean
+-- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
+-- e.g. sectionID == 32061
+local act = midi and r.MIDIEditor_LastFocused_OnCommand(r.NamedCommandLookup(comm_ID), islistviewcommand) -- islistviewcommand false
+or not midi and r.Main_OnCommand(r.NamedCommandLookup(comm_ID), 0) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything
+end
+
+
+function ACT3(comm_ID, islistviewcommand, midi) -- islistviewcommand, midi are boolean
+-- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
+-- e.g. sectionID == 32061
+local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
+local act = comm_ID and comm_ID ~= 0 and (midi and r.MIDIEditor_LastFocused_OnCommand(comm_ID, islistviewcommand) -- islistviewcommand false
+or not midi and r.Main_OnCommand(comm_ID, 0)) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything // only if valid command_ID
+end
+
+
+
+local ME = r.MIDIEditor_GetActive() -- UNRELIABLE if script is run from the Main section of the action list, see MIDIEditor_GetActiveAndVisible()
+function ACT4(ID, ME) -- supports MIDI Editor actions, get MIDI editor pointer ME and add as argument otherwise can be left out
+-- ID - string or integer
+	if ID then
+	local ID = r.NamedCommandLookup(ID) -- works with srings and integers
+		if ID ~= 0 then -- valid command_ID
+			if not ME then r.Main_OnCommand(ID, 0)
+			else
+			r.MIDIEditor_LastFocused_OnCommand(ID, false) -- islistviewcommand is false
+		--	r.MIDIEditor_OnCommand(ME, ID)
+			end
+		end
+	end
+end
+
+
+function get_tog_state(sect_ID, comm_ID)
+-- supports string command IDs
+return r.GetToggleCommandStateEx(sect_ID, r.NamedCommandLookup(comm_ID))
+end
+
+
+function capture_command(input, str) -- weed out illegal entries in the Profile console
+-- the input comes from GetUserInputs()
+
+	for cmd in input:gmatch('[^,]*') do -- check all slots; if dot were added here it would help to catch decimal numbers, but opted for error in the main routine
+		if cmd ~= '' and cmd ~= '0' and cmd ~= '1' and not cmd:match('^h+$') and not cmd:match('oo?ut') and cmd ~= 'quit' and not cmd:match('oo?pen') and cmd ~= 'reload' and not cmd:match('toolbar[0-9]+') and not cmd:match('toolbar[0-8]m') and not cmd:match('auto[0-9]+') and cmd ~= 'auto0' then input = nil break end
+	end
+
+	if input and str then
+	input = input:match('^('..str..'),') or input:match(',('..str..'),') or input:match(',('..str..')$')
+	end
+
+return input
+
+end
+
+
+--------------------------------------------
+
+-- Enable this setting by inserting any QWERTY alphanumeric
+-- character between the quotation marks so the script can be used
+-- then configure the settings below
+ENABLE_SCRIPT = ""
+function Script_Not_Enabled(ENABLE_SCRIPT)
+	if #ENABLE_SCRIPT:gsub(' ','') == 0 then
+	local emoji = [[
+		_(ツ)_
+		\_/|\_/
+	]]
+	r.MB('  Please enable the script in its USER SETTINGS.\n\nSelect it in the Action list and click "Edit action...".\n\n'..emoji, 'PROMPT', 0)
+	return true
+	end
+end
+if Script_Not_Enabled(ENABLE_SCRIPT) then return r.defer(function() do return end end) end
+
+
+-- Enable this setting by inserting by inserting any alphanumeric
+-- character between the quotation marks
+-- to permanently prevent USER SETTINGS reminder pop-up
+REMINDER_OFF = ""
+function Reminder_Off(REMINDER_OFF)
+	local function gap(n) -- number of repeats, integer
+	local n = not n and 0 or tonumber(n) and math.abs(math.floor(n)) or 0
+	return string.rep(' ',n)
+	-- return (' '):rep(n)
+	end
+local _, scr_name, scr_sect_ID, cmd_ID, _,_,_ = r.get_action_context()
+local scr_name = scr_name:match('([^\\/]+)%.%w+') -- without path and extension
+--local cmd_ID = r.ReverseNamedCommandLookup(cmd_ID) -- to use instead of scr_name // just an idea
+local ret, state = r.GetProjExtState(0, scr_name, 'REMINDER_OFF')
+	if #REMINDER_OFF:gsub(' ','') == 0 and ret == 0 then
+	local resp = r.MB('\t'..gap(7)..'This is to make you aware\n\n'..gap(12)..'that the script includes USER SETTINGS\n\n'..gap(10)..'you might want to tailor to your workflow.\n\n'..gap(17)..'Clicking "OK" disables this prompt\n\n'..gap(8)..'for the current project (which will be saved).\n\n\t'..gap(6)..'To disable it permanently\n\n change the REMINDER_OFF setting inside the script.\n\n   Select it the the Action list and click "Edit action..."', 'REMINDER', 1)
+		if resp == 1 then
+		r.SetProjExtState(0, scr_name, 'REMINDER_OFF', '1')
+		r.Main_SaveProject(0, false) -- forceSaveAsIn false
+		return true
+		end
+	else return true
+	end
+end
+if not Reminder_Off(REMINDER_OFF) then return r.defer(function() do return end end) end
+
+
+-------------------------------------------
+
+-- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
+-- https://forum.cockos.com/showthread.php?t=280658#25
+-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+-- the earliest appearence of a particular character in the menu can be used as a shortcut
+-- in this case they don't have to be preceded with ampersand '&'
+-- only if particular instance of a character should be used as a shortcut 
+-- such character must be preceded with ampresand '&' otherwise it will be overriden 
+-- by its earliest appearance in the menu
+-- some characters still do need ampresand, e.g. < and >
+local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+-- screen reader used by blind users with OSARA extension may be affected 
+-- by the absence if the gfx window herefore only disable it in builds 
+-- newer than 6.82 if OSARA extension isn't installed
+-- ref: https://github.com/Buy-One/REAPER-scripts/issues/8#issuecomment-1992859534
+local OSARA = r.GetToggleCommandState(r.NamedCommandLookup('_OSARA_CONFIG_reportFx')) >= 0 -- OSARA extension is installed
+local init = (old or OSARA) and gfx.init('', 0, 0)
+-- open menu at the mouse cursor
+-- https://www.reaper.fm/sdk/reascript/reascripthelp.html#lua_gfx_variables
+gfx.x = gfx.mouse_x
+gfx.y = gfx.mouse_y
+local input = gfx.showmenu(menu) -- menu string
+local quit = old and gfx.quit()
+
+
+function Show_Menu_Dialogue(menu)
+-- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
+-- https://forum.cockos.com/showthread.php?t=280658#25
+-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+-- the earliest appearence of a particular character in the menu can be used as a shortcut
+-- in this case they don't have to be preceded with ampersand '&'
+-- only if particular instance of a character should be used as a shortcut 
+-- such character must be preceded with ampresand '&' otherwise it will be overriden 
+-- by its earliest appearance in the menu
+-- some characters still do need ampresand, e.g. < and >
+local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+-- screen reader used by blind users with OSARA extension may be affected 
+-- by the absence if the gfx window herefore only disable it in builds 
+-- newer than 6.82 if OSARA extension isn't installed
+-- ref: https://github.com/Buy-One/REAPER-scripts/issues/8#issuecomment-1992859534
+local OSARA = r.GetToggleCommandState(r.NamedCommandLookup('_OSARA_CONFIG_reportFx')) >= 0 -- OSARA extension is installed
+local init = (old or OSARA) and gfx.init('', 0, 0)
+-- open menu at the mouse cursor
+-- https://www.reaper.fm/sdk/reascript/reascripthelp.html#lua_gfx_variables
+gfx.x = gfx.mouse_x
+gfx.y = gfx.mouse_y
+return gfx.showmenu(menu)
+end
+-- if output == 0 then return r.defer(no_undo) end -- IF RELOADING AFTER CLICK IS CRUCIAL TO PREVENT ENDLESS LOOP OR do if output > 0 then ... else return r.defer(no_undo) end
+
+
+function Reload_Menu_at_Same_Pos1(menu, keep_menu_open, left_edge_dist)
+-- only useful for looking up the result of a toggle action, below see a more practical example
+-- keep_menu_open is boolean
+-- left_edge_dist is integer to only display the menu 
+-- when the mouse cursor is within the sepecified distance in px from the screen left edge
+-- the earliest appearence of a particular character in the menu can be used as a shortcut
+-- in this case they don't have to be preceded with ampersand '&'
+-- only if particular instance of a character should be used as a shortcut 
+-- such character must be preceded with ampresand '&' otherwise it will be overriden 
+-- by its earliest appearance in the menu
+-- some characters still do need ampresand, e.g. < and >
+
+::RELOAD::
+
+left_edge_dist = left_edge_dist and left_edge_dist > 0 and math.floor(left_edge_dist)
+local x, y = r.GetMousePosition()
+
+	if left_edge_dist and x <= left_edge_dist or not left_edge_dist then -- 100 px within the screen left edge
+	
+-- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
+-- https://forum.cockos.com/showthread.php?t=280658#25
+-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+-- BUT LACK OF gfx WINDOW DOESN'T ALLOW RE-OPENING THE MENU AT THE SAME POSITION via ::RELOAD::
+-- therefore enabled when keep_menu_open is valid
+local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+-- screen reader used by blind users with OSARA extension may be affected 
+-- by the absence if the gfx window herefore only disable it in builds 
+-- newer than 6.82 if OSARA extension isn't installed
+-- ref: https://github.com/Buy-One/REAPER-scripts/issues/8#issuecomment-1992859534
+local OSARA = r.GetToggleCommandState(r.NamedCommandLookup('_OSARA_CONFIG_reportFx')) >= 0 -- OSARA extension is installed
+local init = (old or OSARA or not old and not OSARA and keep_menu_open) and gfx.init('', 0, 0)
+	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position	
+		-- ensure that if keep_menu_open is enabled the menu opens every time at the same spot
+		if keep_menu_open and not coord_t then -- keep_menu_open is the one which enables menu reload
+		coord_t = {x = gfx.mouse_x, y = gfx.mouse_y}
+		elseif not keep_menu_open then
+		coord_t = nil
+		end
+	-- sets menu position to mouse
+	-- https://www.reaper.fm/sdk/reascript/reascripthelp.html#lua_gfx_variables
+	gfx.x = coord_t and coord_t.x or gfx.mouse_x
+	gfx.y = coord_t and coord_t.y or gfx.mouse_y
+	local retval = gfx.showmenu(menu) -- menu string
+		if retval > 0 then
+		goto RELOAD
+		end
+	end
+end
+
+
+::RELOAD::
+function Reload_Menu_at_Same_Pos2(menu, keep_menu_open, left_edge_dist) 
+-- keep_menu_open is boolean
+-- left_edge_dist is integer to only display the menu 
+-- when the mouse cursor is within the sepecified distance in px from the screen left edge
+-- the earliest appearence of a particular character in the menu can be used as a shortcut
+-- in this case they don't have to be preceded with ampersand '&'
+-- only if particular instance of a character should be used as a shortcut 
+-- such character must be preceded with ampresand '&' otherwise it will be overriden 
+-- by its earliest appearance in the menu
+-- some characters still do need ampresand, e.g. < and >
+
+left_edge_dist = left_edge_dist and left_edge_dist > 0 and math.floor(left_edge_dist)
+local x, y = r.GetMousePosition()
+
+	if left_edge_dist and x <= left_edge_dist or not left_edge_dist then -- 100 px within the screen left edge
+-- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
+-- https://forum.cockos.com/showthread.php?t=280658#25
+-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+-- BUT LACK OF gfx WINDOW DOESN'T ALLOW RE-OPENING THE MENU AT THE SAME POSITION via ::RELOAD::
+-- therefore enabled with keep_menu_open is valid
+local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+-- screen reader used by blind users with OSARA extension may be affected 
+-- by the absence if the gfx window herefore only disable it in builds 
+-- newer than 6.82 if OSARA extension isn't installed
+-- ref: https://github.com/Buy-One/REAPER-scripts/issues/8#issuecomment-1992859534
+local OSARA = r.GetToggleCommandState(r.NamedCommandLookup('_OSARA_CONFIG_reportFx')) >= 0 -- OSARA extension is installed
+local init = (old or OSARA or not old and not OSARA and keep_menu_open) and gfx.init('', 0, 0)
+	-- open menu at the mouse cursor, after reloading the menu doesn't change its position based on the mouse pos after a menu item was clicked, it firmly stays at its initial position
+		-- ensure that if keep_menu_open is enabled the menu opens every time at the same spot
+		if keep_menu_open and not coord_t then -- keep_menu_open is the one which enables menu reload
+		coord_t = {x = gfx.mouse_x, y = gfx.mouse_y}
+		elseif not keep_menu_open then
+		coord_t = nil
+		end
+
+	gfx.x = coord_t and coord_t.x or gfx.mouse_x
+	gfx.y = coord_t and coord_t.y or gfx.mouse_y
+
+	return gfx.showmenu(menu) -- menu string
+	
+	end
+	
+end
+-- USE:
+--[[
+::RELOAD::
+local retval = Reload_Menu_at_Same_Pos2(menu)
+	if retval and retval == xyz then -- returned menu item index other than 0
+-- 	DO STUFF
+	goto RELOAD
+	else return r.defer(function() do return end end)
+	end
+-- OR
+	if retval == 0 then return r.defer(function() do return end end) -- CRUCIAL TO PREVENT ENDLESS RELOAD LOOP
+	else
+		if retval == abc then
+		-- DO STUFF
+		elseif retval == xyz then
+		-- DO OTHER STUFF
+		end
+	goto RELOAD
+	end
+]]
+
+
+function Re_Store_Ext_State(section, key, persist, val) -- section & key args are strings, persist is boolean if false/nil global ext state is only stored for the duration of REAPER session, only relevant for storage stage; presence of val arg is anything which needs storage, determines whether the state is loaded or stored
+	if not val then
+	local ret, state = r.GetProjExtState(0, section, key)
+	local state = (not ret or #state == 0) and r.GetExtState(section, key) or state
+	return state
+	else
+	r.SetExtState(section, key, val, persist)
+	r.SetProjExtState(0, section, key, val)
+	end
+end
+
+-- USAGE:
+-- local state = Re_Store_Ext_State(section, key) -- load
+-- Re_Store_Ext_State(section, key, persist, val) -- store
+
+
+--------------------- T O G G L E S -------------------------
+
+-- (re)setting toggle state and updating toolbar button, see also Re_Set_Toggle_State() below
+local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
+
+r.SetToggleCommandState(sect_ID, cmd_ID, 1)
+r.RefreshToolbar(cmd_ID)
+
+-- CODE (mainly for defer functions)
+
+r.atexit(function() r.SetToggleCommandState(sect_ID, cmd_ID, 0); r.RefreshToolbar(cmd_ID) end)
+
+
+function EMERGENCY_TOGGLE()
+local t = {reaper.get_action_context()}
+reaper.SetToggleCommandState(t[3], t[4], 0)
+end
+---------------- EMERGENCY -------------------
+
+-- EMERGENCY_TOGGLE() do return end
+
+---------------------------------------------
+
+local function Wrapper1(func,...)
+-- wrapper for a 3d function with arguments
+-- to be used with defer() and atexit()
+-- thanks to Lokasenna, https://forums.cockos.com/showthread.php?t=218805 -- defer with args
+-- func is function name, the elipsis represents the list of function arguments
+-- Lokasenna's code didn't work because func(...) produced an error 
+-- " cannot use '...' outside a vararg function near '...' "
+-- without there being elipsis in function() as well, but gave direction;
+-- if original function has arguments they MUST be passed to the Wrapper() function 
+-- regardless of their scope (global or local); 
+-- if it doesn't, the upvalues must all be global and it doesn't matter 
+-- whether they're passed to the Wrapper() function
+local t = {...}
+return function() func(table.unpack(t)) end
+end
+-- USE:
+--[[
+function MY_FUNCTION(arg1, arg2)
+r.defer(Wrapper(MY_FUNCTION, arg1, arg2))
+end
+MY_FUNCTION(arg1, arg2)
+
+function My_Function(arg1, arg2, arg3) -- some routine -- end
+r.atexit(Wrapper(My_Function, arg1, arg2, arg3)
+]]
+
+
+
+local function Wrapper2(...) -- more wordy
+-- to be used with defer() and atexit()
+-- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
+local t = {...}
+local func = t[1] -- assign function name val
+table.remove(t,1) -- remove function name arg
+return function() func(table.unpack(t)) end
+end
+
+
+
+local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
+function Re_Set_Toggle_State(sect_ID, cmd_ID, toggle_state) -- in deferred scripts can be used to set the toggle state on start and then with r.atexit and At_Exit_Wrapper() to reset it on script termination
+r.SetToggleCommandState(sect_ID, cmd_ID, toggle_state)
+r.RefreshToolbar(cmd_ID)
+end
+-- USAGE:
+-- Re_Set_Toggle_State(sect_ID, cmd_ID, 1)
+-- defer routine
+-- r.atexit(At_Exit_Wrapper(Re_Set_Toggle_State, sect_ID, cmd_ID, 0))
+
+-- TOGGLE MODE AND ARMABILITY ARE NOT COMPATIBLE
+
+
+--------------------- T O G G L E S  E N D -------------------------
+
+-- STORE DEFERRED SCRIPT DATA -----------------------------------------------------------
+function defer_store()
+local is_new_value, fullpath, sectionID, cmdID, mode, resolution, val = reaper.get_action_context()
+-- Find first available slot
+local i = 1
+	repeat
+	local state = r.GetExtState(os.date('%x'), 'defer'..i)
+		if #state == 0 then break end
+	i = i+1
+	until #state == 0
+r.SetExtState(os.date('%x'), 'defer'..i, table.concat({sectionID, cmdID, fullpath:match('.+[\\/](.+)'), fullpath}, ';'), false)
+return i
+end
+
+local defer_data_slot = defer_store()
+
+-- EXTRACT STORED DEFERRED SCTIPT DATA
+local i = 1
+	repeat
+	local sectionID, cmdID, name, fullpath = r.GetExtState(os.date('%x'), 'defer'..i):match('(.+);(.+);(.+);(.+)')
+		if not sectionID then break end
+	i = i+1
+	until not sectionID
+
+-- DELETE STORED DEFERRED SCRIPT DATA
+r.atexit(r.DeleteExtState(os.date('%x'), 'defer'..defer_data_slot, true))
+
+--------------------------------------------------------------------------------------------------
+
+
+function Count_Proj_Tabs()
+local i = 0
+	repeat
+	local retval, projfn = r.EnumProjects(i)
+	i = retval and i+1 or i
+	until not retval
+return i
+end
+
+
+function Temp_Proj_Tab()
+-- relies on Create_Dummy_Project_File() if current tab isn't linked to a saved project
+local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer
+r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
+-- DO STUFF
+local dummy_proj = Create_Dummy_Project_File()
+r.Main_openProject('noprompt:'..projfn) -- open dummy proj in the newly open tab without save prompt
+r.Main_OnCommand(40860, 0) -- Close current (temp) project tab // save prompt won't appear either because nothing has changed in the dummy proj
+r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
+end
+
+
+function Close_Tab_Without_Save_Prompt()
+-- Close temp project tab without save prompt; when a freshly opened project closes there's no prompt
+local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer
+r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
+-- DO STUFF
+r.Main_openProject('noprompt:'..projfn) -- open the stored project in the temp tab
+r.Main_OnCommand(40860, 0) -- Close current project tab // won't generate a save prompt
+r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
+end
+
+
+
+
+function Is_Win()
+local OS = r.GetAppVersion()
+return not OS:match('/') or OS:match('/x')
+end
+
+
+function Get_OS()
+local OS = r.GetAppVersion()
+return (not OS:match('/') or OS:match('/x')) and 'win'
+or OS:match('OS') and 'mac' or OS:match('linux')
+-- OR
+-- local OS = r.GetOS()
+-- return OS:match('Win') or OS:match('OSX') and 'Mac' or 'Other'
+end
+
+
+
+function All_Proj_Change_Cnt() -- get proj change count accounting for all open projects // hardly necessary as changes are only registered in the active one
+local i = 0
+local count = 0
+	repeat
+	local retval, projfn = r.EnumProjects(i)
+	count = retval and count + r.GetProjectStateChangeCount(retval) or count
+	i = i+1
+	until not retval
+return count
+end
+
+
+function Bump_Proj_Change_Cnt() -- API functions seems to not update project change count, most of them anyway
+r.Main_OnCommand(41156,0) -- Options: Selecting one grouped item selects group
+r.Main_OnCommand(41156,0)
+end
+
+
+
+function PAUSE()
+do r.MB('PAUSE','PAUSE',0) return end
+end
+
+do r.MB('PAUSE','PAUSE',0) return end
+
+
+
+function EvaluateTAG(fx_name,TAG) 
+-- in FX/track/item/take/marker/region names
+return fx_name:match('^('..Esc(TAG)..')%s')
+or fx_name:match('%s('..Esc(TAG)..')%s') 
+or fx_name:match('%s('..Esc(TAG)..')$')
+or fx_name:match('^%s*'..Esc(TAG)..'%s*$') -- when the TAG is the whole name
+end
+TAG = TAG:match('[%w%p].+[%w%p]') or TAG:match('[%w%p]+') -- strip leading/trailing spaces, account for single character
+
 
 
 function is_tbl_or_ptr_or_fnc(obj)
@@ -13396,8 +13578,60 @@ return native, cust_act, sws_act, script
 end
 
 
+function Get_Armed_Action_Name(path, sep)
 
-function timed_tooltip(tooltip, x, y, time) -- local x, y = r.GetMousePosition()
+	local function script_exists(line, name)
+	-- how paths external to \Scripts folder may look on MacOS
+	-- https://github.com/Samelot/Reaper/blob/master/reaper-kb.ini
+	local f_path = line:match(esc(name)..' "(.+)"$') or line:match(esc(name)..' (.+)$') -- path either with or without spaces, in the former case it's enclosed within quotation marks
+	local f_path = f_path:match('^%u:') and f_path or path..sep..'Scripts'..sep..f_path -- full (starts with the drive letter and a colon) or relative file path; in reaper-kb.ini full path is stored when the script resides outside of the 'Scripts' folder of the REAPER instance being used // NOT SURE THE FULL PATH SYNTAX IS VALID ON OSs OTHER THAN WIN
+--	script_exists = r.file_exists(f_path)
+	return r.file_exists(f_path)
+	end
+
+local sws = r.APIExists('CF_GetCommandText')
+
+local sect_t = {['']=0,['MIDI Editor']=32060,['MIDI Event List Editor']=32061,
+				['MIDI Inline Editor']=32062,['Media Explorer']=32063}
+
+	if r.GetToggleCommandStateEx(0,40605) == 1 then -- Show action list // only if Action list window is open to force deliberate use of action notes and prevent accidents in case some action is already armed for other purposes
+	local cmd, section = r.GetArmedCommand() -- cmd is 0 when no armed action, empty string section is 'Main' section
+	r.ArmCommand(0, section) -- 0 unarm all
+		if cmd > 0 then
+		local named_cmd = r.ReverseNamedCommandLookup(cmd) -- if the cmd belongs to a native action or is 0 the return value is nil
+		local name, scr_exists, mess = false, true -- mess is nil // scr_exists is true by default to accomodate actions which can't be removed
+			if cmd > 0 and not named_cmd and not sws then -- native action is armed; without CF_GetCommandText() there's no way to retrieve native action name, only script and custom action names via reaper-kb.ini; without the sws extension cycle actions aren't available
+			mess = space(6)..'since the sws extension \n\n'..space(11)..'is not installed \n\n only non-cycle custom actions \n\n'..space(4)..'and scripts are supported'
+			elseif named_cmd and not sws then -- without CF_GetCommandText() there's no way to retrieve the sws extension action names, only custom actions and scripts from reaper-kb.ini; without the sws extension cycle actions aren't available anyway
+				for line in io.lines(path..sep..'reaper-kb.ini') do -- much quicker than using io.read() which freezes UI
+				name = line:match('ACT.-("'..esc(named_cmd)..'" ".-")') or line:match('SCR.-('..esc(named_cmd)..' ".-")') -- extract command ID and name
+					if name then
+						if line:match('SCR') then -- evaluate if script exists
+						scr_exists = script_exists(line, name)
+						end
+					name = name:gsub('Custom:', 'Script:', 1) -- make script data retrieved from reaper-kb.ini conform to the name returned by CF_GetCommandText() which prefixes the name with 'Script:' following their appearance in the Action list instead of 'Custom:' as they're prefixed in reaper-kb.ini file
+					break end
+				end
+			elseif cmd > 0 then -- sws extension is installed
+			name = cmd > 0 and (named_cmd or cmd)..' "'..r.CF_GetCommandText(sect_t[section], cmd)..'"' -- add quotes to match data being retrieved form reaper-kb.ini to simplify creation of section title // if script, returns name with prefix 'Script:' as they're listed in the Action list even though in reaper-kb.ini script names are prefixed with 'Custom:' just like custom action names
+				if name and name:match('Script') then
+				local scr_name = name:gsub('Script:', 'Custom:') -- evaluate if script exists having made a replacement to conform to the reaper-kb.ini syntax
+					for line in io.lines(path..sep..'reaper-kb.ini') do
+						if line:match(esc(scr_name)) then
+						scr_exists = script_exists(line, scr_name)
+						break end
+					end
+				end
+			end
+		return name, scr_exists, mess
+		end
+	end
+
+end
+
+
+
+function timed_tooltip1(tooltip, x, y, time) -- local x, y = r.GetMousePosition()
 -- sticks for the duration of time in sec if the script is run from a floating toolbar button
 -- so it's overrides button own tooltip which interferes
 
@@ -13422,7 +13656,7 @@ end
 
 
 
-function timed_tooltip(x,y) -- deferred, all used vars must be global and come from outside, 'start' in particular
+function timed_tooltip2(x,y) -- deferred, all used vars must be global and come from outside, 'start' in particular
 local x, y = r.GetMousePosition()
 	if r.time_precise - start < 1 -- 1 sec
 	then r.defer(timed_tooltip) end
@@ -13430,7 +13664,7 @@ r.TrackCtl_SetToolTip('TEXT', x, y, true) -- topmost is true; if x and y are tak
 end
 
 
-function Error_Tooltip2(text, caps, spaced, x2, y2)
+function Error_Tooltip1(text, caps, spaced, x2, y2)
 -- the tooltip sticks under the mouse within Arrange 
 -- but quickly disappears over the TCP, to make it stick 
 -- just a tad longer there it must be directly under the mouse
@@ -13512,25 +13746,6 @@ r.UpdateTimeline() -- might be needed because tooltip can sometimes affect graph
 end
 
 
-
-function Get_Mouse_Pos_Sec(want_over_arrange, want_snapping)
-
-	if want_over_arrange and not r.GetTrackFromPoint(r.GetMousePosition()) -- look for the mouse cursor pos // GetTrackFromPoint() prevents getting mouse position if the script is run from a toolbar or the Action list window floating over Arrange or if mouse cursor is outside of Arrange because in this case GetTrackFromPoint() returns nil; usually in this case the script should fall back on getting edit cursor position; this condition doesn't apply to mouse over a Mixer track
-	then return end
-
-local comm_id = want_snapping and 40513 -- View: Move edit cursor to mouse cursor
-or 40514 -- View: Move edit cursor to mouse cursor (no snapping)
-r.PreventUIRefresh(1)
-local cur_pos = r.GetCursorPosition() -- store current edit cur pos
-r.Main_OnCommand(comm_id,0)
-local mouse_pos = r.GetCursorPosition()
-r.SetEditCurPos(cur_pos, false, false) -- moveview, seekplay false // restore edit cur pos
-r.PreventUIRefresh(-1)
-return mouse_pos
-end
-
-
-
 function Center_Message_Text(mess, spaced) 
 -- to be used before Error_Tooltip()
 -- spaced is boolean, must be true if the same argument is true in Error_Tooltip()
@@ -13552,8 +13767,63 @@ end
 
 
 
+function Get_Mouse_Pos_Sec(want_over_arrange, want_snapping)
+
+	if want_over_arrange and not r.GetTrackFromPoint(r.GetMousePosition()) -- look for the mouse cursor pos // GetTrackFromPoint() prevents getting mouse position if the script is run from a toolbar or the Action list window floating over Arrange or if mouse cursor is outside of Arrange because in this case GetTrackFromPoint() returns nil; usually in this case the script should fall back on getting edit cursor position; this condition doesn't apply to mouse over a Mixer track
+	then return end
+
+local comm_id = want_snapping and 40513 -- View: Move edit cursor to mouse cursor
+or 40514 -- View: Move edit cursor to mouse cursor (no snapping)
+r.PreventUIRefresh(1)
+local cur_pos = r.GetCursorPosition() -- store current edit cur pos
+r.Main_OnCommand(comm_id,0)
+local mouse_pos = r.GetCursorPosition()
+r.SetEditCurPos(cur_pos, false, false) -- moveview, seekplay false // restore edit cur pos
+r.PreventUIRefresh(-1)
+return mouse_pos
+end
+
+
+function Get_Mouse_Time_Pos() -- isn't suitable for use during playback as it stops it (this seems wrong)
+local cur_pos_init = r.GetCursorPosition()
+r.Main_OnCommand(40514, 0) -- View: Move edit cursor to mouse cursor (no snapping)
+local cur_pos = r.GetCursorPosition()
+r.SetEditCurPos(cur_pos_init, false, false) -- moveview, seekplay false // restore orig edit curs pos
+return cur_pos
+end
+
+
+
+function Get_Mouse_TimeLine_Pos(zones_t)
+-- zones_t contains start and end time along X axis
+-- if zones_t arg is absent the function evaluates if mouse if over the TCP, otherwise if mouse is within a paricular zone on the Arrange time line
+-- r.GetTrackFromPoint() covers the entire track timeline hence isn't suitable for getting the TCP
+-- master track is supported
+local right_tcp = r.GetToggleCommandStateEx(0,42373) == 1 -- View: Show TCP on right side of arrange
+local curs_pos = r.GetCursorPosition() -- store current edit curs pos
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start, screen_x_end are 0 to get full arrange view coordinates // get time of the current Arrange scroll position to use to move the edit cursor away from the mouse cursor // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and end_time should be on the screen when non-zero when isSet is true // when the Arrange is scrolled all the way to the start the function ignores project start time offset and any offset start still treats as 0
+--local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
+r.PreventUIRefresh(1)
+local edge = right_tcp and start_time-5 or end_time+5
+r.SetEditCurPos(edge, false, false) -- moveview, seekplay false // to secure against a vanishing probablility of overlap between edit and mouse cursor positions in which case edit cursor won't move just like it won't if mouse cursor is over the TCP // +/-5 sec to move edit cursor beyond right/left edge of the Arrange view to be completely sure that it's far away from the mouse cursor // if start_time is 0 and there's negative project start offset the edit cursor is still moved to the very start, that is past 0, the function ignores negative start offset therefore is fully compatible with GetSet_ArrangeView2()
+r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping) // more sensitive than with snapping // works along the entire screen Y axis outside of the TCP regardless of whether the program window is under the mouse
+local new_cur_pos = r.GetCursorPosition()
+local target
+	if not zones_t then
+	target = new_cur_pos == edge or new_cur_pos == 0 -- if the TCP is on the right and the Arrange is scrolled all the way to the project start or close enough to it start_time-5 won't make the edit cursor move past the project start hence the 2nd condition, but it can move past the right edge
+	else
+	target = new_cur_pos >= zones_t.start and new_cur_pos <= zones_t.fin
+	end
+-- Restore orig. edit cursor pos
+r.SetEditCurPos(curs_pos, false, false) -- moveview, seekplay false // restore orig. edit curs pos
+r.PreventUIRefresh(-1)
+return target
+end
+
+
+
 function Get_Tooltip_Settings()
--- r.get_config_var_string() can be used instead
+-- r.get_config_var_string() can be used instead of io.open()
 -- Preferences -> Appearance - Appearance settings - Tooltips:
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
@@ -13616,7 +13886,7 @@ local timestamp = tonumber(r.GetExtState(cmd_ID, 'EXPIRY TIMER'))
 	r.SetExtState(cmd_ID, 'EXPIRY TIMER', r.time_precise(), false) -- persist false
 	elseif timestamp and threshold and r.time_precise()-timestamp >= threshold then -- this conditions greyed out Undo menu item after time has elapsed
 	r.DeleteExtState(cmd_ID, 'EXPIRY TIMER', true) -- persist true
-	Process_Undo(cmd_ID, true) -- clear_undo_data true
+	Process_Undo(cmd_ID, true) -- clear_undo_data true (used in BuyOne_Import metadata from media into the Project Render Metadata.lua)
 	return true
 	elseif not timestamp and threshold then
 	return true -- this conditions greyed out Undo menu item when the script hasn't been run yet and so the timer hasn't been set
@@ -13627,6 +13897,8 @@ Expiry_Timer(cmd_ID) -- store
 	if not Expiry_Timer(cmd_ID, 60) then -- 60 sec haven't elapsed
 	-- DO STAFF
 	end
+	-- OR
+	if Expiry_Timer(cmd_ID, 60) then return r.defer(no_undo) end
 ]]
 
 
@@ -13786,56 +14058,6 @@ end
 
 
 
-function Enum_RS5k_files(tr, fx_idx)
-local i = 0
-	repeat
-	local retval, name = r.TrackFX_GetNamedConfigParm(tr, fx_idx, "FILE"..i)
-	local name = name:match('.+[\\/](.+)')
-		if name then ... end -- if retval then .... end // ... means some operation
-	i = i + 1
-	until not retval or not name or name == ''
-end
-
-
-for key in pairs(reaper) do _G[key] = reaper[key] end  -- MPL: get rid of 'reaper.' table key in functions
-
-
-
-function Close_Tab_Without_Save_Prompt()
--- Close temp project tab without save prompt; when a freshly opened project closes there's no prompt
-local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer
-r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
--- DO STUFF
-r.Main_openProject('noprompt:'..projfn) -- open the stored project in the temp tab
-r.Main_OnCommand(40860, 0) -- Close current project tab // won't generate a save prompt
-r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
-end
-
-
-
-function All_Proj_Change_Cnt() -- get proj change count accounting for all open projects // hardly necessary as changes are only registered in the active one
-local i = 0
-local count = 0
-	repeat
-	local retval, projfn = r.EnumProjects(i)
-	count = retval and count + r.GetProjectStateChangeCount(retval) or count
-	i = i+1
-	until not retval
-return count
-end
-
-
-function Count_Proj_Tabs()
-local i = 0
-	repeat
-	local retval, projfn = r.EnumProjects(i)
-	i = retval and i+1 or i
-	until not retval
-return i
-end
-
-
-
 function GetPlayPosition3() -- using r.GetPlayPosition2() only when transport runs because the function runs independently of it
 -- https://forum.cockos.com/showthread.php?p=2617467
 -- https://forum.cockos.com/showthread.php?t=273086
@@ -13849,32 +14071,6 @@ local pos
 return pos
 end
 
-
-function Get_Mouse_TimeLine_Pos(zones_t)
--- zones_t contains start and end time along X axis
--- if zones_t arg is absent the function evaluates if mouse if over the TCP, otherwise if mouse is within a paricular zone on the Arrange time line
--- r.GetTrackFromPoint() covers the entire track timeline hence isn't suitable for getting the TCP
--- master track is supported
-local right_tcp = r.GetToggleCommandStateEx(0,42373) == 1 -- View: Show TCP on right side of arrange
-local curs_pos = r.GetCursorPosition() -- store current edit curs pos
-local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start, screen_x_end are 0 to get full arrange view coordinates // get time of the current Arrange scroll position to use to move the edit cursor away from the mouse cursor // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and end_time should be on the screen when non-zero when isSet is true // when the Arrange is scrolled all the way to the start the function ignores project start time offset and any offset start still treats as 0
---local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
-r.PreventUIRefresh(1)
-local edge = right_tcp and start_time-5 or end_time+5
-r.SetEditCurPos(edge, false, false) -- moveview, seekplay false // to secure against a vanishing probablility of overlap between edit and mouse cursor positions in which case edit cursor won't move just like it won't if mouse cursor is over the TCP // +/-5 sec to move edit cursor beyond right/left edge of the Arrange view to be completely sure that it's far away from the mouse cursor // if start_time is 0 and there's negative project start offset the edit cursor is still moved to the very start, that is past 0, the function ignores negative start offset therefore is fully compatible with GetSet_ArrangeView2()
-r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping) // more sensitive than with snapping // works along the entire screen Y axis outside of the TCP regardless of whether the program window is under the mouse
-local new_cur_pos = r.GetCursorPosition()
-local target
-	if not zones_t then
-	target = new_cur_pos == edge or new_cur_pos == 0 -- if the TCP is on the right and the Arrange is scrolled all the way to the project start or close enough to it start_time-5 won't make the edit cursor move past the project start hence the 2nd condition, but it can move past the right edge
-	else
-	target = new_cur_pos >= zones_t.start and new_cur_pos <= zones_t.fin
-	end
--- Restore orig. edit cursor pos
-r.SetEditCurPos(curs_pos, false, false) -- moveview, seekplay false // restore orig. edit curs pos
-r.PreventUIRefresh(-1)
-return target
-end
 
 
 function Is_Mouse_Over_Arrange1() -- SEE Is_Mouse_Over_Arrange2() for version without limitations AND a streamlined version Is_Mouse_Over_Arrange3()
@@ -14219,59 +14415,6 @@ return t
 end
 
 
-function Get_Armed_Action_Name(path, sep)
-
-	local function script_exists(line, name)
-	-- how paths external to \Scripts folder may look on MacOS
-	-- https://github.com/Samelot/Reaper/blob/master/reaper-kb.ini
-	local f_path = line:match(esc(name)..' "(.+)"$') or line:match(esc(name)..' (.+)$') -- path either with or without spaces, in the former case it's enclosed within quotation marks
-	local f_path = f_path:match('^%u:') and f_path or path..sep..'Scripts'..sep..f_path -- full (starts with the drive letter and a colon) or relative file path; in reaper-kb.ini full path is stored when the script resides outside of the 'Scripts' folder of the REAPER instance being used // NOT SURE THE FULL PATH SYNTAX IS VALID ON OSs OTHER THAN WIN
---	script_exists = r.file_exists(f_path)
-	return r.file_exists(f_path)
-	end
-
-local sws = r.APIExists('CF_GetCommandText')
-
-local sect_t = {['']=0,['MIDI Editor']=32060,['MIDI Event List Editor']=32061,
-				['MIDI Inline Editor']=32062,['Media Explorer']=32063}
-
-	if r.GetToggleCommandStateEx(0,40605) == 1 then -- Show action list // only if Action list window is open to force deliberate use of action notes and prevent accidents in case some action is already armed for other purposes
-	local cmd, section = r.GetArmedCommand() -- cmd is 0 when no armed action, empty string section is 'Main' section
-	r.ArmCommand(0, section) -- 0 unarm all
-		if cmd > 0 then
-		local named_cmd = r.ReverseNamedCommandLookup(cmd) -- if the cmd belongs to a native action or is 0 the return value is nil
-		local name, scr_exists, mess = false, true -- mess is nil // scr_exists is true by default to accomodate actions which can't be removed
-			if cmd > 0 and not named_cmd and not sws then -- native action is armed; without CF_GetCommandText() there's no way to retrieve native action name, only script and custom action names via reaper-kb.ini; without the sws extension cycle actions aren't available
-			mess = space(6)..'since the sws extension \n\n'..space(11)..'is not installed \n\n only non-cycle custom actions \n\n'..space(4)..'and scripts are supported'
-			elseif named_cmd and not sws then -- without CF_GetCommandText() there's no way to retrieve the sws extension action names, only custom actions and scripts from reaper-kb.ini; without the sws extension cycle actions aren't available anyway
-				for line in io.lines(path..sep..'reaper-kb.ini') do -- much quicker than using io.read() which freezes UI
-				name = line:match('ACT.-("'..esc(named_cmd)..'" ".-")') or line:match('SCR.-('..esc(named_cmd)..' ".-")') -- extract command ID and name
-					if name then
-						if line:match('SCR') then -- evaluate if script exists
-						scr_exists = script_exists(line, name)
-						end
-					name = name:gsub('Custom:', 'Script:', 1) -- make script data retrieved from reaper-kb.ini conform to the name returned by CF_GetCommandText() which prefixes the name with 'Script:' following their appearance in the Action list instead of 'Custom:' as they're prefixed in reaper-kb.ini file
-					break end
-				end
-			elseif cmd > 0 then -- sws extension is installed
-			name = cmd > 0 and (named_cmd or cmd)..' "'..r.CF_GetCommandText(sect_t[section], cmd)..'"' -- add quotes to match data being retrieved form reaper-kb.ini to simplify creation of section title // if script, returns name with prefix 'Script:' as they're listed in the Action list even though in reaper-kb.ini script names are prefixed with 'Custom:' just like custom action names
-				if name and name:match('Script') then
-				local scr_name = name:gsub('Script:', 'Custom:') -- evaluate if script exists having made a replacement to conform to the reaper-kb.ini syntax
-					for line in io.lines(path..sep..'reaper-kb.ini') do
-						if line:match(esc(scr_name)) then
-						scr_exists = script_exists(line, scr_name)
-						break end
-					end
-				end
-			end
-		return name, scr_exists, mess
-		end
-	end
-
-end
-
-
-
 function Un_Set_MW_Config_Flags(TCP, focused_fx, all_faders, TCP_faders) -- TCP and focused_fx are booleans, all_faders, TCP_faders are for restoration
 -- Preferences -> Editing behavior -> Mouse
 -- 'Ignore mousewheel on all faders'
@@ -14301,6 +14444,7 @@ function Get_Mousewheel_Mode()
 -- 'Ignore mousewheel on track panel faders'
 -- Thanks to Mespotine
 -- https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
+-- get_config_var_string() can be used instead of io.open()
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
@@ -14313,7 +14457,7 @@ end
 -- Can be used in defer functions to prevent script activity in project tabs other than the one it was launched under
 -- when the project is switched the script will terminate
 proj_init, projfn_init = r.EnumProjects(-1)
-function RUN()
+function RUN1()
 local proj, projfn = r.EnumProjects(-1)
 -- MAIN CODE
 --	if projfn == projfn_init then -- this won't work in tabs without saved project
@@ -14321,8 +14465,10 @@ local proj, projfn = r.EnumProjects(-1)
 	defer(RUN)
 	end
 end
+
+
 -- to keep the script running without execution
-function RUN()
+function RUN2()
 local proj, projfn = r.EnumProjects(-1)
 --	if projfn == projfn_init then -- this won't work in tabs without saved project
 	if proj == proj_init then
@@ -14330,6 +14476,8 @@ local proj, projfn = r.EnumProjects(-1)
 	end	
 defer(RUN)
 end
+
+
 -- to be able to run the script exclusively under the project it's been originally launched under and re-link it to another project by toggling Master track visibility in TCP, including to re-link automatically after the orig proj has been closed
 IGNORE_OTHER_PROJECTS = "1"
 IGNORE_OTHER_PROJECTS = #IGNORE_OTHER_PROJECTS:gsub(' ','') > 0
@@ -14362,17 +14510,6 @@ proj = IGNORE_OTHER_PROJECTS and r.EnumProjects(-1) ~= proj and Link_To_New_Proj
 	-- MAIN CODE
 	end
 defer(RUN)	
-end
-
-
-
-
-function Get_Mouse_Time_Pos() -- isn't suitable for use during playback as it stops it (this seems wrong)
-local cur_pos_init = r.GetCursorPosition()
-r.Main_OnCommand(40514, 0) -- View: Move edit cursor to mouse cursor (no snapping)
-local cur_pos = r.GetCursorPosition()
-r.SetEditCurPos(cur_pos_init, false, false) -- moveview, seekplay false // restore orig edit curs pos
-return cur_pos
 end
 
 
@@ -14529,6 +14666,7 @@ end
 
 --]]
 
+
 local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context()-- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // the function must be outside as it cannot work properly inside more than 1 user function, in which case val will be 0	
 function Mousewheel_Or_Shortcut(val)
 return val == math.abs(15), val == 63 -- mousewheel, shortcut
@@ -14561,15 +14699,6 @@ local hr = time_in_sec:sub(1,-#(':'..min..':'..sec..'.'..ms)-1) or ''
 return hr..sep..min..sep..sec..sep..ms -- to autofill the dialogue
 end
 
-
-
-function Is_Project_Start(time) -- for use with time selection / loop / edit cursor pos / item pos values to prevent them getting aligned with the project start and ruining their position relative to the grid when moving leftwards (the concept is used in scripts 'Move edit cursor left by one grid unit' and 'Scroll horizontally and;or move loop and;or time selection by user defined interval')
--- proj end cannot be reached by the cursor hence alignment with it isn't a problem
-local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0) -- isSet false // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
---local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
-local proj_offset_time = r.GetProjectTimeOffset(0, false) -- rndframe false
-return start_time == proj_offset_time
-end
 
 
 function Ad_Hoc_Setting()
@@ -14660,33 +14789,8 @@ end
 -- local enabled, time_sel, itms_full, tr_env, proj_mrk, rgn, time_sig_mrk, itm_horiz_move, itm_vert_move, itm_edges, itm_fade_vol_hand, loop_pts, take_env, stretch_mrk = Get_Lock_Settings2()
 
 
-
----- VALIDATE VARIABLES
-
-function validate_global_var(var_name, typ)
--- var_name is a string
--- typ is a string supported by the Lua type() function, optional
-local var = _G[var_name]
-return (not typ or typ and type(var) == typ) and var
-end
--- EXAMPLE
--- local func = validate_global_var('func_name', 'function') -- look for global function referenced as a string
-
--- validate local variable
--- https://stackoverflow.com/questions/2834579/print-all-local-variables-accessible-to-the-current-scope-in-lua
--- https://www.gammon.com.au/scripts/doc.php?lua=debug.getlocal
--- this loop must not be enclosed in a function otherwise only variables local to the function will be traversed
-local i = 1
-local var_name, typ, var = '', '' -- type in var name and type supported by the Lua type() function which is optional
-	repeat
-	local name, val = debug.getlocal(1, i) -- 1 is stack level
-		if name == var_name and (not typ or typ and type(val) == typ) then var = val break end
-	i = i+1
-	until not name
-
-
 -- amagalma breakpoint for debugging
-local function Break(msg) -- msg is a string
+function Break(msg) -- msg is a string
 -- https://forum.cockos.com/showthread.php?t=262893
 -- https://forum.cockos.com/showthread.php?p=2528121#post2528121
 local line = "Breakpoint at line " .. debug.getinfo(2).currentline
@@ -14709,7 +14813,7 @@ end
 
 --=================================== U T I L I T Y  E N D ======================================
 
---============================ C O N V E R T I O N S ==============================
+--============================ C O N V E R S I O N S ==============================
 
 -- BASE64 EN / DECODER
 
@@ -15017,11 +15121,11 @@ end
 -- https://gist.github.com/X-Raym/448e8afea7d91bce96b520ca12ddc698
 
 
---========================= C O N V E R T I O N S   E N D ===========================
+--========================= C O N V E R S I O N S   E N D ===========================
 
 
 
---===================================================================================
+--======== R E A S C R I P T  F U N C T I O N S  F O R  V A R I O U S  T A S K S =========
 
 
 -- Get take source
@@ -15325,8 +15429,711 @@ reaper.EnumProjects(-1) returns full path of the current proj as a 2nd value
 proj_full_path = select(2,r.EnumProjects(-1))
 
 
-===================================================================================
+--===================================================================================
 
 
 -- Detect undo
 
+--=============================== F U N C T I O N   L I S T =========================
+
+
+--[[
+
+**** M **** E **** N **** U ****
+
+U N D O
+
+	no_undo
+	undo_block
+	Force_MIDI_Undo_Point1
+	Force_MIDI_Undo_Point2
+	Force_RS5k_Undo_With_Closed_Chain
+	GetUndoSettings
+
+M A T H
+
+	is_integer
+	is_decimal
+	is_even
+	round1
+	round2
+	round3
+	round4
+	round
+	truncate_decimal
+	math.randomseed
+	Get_Closest_Prev_Whole_Multiple
+	Get_Closest_Multiple_Of_Divisor
+	nmb
+	split_integer_to_1s_and_10s
+	range_to_sequence
+	gener_numer_seq
+	mod
+	get_integral_1
+	get_integral_2
+	get_fractional_1
+	get_fractional_2
+	get_prev_multiple
+	get_base2_log
+	truncate_all_dec_places1
+	truncate_all_dec_places2
+	toBits1
+	toBits2
+	toBits3
+	count_bits_in_number
+	hex2dec
+
+
+S T R I N G S
+
+	str
+	space
+	Rep
+	Esc
+	literalize
+	replace
+	remove_all_bar_some
+	spaceout
+	starts_with
+	ends_with
+	strip_spaces
+	trunc_hanging_dec_zero
+	split_into_lines
+	split_into_multiple_lines
+	split_line_by_capture_count
+	Are_Multiple_Captures
+	count_captures
+	insert_string_at_specific_position1
+	insert_string_at_specific_position2
+	count_specific_chars
+	remove_Nth_capture
+	replace_Nth_capture1
+	remove_replace_Nth_capture
+	replace_Nth_capture2
+	replace_capture_by_capture_number1
+	replace_capture_by_capture_number2
+	replace_capture_by_capture_number3
+	replace_captures_with_table_vals1
+	replace_captures_with_table_vals2
+	re_store_identical_captures
+	list_2_table1
+	list_2_table2
+	get_index_from_range_or_list1
+	get_index_from_range_or_list2
+	validate_search_term1
+	validate_search_term2
+	Convert_Text_To_Menu
+	multibyte_str_len
+	utf8_len
+	utf8_chars_to_bytes
+	format_time
+	magiclines
+	hex
+
+
+T A B L E S
+
+	copy_array1
+	copy_array2
+	copy_table
+	reverse_indexed_table1
+	reverse_indexed_table2
+	reverse_indexed_table3
+	reverse_indexed_table4
+	James_Bradbury_reverse_table
+	filter_table_vals
+	filter_inplace1
+	filter_inplace2
+	sort_tableA_by_tableB
+	merge_2_arrays_at_index
+	merge_tables1
+	merge_tables2
+	merge_args_into_array
+	unpack_alt
+	shuffle_array
+	Randomize_Array
+	sort_notes_by_name
+	binary_search1
+	binary_search2
+	collect_numbers
+	construct_char_array
+
+
+M I D I
+
+	MIDIEditor_GetSetting_int
+	MIDI_GetCC
+	MIDI_GetTextSysexEvt
+	MIDI_InsertTextSysexEvt
+	Is_MIDI_Ed_Open
+	MIDIEditor_GetActiveAndVisible
+	Force_MIDI_Undo_Point1
+	Force_MIDI_Undo_Point2
+	Lane_Type_To_Event_Data
+	MIDI_Take_Open_Close
+	Clear_Restore_MIDI_Channel_Filter
+	are_notes_selected
+	Notes_Selected
+	selected_notes_exist
+	CC_Evts_Selected
+	Notes_CCEvts_Selected
+	Evts_Selected
+	All_Sel_CCEvts_Belong_To_Visble_OR_Last_Clicked_Lane
+	count_selected_notes
+	count_selected_events
+	find_first_next_note
+	Notes_Overlap_Ignored_Chords
+	Notes_Overlap_Respected_Chords
+	Correct_Overlapping_Notes1
+	Correct_Overlapping_Notes2
+	re_store_sel_MIDI_notes
+	Cursor_outside_pianoroll
+	Get_Mouse_Coordinates_MIDI
+	Get_Note_Under_Mouse
+	is_dotted
+	round_note
+	is_CC_Env_active
+	Get_Currently_Active_Chan_And_Filter_State1
+	Get_Currently_Active_Chan_And_Filter_State2
+	Ch_Filter_Enabled1
+	Ch_Filter_Enabled2
+	Get_Ch_Selected_In_Ch_Filter
+	Prompt_to_Enable_MIDI_Ch_Filter
+	Re_Store_Selected_CCEvents1
+	Re_Store_Selected_CCEvents2
+	Re_Store_Selected_CCEvents3
+	Get_Currently_Visible_CC_Lanes
+	Only_ReSelect_Evnts_In_Visble_CC_Lanes
+	Get_Visible_Lanes_With_Selected_Events
+	Get_CC_Lanes_With_Selected_Events
+	Delete_CC_Evts_From_Target_Lanes
+	Selected_Evnts_In_Visible_CC_Lanes
+	All_Sel_CCEvts_Belong_To_Visble_OR_Last_Clicked_Lane
+	Delete_Notes_In_MIDI_Channel
+	Delete_Notes
+	CC_Evts_Exist
+	Store_Insert_Notes_OR_Evts
+	Get_MIDI_Ed_Grid
+	Get_Track_MIDI_Note_Names
+	Get_Default_MIDI_Chan
+	Re_Store_MIDI_Editor_Mode
+
+
+(R E) S T O R E
+
+	StoreSelectedObjects
+	Restore_Saved_Selected_Objects
+	Restore_Saved_Selected_Objects
+	Re_Store_Selected_Objects
+	re_store_sel_trks
+	ReStoreSelectedItems
+	re_store_obj_selection
+	
+	
+O B J E C T S
+	
+	Find_And_Get_New_Objects
+	Get_Object_Under_Mouse_Curs
+	GetObjInfo_Value
+	SetObjInfo_Value
+	GetSetObjInfo_String
+	GetObjAllInfo_Values
+	Get_Obj_By_GUID1
+	Get_Obj_By_GUID2
+	
+
+T R A C K S
+
+	Get_TCP_Under_Mouse
+	Track_Visible_In_Arrange_Or_Mixer
+	Get_Track_At_Mouse_Cursor_Y
+	collapse_TCP1
+	collapse_TCP2
+	Deselect_All_Tracks1
+	Deselect_All_Tracks2
+	Track_Controls_Locked
+	Collect_Snd_Data
+	GetSetTrackSendInfo_Value
+	Preserve_TCP_Heights_When_Bot_Dock_Open
+	Re_Store_Track_Heights_Selection_x_Scroll
+	Temp_Track_For_FX
+	Insert_Temp_Track
+	Get_Vis_TCP_Tracklist_Length_px_X_Topmost_Track
+	Scroll_Track_To_Top1
+	Scroll_Track_To_Top2
+	Scroll_Track_To_Bottom
+	Scroll_Track_Into_View
+	Un_Collapse_All_Tracks_Temporarily
+	Create_Buss_Track
+	Find_And_Get_New_Tracks
+	Get_Track_Minimum_Height1
+	Get_Track_Minimum_Height2
+	Reverse_Track_Order
+	Remove_Track_From_All_Groups
+	Remove_Track_Roles_From_All_Groups
+	Is_TrackList_Hidden
+	Parse_Razor_Edit_Data
+	Collect_Razor_Edit_Areas
+	Update_Track_MIDI_Note_Names
+	Get_Track_MIDI_Note_Names
+	GetTrackState
+	Is_Send_Dest_Track
+	Is_Recv_Src_Track
+	Remove_Track_Receives
+	Get_Track_MIDI_Send_Recv_Channels
+	Set_Track_MIDI_Send_Recv_Channels
+
+
+F O L D E R S
+
+	Count_And_Store_Children
+	Are_All_Children_Selected
+	Count_And_Store_Siblings
+	Are_All_Siblings_Selected
+	Get_Folder_First_Track
+	Get_Folder_Last_Track
+	Get_All_Track_Parents
+	Get_Topmost_Uncollapsed_TCP_Parent
+	get_last_uncollapsed_parent
+	Find_Last_Uncollapsed_MCP_Parent
+	Get_Parent_Of_MCP_First_Uncollapsed_Folder1
+	Get_Parent_Of_MCP_First_Uncollapsed_Folder2
+	Get_All_Children
+	Is_TCP_MCP_Collapsed
+	Dismantle_FolderOrSubfolder
+	Track_Is_Vis_And_Child_Of_Collapsed_MCP_Folder
+	Track_Is_Vis_And_Child_Of_Collapsed_TCP_Folder
+	Track_Is_Child_Of_Collapsed_Folder1
+	Track_Is_Child_Of_Collapsed_Folder
+	Track_Is_Vis_And_Child_Of_Collapsed_Folder
+	All_Parent_Folders_Uncollapsed
+
+
+E N V E L O P E S
+
+	Is_Valid_Envelope
+	Is_Env_Visible
+	Set_Env_In_Visible
+	Is_Env_Bypassed
+	Delete_Env
+	Get_Env_GUID
+	Get_Vis_Env_GUID
+	Re_Store_Env_Selection
+	Manipulate_Envelope_With_Actions
+	Count_FX_Envelopes
+	Get_Env_Point_At_Time
+	Count_Sel_Points
+	Get_FX_Env_Src_Parameter
+	Get_Take_Pitch_Env_Snap
+	Get_Vol_Env_Range
+	Is_Track_FX_Envelope
+	Is_Track_Or_Take_Env
+	Is_Selected_Track_Or_Take_Env
+	FX_Or_Native_Envelope
+	Envelopes_Locked
+	Deselect_All_Env_Points
+	Get_Env_Segment_At_Cursor
+	Get_Env_Custom_Colors
+	Check_env_scaling
+
+
+A U T O M A T I O N  I T E M S
+
+	UnTrim_AutomItem_LeftEdge
+	Trim_AutomItem_LeftEdge
+	Delete_AutomItem
+	Split_AutomItem
+	Re_Store_Sel_AIs1
+	Re_Store_Sel_AIs2
+	Deselect_Selected_AIs
+	Get_Sel_AI_St_And_End
+	Delete_Or_Unpool_Selected_AI
+	RESOLVE_AI_OVERLAPS
+	Get_AI_At_Mouse_Cursor
+	Deselect_Points_In_Env_All_AIs1
+	Deselect_Points_In_Env_All_AIs2
+	Get_Props_Of_AI_Intersecting_Cur_Pos
+	Get_Props_Of_AI_Overlapping_Env_Pt
+	Get_AI_Env_Segment_At_Cursor
+
+
+C H U N K
+
+	GetObjChunk1
+	GetObjChunk2
+	Err_mess
+	SetObjChunk1
+	SetObjChunk2
+	Replace_GUIDs_in_Chunk
+
+
+R A Z O R  E D I T
+
+	Re_Store_Razor_Edit_Areas
+	Parse_Razor_Edit_Data
+	Collect_Raz_Edit_Data
+	Find_And_Remove_Raz_Edit_Overlaps
+
+	
+F X
+
+	Summary of native FX selection functions
+	GetMonFXProps
+	GetFocusedFX1
+	GetFocusedFX2
+	GetOrigFXName
+	Get_Focused_FX_Orig_Name
+	Retrieve_Orig_Plugin_Names
+	Get_FX_Chain_Chunk
+	Get_FX_Chunk
+	Collect_VideoProc_Instances
+	Collect_VST3_Instances
+	Collect_FX_Preset_Names
+	Re_Store_Plugin_Settings
+	Select_FX_UI_in_FXChain
+	GetLastTouchedFX1
+	GetLastTouchedFX2
+	Collect_FX_Output_Data
+	Is_TrackFX_Open
+	Count_FX
+	Get_FX_Env_Src_Parameter
+	Get_FX_Type
+	Is_Same_Plugin
+	Check_FX_In_Focused_FX_Chain
+	Check_If_FX_Selected_In_FX_Browser1
+	Check_If_FX_Selected_In_FX_Browser2
+	Check_Selected_FX
+	Re_Store_Float_FX_Wnds
+	Re_Store_FX_Windows_Visibility
+	FX_Has_Envelopes
+	TrackFX_GetRecChainVisible1
+	TrackFX_GetRecChainVisible2
+	FX_Exists
+	Enum_RS5k_files
+	Force_RS5k_Undo_With_Closed_Chain
+	Get_FX_Selected_In_FX_Chain
+	Apply_FX_Chain
+	Process_FX_Incl_In_All_Containers
+	Collect_All_Container_FX_Indices
+	Loop_Over_FX_Container_Table
+	Get_FX_Parm_Orig_Name
+	Validate_FX_Identity
+
+
+I T E M S
+
+	Get_Item_By_Take_GUID
+	Re_Store_Options_Togg_States
+	Toggle_Item_Selection
+	Display_Item_Name
+	Rename_Item_Take_Src_File1
+	Rename_Item_Take_Src_File2
+	Delete_Take_Src
+	Count_Track_Sel_Items1
+	Count_Track_Sel_Items2
+	Get_Folder_Rightmost_Item_RightEdge
+	Generate_Consistent_IID_Sequence
+	Are_There_Overlapping_Itms
+	Are_Itms_Overlapping
+	Are_Two_Items_Overlapping
+	Count_Selected_Overlapping_Itms
+	Get_Outermost_Overlapping_Item
+	Overlapping_Itms_Props
+	Are_Itms_Overlapping_Selected_Collapsed
+	Are_Overlapping_Itm_Lanes_Collapsed
+	Shift_Overlapping_Items_Together
+	Count_Sel_Itms_Unique_Tracks
+	Get_Item_Greatest_And_1st_Availab_Group_IDs1
+	Get_Item_Greatest_And_1st_Availab_Group_IDs2
+	Insert_Empty_Item_To_Display_Text1
+	Insert_Empty_Item_To_Display_Text2
+	Get_Item_Edge_At_Mouse
+	Get_Sel_Items_St_And_End
+	Is_Same_Items_Track
+	REVERSE_TAKES_VIA_CHUNK
+	Get_Arrange_and_Header_Heights1
+	Get_Arrange_and_Header_Heights2
+	Get_Item_Track_Segment_At_Mouse
+	Proj_Time_2_Item_Time
+	Item_Time_2_Proj_Time
+	ApplyNudge scenarios
+	Fades_Exist
+	Get_Take_Src_Props
+	Select_Items_With_Same_Src_Media
+	Audio_Or_MIDI_Takes
+	Get_Src_Orig_Length
+	Is_Take_Source_Trimmed
+	Create_Take_Source_Section
+	Get_Take_Phase
+	MPL_Set_Startoffs_With_Stretch_Mrkrs
+	Re_Store_Apply_Stretch_Markers
+	Find_And_Get_New_Items
+	Is_Item_Looped_In_Arrange
+	Import_Item_To_RS5k
+	Is_Item_Under_Mouse
+	Is_Item_Under_Mouse_Locked
+
+
+C O L O R
+
+	Validate_HEX_Color_Setting1
+	Validate_HEX_Color_Setting2
+	hex2rgb
+	FTC_HexToNormRGB
+	rgb2hex
+	RANDOM_RGB_COLOR
+	Generate_Random_Color_Val
+	zaibuyidao_RGBHexToDec
+	randomize_color
+	rgb2num
+	num2rgb
+	RGB_To_From_Integer1
+	RGB_To_From_Integer2
+	RGB_To_Normalized
+	Split_Integer_To_RGB_And_Combine
+	Extract_Object_Color
+
+
+C L O S U R E S
+
+	LoopOverSelectedItems
+	return_captures
+	gmatch_alt
+
+
+M A R K E R S  &  R E G I O N S
+
+	is_region_within_time_sel
+	get_region_at_edit_or_mouse_cursor
+	GetRegionAtCursor
+	Get_Marker_Reg_At_Mouse_Or_EditCursor
+	Get_Marker_Reg_In_Time_Sel
+	Store_Delete_Restore_Proj_Markers
+	Store_Delete_Restore_Proj_Markers
+	Store_Delete_Restore_Proj_Mark_Regions
+	lexaproductions_Region_IsSelected
+	Get_First_MarkerOrRgn_After_Time
+	Find_Next_MrkrOrRgn_By_Name
+	Monitor_MrkrsOrRgns
+	Take_Marker_Exists
+	Get_Mrkr_Region_Default_Color
+	Get_Take_Mrkr_Default_Color
+	Get_Action_Marker_Data
+
+
+G F X
+
+	GFX_SETFONT_FLAGS
+	Prevent_Floating_Window_Resize1
+	Prevent_Floating_Window_Resize2
+	gfx_drawstring
+	Get_Store_GFX_Wnd_Dock_State
+	Get_Store_GFX_Wnd_Coordinates
+
+
+W I N D O W S
+
+	Loka_Window_At_Mouse
+	Loka_Window_At_Center
+	SWS_wnd_open
+	SWS_wnd_data
+	Get_Mixer_Wnd_Dock_State
+	Detect_Docker_Pane_Change
+	Get_Mixer_Width
+	GetTCP_Width
+	Re_Store_Windows_Props_By_Names1
+	Re_Store_Windows_Props_By_Names2
+	Re_Store_Windows_Props_By_Names_And_Handles1
+	Re_Store_Windows_Props_By_Names_And_Handles2
+	Window_Is_Visible
+	Exclude_Visible_Windows
+	Move_Window_To_Another_Dock
+	Get_Arrange_Dims
+	JS_Window_IsVisible
+	Find_Window_SWS
+	Activate_Context
+
+
+F I L E S
+
+	get_script_path
+	get_package_path_for_require
+	Get_Script
+	set_script_instances_mode
+	Parse_Script_Name1
+	Parse_Script_Name2
+	Parse_Script_Name3
+	Invalid_Script_Name1
+	Invalid_Script_Name2
+	Invalid_Script_Name3
+	Dir_Exists1
+	Dir_Exists2
+	File_Exists
+	Validate_Folder_Path
+	print_or_write_to_file
+	ScanPath1
+	ScanPath2
+	scandir
+	Count_Files_In_Folder
+	Remove_Peak_Files
+	get_file_timestamp1
+	get_file_timestamp2
+	get_file_timestamp3
+	get_file_timestamp4
+	open_dir_in_file_browser
+	delete_string_from_file
+	Read_Lines
+	get_ini_file_path
+	get_proj_path
+	get_proj_title
+	get_ini_cont
+	Check_reaper_ini
+	Extract_reaper_ini_val
+	Get_File_Cont
+	Create_Dummy_Project_File
+	META_Spawn_Scripts
+	GetActionCommandIDByFilename
+	Get_Set_Script_Cont
+	Get_File_Size
+	Script_Is_Installed
+	Parse_ReaBank_File
+	Get_CommID_By_Script_Name
+
+
+M E A S U R E M E N T S / C A L C U L A T I O N S
+
+	Get_Vis_Arrange_Len_In_Pixels
+	Get_Proj_Len_In_Px
+	Beat_To_Pixels
+	Grid_Div_Dur_In_Sec
+	Music_Div_To_Sec
+	Music_Div_To_Pixels
+	Scale_Time_By_Horiz_Zoom_Level
+	frames2ms
+	frames2sec
+	time_pos_to_pixels
+	pixel_to_sec
+	Horiz_Scroll_Distance
+	Get_Screen_Dims
+	Calc_New_Vol_Value
+	DbToVal
+	ValToDb
+	dBFromVal
+	ValFromdB
+	WDL_DB2VAL
+	WDL_VAL2DB
+	Adjust_Velocity_By_dB
+	Measure_Note_In_Ms
+	Offset_Shift_Value_To_Land_On_Natural_Keys1
+	Offset_Shift_Value_To_Land_On_Natural_Keys2
+
+
+U T I L I T Y
+
+	Msg
+	printf
+	Is_Project_Start
+	Validate_Positive_Integer
+	is_set
+	validate_sett
+	validate_multi_line_sett
+	validate_settings1
+	validate_settings2
+	validate_settings3
+	validate_global_var
+	Validate_All_Global_Settings
+	validate_output1
+	validate_output2
+	Get_Action_ID
+	do_in_X_mins
+	ACT1
+	ACT2
+	ACT3
+	ACT4
+	get_tog_state
+	capture_command
+	Script_Not_Enabled
+	Reminder_Off
+	Show_Menu_Dialogue
+	Reload_Menu_at_Same_Pos1
+	Reload_Menu_at_Same_Pos2
+	Re_Store_Ext_State
+	EMERGENCY_TOGGLE
+	Wrapper1
+	Wrapper2
+	Re_Set_Toggle_State
+	defer_store
+	Count_Proj_Tabs
+	Temp_Proj_Tab
+	Close_Tab_Without_Save_Prompt
+	Is_Win
+	Get_OS
+	All_Proj_Change_Cnt
+	Bump_Proj_Change_Cnt
+	PAUSE
+	EvaluateTAG
+	is_tbl_or_ptr_or_fnc
+	GetUserInputs
+	Get_Type_Of_Action
+	Get_Armed_Action_Name
+	timed_tooltip1
+	timed_tooltip2
+	Error_Tooltip1
+	Error_Tooltip2
+	Error_Tooltip3
+	Center_Message_Text
+	Get_Mouse_Pos_Sec
+	Get_Mouse_Time_Pos
+	Get_Mouse_TimeLine_Pos
+	Get_Tooltip_Settings
+	Keep_ExtState_For_X_Mins1
+	Keep_ExtState_For_X_Mins2
+	Expiry_Timer
+	Set_Get_Delete_ExtState_Series
+	WAIT
+	Archie_WAIT
+	REAPER_Ver_Check1
+	REAPER_Ver_Check2
+	REAPER_Ver_Check3
+	how_recently_the_project_was_saved
+	Time_Sel_Or_Loop_Exist
+	Is_Ctrl_And_Shift
+	GetPlayPosition3
+	Is_Mouse_Over_Arrange1
+	Is_Mouse_Over_Arrange2
+	Is_Mouse_Over_Arrange3
+	Get_Cursor_Contexts
+	GetRulerTimeUnit
+	GetTransportTimeUnit
+	Un_Set_MW_Config_Flags
+	Get_Mousewheel_Mode
+	RUN1
+	RUN2
+	Link_To_New_Project
+	Note_Format_Check
+	Custom_Horiz_Scroll
+	Mouse_Wheel_Direction
+	Process_Mouse_Wheel_Direction1
+	Process_Mouse_Wheel_Direction2
+	Process_Mousewheel_Sensitivity
+	Mousewheel_Or_Shortcut
+	format_time_given_in_sec
+	Time_in_Sec_to_List
+	Ad_Hoc_Setting
+	Get_Lock_Settings1
+	Get_Lock_Settings2
+	Break
+	J_Reverb_randomizer
+
+
+C O N V E R S I O N S
+
+	Mespotine_Base64_Encoder
+	Mespotine_Base64_Decoder
+	codepoint_to_utf8
+	map_unicode_to_1252
+	string.fromutf8
+	string.toutf8
+	FromUTF8
+
+]]
