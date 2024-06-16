@@ -54,8 +54,6 @@ R E A S C R I P T  F U N C T I O N S  F O R  V A R I O U S  T A S K S
 
 F U N C T I O N   L I S T
 
-
-
 ]]
 
 
