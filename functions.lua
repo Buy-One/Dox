@@ -583,7 +583,10 @@ end
 function strip_spaces(str) -- keeps chars and punctuation, strips leading and trailing spaces and control chars
 --return str:match('[%w%p]?.*[%w%p]*') -- accommodating both mutlti- and single char string
 return str:match('^%s*(.-)%s*$') -- seems more reliable
+-- OR
+-- return str:match('(%S.-)%s*$')
 end
+
 
 
 function trunc_hanging_dec_zero(num) 
@@ -3995,6 +3998,7 @@ return t
 end
 
 
+
 function GetSetTrackSendInfo_Value(tr, cat, send_idx, param, val) -- param is a string, last two args are for setting
 	if not param or not val then
 	local t = {B_MUTE = 0, B_PHASE = 0, B_MONO = 0, D_VOL = 0, D_PAN = 0, D_PANLAW = 0, I_SENDMODE = 0, I_AUTOMODE = 0, I_SRCCHAN = 0, I_DSTCHAN = 0, I_MIDIFLAGS = 0, P_DESTTRACK = 0, P_SRCTRACK = 0, ['P_ENV:<VOLENV'] = 0, ['P_ENV:<PANENV'] = 0, ['P_ENV:<MUTEENV'] = 0}
@@ -4074,6 +4078,7 @@ function Re_Store_Track_Heights_Selection_x_Scroll(t, ref_tr_y) -- scroll state 
 end
 
 
+
 function Temp_Track_For_FX(obj, fx_idx, take_GUID)
 -- instead of using take_GUID to condition selection of take related function use
 -- local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
@@ -4102,6 +4107,7 @@ return -- STUFF
 end
 
 
+
 function Insert_Temp_Track(want_midi_editor, tr_name)
 
 r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
@@ -4124,6 +4130,41 @@ r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINMIXER', 0) -- hide in Mixer
 	
 r.DeleteTrack(temp_tr)
 	
+end
+
+
+
+
+function Insert_Delete_Temp_Track(obj, input_fx, temp_tr)
+-- the function was meant to be used for copying FX over to the temp track
+-- and processing them there to prevent affecting their settings on the original object
+-- input_fx is boolean to modify fx indices
+
+	if not temp_tr then
+	r.PreventUIRefresh(1)
+	r.InsertTrackAtIndex(r.GetNumTracks(), false) -- insert new track at end of track list and hide it; action 40702 creates undo point
+	local temp_tr = r.GetTrack(0,r.CountTracks(0)-1)
+	r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINMIXER', 0) -- hide in Mixer
+	r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINTCP', 0) -- hide in Arrange
+
+	local countFX, copyFX = table.unpack(r.ValidatePtr(obj, 'MediaItem_Take*')
+	and {r.TakeFX_GetCount, r.TakeFX_CopyToTrack}
+	or r.ValidatePtr(obj, 'MediaTrack*')
+	and {input_fx and r.TrackFX_GetRecCount or r.TrackFX_GetCount, r.TrackFX_CopyToTrack} or {})
+
+		if countFX then
+			for i=0, countFX(obj)-1 do
+			local src_fx_idx = input_fx and i+0x1000000 or i
+			copyFX(obj, src_fx_idx, temp_tr, i, false) -- is_move false
+			end
+		r.PreventUIRefresh(-1)
+		return temp_tr
+		end
+
+	else
+	r.DeleteTrack(temp_tr)
+	end
+
 end
 
 
@@ -7094,6 +7135,7 @@ return fx_chain_chunk
 end
 
 
+
 function Get_FX_Chunk(obj, obj_chunk, fx_idx, take_idx) -- obj is track or item pointer; if no take_idx arg is supplied, the active take will be used // for track input FX and Mon FX fx_idx argument must look like fx_idx+0x1000000 or fx_idx+16777216; relies on Esc() function
 -- since REAPER 7 'WAK 0 0' may be followed by PARALLEL 1 or PARALLEL 2 if 'Run selected FX in parallel with previous FX' or 'Run selected FX in parallel with previous FX (merge MIDI)' options are enabled respectively
 -- due to introduction of FX containers in REAPER 7 'WAK 0 0' and 'PARALLEL X' tokens can be found in FX container chunk and the function may return incomlete chunk not having reached the end of the chain
@@ -7125,14 +7167,48 @@ return prev_fx_GUID and target_fx_GUID and obj_chunk:match(FXCHAINSEC..'\n.-'..E
 end
 
 
+
+function Exclude_FX_Containers_From_Chunk(chunk)
+-- leaves behind last lines not enclosed within closures
+--[[
+FLOATPOS 0 0 0 0
+FXID {AEA25FBD-59F3-44A2-A727-28381E97FE24}
+WAK 0 0
+PARALLEL 1
+]]
+
+local opening_cnt, found = 0
+local chunk_t = {}
+	for line in chunk:gmatch('[^\n\r]+') do
+		if line:match('^<CONTAINER') then
+		found = 1
+		opening_cnt = opening_cnt+1
+		chunk_t[#chunk_t+1] = '<CONTAINER>' -- this is useful for accurate count of plugin indices via chunk with Collect_VideoProc_Instances() and Collect_VST3_Instances() below
+		elseif found then
+		opening_cnt = line:match('^<') and opening_cnt+1 or line:match('^>$') and opening_cnt-1 or opening_cnt
+			if opening_cnt == 0 then found = nil end
+		else
+		chunk_t[#chunk_t+1] = line
+		end			
+	end
+return table.concat(chunk_t, '\n')
+end
+
+
+
 function Collect_VideoProc_Instances(fx_chain_chunk) -- fx chain chunk is obtained with Get_FX_Chain_Chunk()
+-- to accurately count fx indices in fx chain
+-- fx container data must be excluded from the chunk using Exclude_FX_Containers_From_Chunk(), see above
 
 local video_proc_t = {} -- collect indices of video processor instances, because detection by fx name is unreliable as not all its preset names contain 'video processor' phrase due to length
 local counter = 0 -- to store indices of video processor instances
 
 	if fx_chunk and #fx_chunk > 0 then
 		for line in fx_chunk:gmatch('[^\n\r]*') do -- all fx must be taken into account for video proc indices to be accurate
-		local plug = line:match('<VST') or line:match('<AU') or line:match('<JS') or line:match('<DX') or line:match('<LV2') or line:match('<VIDEO_EFFECT')
+		local plug = line:match('<VST') or line:match('<AU') 
+		or line:match('<JS') or line:match('<DX') 
+		or line:match('<LV2') or line:match('<CLAP')
+		or line:match('<VIDEO_EFFECT') or line:match('<CONTAINER')
 			if plug then
 				if plug == '<VIDEO_EFFECT' then
 				video_proc_t[counter] = '' -- dummy value as we only need indices
@@ -7148,7 +7224,9 @@ end
 
 
 
-function Collect_VST3_Instances(fx_chain_chunk) -- -- fx chain chunk is obtained with Get_FX_Chain_Chunk()// replicates Collect_VideoProc_Instances()
+function Collect_VST3_Instances(fx_chain_chunk) -- fx chain chunk is obtained with Get_FX_Chain_Chunk()// replicates Collect_VideoProc_Instances()
+-- to accurately count fx indices in fx chain
+-- fx container data must be excluded from the chunk using Exclude_FX_Containers_From_Chunk(), see above
 
 -- required to get hold of .vstpreset file names stored in the plugin dedicated folder and list those in the menu
 
@@ -7159,7 +7237,10 @@ local counter = 0 -- to store indices of vst3 plugin instances
 
 	if fx_chunk and #fx_chunk > 0 then
 		for line in fx_chunk:gmatch('[^\n\r]*') do -- all fx must be taken into account for vst3 plugin indices to be accurate
-		local plug = line:match('<VST') or line:match('<AU') or line:match('<JS') or line:match('<DX') or line:match('<LV2') or line:match('<VIDEO_EFFECT')
+		local plug = line:match('<VST') or line:match('<AU') 
+		or line:match('<JS') or line:match('<DX') 
+		or line:match('<LV2') or line:match('<CLAP')
+		or line:match('<VIDEO_EFFECT') or line:match('<CONTAINER')
 			if plug then
 				if line:match('VST3') then
 				vst3_t[counter] = '' -- dummy value as we only need indices
@@ -7172,6 +7253,7 @@ local counter = 0 -- to store indices of vst3 plugin instances
 return vst3_t
 
 end
+
 
 
 function Collect_FX_Preset_Names(obj, src_fx_cnt, src_fx_idx, pres_cnt)
@@ -7218,8 +7300,8 @@ r.PreventUIRefresh(-1)
 end
 
 
-local _, scr_name, scr_sect_ID, cmd_ID, _,_,_ = r.get_action_context()
 
+local _, scr_name, scr_sect_ID, cmd_ID, _,_,_ = r.get_action_context()
 
 function Re_Store_Plugin_Settings(obj, fx_idx, t, scr_cmd_ID) -- scr_cmd_ID is obtained with r.get_action_context()
 -- if applied to focused fx then fx_idx must be obtained from custom GetFocusedFX2() function
@@ -7261,6 +7343,7 @@ local parm_list = r.GetExtState(scr_cmd_ID, 'PARM_LIST')
 end
 
 
+
 function Select_FX_UI_in_FXChain(object, take_idx, fx_idx, want_input_mon_fx)
 -- mainly keeping FX chain closed, but if it's open keeps it open
 -- another method of doing that is via chunk, won't work for Monitor FX as from chunk they
@@ -7289,6 +7372,7 @@ local item = r.ValidatePtr(object, ' MediaItem*')
 end
 
 
+
 function GetLastTouchedFX1() -- means last even if no longer focused // Mon FX aren't supported by the API function
 -- Returns true if the last touched FX parameter is valid, false otherwise.
 -- Always returns true as long as FX was touched at least once during a session and that FX is still present, unless the edit cursor is over an item or a TCP
@@ -7310,8 +7394,9 @@ local take_num = item and src_fx_num>>16 -- high word (16 bits out of 32) right 
 local take = item and r.GetTake(item, take_num)
 return is_last_touched, track_num-1, tr, item_num-1, item, take_num, take, fx_num, src_param_num -- indices are 0 based; track_num = -1 means Master; item_num = -1 or take_num or take = false means not take FX
 end
+-- EXAMPLE:
+-- is_last_touched, track_num, tr, item_num, item, take_num, take, fx_num, parm_num = GetLastTouchedFX()
 
-is_last_touched, track_num, tr, item_num, item, take_num, take, fx_num, parm_num = GetLastTouchedFX() -- example
 
 
 function GetLastTouchedFX2() -- DOESN'T SUPPORT Monitoring FX since native GetLastTouchedFX() doesn't support them
@@ -7337,8 +7422,9 @@ local is_last_touched, tr_bitfield, fx_bitfield, parm_idx = r.GetLastTouchedFX()
 	end
 
 end
+-- EXAMPLE:
+-- is_last_touched, tr_idx, tr, item_idx, item, take_idx, take, fx_idx, parm_idx = GetLastTouchedFX()
 
-is_last_touched, tr_idx, tr, item_idx, item, take_idx, take, fx_idx, parm_idx = GetLastTouchedFX() -- example
 
 
 function Collect_FX_Output_Data(tr) -- fx index and output channels // blueprint of dealing with output channels
@@ -7384,6 +7470,7 @@ return t, rs5k_cnt
 end
 
 
+
 function Is_TrackFX_Open(obj, fx_index) -- open in the fx chain and in a floating window
 local tr = r.ValidatePtr(obj, 'MediaTrack*')
 local take = r.ValidatePtr(obj, 'MediaItem_Take*')
@@ -7406,6 +7493,7 @@ return GetOpen(obj, fx_index), GetFloatingWindow(obj,fx_index)
 	end
 	]]
 end
+
 
 
 function Count_FX(sel_trk_cnt, sel_itms_cnt)
@@ -7459,72 +7547,19 @@ local obj = take or tr
 end
 
 
+
 function Get_FX_Type(obj, fx_idx)
 -- https://forum.cockos.com/showthread.php?t=277103
 local plug_types_t = {[0] = 'DX', [1] = 'LV2', [2] = 'JSFX', [3] = 'VST',
 [4] = '', [5] = 'AU', [6] = 'Video processor', [7] = 'CLAP', [8] = 'Container'}
-local GetIOSize = obj and (r.ValidatePtr(obj, 'MediaItem_Take*') and r.TakeFX_GetIOSize or r.ValidatePtr(obj, 'MediaTrack*') and r.TrackFX_GetIOSize)
+local GetIOSize = obj and (r.ValidatePtr(obj, 'MediaItem_Take*') and r.TakeFX_GetIOSize 
+or r.ValidatePtr(obj, 'MediaTrack*') and r.TrackFX_GetIOSize)
 	if GetIOSize then
 	local plug_type, inputPins_cnt, outputPins_cnt = GetIOSize(obj, fx_idx)
 	return plug_types_t[plug_type]
 	end
 end
 
-
-function Is_Same_Plugin(src_obj, src_fx_idx, dest_obj, dest_fx_idx) 
--- src_obj and dest_obj are either track or take
--- input/Monitoring FX index must be fed in the API format, i.e. 0x1000000+idx or 16777216+idx
--- may not be good for JSFX plugins, because they may have too few params to reliably compare
--- while having common wet, bypass, delta params
-
-	local function get_fx_parms(obj, fx_idx)
-	local take = r.ValidatePtr(obj, 'MediaItem_Take*')
-	local tr = r.ValidatePtr(obj, 'MediaTrack*')
-	local GetNumParams, GetParamName = table.unpack(take and {r.TakeFX_GetNumParams, r.TakeFX_GetParamName}
-	or tr and {r.TrackFX_GetNumParams, r.TrackFX_GetParamName} or {})
-		if obj then
-		local t = {}
-			for idx = 0, GetNumParams(obj, fx_idx)-1 do
-			local ret, parm_name = GetParamName(obj, fx_idx, idx, '')
-			t[#t+1] = parm_name
-			end
-		return t
-		end
-	end
-
-local src_parm_t = get_fx_parms(src_obj, src_fx_idx)
-local dest_parm_t = get_fx_parms(dest_obj, dest_fx_idx)
-
-	if src_parm_t and dest_parm_t and #src_parm_t == #dest_parm_t then
-		for i = 1, #src_parm_t do -- compare the entire parm list
-		local src, dest = src_parm_t[i], dest_parm_t[i]
-			if src ~= 'Wet' and src ~= 'Bypass' and src ~= 'Delta' then -- not stock parameters
-				if src ~= dest then return false
-			end
-		end
-	--[[ OR
-	math.randomseed(math.floor(r.time_precise())*1000) -- math.floor() because the seeding number must be integer
-	local r, r_init
-		for i = 1, 3 do	-- 3 random comparisons
-			if #src_parm_t > 4 then -- if 4 or less the loop might get stuck when none of the 'until' conditions is met, so math.random must be allowed to alternate between at least two values other than the 3 stock params
-				repeat
-				r = math.random(1,#src_parm_t)
-				local parm = src_parm_t[r]
-				until r ~= r_init and parm ~= 'Wet' and parm ~= 'Bypass' and parm ~= 'Delta'
-			r_init = r
-			else
-			r = math.random(1,#src_parm_t)
-			end
-		local src, dest = src_parm_t[r], dest_parm_t[r]
-			if src ~= 'Wet' and src ~= 'Bypass' and src ~= 'Delta' then -- not stock parameters
-				if src ~= dest then return false
-			end
-		end
-	--]]
-	return true
-	end
-
-end
 
 
 function Check_FX_In_Focused_FX_Chain(take, track, fx_idx) -- whether any plugin contains presets
@@ -7828,6 +7863,7 @@ function TrackFX_GetRecChainVisible1(tr)
 end
 
 
+
 function TrackFX_GetRecChainVisible2(tr) -- only returns fx chain window status
 	if not tr or not r.ValidatePtr(tr, 'MediaTrack*') then return end
 r.PreventUIRefresh(1)
@@ -7876,7 +7912,7 @@ local supported = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.37 -- since 
 	for idx = start, fin do
 	local found_cnt = 0
 		if supported and #fx_name:gsub(' ','') > 0 then
-		local _, org_name = FX_GetNamedConfigParm(obj, idx, 'fx_name') -- parmname could be 'original_name'
+		local _, org_name = FX_GetNamedConfigParm(obj, idx, 'fx_name') -- parmname could be 'original_name' as well
 			if fx_name == org_name then return true end
 		else
 		local parm_cnt = FX_GetNumParams(obj, idx)
@@ -7961,7 +7997,10 @@ end
 -- Undo_EndBlock('',2) -- the flag MUST be 2 (UNDO_STATE_FX), NOT -1 which works only once if the plugin UI is originally open
 
 
-function Get_FX_Selected_In_FX_Chain(chunk)
+
+function Get_FX_Selected_In_FX_Chain(chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensible vesrion
+-- isn't suitable for input fx because the loop stops
+-- at the value belonging to the main chain
 	for line in chunk:gmatch('[^\n\r]+') do
 		if line:match('LASTSEL') then return line:match('%d+') end
 	end
@@ -7969,7 +8008,7 @@ end
 
 
 
-function Set_FX_Selected_In_FX_Chain(obj, fx_idx, chunk)
+function Set_FX_Selected_In_FX_Chain(obj, fx_idx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensible vesrion
 -- functions FX_Copy_To_Take(), FX_Copy_To_Track() in particular change fx selection in the source chain, making selected the last addressed fx
 -- so the original selection requires restoration
 -- doesn't support containers
@@ -8002,7 +8041,7 @@ end
 
 
 function GetSet_FX_Selected_In_FX_Chain(obj, sel_idx, chunk, input_fx)
--- functions FX_Copy_To_Take(), FX_Copy_To_Track() in particular change fx selection in the source chain, making selected the last addressed fx
+-- functions FX_Copy_To_Take(), FX_Copy_To_Track() in particular change fx selection in the source chain if the source and destination FX indices are identical https://forum.cockos.com/showthread.php?t=285177#18
 -- so the original selection requires restoration
 -- sel_idx is string, input_fx is boolean to address input fx chain
 -- chunk comes from GetObjChunk(), relevant at both stages
@@ -8113,6 +8152,7 @@ local tr, item = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaIte
 end
 
 
+
 function Process_FX_Incl_In_All_Containers(obj, recFX, parent_cntnr_idx, parents_fx_cnt)
 -- https://forum.cockos.com/showthread.php?t=282861
 -- https://forum.cockos.com/showthread.php?t=282861#18
@@ -8184,6 +8224,7 @@ fx_cnt = fx_cnt or ({GetConfig(obj, parent_cntnr_idx, 'container_count')})[2]
 end
 
 
+
 function Collect_All_Container_FX_Indices(t, obj, recFX, parent_cntnr_idx, parents_fx_cnt)
 -- t must be nil, obj is track or take, recFX is boolean to target input/Monitoring FX
 -- parent_cntnr_idx, parents_fx_cnt must be nil
@@ -8227,6 +8268,7 @@ local t = t or {} -- add table for the outermost FX chain on the very first run
 return t
 
 end
+
 
 
 function Loop_Over_FX_Container_Table(obj, t)
@@ -8297,6 +8339,64 @@ return parm_name
 end
 
 
+
+function Is_Same_Plugin(src_obj, src_fx_idx, dest_obj, dest_fx_idx) 
+-- src_obj and dest_obj are either track or take
+-- input/Monitoring FX index must be fed in the API format, i.e. 0x1000000+idx or 16777216+idx
+-- may not be good for JSFX plugins, because they may have too few params to reliably compare
+-- while having common wet, bypass, delta params
+
+	local function get_fx_parms(obj, fx_idx)
+	local take = r.ValidatePtr(obj, 'MediaItem_Take*')
+	local tr = r.ValidatePtr(obj, 'MediaTrack*')
+	local GetNumParams, GetParamName = table.unpack(take and {r.TakeFX_GetNumParams, r.TakeFX_GetParamName}
+	or tr and {r.TrackFX_GetNumParams, r.TrackFX_GetParamName} or {})
+		if obj then
+		local t = {}
+			for idx = 0, GetNumParams(obj, fx_idx)-1 do
+			local ret, parm_name = GetParamName(obj, fx_idx, idx, '')
+			t[#t+1] = parm_name
+			end
+		return t
+		end
+	end
+
+local src_parm_t = get_fx_parms(src_obj, src_fx_idx)
+local dest_parm_t = get_fx_parms(dest_obj, dest_fx_idx)
+
+	if src_parm_t and dest_parm_t and #src_parm_t == #dest_parm_t then
+		for i = 1, #src_parm_t do -- compare the entire parm list
+		local src, dest = src_parm_t[i], dest_parm_t[i]
+			if src ~= 'Wet' and src ~= 'Bypass' and src ~= 'Delta' then -- not stock parameters
+				if src ~= dest then return false
+			end
+		end
+	--[[ OR
+	math.randomseed(math.floor(r.time_precise())*1000) -- math.floor() because the seeding number must be integer
+	local r, r_init
+		for i = 1, 3 do -- 3 random comparisons
+			if #src_parm_t > 4 then -- if 4 or less the loop might get stuck when none of the 'until' conditions is met, so math.random must be allowed to alternate between at least two values other than the 3 stock params
+				repeat
+				r = math.random(1,#src_parm_t)
+				local parm = src_parm_t[r]
+				until r ~= r_init and parm ~= 'Wet' and parm ~= 'Bypass' and parm ~= 'Delta'
+			r_init = r
+			else
+			r = math.random(1,#src_parm_t)
+			end
+		local src, dest = src_parm_t[r], dest_parm_t[r]
+			if src ~= 'Wet' and src ~= 'Bypass' and src ~= 'Delta' then -- not stock parameters
+				if src ~= dest then return false
+			end
+		end
+	--]]
+	return true
+	end
+
+end
+
+
+
 function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, TAG)
 -- the function is based on Get_FX_Parm_Orig_Name() above
 -- in case it's been aliased by the user
@@ -8305,13 +8405,15 @@ function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, TAG)
 -- parm_t is a table indexed by param indices whose fields hold corresponding original param names
 -- e.g. {[4] = 'parm name 4', [12] = 'parm name 12', [23] = 'parm name 23'}
 -- TAG is a user TAG added to FX name in the FX chain
--- to mark is as a target for script, optional
+-- to mark it as a target for script, optional
 -- works with builds 6.37+
 -- relies on Esc() function
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-local GetFXName, GetConfig, CopyFX, DeleteFX = 
-table.unpack(tr and {r.TrackFX_GetFXName, r.TrackFX_GetNamedConfigParm, r.TrackFX_CopyToTrack} 
-or take and {r.TakeFX_GetFXName, r.TakeFX_GetNamedConfigParm, r.TakeFX_CopyToTrack} or {})
+local GetFXName, GetConfig, CopyFX, GetParmCount, GetParamName = 
+table.unpack(tr and {r.TrackFX_GetFXName, r.TrackFX_GetNamedConfigParm, 
+r.TrackFX_CopyToTrack, r.TrackFX_GetNumParams, r.TrackFX_GetParamName} 
+or take and {r.TakeFX_GetFXName, r.TakeFX_GetNamedConfigParm, 
+r.TakeFX_CopyToTrack, r.TakeFX_GetNumParams, r.TakeFX_GetParamName} or {})
 -- get name displayed in fx chain
 local retval, fx_chain_name = GetFXName(obj, fx_idx, '')
 fx_chain_name = TAG and fx_chain_name:gsub(TAG,'') or fx_chain_name -- if TAG is supplied removing to be able to evaluate clean name
@@ -8322,10 +8424,12 @@ fx_chain_name = TAG and fx_chain_name:gsub(TAG,'') or fx_chain_name -- if TAG is
 
 local build_6_37 = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.37
 
-local orig_fx_name
+local retval, orig_fx_name
 
 	if build_6_37 then
 	retval, orig_fx_name = GetConfig(obj, fx_idx, 'original_name') -- or 'fx_name' // returned with fx type prefix
+	-- In theory two different plugins can have identical names set by the user in the FX browser 
+	-- but in practice the odds are low
 		if orig_fx_name:match(Esc(fx_name)) then return true end -- ignoring fx type prefix
 	end
 
@@ -8341,19 +8445,56 @@ r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
 -- search for the name of fx parameter at the same index as the one being evaluated, in the copy of the fx
 -- on the temp track
 CopyFX(obj, fx_idx, temp_track, 0, false) -- is_move false
+local parm_t = parm_t and type(parm_t) == 'table' and #parm_t > 0 and parm_t
 local name_match = true
-	for i = 0, r.TrackFX_GetNumParams(temp_track, 0)-1 do -- fx_idx 0
-	local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, i, '') -- fx_idx 0
-		if parm_t[i] and parm_t[i] ~= parm_name then
-		-- break rather than return to allow deletion of the temp track 
-		-- before returning the value
-		name_match = false break
+	
+	if parm_t then
+		for idx, name in pairs(parm_t) do
+		local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, idx, '') -- fx_idx 0
+			if and parm_t[i] ~= parm_name then
+			-- break rather than return to allow deletion of the temp track 
+			-- before returning the value
+			name_match = false break
+			end
+		end
+	else -- compare names of up to 6 random parameters
+	local src_parm_cnt = GetParmCount(obj, fx_idx)
+	local tmp_parm_cnt = r.TrackFX_GetNumParams(temp_track, 0)
+		if src_parm_cnt == tmp_parm_cnt then
+		parm_t = {}
+		math.randomseed(math.floor(r.time_precise()*1000))
+		local count = src_parm_cnt > 5 and 6 or src_parm_cnt -- look for 6 param names as long as the param count allows that, 6 is more reliable than 3 or 4 because random number may repeat which will reduce the number of options	
+			for i=1, count do
+			local rnd = math.random(1, src_parm_cnt)-1 -- math.random range must start from 1
+			local ret, parm_name = GetParamName(obj, fx_idx, rnd, '')
+			local stock = parm_name == 'Bypass' or parm_name == 'Wet' or build_6_37 and parm_name == 'Delta' -- excluding 3 stock parameters because they're not unique to a plugin
+				if parm_t[rnd] or stock then -- prevent storing the same param several times if math.random generates the same number and storing stock params
+					repeat
+					rnd = math.random(1, src_parm_cnt)-1
+					ret, parm_name = GetParamName(obj, fx_idx, rnd, '')
+					until not parm_t[rnd] and parm_name ~= 'Bypass' and parm_name ~= 'Wet' 
+					and (not build_6_37 or parm_name ~= 'Delta')
+				end		
+			parm_t[rnd] = parm_name
+			end
+			for parm_idx, name in pairs(parm_t) do
+			local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, parm_idx, '') -- fx_idx 0
+				if name ~= parm_name then
+				-- break rather than return to allow deletion of the temp track 
+				-- before returning the value
+				name_match = false break
+				end
+			end
 		end
 	end
 
+
+--[[ -- THIS IS REDUNDANT SINCE IN BUILDS 6.37+ VALIDATION WILL SUCCEED THROUGH FX_GetNamedConfigParm()
+	  -- WHILE IN OLDER BUILDS FX CANNOT BE LOADED FROM BROWSER WITH FX_AddByName() TO CONTINUE COMPARING 
+	  -- THEIR PARAMETERS
 -- if name_match ends up being false there's possibility that the parameters have been aliased
 -- in which case collate parm names in the clean instance of the fx loaded from the fx browser in builds 6.37+
-	if build_6_37 then
+	if parm_t and not name_match and build_6_37 then
 	-- delete fx instance copied in the previous routine to the temp track
 	r.TrackFX_Delete(temp_track, 0)
 	-- use fx name displayed in fx browser
@@ -8375,7 +8516,8 @@ local name_match = true
 			end
 		end
 	end
-		
+]]
+	
 r.DeleteTrack(temp_track)
 r.PreventUIRefresh(-1)
 
@@ -8690,6 +8832,7 @@ return selected_cntr
 end
 
 
+
 function Get_Outermost_Overlapping_Item(are_lanes_collapsed, tr, start, length) -- for 'explode' and 'crop' when item lanes are collapsed
 local overlap_itm_cnt, outermost_itm = 0
 	if are_lanes_collapsed then	-- get the outermost item to be able to crop everything to it if it happens to be selected
@@ -8738,6 +8881,7 @@ return count_overlap and count_sel and cntr > 0 and cntr+1 == selected_cntr
 or count_overlap and not count_sel and cntr
 or count_sel and not count_overlap and selected_cntr
 end
+
 
 
 function Are_Itms_Overlapping_Selected_Collapsed(t) -- t is an array storing selected items, optional
@@ -9975,6 +10119,83 @@ end
 
 
 
+function Insert_Image()
+-- change path, image file name and undo point title in the code
+
+local chunk = [[
+<ITEM
+POSITION 0
+SNAPOFFS 0
+LENGTH 8
+LOOP 1
+ALLTAKES 0
+FADEIN 1 0 0 1 0 0 0
+FADEOUT 1 0 0 1 0 0 0
+MUTE 0 0
+SEL 1
+IGUID {3E42B32C-B52E-4644-A494-DFDBCFB163B9}
+IID 1
+RESOURCEFN "F:\Program Files\REAPER (x64)\Scripts\MY\my_Transcribing\Transcribing toolbar layout.png"
+IMGRESOURCEFLAGS 5
+NOTESWND 197 95 1198 659
+>
+]]
+
+r.Undo_BeginBlock()
+-- the function will faulter here if it's already used outside of the function
+-- in which case scr_name will have to be passed as an argument
+local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context()
+local img_name = 'Transcribing 2 toolbar layout.png'
+local path = scr_name:match('.+[\\/]')..img_name
+	if r.file_exists(path) then
+	local GetSet = r.GetSetMediaTrackInfo_String
+	local img_tr
+	-- search for an empty file with the image inserted earler to prevent duplication on successive script runs
+	-- when the toolbar file gets overwritten this function doesn't run
+		for i=r.GetNumTracks()-1, 0, -1 do
+		local tr = r.GetTrack(0,i)
+		local ret, ext = GetSet(tr, 'P_EXT:'..img_name, '', false) -- setNewValue false
+			if ret then
+				for i=0,r.CountTrackMediaItems(tr)-1 do
+				local item = r.GetTrackMediaItem(tr,i)
+					if r.CountTakes(item) == 0 then -- OR not r.GetActiveTake(item) // empty items don't have takes
+					local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
+						if chunk:match('RESOURCEFN "'..Esc(path)..'"') then return end -- already exists
+					end
+				end
+			img_tr = tr
+			break end
+		end
+	--Msg(path)
+		if not img_tr then
+		r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefault false
+		img_tr = r.GetTrack(0,r.GetNumTracks()-1)
+		end
+	local item = r.AddMediaItemToTrack(img_tr)
+	GetSet(img_tr, 'P_NAME', 'Transcribing 2 toolbar layout', true) -- setNewValue true
+	GetSet(img_tr, 'P_EXT:'..img_name, '1', true) -- setNewValue true
+	chunk = chunk:gsub('RESOURCEFN.-\n', 'RESOURCEFN "'..path..'"\n')
+	--Msg(chunk)
+	r.SetItemStateChunk(item, chunk, false) -- isundo false
+	local st_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0) -- isSet false
+	r.SetMediaItemInfo_Value(item, 'D_LENGTH', end_time)
+--	r.UpdateArrange()
+		if r.GetCursorPosition() < end_time then -- prevent edit cursor crossing the image
+		r.SetEditCurPos(0,true,false) -- moveview true, seekplay false
+		end
+	-- The image may end up being a bit cut off on the left if zoom level is not high enough
+	-- but couldn't figure out a way to ensure the sweet spot of the zoom level, Set_Horiz_Zoom_Level() didn't help
+	r.CSurf_OnScroll(-400,0) -- scroll horizontally left, 1 scroll unit is 16 px so scroll 6400 px which should be enough to reach the project start
+--	Set_Horiz_Zoom_Level(10)
+--	r.CSurf_OnScroll(2,0)
+	GetSet_Track_Zoom_100_Perc(img_tr)
+--	r.UpdateArrange()
+	end
+r.Undo_EndBlock('Insert Transcribing toolbar layout image', -1)
+
+end
+
+
 --================================ I T E M S   E N D ==================================
 
 
@@ -10544,8 +10765,9 @@ function Get_Marker_Reg_At_Mouse_Or_EditCursor()
 	end
 
 local cur_pos = r.GetCursorPosition()
-local color, mrkr_reg_props_t = get_mrkr_reg(cur_pos) -- at the edit cursor
+local color, mrkr_reg_props_t = get_mrkr_reg(cur_pos) -- at the edit cursor // see a more efficient Get_Marker_Region_At_Time() below
 
+	-- color condition is script specific
 	if not color and r.GetTrackFromPoint(r.GetMousePosition()) then -- the edit cursor is not aligned with marker or region start/end // look for these at the mouse cursor // GetTrackFromPoint() prevents this context from activation if the script is run from a toolbar or the Action list window floating over Arrange or if mouse cursor is outside of Arrange
 	r.PreventUIRefresh(1)
 	ACT(40513) -- View: Move edit cursor to mouse cursor [with snapping so it can snap to marker / region start/end]
@@ -10568,6 +10790,46 @@ return color, mrkr_reg_props_t
 	end
 ]]
 
+end
+
+
+
+function Get_Marker_Region_At_Time(time)
+-- can be used to get marker/region at edit cursor 
+-- if r.GetCursorPosition() is passed as time argument 
+-- without the need to traverse all of them
+local mrkr_idx, rgn_idx = r.GetLastMarkerAndCurRegion(0, time)
+local t = {}
+t.mrkr = mrkr_idx > -1 and {r.EnumProjectMarkers3(0,mrkr_idx)}
+t.rgn = rgn_idx > -1 and {r.EnumProjectMarkers3(0,rgn_idx)}
+	if t.mrkr then table.insert(t.mrkr,1,t.mrkr[3] == time) end
+	if t.rgn then table.insert(t.rgn,1,t.rgn[3] == time) end
+-- fields:
+-- 1 - true if marker or region start are exactly at the time, false if last marker before time
+-- or region start before time
+-- 2 - sequential index on the time line, same as mrkr_idx and rgn_idx
+-- 3 - isrgn, 4 - position, 5 - rgn_end, 6 - name, 7 - displayed index, 8 - color
+-- empty t.mrkr or t.rgn table - no marker or region respectively before or at the time 
+return t
+end
+
+
+
+
+function Delete_Marker_Region_At_Time(time, want_region)
+-- want_region is boolean
+-- region is deleted if time matches its start
+	if time then
+	local mrkr_idx, rgn_idx = r.GetLastMarkerAndCurRegion(0, pos)
+	local idx = want_region and rgn_idx or mrkr_idx
+		if want_region and rgn_idx > -1 or mrkr_idx > -1 
+		and ({r.EnumProjectMarkers3(0, idx)})[3] == pos then
+		r.DeleteProjectMarkerByIndex(0, idx)
+		-- OR
+		-- local t = {r.EnumProjectMarkers3(0, idx)}
+		-- r.DeleteProjectMarker(0, t[6], want_region)
+		end
+	end
 end
 
 
@@ -10748,7 +11010,7 @@ return reaper.JS_ListView_GetItemState(lv, idx-1) > 0
 end
 
 
-
+-- see also Get_Marker_Region_At_Time() above
 function Get_First_MarkerOrRgn_After_Time(time, USE_REGIONS, KEYWORD) -- accounting for all overlaps
 -- time in sec
 -- USE_REGIONS is boolean
@@ -11109,6 +11371,14 @@ end
 --==================================== G F X  E N D ==================================
 
 --==================================== W I N D O W S =================================
+
+--[[
+How to get ID for using with JS_Window_FindChildByID on MAC
+Hold your mouse over the target window (the child window), and run this script:
+w = reaper.JS_Window_FromPoint(reaper.GetMousePosition())
+ID = reaper.JS_Window_GetLong(w, "ID")
+https://forum.cockos.com/showthread.php?p=2349444#post2349444
+]]
 
 function Loka_Window_At_Mouse(w, h) -- Lokasenna // https://forum.cockos.com/showpost.php?p=1689028&postcount=15
 -- This will open a window centered on the mouse cursor, adjusted to make sure it's all on the screen and clear of the taskbar
@@ -11918,6 +12188,56 @@ function Re_Store_Windows_Props_By_Names_And_Handles2(names_t, t)
 end
 
 
+
+function GetSet_Notes_Wnd_Scroll_Pos(search_term, scroll_dir, notes_wnd, scroll_pos)
+-- Applies to SWS Notes window
+-- works successfully with Track Notes
+-- search_term is any character sure to be found in the Notes or single empty space
+-- scroll_dir is string, either 'v', 'SB_VERT' or 'VERT' for vertical scrollbar
+-- and 'h', 'SB_HORZ' or 'HORZ' for horizontal
+-- notes_wnd, scroll_pos are values returned at the Get stage and are only relevant at the Set stage
+-- arg 1 is only relevant for Get stage, arg 2 for both Get and Set stages, 3-4 only for the Set stage
+	
+	if not r.JS_Window_Find then return end
+
+	if not notes_wnd then -- Get
+	local parent_wnd
+		for k, title in ipairs({'Notes', 'Notes (docked)'}) do -- the names cover docked and undocked wrapper window
+		parent_wnd = r.JS_Window_Find(title, true) -- exact true
+			if parent_wnd then break end
+		end
+		if parent_wnd then
+		local notes_wnd = r.JS_Window_FindChild(parent_wnd, search_term, false) -- exact false, Track notes window containing text can be found with blank space or 0 or colon (:) which is very likely to be included in the Notes, the entire Notes content is returned as Track notes child window title with JS_Window_GetTitle(), if not found there're no Notes
+			if notes_wnd then
+			local retval, top_pos, pageSize, min_px, max_px, scroll_pos = r.JS_Window_GetScrollInfo(notes_wnd, scroll_dir) -- the shorter the window the greater the bottomost/rightmost scroll_pos value // when window is a list (to be handled with functions JS_ListView), min and max are the lowest and highest 0-based row index, the scroll position is the number of hidden rows at the top
+			return notes_wnd, scroll_pos
+			end
+		end		
+	else -- Set	
+	r.JS_Window_SetScrollPos(notes_wnd, scroll_dir, scroll_pos)
+	end
+
+end
+--[[ USE:
+local notes_wnd, scroll_pos = GetSet_Notes_Wnd_Scroll_Pos(search_term, scroll_dir) -- store
+-- DO STAFF
+GetSet_Notes_Wnd_Scroll_Pos(search_term, scroll_dir, notes_wnd, scroll_pos) -- restore, search_term can be nil
+]]
+
+
+
+function Get_All_Child_Wnds(parent_hwnd)	
+local retval, list = r.JS_Window_ListAllChild(parent_hwnd)
+local t = {}
+	for address in list:gmatch('0x%x+') do
+	local wnd = r.JS_Window_HandleFromAddress(address)
+	t[#t+1] = {hwnd = wnd, title = r.JS_Window_GetTitle(wnd)}
+	end
+return t
+end
+
+
+
 function Window_Is_Visible(hwnd)
 -- takes advantage of the fact that the following functions don't affect invisible windows
 -- docked windows will be considered invisible because focus and foreground status can't be applied to them, they're children windows
@@ -12126,9 +12446,10 @@ local docker = toggle_state(0, 40279) == 1 -- 'View: Show docker'
 end
 
 
+
 function Find_Window_SWS(wnd_name, want_main_children)
 -- finds main window children, their siblings, their grandchildren and their siblings, including docked ones, floating windows and probably their children as well
--- want_main_children is boolean to search for internal or non-dockable main window children and for their children regardless of the dock being open, the dock condition in the routine is only useful fot validating visibility of windows which can be docked
+-- want_main_children is boolean to search for internal or non-dockable main window children and for their children regardless of the dock being open, the dock condition in the routine is only useful for validating visibility of windows which can be docked
 
 -- 1. search floating toolbars with BR_Win32_FindWindowEx(), including docked
 -- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowtexta#return-value
@@ -12169,19 +12490,21 @@ function Find_Window_SWS(wnd_name, want_main_children)
 -- search for floating toolbar
 local wnd = Find_Win(wnd_name)
 -- search for a floating docker with one attached toolbar window // toolbars can be attached to a regular floating docker as well
-or Find_Win(wnd_name..' (docked)') -- when a single toolbar is attached to a floating docker its title is 'MIDI 1 (docked)' or 'Toolbar 1 (docked)' or whatever the toolbar custom name is with '(docked)' added regardless of whether this a toolbar docker or a regular docker
+or Find_Win(wnd_name..' (docked)') -- when a single toolbar is attached to a floating docker its title is 'MIDI 1 (docked)' or 'Toolbar 1 (docked)' or whatever the toolbar custom name is with '(docked)' added regardless of whether this is a toolbar docker or a regular docker
 
-	if wnd and r.JS_Window_IsVisible(tb) then return wnd -- JS_Window_IsVisible() isn't suitable for multi-window dockers because it returns false when a window is inactive, but it works reliably when floating docker only has one attached window which cannot be inactive
+	if wnd and r.JS_Window_IsVisible and r.JS_Window_IsVisible(wnd) then return wnd -- JS_Window_IsVisible() isn't suitable for multi-window dockers because it returns false when a window is inactive, but it works reliably when floating docker only has one attached window which cannot be inactive
 	end -- if not found the function will continue
 
 -- docker toggle states are used for visibility validation instead of extension functions due to unreliabiliy of the latter which return false in multi-window docker scenarios when a window is inactive
-local tb_dock = r.GetToggleCommandStateEx(0, 41084) == 1 -- 'Toolbar: Show/hide toolbar docker'
+local tb_dock = r.GetToggleCommandStateEx(0, 41084) == 1 -- 'Toolbar: Show/hide toolbar docker' // NOT NEEDED IF LOOKING FOR WINDOWS OTHER THAN TOOLBAR
 local dock = r.GetToggleCommandStateEx(0, 40279) == 1 -- 'View: Show docker'
 
+----- NOT NEEDED IF LOOKING FOR WINDOWS OTHER THAN TOOLBAR -------
 -- search floating docker with multiple attached windows
 local docker = Find_Win('Toolbar Docker') -- when toolbars are collected in the floating toolbar docker to begin with and there're more than 1, its title is 'Toolbar Docker'
 wnd = search_floating_docker(docker, tb_dock, wnd_name)
 	if wnd then return wnd end -- if not found the function will continue
+------------------------------------------------------------------
 
 local docker = Find_Win('Docker') -- when a docker attached to the main window is detached from it by toggling 'Attach docker to the main window' and there're several windows in it, the floating docker title is 'Docker'
 wnd = search_floating_docker(docker, dock, wnd_name)
@@ -12195,6 +12518,26 @@ wnd = search_floating_docker(docker, dock, wnd_name)
 	end
 
 end
+
+
+
+function Get_Child_Windows_SWS(parent_wnd)
+-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindow
+-- the function doesn't cover grandchildren
+-- once window handles have been collected
+-- they can be analyzed further for presence of certain string
+-- using BR_Win32_GetWindowText()
+local child = r.BR_Win32_GetWindow(parent_wnd, 5) -- 5 = GW_CHILD, returns 1st child
+	if not child then return end -- no children
+local i, t = 0, {child} -- storing 1st found child
+	repeat
+	child = r.BR_Win32_GetWindow(child, 2) -- 2 = GW_HWNDNEXT // get next sibling of each next found child window advancing until no child is found
+		if child then t[#t+1] = child break end
+	i=i+1
+	until not child
+return #t > 0 and t
+end
+
 
 
 local is_new_value,filename,sectionID,cmdID_orig,mode,resolution,val = r.get_action_context()
@@ -13852,10 +14195,12 @@ Msg(t.a) Msg(t.b) Msg(t.c)
 
 
 
-function Settings_Management_Menu()
+function Settings_Management_Menu_And_Help(want_help)
 -- manage script settings from a menu
 -- the function updates the actual script file
+-- used in Transcribing A - Create and manage segments (MAIN).lua
 -- relies on Reload_Menu_at_Same_Pos2() and Esc() functions
+-- want_help is boolean if About text needs to be displayed to the user
 
 --[[ HERE INSERT SOME CONDITION TO OPEN THE SETTINGS MENU IN A REGULAR SCRIPT
 
@@ -13866,7 +14211,7 @@ function Settings_Management_Menu()
 
 local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context() -- TO BE AWARE THAT HERE THIS FUNCTION WILL GLITCH OUT IF IT'S ALREADY USED OUTSIDE OF THE FUNCTION SO scr_name VAR MAY NEED TO BE FED AS AN ARGUMENT
 
-local sett_t, help_t, about = {}, {} -- help_t is optional if help is important enough
+local sett_t, help_t, about = {}, want_help and {} -- help_t is optional if help is important enough
 	for line in io.lines(scr_name) do
 	-- collect settings
 		if line:match('----- USER SETTINGS ------') and #sett_t == 0 then
@@ -13879,7 +14224,7 @@ local sett_t, help_t, about = {}, {} -- help_t is optional if help is important 
 		sett_t[#sett_t+1] = line
 		end
 	-- collect help
-		if #help_t == 0 and line:match('About:') then
+		if want_help and #help_t == 0 and line:match('About:') then
 		help_t[#help_t+1] = line:match('About:%s*(.+)')
 		about = 1
 		elseif line:match('----- USER SETTINGS ------') then
@@ -13911,7 +14256,7 @@ local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
 	
 	if output == 6 then -- THE VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
 	r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'),r.ClearConsole()) 
-	return 1 end -- 1  i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited
+	return 1 end -- 1  i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited // trimming the first line of user settings section because it's captured by the loop
 
 output = output-1 -- offset the 1st menu item which is a title
 local src = user_sett[output]
@@ -13942,6 +14287,25 @@ end
 	return r.defer(no_undo) -- menu was exited or item is invalid
 	end	
 ]]
+
+
+
+function Display_Script_Help_Txt(scr_path)
+-- scr_path stems from get_action_context()
+
+local help_t = {}
+	for line in io.lines(scr_path) do
+		if #help_t == 0 and line:match('About:') then
+		help_t[#help_t+1] = line:match('About:%s*(.+)')
+		about = 1
+		elseif line:match('----- USER SETTINGS ------') then
+		r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'), r.ClearConsole()) return -- trimming the first line of user settings section because it's captured by the loop
+		elseif about then
+		help_t[#help_t+1] = line:match('%s*(.-)$')
+		end
+	end	
+end
+
 
 
 
@@ -15230,6 +15594,7 @@ return arrange
 end
 
 
+
 function Is_Mouse_Over_Arrange3(ignore_items)
 -- relies on Get_TCP_Under_Mouse()
 -- ignore_items is boolean, if true, only cursor outside of items in Arrange is respected
@@ -15241,9 +15606,9 @@ local x, y = r.GetMousePosition()
 	then return not ignore_items end
 
 local tr, info = r.GetTrackFromPoint(x, y)
-	if tr and info ~= 2 and not Get_TCP_Under_Mouse() then return tr end
+	if tr and info ~= 2 and not Get_TCP_Under_Mouse() then return tr end -- info 2 is FX window
 
-	if not tr then -- info 2 is FX
+	if not tr then -- the cursor might be located within Arrange but below the last track in which case tr will be nil
 --	r.PreventUIRefresh(1) -- doesn't help much
 	local tr_idx = not r.GetTrack(0,0) and 0 or r.GetNumTracks()-1 -- insert temp track if no tracks or cursor is lower than the last track in which case tr cannot be valid
 	r.InsertTrackAtIndex(tr_idx, false) -- wantDefaults false
@@ -15771,6 +16136,7 @@ return table.unpack(cmd_t) -- 14 return values
 end
 -- GETTING OUTPUT:
 -- local enabled, time_sel, itms_full, tr_env, proj_mrk, rgn, time_sig_mrk, itm_horiz_move, itm_vert_move, itm_edges, itm_fade_vol_hand, loop_pts, take_env, stretch_mrk = Get_Lock_Settings2()
+
 
 
 -- amagalma breakpoint for debugging
@@ -16418,16 +16784,23 @@ reaper.TrackFX_Show(reaper.GetSelectedTrack(0,0), 0, 0)
 
 --===================================================================================
 
+-- Functions to get active preset name and index
+
+local ret, act_pres_name = r.TrackFX_GetPreset(tr, fx_idx, '') -- ret is always true https://forum.cockos.com/showthread.php?t=270988
+local act_pres_idx, pres_cnt = r.TrackFX_GetPresetIndex(tr, fx_idx) -- if can't return act_pres_idx is -1, usually when no preset is selected
+
+--===================================================================================
+
 -- Functions to get project path/directory
 
 
-reaper.GetProjectPath() returns primary record path and if not set returns project path,
+reaper.GetProjectPath() -- returns primary record path and if not set returns project path,
 
 in both cases without the last slash
 
-reaper.EnumProjects(idx) returns full proj path a 2nd value
+reaper.EnumProjects(idx) -- returns full proj path a 2nd value
 
-reaper.EnumProjects(-1) returns full path of the current proj as a 2nd value
+reaper.EnumProjects(-1) -- returns full path of the current proj as a 2nd value
 
 proj_full_path = select(2,r.EnumProjects(-1))
 
@@ -16686,6 +17059,7 @@ T R A C K S
 	Re_Store_Track_Heights_Selection_x_Scroll
 	Temp_Track_For_FX
 	Insert_Temp_Track
+	Insert_Delete_Temp_Track
 	Get_Vis_TCP_Tracklist_Length_px_X_Topmost_Track
 	Scroll_Track_To_Top1
 	Scroll_Track_To_Top2
@@ -16833,8 +17207,7 @@ F X
 	Is_TrackFX_Open
 	Count_FX
 	Get_FX_Env_Src_Parameter
-	Get_FX_Type
-	Is_Same_Plugin
+	Get_FX_Type	
 	Check_FX_In_Focused_FX_Chain
 	Check_If_FX_Selected_In_FX_Browser1
 	Check_If_FX_Selected_In_FX_Browser2
@@ -16853,8 +17226,9 @@ F X
 	Apply_FX_Chain
 	Process_FX_Incl_In_All_Containers
 	Collect_All_Container_FX_Indices
-	Loop_Over_FX_Container_Table
+	Loop_Over_FX_Container_Table	
 	Get_FX_Parm_Orig_Name
+	Is_Same_Plugin
 	Validate_FX_Identity
 
 
@@ -16913,6 +17287,7 @@ I T E M S
 	Import_Item_To_RS5k
 	Is_Item_Under_Mouse
 	Is_Item_Under_Mouse_Locked
+	Insert_Image
 
 
 C O L O R
@@ -16948,6 +17323,8 @@ M A R K E R S  &  R E G I O N S
 	get_region_at_edit_or_mouse_cursor
 	GetRegionAtCursor
 	Get_Marker_Reg_At_Mouse_Or_EditCursor
+	Get_Marker_Region_At_Time
+	Delete_Marker_Region_At_Time
 	Get_Marker_Reg_In_Time_Sel
 	Remove_All_Proj_Markers
 	Store_Delete_Restore_Proj_Markers	
@@ -16986,11 +17363,14 @@ W I N D O W S
 	Re_Store_Windows_Props_By_Names2
 	Re_Store_Windows_Props_By_Names_And_Handles1
 	Re_Store_Windows_Props_By_Names_And_Handles2
+	GetSet_Notes_Wnd_Scroll_Pos
+	Get_All_Child_Wnds
 	Window_Is_Visible
 	Exclude_Visible_Windows
 	Move_Window_To_Another_Dock	
 	JS_Window_IsVisible
 	Find_Window_SWS
+	Get_Child_Windows_SWS
 	Activate_Context
 	Set_Horiz_Zoom_Level
 
@@ -17086,6 +17466,8 @@ U T I L I T Y
 	validate_settings3
 	validate_global_var
 	Validate_All_Global_Settings
+	Settings_Management_Menu_And_Help
+	Display_Script_Help_Txt
 	validate_output1
 	validate_output2
 	Get_Action_ID
