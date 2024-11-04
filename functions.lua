@@ -553,6 +553,18 @@ function literalize(str) -- same as Esc()
 end
 
 
+
+-- alternative to string.gmatch if all captures are identical
+function captures_to_table(str, patt, count)
+-- patt is regular expression
+-- preverably with lenient reapeat operators -, ?, *, which allow capture of empty string
+-- because if one capture is nil all the rest will be nil as well
+	if count > 32 then return end -- string lib only supports up to 32 captures
+return {str:match(Esc(patt):rep(count))}
+end
+
+
+
 function replace(str, what, with)
 -- https://stackoverflow.com/a/29379912/8883033
     what = string.gsub(what, "[%(%)%.%+%-%*%?%[%]%^%$%%]", "%%%1") -- escape pattern
@@ -844,7 +856,7 @@ local capt_cnt = 0
 	while i < #src_str do
 	-- OR
 	--repeat
-	st, fin, capt = src_str:find('('..patt..')', i)
+	st, fin, capt = src_str:find('('..patt..')', i) -- in order to return the capture string.find requires explicit formatting of the pattern or literal string as a capture
 		if capt then capt_cnt = capt_cnt + 1 end
 		if capt_cnt == N then break end
 	i = fin + 1
@@ -1037,7 +1049,7 @@ end
 
 
 
--- !!!! OVER 26 captures may make the system freeze (could also depend on the length of each capture) // same with string.find()
+-- !!!! OVER 26 captures may make the system freeze (could also depend on the length of each capture) // same with string.find() whose limit is 32 captures https://www.gammon.com.au/scripts/doc.php?lua=string.find
 function list_2_table1(str, pattern, delimiter) -- pattern e.g. '(%d+);?' to extract semicolon delimited numbers; if using the included tables pattern and delimiter must be numbers else delimiter arg isn't needed
 local pattern = {'(%a+)', -- mixed case words = 1
 				 '(%l+)' -- only lower case words = 2
@@ -1064,7 +1076,7 @@ return t, counter[2] -- second return value holds number of captures
 end
 
 
--- !!!! OVER 26 caprures may make the system freeze (could also depend on the length of each capture) // same with string.find()
+-- !!!! OVER 26 caprures may make the system freeze (could also depend on the length of each capture) // same with string.find() whose limit is 32 captures https://www.gammon.com.au/scripts/doc.php?lua=string.find
 function list_2_table2(str, pattern) -- pattern e.g. '(%d+);?' to extract semicolon delimited numbers;
 local counter = str -- a safety measure to avoid accidental ovewriting the orig. string, although this shouldn't happen thanks to %0
 local counter = {counter:gsub(pattern, '%0')} -- 2nd return value is the number of replaced captures
@@ -1176,7 +1188,7 @@ local text = text:gsub('|', 'ㅣ') -- replace pipe, if any, with Hangul characte
 local text = text:gsub('&', '+') -- convert ampersand to + because it's a menu special character used as a quick access shortuct hence not displayed in the menu
 local text = text:gsub('\n', '|')-- OR text:gsub('\r', '|') // convert user line breaks into pipes to divide lines by creating menu items, otherwise user line breaks aren't respected; multiple line break is created thanks to the space between pipes originally left after each \n character, if there's none a solid line is displayed instead or several thereof starting from 3 pipes and more
 local t = {}
-	for w in text:gmatch('[%w%p\128-\255]+[%s%p]*') do -- split into words + trailing space if any; [%w%p] makes sure that words with apostrophe <it's>, <don't> aren't split up; [%s%p] makes menu divider pipes and special characters (!#<>), if any, attached to the words because they're punctuation marks (%p); accounting for utif-8 characters
+	for w in text:gmatch('[%w%p\128-\255]+[%s%p]*') do -- split into words + trailing space if any; [%w%p] makes sure that words with apostrophe <it's>, <don't> aren't split up; [%s%p] makes menu divider pipes and special characters (!#<>), if any, attached to the words because they're punctuation marks (%p); accounting for utf-8 characters
 		if w then
 		t[#t+1] = w end
 	end
@@ -1208,6 +1220,8 @@ local _, line_cnt = tmp:gsub('|+','') -- count pipe clusters which format lines 
 return menu, line_cnt
 end
 
+
+-- https://www.charset.org/utf-8
 
 function multibyte_str_len(str)
 -- https://stackoverflow.com/questions/43125333/lua-string-length-cyrillic-in-utf8
@@ -1303,6 +1317,26 @@ local s = '' -- some string
 ]]
 
 
+function parse_lines_in_reverse(str)
+-- relies on Esc() function
+local str = str:sub(1,2):match('.\n') and str or ' \n'..str -- add line break preceded by space before 1st line if absent to ensure 1st line capture with the pattern in use
+local line = ''
+	repeat
+	line = Esc(line)
+	-- OR
+	-- line = line:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0') -- escape
+	line = str:match('.+(\n.-)'..line) -- lines are captured with line break used as an anchor so it might need to be deleted from the capture before storing in a table for instance but keeping the original line var because it's used inside the pattern
+		if line then
+		-- DO STUFF
+--Msg(line:gsub('\n',''))
+		else break end
+	until not line
+-- return STAFF
+end
+
+
+
+
 function hex(s) 
 -- probably can be used to convert binary data (i.e. image file) after getting it
 -- with io.open(path, 'rb') to hex string
@@ -1345,6 +1379,19 @@ end
 -- utf8.charpattern is the string "[\0-\x7F\xC2-\xF4][\x80-\xBF]*" for the pattern to match one UTF-8 byte sequence, equal to "[\0-\127\194-\244][\128-\191]*]"
 for w in str:gmatch(utf8.charpattern) do
   print(w)
+end
+
+
+function is_utf8_1(str)
+-- deleting trailing (continuation bytes)
+return #str ~= #str:gsub('[\128-\191]','')
+end
+
+
+function is_utf8_2(str)
+-- capturing trailing (continuation bytes)
+-- returns a string (likely empty) if true and nil if false
+return str:match('[\128-\191]')
 end
 
 
@@ -10453,6 +10500,43 @@ r.Undo_EndBlock('Insert Transcribing toolbar layout image', -1)
 end
 
 
+function Split_Item_Into_Takes_And_Reconstruct(item)
+-- relies on GetObjChunk and SetObjChunk functions
+
+local chunk = GetObjChunk(item)
+local t = {}
+local take_cnt = r.r.CountTakes(item)
+
+-- split chunk between takes
+local header = chunk:match('(.-)\nNAME')
+t[take_cnt] = chunk:match('.+(\nNAME.+)\n>') -- last take chunk just before item chunk closure >, add to last take field // ALTERNATIVELY THIS CAN BE ADDED AFTER THE repeat loop below as t[#t] = chunk:match('.+(\nNAME.+)\n>')
+local i, st, fin, capt = 1, 0, 0
+	repeat
+	st, fin, capt = chunk:find('(\nNAME.-)\nTAKE[%W]', fin) -- excluding 'TAKE' token from the capture because the first one won't have it anyway, will be re-added afterwards
+		if not st then break
+		else	
+		t[i] = capt; i=i+1
+		end
+	until not st
+	
+----------------------------------------
+-- DO STUFF TO TAKES, e.g. sort/reorder	
+----------------------------------------
+
+-- reconstruct chunk
+local chunk_proc = header
+	for k, take_chunk in ipairs(t) do
+	chunk_sorted = chunk_proc..(k > 1 and '\nTAKE' or '')..take_chunk -- take 1 isn't preceded by 'TAKE' token
+	end
+chunk_proc = chunk_proc..'\n>' -- close item chunk
+
+SetObjChunk(item, chunk_proc)
+
+end
+
+
+
+
 --================================ I T E M S   E N D ==================================
 
 
@@ -10641,7 +10725,8 @@ gfx.r, gfx.g, gfx.b = RGB_To_Normalized(R, G, B)
 
 
 function HEX_color_2_integer(HEX)
--- tonumber(HEX:gsub('#',''), 16) isn't suitable because it converts into a big endian number whereas color code is little endian
+-- tonumber(HEX:gsub('#',''), 16) isn't suitable because it converts into a big endian number whereas color code is little endian, which seem only apply to Windows
+-- https://forums.cockos.com/showthread.php?t=253981#5
 local r,g,b = HEX:match('(%x%x)(%x%x)(%x%x)')
 r, g, b = tonumber(r,16), tonumber(g,16), tonumber(b,16)
 return r|g<<8|b<<16 -- OR r+(g<<8)+(b<<16)
@@ -10652,7 +10737,7 @@ end
 function Split_Integer_To_RGB_And_Combine(color)
 -- color is 24 bit integer returned by GR_SelectColor() or r.ColorToNative(r, g, b)
 
-local r, g, b = color & 0xFF, color >> 8 & 0xFF, color >> 16  -- color value returned by GR_SelectColor() is 24 bit little endian (3 clusters of 8 bits each, i.e. 3 ranges of 0 - 255), max decimal value is 16777215 (zero based), count starts on the right, so rgb direction is right to left // 'color & 0xFF' is masking rightmost 8 bits with 11111111, 'color >> 8 & 0xFF' is shifting middle 8 bits rightwards 8 places so they replace the original rightmost 8 bits and then masking, 'color >> 16' is shifting leftmost 8 bits 16 places rightwards so they relplace the original rightmost 8 bits, no masking is needed because at this point there're no set bits anymore beyond these 8 // same as r.ColorFromNative()
+local r, g, b = color & 0xFF, color >> 8 & 0xFF, color >> 16  -- color value returned by GR_SelectColor() is 24 bit little endian (3 clusters of 8 bits each, i.e. 3 ranges of 0 - 255), max decimal value is 16777215 (zero based), count starts on the right, so rgb direction is right to left (seems to only apply to Windows https://forums.cockos.com/showthread.php?t=253981#5) // 'color & 0xFF' is masking rightmost 8 bits with 11111111, 'color >> 8 & 0xFF' is shifting middle 8 bits rightwards 8 places so they replace the original rightmost 8 bits and then masking, 'color >> 16' is shifting leftmost 8 bits 16 places rightwards so they relplace the original rightmost 8 bits, no masking is needed because at this point there're no set bits anymore beyond these 8 // same as r.ColorFromNative()
 
 -- DO STUFF (like randomize or other operations)
 
@@ -10911,7 +10996,7 @@ end
 
 -- 'Set all selected video items to Ignore Audio.lua' by Claudiohbsantos
 function LoopOverSelectedItems(proj) -- iterator function, doesn't depend on items count, doesn't produce error when no (more) items
-	local i = -1 -- to begin iterator with 0 below
+local i = -1 -- to begin iterator with 0 below
 	return function() i = i+1; return r.GetSelectedMediaItem(proj, i) end
 end
 -- USAGE
@@ -10924,20 +11009,21 @@ function return_captures(src_str, capt_str, patt)
 local capt_str = patt and capt_str or capt_str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0') -- do not escape if pattern; escape if literal string
 local i = 1
 	return function()
-	local st, fin, capt = src_str:find('('..capt_str..')',i)
-		if i == fin then i = i + 1 -- allow capturing single chracters advancing by 1
+	local st, fin, capt = src_str:find('('..capt_str..')',i) -- in order to return the capture string.find requires explicit formatting of the pattern or literal string as a capture
+		if i == fin then i = i + 1 -- allow capturing single characters advancing by 1
 		elseif fin then i = fin+1 end -- allow capturing series of characters
 	return capt
 	end
 end
 
--- USAGE
+--[[ USAGE
 -- if no captures the loop doesn't start
 for capt in return_captures(str, 'find') do
 -- OR
---for capt in return_captures(str, '%a+', 1) do -- with 3d argument to enable pattern '%a+'
+-- for capt in return_captures(str, '%a+', 1) do -- with 3d argument to enable pattern '%a+'
 Msg(capt)
 end
+]]
 
 
 function gmatch_alt(str, ...)
@@ -10947,7 +11033,7 @@ local t = {...}
 	return function()
 	local st, fin, retval
 		for _, capt in ipairs(t) do -- the t contains capture patterns, traverse until one of them produces valid capture
-		st, fin, retval = str:find('('..capt..')',i) -- if the pattern already includes the parentheses they must be removed here
+		st, fin, retval = str:find('('..capt..')',i) -- if the pattern already includes the parentheses they must be removed here // in order to return the capture string.find requires explicit formatting of the pattern or literal string as a capture
 			if retval then break end
 		end
 	i = fin and fin+1 or i+1 -- advance only after all capture patterns have been tried
@@ -10957,6 +11043,43 @@ end
 --[[ USE:
 local str = 'abcdefgh'
 for w in gmatch_alt(str, '%d','%p','%a') do
+end
+]]
+
+
+-- https://github.com/TeamAudio/reaspeech/blob/main/reascripts/common/libs/ReaIter.lua
+-- https://github.com/TeamAudio/reaspeech/blob/main/reascripts/ReaSpeech/tests/TestTranscriptAnnotations.lua
+ReaIter = {}
+ReaIter._make_iterator = function(count_f, item_f)
+  return function(proj)
+    proj = proj or 0
+    local i = 0
+    local n = count_f(proj)
+    return function ()
+      if i < n then
+        local item = item_f(proj, i)
+        i = i + 1
+        return item
+      end
+    end
+  end
+end
+ReaIter.each_media_item = ReaIter._make_iterator(reaper.CountMediaItems, reaper.GetMediaItem)
+ReaIter.each_take = ReaIter._make_iterator(reaper.CountTakes, reaper.GetTake)
+ReaIter.each_track = ReaIter._make_iterator(reaper.CountTracks, reaper.GetTrack)
+-- etc.
+--[[ USE
+-- https://github.com/TeamAudio/reaspeech/blob/main/reascripts/ReaSpeech/source/TranscriptAnnotations.lua
+for item in ReaIter.each_media_item() do
+	for take in ReaIter.each_take(item) do
+	end
+end
+https://github.com/TeamAudio/reaspeech/blob/main/reascripts/ReaSpeech/source/ASRActions.lua
+for track in ReaIter.each_selected_track() do
+	for item in ReaIter.each_track_item(track) do
+		for take in ReaIter.each_take(item) do
+		end
+	end
 end
 ]]
 
@@ -11528,6 +11651,69 @@ local fixed	-- script specific
 return fixed -- script specific
 
 end
+
+
+
+function Get_Mrkrs_Of_Takes_At_Mouse_Or_Edit_Curs()
+
+	local function get_take_mrkrs_at_curs(t, item, take, curs_pos)	
+		for i=r.GetNumTakeMarkers(take)-1,0,-1 do -- in reverse to catch the first take marker left of mouse cursor if there's none under the mouse
+		local pos, name, color = r.GetTakeMarker(take, i)
+		local pos_proj = Item_Time_2_Proj_Time(pos, item, take) -- the function only returns value if marker is within visible item area
+			if pos_proj and pos_proj <= curs_pos then -- take marker is within visible item area and under or just left of the mouse cursor
+			t[item].mrkr_idx, t[item].pos, t[item].name, t[item].col = i, pos, name, color
+			break end
+		end
+	return t
+	end
+	
+local x, y = r.GetMousePosition()
+local item, take = r.GetItemFromPoint(x, y, false) -- 0 allow_locked false
+local curs_pos_init = r.GetCursorPosition()
+local GET = r.GetMediaItemInfo_Value
+
+local t = {}
+	if take then -- if take under mouse, track from point prevents getting 
+		if GET(item, 'C_LOCK')&1 == 1 then
+		Error_Tooltip('\n\n the item is locked \n\n', 1, 1) -- caps, spaced true
+		return end
+	-- get mouse position
+	r.PreventUIRefresh(1)
+	r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping)
+	local curs_pos = r.GetCursorPosition()
+	r.SetEditCurPos(curs_pos_init, false, false) -- moveview, seekplay false // restore
+	r.PreventUIRefresh(-1)
+	local take_idx = r.GetMediaItemTakeInfo_Value(take, 'IP_TAKENUMBER')
+	t[item] = {idx=take_idx} -- if no markers in the take or no left of cursor one will be inserted; item pointer and take index are stored to be able to get take with GetTake(item, t.idx)
+	t = get_take_mrkrs_at_curs(t, item, take, curs_pos)	
+	curs_pos_init = curs_pos -- assign mouse position to the var so that's what's returned at the end of the function
+	else -- scan items under the edit cursor
+	-- REAPER devs don't recommend using CountSelectedMediaItems()
+	-- and GetSelectedMediaItem but to rely on CountMediaItems()
+	-- and IsMediaItemSelected() instead
+	-- https://forum.cockos.com/showthread.php?p=2807092#post2807092
+		for i=0, r.CountMediaItems(0)-1 do
+		local item = r.GetMediaItem(0,i)
+			if GET(item, 'C_LOCK')&1 ~= 1 then -- not locked
+			local item_st = GET(item, 'D_POSITION')
+			local item_end = item_st + GET(item, 'D_LENGTH')
+				if r.IsMediaItemSelected(item) and curs_pos_init > item_st and curs_pos_init <= item_end then -- item under edit cursor
+				local take = r.GetActiveTake(item)
+					if take then -- only respecting active take in each item and ignoring empty items which don't have takes
+					local take_idx = r.GetMediaItemTakeInfo_Value(take, 'IP_TAKENUMBER')
+					t[item] = {idx=take_idx} -- if no markers in the take or no left of cursor one will be inserted; item pointer and take index are stored to be able to get take with GetTake(item, t.idx)
+					t = get_take_mrkrs_at_curs(t, item, take, curs_pos_init)
+					end
+				end
+			end
+		end
+	end
+
+return t, curs_pos_init
+
+end
+
+
 
 
 --========================== M A R K E R S  &  R E G I O N S  E N D =========================
@@ -12811,6 +12997,7 @@ function Find_Window_SWS(wnd_name, want_main_children)
 	end
 
 -- search for floating window
+-- won't be found if closed
 local wnd = Find_Win(wnd_name)
 
 	if wnd then return wnd end -- if not found the function will continue
@@ -12866,6 +13053,9 @@ function Get_Child_Windows_SWS(parent_wnd)
 -- once window handles have been collected
 -- they can be analyzed further for presence of certain string
 -- using BR_Win32_GetWindowText()
+
+	if not parent_wnd then return end
+
 local child = r.BR_Win32_GetWindow(parent_wnd, 5) -- 5 = GW_CHILD, returns 1st child
 	if not child then return end -- no children
 local i, t = 0, {}
@@ -12923,6 +13113,7 @@ function Scroll_SWS_Notes_Window(parent_wnd, str, tr, want_highlight)
 -- str is string to be found in the Notes
 -- tr is selected track, only relevant for Track Notes
 -- want_highlight is boolean to trigger highlighting of the line being scrolled to;
+-- no scrolling will occur if the track notes aren't found in the Notes window
 -- the function may require waiting until window fully loads if script is short
 -- and runs through faster than window loads, otherwise it won't affect the window
 -- for this run the function inside a defer function which must be the last in the script
@@ -12968,8 +13159,8 @@ local i, notes = 1
 			if not notes then
 			local notes_tmp = r.NF_GetSWSTrackNotes(tr)
 				if #notes_tmp:gsub('[%c%s]','') > 0 then
-				local test_str = 'ISTRACKNOTES\n'
-				r.NF_SetSWSTrackNotes(tr, test_str..notes_tmp) -- add a test string to start of the notes so it's sure to be included in the string returned by the limited BR_Win32_GetWindowText() version
+				local test_str = 'ISTRACKNOTES' -- the test string is initialized without line break char to be able to successfully find it in the window text because search with the line break char will fail due to carriage return \r being added to the end of the line and thus preceding the line break, i.e. 'ISTRACKNOTES\r\n'
+				r.NF_SetSWSTrackNotes(tr, test_str..'\n'..notes_tmp) -- add a test string to start of the notes so it's sure to be included in the string returned by the limited BR_Win32_GetWindowText() version 
 				local ret, txt = r.BR_Win32_GetWindowText(child)
 					if ret and txt:match(test_str) and string_exists(notes_tmp, str) then
 					notes = notes_tmp
@@ -12987,21 +13178,38 @@ local i, notes = 1
 
 	if notes then
 	local line_cnt, notes = 0, notes:sub(-1) ~= '\n' and notes..'\n' or notes -- ensures that the last line is captured with gmatch search
+	local target_line
 		for line in notes:gmatch('(.-)\n') do	-- accounting for empty lines because all must be counted
-			if line:match(str) then break end -- stop counting because that's the line which should be reached by scrolling but not scrolled past; to cover all cases str must be escaped with Esc() function but here it's not necessary
-		line_cnt = line_cnt+1
+			if line:match(str) then 
+			target_line = line
+			break end -- stop counting because that's the line which should be reached by scrolling but not scrolled past; to cover all cases str must be escaped with Esc() function but here it's not necessary
+		line_cnt = line_cnt+1 -- if this expression preceded 'break end' above, 1 would have to be subtracted from it in the scroll loop below to stop scrolling at the target line and not scroll past it
 		end
 	-- r.PreventUIRefresh(1) doesn't affect windows
 	--	set scrollbar to top to procede from there on down by lines
 	r.BR_Win32_SendMessage(child, 0x0115, 6, 0) -- msg 0x0115 WM_VSCROLL (undocumented in the SWS API doc), 6 SB_TOP, 7 SB_BOTTOM, 2 SB_PAGEUP, 3 SB_PAGEDOWN, 1 SB_LINEDOWN, 0 SB_LINEUP https://learn.microsoft.com/en-us/windows/win32/controls/wm-vscroll
 		for i=1, line_cnt do
 		r.BR_Win32_SendMessage(child, 0x0115, 1, 0) -- msg 0x0115 WM_VSCROLL, lParam 0, wParam 1 SB_LINEDOWN scrollbar moves down / 0 SB_LINEUP scrollbar moves up that's how it's supposed to be as per explanation at https://learn.microsoft.com/en-us/windows/win32/controls/wm-vscroll but in fact the message code must be passed here as lParam while wParam must be 0, same as at https://stackoverflow.com/questions/3278439/scrollbar-movement-setscrollpos-and-sendmessage
+		-- WM_VSCROLL is equivalent of EM_SCROLL 0x00B5 https://learn.microsoft.com/en-us/windows/win32/controls/em-scroll
 		end
 		if want_highlight then
 		r.BR_Win32_SetFocus(child) -- window must be focused for selection to work
 	--	SendMsg(child, 0x00B1, char_cnt+1, char_cnt+20) -- EM_SETSEL 0x00B1, wParam start char index, lParam -1 to select all text or end char index // char_cnt isn't accurate because it doesn't include line breaks which are ignored in the gmatch pattern
-		notes = notes:gsub('[\128-\191]','') -- remove extra (continuation or trailing) bytes in case text is Unicode so string.find counts characters accurately
-		local line_st = notes:find(Esc('\n'..target_line)) or 0 -- if not the first line, new line char must be taken into account for start value to refer to the visible start of the line otherwise the start will be offset by 1
+
+		-- THE FOLLOWING line_st VALUE IS ONLY ACCURATE BECAUSE notes VAR STEMS FROM BR_Win32_GetWindowText()
+		-- or JS_Window_GetTitle() WHICH RETURN TEXT FROM WINDOW AND IN THE WINDOW EACH LINE FOLLOWED
+		-- BY A NEW LINE IS TERMINATED WITH CARRIAGE RETURN \r WHICH IS COUNTED AS WELL. 
+		-- THIS WOULDN'T HAVE BEEN THE CASE IF notes VAR STEMMED FROM NF_GetSWSTrackNotes()
+		-- and the count of lines preceding the target line would have to be added to line_st
+		-- e.g. notes:find(Esc('\n'..target_line)) + line_cnt or 0
+		local line_st = notes:find(Esc('\n'..target_line)) or 0 -- if not the first line, new line char must be taken into account for start value to refer to the visible start of the line otherwise the start will be offset by 1 because for accurate selection the cursor must start before the first selection character which is the same as past the previous one
+		
+		-- correct the char count of notes preceding the target line by subtracting extra (continuation or trailing) bytes count
+		-- in case Unicode chars are present so that text selection/highlighting is accurate
+		-- because it's performed on the basis of characters rather than bytes
+		local extra_bytes_cnt = select(2, notes:match('(.-)'..Esc(target_line)):gsub('[\128-\191]','')) 
+		line_st = line_st - extra_bytes_cnt
+		
 		local line_len = #target_line:match('(.+:%d+.%d+)') -- in segment entry only heghlight the time stamp(s)
 		-- https://learn.microsoft.com/en-us/windows/win32/controls/em-setsel
 		SendMsg(child, 0x00B1, line_st, line_st+line_len) -- EM_SETSEL 0x00B1, wParam line_st, lParam line_st+line_len
@@ -14539,7 +14747,7 @@ end
 
 
 function Adjust_Velocity_By_dB(vel, dB) 
--- only relevant for plugins using normalized scale (0 - 1) for gain interpolation
+-- only relevant for plugins using normalized scale (0..1) for gain interpolation
 -- first or all ReaPlugs (RS5k, ReaSynth)
 -- https://dobrian.github.io/cmp/topics/linear-mapping-and-interpolation/1.IntroductionToLinearInterpolation&LinearMapping.html
 -- Thanks to Justin
@@ -14548,7 +14756,7 @@ function Adjust_Velocity_By_dB(vel, dB)
 -- Linear interpolation of gain (so if mapping 0..127 to -inf .. +0dB, 63 would be around -6dB (0.5), 32 would be around -12dB (0.25) etc. 
 -- https://www.askjf.com/index.php?q=6925s
 -- the code snippet converts velocity units to dB units
---[[
+--[[ -- sc stands for scale
 max_sc = 1; // +0 dB, aka 10^(0/20)
 min_sc = 0; // -inf dB
 max_v = 127;
@@ -14650,7 +14858,11 @@ function Msg(param) -- X-Raym's
 reaper.ShowConsoleMsg(tostring(param).."\n")
 end
 
+-- this is probably the origin of the debug version
+-- https://forum.cockos.com/showthread.php?p=1799680
 local Debug = ""
+-- OR
+-- local Debug = not select(2, r.get_action_context()):match('.+[\\/]BuyOne_') and "" -- in public scripts audomatically disabled
 function Msg(param, cap) -- caption second or none
 local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
 	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
@@ -14692,6 +14904,41 @@ end
 -- e.g. printf(">\tnote %d\tchan=%s vel=%s\n", note.pitch, note.chan, note.vel)
 
 
+-- Debugging function
+-- https://forums.cockos.com/showthread.php?t=189118
+-- You put first on top of your script the function os.remove("C:\\ReascriptLog.txt") 
+-- and then the Msg() function. Whenever you want to find out in your script what some 
+-- variable is doing you simply write: Msg(' ') and put your variable inside ' '. 
+-- It will create a log txt file with the name and path you have specified. 
+-- If you change the path do not forget to change it in the os.remove function too.
+-- If you add in the end of your script the function 
+-- os.execute('start "" '..'"C:\\ReascriptLog.txt"'), 
+-- the log file will open automatically
+os.remove("C:\\ReascriptLog.txt")
+function DebugMsg(name)
+-- usage: Msg('  ') // put inside the '' what you want to get
+local value = _G[name]
+	for i=1,math.huge do
+	 local localname, localvalue = debug.getlocal(2,i,1)
+		if not localname then
+		break -- no more locals to check
+		elseif localname == name then
+		value = localvalue
+		end
+	end
+	if value then
+	message = (string.format("%s = %s", name, tostring(value)).."\n")
+	else
+	message = (string.format("No variable named '%s' found.", name).."\n")
+	end
+file = io.open("C:\\ReascriptLog.txt", "a")
+file:write(message)
+file:close()
+end
+os.execute('start "" '..'"C:\\ReascriptLog.txt"')
+
+
+
 local date = os.date('%H-%M-%S_%d.%m.%y') -- a convenient way to make file names unique and prevent clashes
 
 
@@ -14720,7 +14967,7 @@ end
 function is_set(sett, is_literal) 
 -- sett is a string
 -- is_literal is boolean to determine the gsub pattern
--- in case literal string is used as sett, e.g. [[ ]]
+-- in case a long string is used as sett, i.e. the one inside [[ ]]
 
 -- if literal string is used as sett it may happen to contain 
 -- implicit new lines which should be accounted for in evaluation
@@ -14732,9 +14979,9 @@ end
 function validate_sett(sett, is_literal)
 -- validate setting, can be either a non-empty string or any number
 -- is_literal is boolean to determine the gsub pattern
--- in case literal string is used for a setting, e.g. [[ ]]
+-- in case a long literal string is used as sett, i.e. the one inside [[ ]]
 
--- if literal string is used for a setting it may happen to contain 
+-- if a long literal string is used for a setting it may happen to contain 
 -- implicit new lines which should be accounted for in evaluation
 local pattern = is_literal and '[%s%c]' or ' '
 return type(sett) == 'string' and #sett:gsub(pattern,'') > 0 or type(sett) == 'number'
@@ -14751,8 +14998,9 @@ end
 
 
 function validate_settings1(is_literal, ...) -- if actual setting value is immaterial
--- if literal string is used for all settings they may happen to contain 
--- implicit new lines which should be accounted for in evaluation
+-- if a long literal string is used for all settings, i.e. the one inside [[ ]] 
+-- they may happen to contain implicit new lines 
+-- which should be accounted for in evaluation
 local pattern = is_literal and '[%s%c]' or ' '
 local t = {...}
 	for k, sett in ipairs(t) do
@@ -14943,7 +15191,7 @@ local help_t = {}
 		if #help_t == 0 and line:match('About:') then
 		help_t[#help_t+1] = line:match('About:%s*(.+)')
 		about = 1
-		elseif line:match('----- USER SETTINGS ------') then
+		elseif line:match('----- USER SETTINGS ------') then -- captures without escaped '-' for some reason
 		r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'), r.ClearConsole()) return -- trimming the first line of user settings section because it's captured by the loop
 		elseif about then
 		help_t[#help_t+1] = line:match('%s*(.-)$')
@@ -14969,22 +15217,26 @@ local opts = r.GetExtState(named_ID, 'OPTIONS')
 	if not t then -- GET
 	local t = {}
 		for i=opt_st_idx, opt_end_idx do
-		t[i] = 0
+		t[i] = 0 -- initialize all off
 		end
 	local i = opt_st_idx
 		for opt in opts:gmatch('%d') do
-			if opt then		
+			if opt then
 			t[i] = opt
 			i=i+1
 			end
 		end
-	return t
+	return t -- will be used for adding checkmarks to the menu and for activating the SET stage
 	else -- SET
 	local cnt = opt_end_idx-opt_st_idx+1
 	opts = want_excl and ('0'):rep(cnt) or opts
+-- OR without cnt
+--	opts = want_excl and ('0'):rep(#t) or opts
 		for k, opt in ipairs(t) do
 			if output == k then
 			local new_val = opt == '1' and '0' or '1' -- toggle
+		-- OR
+		--	local new_val = tonumber(opt)~1 -- toggle
 			local i = 0
 			opts = opts:gsub('0', function() i=i+1 if i==k then return new_val end end)
 			break end
@@ -14996,6 +15248,8 @@ local opts = r.GetExtState(named_ID, 'OPTIONS')
 			i=i+1
 				if i == output then
 				local new_val = t[i] == '1' and '0' or '1' -- toggle
+			-- OR
+			-- local new_val = tonumber(t[i])~1 -- toggle
 				local i = 0
 				opts = opts:gsub('0', function() i=i+1 if i==output then return new_val end end)
 				break end
@@ -15574,7 +15828,7 @@ end
 
 
 function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator, comment_field, comment)
--- title string, field_cnt integer, field_names string separator delimited
+-- title string, field_cnt integer, field_names string comma delimited
 -- the length of field names list should obviously match field_cnt arg
 -- it's more reliable to contruct a table of names and pass the two vars field_cnt and field_names as #t, t
 -- field_cont is empty string unless they must be initially filled
@@ -15583,6 +15837,7 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 -- in which case it's a separator delimited list e.g.
 -- ,,field 3,,field 5
 -- separator is a string, character which delimits the fields
+-- MULTIPLE CHARACTERS CANNOT BE USED AS FIELD SEPARATOR, FIELD NAMES LIST OR ITS FORMATTING BREAKS
 -- comment_field is boolean, comment is string to be displayed in the comment field
 -- extrawidth parameter is inside the function
 	if field_cnt == 0 then return end
@@ -15618,6 +15873,7 @@ field_cnt = #comment > 0 and field_cnt-1 or field_cnt -- adjust for the next sta
 	elseif field_cnt > 1 and output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)
 	or #output:gsub('[%s%c]','') == 0 then return 'empty' end
 	]]
+-- construct table out of input fields
 local t = {}
 	for s in output:gmatch('(.-)'..sep) do
 		if s then t[#t+1] = s end
@@ -15628,6 +15884,7 @@ local t = {}
 	-- it wasn't caught in the above loop
 	t[#t+1] = output:match('.+'..sep..'(.*)')
 	end
+-- return fields content in a table and as a string to refill the dialogue on reload
 return t, #comment > 0 and output:match('(.+)'..sep) or output -- remove hanging separator if there was a comment field, to simplify re-filling the dialogue in case of reload, when there's a comment the separator will be added with it
 end
 
@@ -16080,6 +16337,26 @@ end
 -- USE:
 -- if REAPER_Ver_Check3(build, want_later, want_earlier, want_current)
 -- then return r.defer(function() do return end end) end -- OR use no_undo() function
+
+
+function SWS_Version_Check(ver, older, newer, same)
+-- ver is a string contaning a version number 
+-- to compare current version againts
+-- the rest are booleans which are comparison criteria
+-- obviously older and newer are mutually exclusive
+-- and option 'older' has priority if both are true
+-- same is compatible with both and complementary
+-- or can be used by itself
+	if r.CF_GetSWSVersion then -- accounting for versions before this function was available
+	-- https://forums.cockos.com/showthread.php?p=2026809 2.9.8
+	-- remove all dots so it looks like an integer and convert to number
+	local ver = ver:gsub('%.','')+0
+	local curr_ver = r.CF_GetSWSVersion():gsub('%.','')+0
+	local result = older and curr_ver < ver or not older and newer and curr_ver > ver -- 'not older' ensures that when both older and newer args are true the function doesn't return truth if first evaluaton fails because not older
+	return result or same and curr_ver == ver
+	end
+end
+
 
 
 function how_recently_the_project_was_saved()
@@ -16911,6 +17188,173 @@ end
 
 --============================ C O N V E R S I O N S ==============================
 
+
+function char_to_bytes(char)
+-- returns a string of bytes which comprise a character 
+-- e.g. '\195\128' 'À', '\196\141' 'č'
+local i = 1
+local byte_code = ''
+	repeat
+	local byte = char:byte(i)
+		if byte then
+		byte_code = byte_code..'\\'..byte
+		end
+	i = i+1
+	until not byte
+return byte_code
+end
+
+
+local function unicode_to_utf8(code)
+-- https://stackoverflow.com/questions/41855842/converting-utf-8-string-to-ascii-in-pure-lua/41859181#41859181
+-- converts numeric UTF code (U+code) to UTF-8 string, i.e. actual character
+-- code arg is a hex number, i.e. 0x0000 or integer in base 10 
+-- from the UTF-8 code page 2nd or 1st columns here https://www.charset.org/utf-8
+local t, h = {}, 128
+	while code >= h do
+		t[#t+1] = 128 + code%64
+		code = math.floor(code/64)
+		h = h > 32 and 32 or h/2
+	end
+t[#t+1] = 256 - 2*h + code
+return string.char(table.unpack(t)):reverse()
+end
+
+
+local function utf8_to_unicode(utf8str, pos)
+-- https://stackoverflow.com/questions/41855842/converting-utf-8-string-to-ascii-in-pure-lua/41859181#41859181
+-- pos = starting byte position inside input string (default 1)
+pos = pos or 1
+local code, size = utf8str:byte(pos), 1
+	if code >= 0xC0 and code < 0xFE then
+	local mask = 64
+	code = code - 128
+		repeat
+		local next_byte = utf8str:byte(pos + size) or 0
+			if next_byte >= 0x80 and next_byte < 0xC0 then
+				code, size = (code - mask - 2) * 64 + next_byte, size + 1
+			else
+				code, size = utf8str:byte(pos), 1
+			end
+		mask = mask * 32
+		until code < mask
+	end
+-- returns code, number of bytes in this utf8 char
+return code, size
+end
+
+-----------ARABIC WIN-1256 TO UTF-8---------------------------------
+
+-- https://stackoverflow.com/questions/16624036/how-to-convert-windows-1256-to-utf-8-in-lua#16627763
+local win2utf_list = [[
+0x00    0x0000  #NULL
+0x01    0x0001  #START OF HEADING
+0x02    0x0002  #START OF TEXT
+-- Download full text from 
+-- http://www.unicode.org/Public/MAPPINGS/VENDORS/MICSFT/WINDOWS/CP1256.TXT
+0xFD    0x200E  #LEFT-TO-RIGHT MARK
+0xFE    0x200F  #RIGHT-TO-LEFT MARK
+0xFF    0x06D2  #ARABIC LETTER YEH BARREE
+]]
+
+local win2utf = {}
+
+	for w, u in win2utf_list:gmatch'0x(%x%x)%s+0x(%x+)' do
+	local c, t, h = tonumber(u,16), {}, 128
+		while c >= h do
+			t[#t+1] = 128 + c%64
+			c = math.floor(c/64)
+			h = h > 32 and 32 or h/2
+		end
+	t[#t+1] = 256 - 2*h + c
+	win2utf[w.char(tonumber(w,16))] = 
+	w.char((table.unpack or unpack)(t)):reverse()
+	end
+
+local function convert_to_utf8(win_string)
+return win_string:gsub('.', win2utf)
+end
+
+--------------------------------------------
+
+function convert_case_in_unicode(str, want_upper_case)
+-- by default converts to lower case
+-- want_case is boolean to convert to upper case
+-- if false/nil convertion into lower will be done
+-- https://stackoverflow.com/questions/41855842/converting-utf-8-string-to-ascii-in-pure-lua/41859181#41859181
+-- https://stackoverflow.com/questions/13235091/extract-the-first-letter-of-a-utf-8-string-with-lua
+-- https://www.ibm.com/docs/en/i/7.3?topic=tables-unicode-lowercase-uppercase-conversion-mapping-table -- this is only a list of ordinal number correspondence within the table, such as at https://www.charset.org/utf-8, not actual code point values
+-- https://stackoverflow.com/questions/29966782/how-to-embed-hex-values-in-a-lua-string-literal-i-e-x-equivalent
+
+-- t table below contains Unicode code points, i.e. U+codepoint in base 10 rather than hex for brevity
+-- code points reference table see at https://www.charset.org/utf-8
+-- fields order: upper case, lower case
+local t = { 
+-- the commented out code is basic latin code points which are supported by the stock lua string lib so redundant
+-- {65,97}, {66,98}, {67,99}, {68,100}, {69,101}, {70,102}, {71,103}, {72,104}, {73,105}, {74,106}, {75,107}, {76,108}, {77,109}, {78,110}, {79,111}, {80,112},
+{81,113},{82,114},{83,115},{84,116},{85,117},{86,118},{87,119},{88,120},{89,121},{90,122},{192,224},{193,225},{194,226},{195,227},{196,228},{197,229},{198,230},{199,231},{200,232},{201,233},{202,234},{203,235},{204,236},{205,237},{206,238},{207,239},{208,240},{209,241},{210,242},{211,243},{212,244},{213,245},{214,246},{216,248},{217,249},{218,250},{219,251},{220,252},{221,253},{222,254},{376,255},{256,257},{258,259},{260,261},{262,263},{264,265},{266,267},{268,269},{270,271},{272,273},{274,275},{276,277},{278,279},{280,281},{282,283},{284,285},{286,287},{288,289},{290,291},{292,293},{294,295},{296,297},{298,299},{300,301},{302,303},{73,305},{306,307},{308,309},{310,311},{313,314},{315,316},{317,318},{319,320},{321,322},{323,324},{325,326},{327,328},{330,331},{332,333},{334,335},{336,337},{338,339},{340,341},{342,343},{344,345},{346,347},{348,349},{350,351},{352,353},{354,355},{356,357},{358,359},{360,361},{362,363},{364,365},{366,367},{368,369},{370,371},{372,373},{374,375},{377,378},{379,380},{381,382},{386,387},{388,389},{391,392},{395,396},{401,402},{408,409},{416,417},{418,419},{420,421},{423,424},{428,429},{431,432},{435,436},{437,438},{440,441},{444,445},{452,454},{455,457},{458,460},{461,462},{463,464},{465,466},{467,468},{469,470},{471,472},{473,474},{475,476},{478,479},{480,481},{482,483},{484,485},{486,487},{488,489},{490,491},{492,493},{494,495},{497,499},{500,501},{506,507},{508,509},{510,511},{512,513},{514,515},{516,517},{518,519},{520,521},{522,523},{524,525},{526,527},{528,529},{530,531},{532,533},{534,535},{385,595},{390,596},{394,599},{398,600},{399,601},{400,603},{403,608},{404,611},{407,616},{406,617},{412,623},{413,626},{415,629},{425,643},{430,648},{433,650},{434,651},{439,658},{902,940},{904,941},{905,942},{906,943},{913,945},{914,946},{915,947},{916,948},{917,949},{918,950},{919,951},{920,952},{921,953},{922,954},{923,955},{924,956},{925,957},{926,958},{927,959},{928,960},{929,961},{931,963},{932,964},{933,965},{934,966},{935,967},{936,968},{937,969},{938,970},{939,971},{908,972},{910,973},{911,974},{994,995},{996,997},{998,999},{1000,1001},{1002,1003},{1004,1005},{1006,1007},{1040,1072},{1041,1073},{1042,1074},{1043,1075},{1044,1076},{1045,1077},{1046,1078},{1047,1079},{1048,1080},{1049,1081},{1050,1082},{1051,1083},{1052,1084},{1053,1085},{1054,1086},{1055,1087},{1056,1088},{1057,1089},{1058,1090},{1059,1091},{1060,1092},{1061,1093},{1062,1094},{1063,1095},{1064,1096},{1065,1097},{1066,1098},{1067,1099},{1068,1100},{1069,1101},{1070,1102},{1071,1103},{1025,1105},{1026,1106},{1027,1107},{1028,1108},{1029,1109},{1030,1110},{1031,1111},{1032,1112},{1033,1113},{1034,1114},{1035,1115},{1036,1116},{1038,1118},{1039,1119},{1120,1121},{1122,1123},{1124,1125},{1126,1127},{1128,1129},{1130,1131},{1132,1133},{1134,1135},{1136,1137},{1138,1139},{1140,1141},{1142,1143},{1144,1145},{1146,1147},{1148,1149},{1150,1151},{1152,1153},{1168,1169},{1170,1171},{1172,1173},{1174,1175},{1176,1177},{1178,1179},{1180,1181},{1182,1183},{1184,1185},{1186,1187},{1188,1189},{1190,1191},{1192,1193},{1194,1195},{1196,1197},{1198,1199},{1200,1201},{1202,1203},{1204,1205},{1206,1207},{1208,1209},{1210,1211},{1212,1213},{1214,1215},{1217,1218},{1219,1220},{1223,1224},{1227,1228},{1232,1233},{1234,1235},{1236,1237},{1238,1239},{1240,1241},{1242,1243},{1244,1245},{1246,1247},{1248,1249},{1250,1251},{1252,1253},{1254,1255},{1256,1257},{1258,1259},{1262,1263},{1264,1265},{1266,1267},{1268,1269},{1272,1273},{1329,1377},{1330,1378},{1331,1379},{1332,1380},{1333,1381},{1334,1382},{1335,1383},{1336,1384},{1337,1385},{1338,1386},{1339,1387},{1340,1388},{1341,1389},{1342,1390},{1343,1391},{1344,1392},{1345,1393},{1346,1394},{1347,1395},{1348,1396},{1349,1397},{1350,1398},{1351,1399},{1352,1400},{1353,1401},{1354,1402},{1355,1403},{1356,1404},{1357,1405},{1358,1406},{1359,1407},{1360,1408},{1361,1409},{1362,1410},{1363,1411},{1364,1412},{1365,1413},{1366,1414},{4256,4304},{4257,4305},{4258,4306},{4259,4307},{4260,4308},{4261,4309},{4262,4310},{4263,4311},{4264,4312},{4265,4313},{4266,4314},{4267,4315},{4268,4316},{4269,4317},{4270,4318},{4271,4319},{4272,4320},{4273,4321},{4274,4322},{4275,4323},{4276,4324},{4277,4325},{4278,4326},{4279,4327},{4280,4328},{4281,4329},{4282,4330},{4283,4331},{4284,4332},{4285,4333},{4286,4334},{4287,4335},{4288,4336},{4289,4337},{4290,4338},{4291,4339},{4292,4340},{4293,4341},{7680,7681},{7682,7683},{7684,7685},{7686,7687},{7688,7689},{7690,7691},{7692,7693},{7694,7695},{7696,7697},{7698,7699},{7700,7701},{7702,7703},{7704,7705},{7706,7707},{7708,7709},{7710,7711},{7712,7713},{7714,7715},{7716,7717},{7718,7719},{7720,7721},{7722,7723},{7724,7725},{7726,7727},{7728,7729},{7730,7731},{7732,7733},{7734,7735},{7736,7737},{7738,7739},{7740,7741},{7742,7743},{7744,7745},{7746,7747},{7748,7749},{7750,7751},{7752,7753},{7754,7755},{7756,7757},{7758,7759},{7760,7761},{7762,7763},{7764,7765},{7766,7767},{7768,7769},{7770,7771},{7772,7773},{7774,7775},{7776,7777},{7778,7779},{7780,7781},{7782,7783},{7784,7785},{7786,7787},{7788,7789},{7790,7791},{7792,7793},{7794,7795},{7796,7797},{7798,7799},{7800,7801},{7802,7803},{7804,7805},{7806,7807},{7808,7809},{7810,7811},{7812,7813},{7814,7815},{7816,7817},{7818,7819},{7820,7821},{7822,7823},{7824,7825},{7826,7827},{7828,7829},{7840,7841},{7842,7843},{7844,7845},{7846,7847},{7848,7849},{7850,7851},{7852,7853},{7854,7855},{7856,7857},{7858,7859},{7860,7861},{7862,7863},{7864,7865},{7866,7867},{7868,7869},{7870,7871},{7872,7873},{7874,7875},{7876,7877},{7878,7879},{7880,7881},{7882,7883},{7884,7885},{7886,7887},{7888,7889},{7890,7891},{7892,7893},{7894,7895},{7896,7897},{7898,7899},{7900,7901},{7902,7903},{7904,7905},{7906,7907},{7908,7909},{7910,7911},{7912,7913},{7914,7915},{7916,7917},{7918,7919},{7920,7921},{7922,7923},{7924,7925},{7926,7927},{7928,7929},{7944,7936},{7945,7937},{7946,7938},{7947,7939},{7948,7940},{7949,7941},{7950,7942},{7951,7943},{7960,7952},{7961,7953},{7962,7954},{7963,7955},{7964,7956},{7965,7957},{7976,7968},{7977,7969},{7978,7970},{7979,7971},{7980,7972},{7981,7973},{7982,7974},{7983,7975},{7992,7984},{7993,7985},{7994,7986},{7995,7987},{7996,7988},{7997,7989},{7998,7990},{7999,7991},{8008,8000},{8009,8001},{8010,8002},{8011,8003},{8012,8004},{8013,8005},{8025,8017},{8027,8019},{8029,8021},{8031,8023},{8040,8032},{8041,8033},{8042,8034},{8043,8035},{8044,8036},{8045,8037},{8046,8038},{8047,8039},{8072,8064},{8073,8065},{8074,8066},{8075,8067},{8076,8068},{8077,8069},{8078,8070},{8079,8071},{8088,8080},{8089,8081},{8090,8082},{8091,8083},{8092,8084},{8093,8085},{8094,8086},{8095,8087},{8104,8096},{8105,8097},{8106,8098},{8107,8099},{8108,8100},{8109,8101},{8110,8102},{8111,8103},{8120,8112},{8121,8113},{8152,8144},{8153,8145},{8168,8160},{8169,8161},{9398,9424},{9399,9425},{9400,9426},{9401,9427},{9402,9428},{9403,9429},{9404,9430},{9405,9431},{9406,9432},{9407,9433},{9408,9434},{9409,9435},{9410,9436},{9411,9437},{9412,9438},{9413,9439},{9414,9440},{9415,9441},{9416,9442},{9417,9443},{9418,9444},{9419,9445},{9420,9446},{9421,9447},{9422,9448},{9423,9449},{65313,65345},{65314,65346},{65315,65347},{65316,65348},{65317,65349},{65318,65350},{65319,65351},{65320,65352},{65321,65353},{65322,65354},{65323,65355},{65324,65356},{65325,65357},{65326,65358},{65327,65359},{65328,65360},{65329,65361},{65330,65362},{65331,65363},{65332,65364},{65333,65365},{65334,65366},{65335,65367},{65336,65368},{65337,65369},{65338,65370}
+}
+
+	local function unicode_to_utf8(code)
+	-- credit belongs to Egor Skripunoff
+	-- https://stackoverflow.com/questions/41855842/converting-utf-8-string-to-ascii-in-pure-lua/41859181#41859181
+	-- converts numeric UTF code (U+code) to UTF-8 string, i.e. actual character
+	-- code arg is a hex number, i.e. 0x0000 or integer in base 10 
+	-- from the UTF-8 code page 2nd or 1st columns here https://www.charset.org/utf-8
+	local t, h = {}, 128
+		while code >= h do
+			t[#t+1] = 128 + code%64
+			code = math.floor(code/64)
+			h = h > 32 and 32 or h/2
+		end
+	t[#t+1] = 256 - 2*h + code
+	return string.char(table.unpack(t)):reverse()
+	end
+
+	for _, pair in ipairs(t) do
+	local cap, small = pair[1], pair[2]
+	local what = want_upper_case and small or cap
+	local with = want_upper_case and cap or small
+	what = unicode_to_utf8(what)
+		if str:match(what) then
+		with = unicode_to_utf8(with)
+		-- replace one case character instances with their other case instances
+		-- doing that 1 by 1, one character per repeat loop cycle
+		-- which is supposedly safer and more reliable especially when
+		-- str is long because string.gsub only supports a max of 32 replacements
+		local i = 1
+			repeat
+			str, cnt = str:gsub(what, with, 1) -- 1 instance only		
+			i = i+1
+			until cnt == 0 -- until no more replacaments
+		end
+	end
+
+return str
+
+end
+
+
+local function codepoint_to_utf8(n)
+-- https://github.com/ReaTeam/ReaScripts/pull/1293/files
+-- https://github.com/LostViking09/ReaScripts/blob/f1d25bf39701aedf0ebc286823c261e8e29ca92b/Tracks/dontcupthemic_Mixing%20Station%20track%20name%20import.lua
+-- http://scripts.sil.org/cms/scripts/page.php?site_id=nrsi&id=iws-appendixa
+  local f = math.floor
+  if n <= 0x7f then
+    return string.char(n)
+  elseif n <= 0x7ff then
+    return string.char(f(n / 64) + 192, n % 64 + 128)
+  elseif n <= 0xffff then
+    return string.char(f(n / 4096) + 224, f(n % 4096 / 64) + 128, n % 64 + 128)
+  elseif n <= 0x10ffff then
+    return string.char(f(n / 262144) + 240, f(n % 262144 / 4096) + 128,
+                       f(n % 4096 / 64) + 128, n % 64 + 128)
+  end
+  error( string.format("invalid unicode codepoint '%x'", n) )
+end
+
+
+
 -- BASE64 EN / DECODER
 
 function Mespotine_Base64_Encoder(source_string, remove_newlines, remove_tabs)
@@ -17052,7 +17496,7 @@ end
 
 -- BASE64 EN / DECODER END 
 
--- UNICODE -- UTF-8  CONVERTER  END
+-- UNICODE -- UTF-8  CONVERTER  START
 
 function codepoint_to_utf8(n)
 -- http://scripts.sil.org/cms/scripts/page.php?site_id=nrsi&id=iws-appendixa
@@ -17691,7 +18135,10 @@ S T R I N G S
 	format_time
 	format_timestr_alt
 	magiclines
+	parse_lines_in_reverse
 	hex
+	is_utf8_1
+	is_utf8_2
 
 
 T A B L E S
@@ -18061,6 +18508,7 @@ I T E M S
 	Is_Item_Under_Mouse
 	Is_Item_Under_Mouse_Locked
 	Insert_Image
+	Split_Item_Into_Takes_And_Reconstruct
 
 
 C O L O R
@@ -18113,6 +18561,7 @@ M A R K E R S  &  R E G I O N S
 	Get_Action_Marker_Data
 	Get_Last_Proj_Mrkr_Pos
 	Fix_Overlapping_Regions
+	Get_Mrkrs_Of_Takes_At_Mouse_Or_Edit_Curs
 
 	
 
@@ -18238,6 +18687,7 @@ U T I L I T Y
 
 	Msg
 	printf
+	DebugMsg
 	Is_Project_Start
 	Validate_Positive_Integer
 	is_set
@@ -18304,6 +18754,7 @@ U T I L I T Y
 	REAPER_Ver_Check1
 	REAPER_Ver_Check2
 	REAPER_Ver_Check3
+	SWS_Version_Check
 	how_recently_the_project_was_saved
 	Time_Sel_Or_Loop_Exist
 	Is_Ctrl_And_Shift
@@ -18339,7 +18790,11 @@ U T I L I T Y
 
 
 C O N V E R S I O N S
-
+	
+	char_to_bytes
+	unicode_to_utf8
+	utf8_to_unicode
+	convert_case_in_unicode
 	Mespotine_Base64_Encoder
 	Mespotine_Base64_Decoder
 	codepoint_to_utf8
