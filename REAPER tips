@@ -744,7 +744,7 @@ View: Scroll view down/up - scroll exactly track by track regardless of the zoom
 
 
 The following ones don't create undo points and undoing them may produce inconsistent results.
-Wrapping then inside a custom action seems to be a workround, it was tested with the last two.
+Wrapping them inside a custom action seems to be a workround, it was tested with the last two.
 
 SWS/BR: Insert CC event at edit cursor in lane under mouse cursor
 SWS/BR: Delete selected events in last clicked lane
@@ -876,6 +876,14 @@ https://forum.cockos.com/showpost.php?p=2784154&postcount=3323
 
 --------------------------------------------------
 
+
+-- SWS/wol: Toggle enable extended zoom for envelopes in track lane
+
+-- https://forums.cockos.com/showthread.php?t=163122
+
+
+--------------------------------------------------
+
 -- Track: Go to next track
 
 if selection is made from bottom to top, the track selected is the track after the last selected one
@@ -955,9 +963,20 @@ Since build 6.69 supports up to 512 channel
 https://www.youtube.com/watch?v=GKa3uGbz854&t=97s
 
 
-and since version 7 is a built-in option in Preferences -> Audio
+and since version 7 is a built-in option in Preferences -> Audio -> Virtual loopback audio hardware
+can be used alongside the parameter in reaper.ini
 
 https://www.youtube.com/watch?v=FAKiHozcE8o?t=1203s
+
+
+Example of a use case:
+
+Record on multiple tracks while printing FX on the way in via an FX chain on a single track
+
+1. Select Aux (Rearoute) Loopback output on the track housing the FX chain
+2. Select a parallel Aux (Rearoute) Loopback input in the recording preferences of the recording track
+
+https://www.youtube.com/watch?v=J4VZshHlVgU
 
 
 ===========================================================================
@@ -1926,11 +1945,37 @@ https://forums.cockos.com/showthread.php?t=231606
 -- Formatting Chapter tag of ID3 metadata
 
 
+If you add project markers named "CHAP=This is the first chapter", "CHAP=Chapter 2", 
+
+"CHAP=Here is another chapter", etc, then render to MP3 with embed metadata enabled, 
+
+the chapter markers should be embedded in the MP3 (they're also supported by FLAC).
+
+https://forum.cockos.com/showthread.php?t=214245#10
+
+
 The project marker should read "CHAP=some content". The chapters will be automatically numbered.
 
 The mp3 chapter tag encoding doesn't support chapter numbers as a separate field from the chapter name
 
 https://forum.cockos.com/showthread.php?t=235766&highlight=chapter
+
+
+This is possible in REAPER 6.16 and later. If you open the project metadata dialog, 
+
+you can see all of the types of metadata that REAPER supports, including chapter markers, 
+
+which are supported for mp3, flac, ogg, and opus files. You can embed chapter markers 
+
+by creating project markers or regions named "CHAP=XXX", for example "CHAP=Introduction", 
+
+"CHAP=A Dark and Stormy Night", etc. In the render dialog, check the box to embed the 
+
+metadata into the rendered file.
+
+
+https://forum.cockos.com/showthread.php?t=245738#2
+
 
 =========================================================================
 
@@ -3573,6 +3618,38 @@ Action: Skip next action if CC parameter >0/mid -- mousewwheel out, skip next, r
 
 useful to dictate action depending on the mouse wheel direction
 
+if each alternative action is comprised of several individual actions, each must be preceded with 'Action: Skip next ...' action, e.g.
+
+
+Custom: Shift time selection by grid (map to mousewheel - out = right, in = left)
+  ------------------------------------------------------------ alternative 1
+  Action: Skip next action if CC parameter <0/mid
+  Go to start of time selection
+  Action: Skip next action if CC parameter <0/mid
+  View: Move cursor right to grid division
+  Action: Skip next action if CC parameter <0/mid
+  Time selection: Set start point
+  Action: Skip next action if CC parameter <0/mid
+  Go to end of time selection
+  Action: Skip next action if CC parameter <0/mid
+  View: Move cursor right to grid division
+  Action: Skip next action if CC parameter <0/mid
+  Time selection: Set end point
+  ------------------------------------------------------------ alternative 2
+  Action: Skip next action if CC parameter >0/mid
+  Go to start of time selection
+  Action: Skip next action if CC parameter >0/mid
+  View: Move cursor left to grid division
+  Action: Skip next action if CC parameter >0/mid
+  Time selection: Set start point
+  Action: Skip next action if CC parameter >0/mid
+  Go to end of time selection
+  Action: Skip next action if CC parameter >0/mid
+  View: Move cursor left to grid division
+  Action: Skip next action if CC parameter >0/mid
+  Time selection: Set end point
+
+
 The action 
 Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
 can be used to detect toggle state and set CC param to refer to downstream with another 'Action: Skip next action ...'
@@ -3624,6 +3701,30 @@ Custom: Toggle alternate M shortcut MOMENTARY (proof of concept) -- activate 'To
   Track: Toggle mute for selected tracks
   Action: Skip next action if CC parameter <0/mid
   Mixer: Toggle show track icons in mixer
+
+-- as native dummy toggle actions the following can be used linked to a toolbar button because they don't alter behavior drastically
+-- and in a way which may militate against the workflow or playback or layout/appearance
+
+View: Toggle transport visible
+View: Toggle show/hide item labels
+View: Toggle show media cues in items
+View: Toggle master track visible
+View: Toggle displaying labels above/within media items
+View: Toggle auto-view-scroll while recording
+View: Toggle auto-view-scroll during playback
+Transport: Toggle preserve pitch in audio items when changing master playrate
+Track: Toggle show/hide in mixer
+Track: Toggle all track grouping enabled
+Toggle external timecode synchronization
+Monitoring FX: Toggle bypass
+Mixer: Toggle tracks with receives in mixer
+Mixer: Toggle show track icons in mixer
+Mixer: Toggle show icons for the last track in a folder
+Options: Show FX inserts in TCP (when size permits)
+Options: Show sends in TCP (when size permits)
+Some locking toggle actions
+Item properties: Toggle item play all takes
+
 
 - Or a dummy Lua script with the following code can be used to toggle the state:
 
@@ -4459,6 +4560,7 @@ Method 2
 
 
 https://youtu.be/fZhU0HyLreI?t=47
+https://www.youtube.com/watch?v=VwgvBtAZLZU
 
 
 1. Duplicate the track with the drum stem/break as many times as there're elements you wish to convert to MIDI
@@ -4477,6 +4579,28 @@ into 'Audio to MIDI Trigger' JSFX plugin Threshold parameter field. The dialogue
 
 available in the item context menu
 
+
+
+--------------------------------------------
+
+Method 3
+
+
+1. In the 'Dinamic split' dialogue under 'Action to perform' enable 'Split selected item' option and check 'Create chromatic MIDI from slices'
+
+2. Run dynamic split on the selected item
+
+3. Heal the splits in the item using action 'Item: Heal splits in items'
+
+4. In the chromatic MIDI item just created select all notes, open 'Event properties' aka 'Note properties' dialogue
+
+and clamp all events to the same note by selecting the desired note from the 'Note:' drop-down list and clicking OK
+
+5. Once you've gone through steps 1-4 for each type of drum part, if you also need to combine all the parts into a single MIDI item
+
+place all the MIDI files which have been created, on top of each other, select the top one with marquee so that the ones beneath
+
+are also selected and Glue them
 
 
 ==============================================================
@@ -4630,16 +4754,265 @@ place the cursor at the very end and hit Ctr+Shift+Home
 
 ==============================================================
 
+-- Importing .ReaperMenu dumps
+
+
+REAPER doesn't allow importing dump files into a menu section or a toolbar
+
+whose header (title) is different from the one stored inside .ReaperMenu file
+
+between square brackets at the top. For example floating toolbar 2 dump cannot
+
+be imported into a toolbar other than 2.
+
+To overcome this change the dump file header so it matches the toolbar or the menu
+
+title the dump file is being imported into.
+
+
+==============================================================
+
+-- Create custom named command IDs for custom actions and scripts
+
+a method discovered by X-Raym
+
+
+1. Install a script or create a custom action in the Action list
+
+2. Export it as .ReaperKeyMap file from the Action list
+
+3. Replace its current named command ID which looks like so "d6bfa01f0785664bac5abb42b0035b9e" inside the .ReaperKeyMap file
+
+4. Import it back into the Action list
+
+(with scripts they must keep residing at the same path, otherwise the path too can be modified inside the .ReaperKeyMap file: 
+
+if the script is located inside the \Scripts directory its path must be relative to it, if it's located outside of it
+
+it must be absolute)
+
+5. Delete the old entries
+
+Steps 4 and 5 can be swapped
+
+
+SOME WARNINGS AND GUIDELINES
+
+This method is a hack. It had for purpose to showcase a problem, and our desire to fínd a way to overcome it. 
+
+Cockos developpers personnaly recommend to not abuse of it, and even to not use it at all. 
+
+Speaking about COMMAND_ID, I don’t know yet all we have to know to make a good one, but based on what I was 
+
+from SWS extensions, I will advice you to keep it concise, without spaces, and write it in UPPERCASE. Of course, 
+
+it has to be unique, so add your pseudo as preíx may be a way to be sure that your COMMAND_ID will be unique.
+
+A proper COMMAND_ID is critical. I Don’t know what are there limites but I have bad surprises with actions names 
+
+so here as general guidelines based on my experiences: 
+
++ Letters, numbers and underscore (_) only
+
++ Letters Uppercase
+
++ Don’t start with an underscore (_): it will be added automatically
+
++ No more than 34 characters (it seems to work with more but this I cannot be sure)
+
++ Use a distinct initial as preíx (from your pseudo for eg), to be sure that your command IDs will be unique
+
+Command_ID seem to be more îexible than that but it's impossible to test every scenario (aka call from other scripting language, 
+
+diìerent OS, toolbars etc…), so keep it simple.
 
 
 
+Script displayed name can be modified as well. In the .ReaperKeyMap file the script name will start with 'Custom:'
+
+just like a custom action. After import it'll be replaced with 'Script:'
+
+If you want to change a script displayed name, you will have to delete its current entry írst.
+
+
+https://www.extremraym.com/en/advanced-reascripts-management/
+https://www.youtube.com/watch?v=Y_K8vIuBaB8
+http://forum.cockos.com/showthread.php?t=156798
+https://forum.cockos.com/showthread.php?t=221328
+
+
+==============================================================
+
+-- Side-chain on the Master track
+
+1. Send the signal of the side-chain source to channels 3/4 in parallel with 1/2
+
+if it also has to be heard in the mix or instead of 1/2 if it must be muted by checking
+
+relevant boxes in the VST Out matrix of the side-chain source plugin Pin connector dialogue. 
+
+Increase the number of matrix channels if 3/4 isn't available.
+
+2. From the Master Track channels drop-down selector in the I/O (Routing) dialogue select at least 4.
+
+That's it.
+
+https://www.youtube.com/watch?v=aEgdJKlC8AA
+
+==============================================================
+
+-- REAPER debugging with higher timer rates
+
+will never get out of +dev builds, in the [REAPER] section, requires a restart of REAPER to take effect:
+
+fasttimer=x
+x having 1 set means run csurf/automation timers at a higher rate
+x having 2 set means run misc timers from message pump if stalled (Windows only)
+x having 4 set means run meter timers from message pump if stalled (Windows only)
+
+(these can be combined, e.g. 3 is 1 and 2 set, 5 is 1 and 4, etc).
+
+https://forum.cockos.com/showthread.php?t=293607#5
+
+==============================================================
+
+-- Save a script preventing its immediate execution (useful for defer scripts)
+
+
+Ctrl+Shift+S
+
+https://forum.cockos.com/showthread.php?t=274406#2
+
+
+==============================================================
+
+-- SWS Cycle action editor LABEL statement
+
+The LABEL statement is meant to allow running SWS/IX: Label processor commands from cycle actions 
+
+(also accessible from the SWS/S&M extension menu)
+
+ref: https://github.com/reaper-oss/sws/issues/562
+
+
+==============================================================
+
+-- ReaTune color
+
+Manual Correction piano roll background color has the same color settings
+
+as the MIDI Editor background colors in the 'Theme Development / Tweaker' window
+
+
+https://www.youtube.com/watch?v=3W7uVvcl1zo&lc=Ugw6A2Rcws8lR4tvCsR4AaABAg.A6xBqClyFdXA6xcyrAH1sW
+
+==============================================================
+
+-- Syncing up several open projects with offset
+
+
+Supported since v7
+
+1. In each project add a marker named =REF at locations from which the particular project must start playing
+
+OR which determine by how much projects playback will be offset relative to each other if playback starts elsewhere
+
+2. Enable the following options in project tab right-click context menu:
+
+'Run baclkground projects'
+
+'Play stopped background projects with active project'
+
+'Synchronize play start times w/ play background projects'
+
+
+The feature is in essence an enhancement of the last option which allows syncing with offset
+
+The playback in each project may start from anywehere but the difference in =REF markers location
+
+will determine the relative difference between the current playhead positions in each project
 
 
 
+https://forum.cockos.com/showthread.php?t=284653 -- not much info here, but can be used for further discussion if needed
+
+==============================================================
 
 
+-- Render/Batch converter 'Postprocess render' window (Normalize/Limit/Fade) order of operations
 
 
+trim silence => fade-in/fade-out => pad with silence => normalize => limit
+
+https://forum.cockos.com/showthread.php?t=294334#13
+
+
+==============================================================
+
+-- A knee in envelope curve (not a smooth curve)
+
+schwa:
+
+That is standard/default behavior for volume envelopes, scaling by amplitude. 
+
+If you have the default volume envelope range (preferences/editing behavior/envelope display) 
+
+set to +12dB or +24dB then the top half of the envelope scales differently from the bottom 
+
+(which is always -inf to +0dB). So any envelope segment that spans +0dB will have a kink.
+
+If you don't like the kink you can either set the range to +0dB or +6dB, or you can right-click 
+
+the envelope and set the envelope default to fader scaling.
+
+
+https://forums.cockos.com/showthread.php?p=1768388#3
+
+
+==============================================================
+
+-- Fixed lanes settings priority
+
+
+The options menu controls what happens when you record the *first* overlapping media item on a track. The first overlapping media item can:
+
+1. Add lanes: this puts the track in fixed lane view, disabling "recording -> add lanes in layers" for that track.
+
+2. Add lanes in layers: this puts the track in fixed lane view, enabling "recording -> add lanes in layers" for that track.
+
+3. Both of those options disabled: in this case one of the other behaviors in the options menu applies (split items, tape mode, etc).
+
+These options only affect what happens when the first overlapping item is recorded, in other words the options menu defines the default behavior for overlapping items.
+
+Once an overlapping item has been recorded on a track, then the track settings determine the behavior. The track's "recording -> add lanes in layers" setting determines whether newly recorded lanes play in addition to previously playing lanes, or play exclusively.
+
+The "record into first available lane" track setting is independent of all of the above behavior. If that is enabled, new recording will go into the first lane *that does not have an earlier recording above it*. The idea is that if you have overlapping recordings, the earlier recording is always above the later one.
+
+
+https://forums.cockos.com/showthread.php?p=2750447#8
+
+==============================================================
+
+
+-- Quick access of properties in the Media Item Properties dialogue from keyboard
+
+
+A characters which serves as quick access shortcut is underscored in the property name. 
+
+To see the underscrore hold down ALT and press ANY character key.
+
+If any text input field is currently active, in order to target property via quick access shortcut 
+
+ALT must be held down, and to target 'Properties' and 'Rename file' buttons ALT must be complemented with SHIFT.
+
+Once at least one quick access shortcut was used the rest get activated and for them ALT and SHIFT can be omitted.
+
+If no text input field is active all quick access shortcuts can be used without ALT and SHIFT
+
+All this only works when the Item Media Properties window is focused.
+
+
+==============================================================
 
 
 
