@@ -3977,19 +3977,6 @@ https://old.reddit.com/r/Reaper/comments/11su9i1/how_to_make_tape_mode_recording
 
 ==============================================================
 
--- Having the same options config consistently
-
-
-Options toggle states (and probably all toggle states) are stored within the project file 
-
-as a 32 bit value in the first line <REAPER_PROJECT  next to REAPER version.
-
-So to have the same options activated for each new project save a project template file with 
-
-the options configured and start every new project with the template
-
-==============================================================
-
 -- CC Lanes visibility concept
 
 Visible means selected in the left hand CC menu in the MIDI editor
