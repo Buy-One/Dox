@@ -717,7 +717,10 @@ require("X-Raym_Functions - console debug messages")
 -- Actions behavior
 
 Item edit: Move position of item to edit cursor (affected by grouping, if one item is selected and Grouping is ON it drags all grouped items with it)
+
 SWS/FNG: Move selected items to edit cursor (unaffected by grouping)
+
+------------------------------------------------------------------------------
 
 These work relative to the item edge closest to cursor if several of them are selected, so all are moved as one unit and at cursor ends up only the item whose edge is the closest to cursor
 
@@ -733,6 +736,7 @@ SWS: Pitch all takes up/down one semitone -- is independent of items grouping
 
 In general native actions tend to be group sensitive while the SWS actions do not
 
+------------------------------------------------------------------------------
 
 View: Increase/Decrease selected track heights -- change height by 8 px
 
@@ -742,6 +746,7 @@ View: Scroll view right/left - scroll by 481 px regardless of the zoom level
 
 View: Scroll view down/up - scroll exactly track by track regardless of the zoom level, not very precise when tracks have different heights
 
+-----------------------------------------------------------------------------
 
 The following ones don't create undo points and undoing them may produce inconsistent results.
 Wrapping them inside a custom action seems to be a workround, it was tested with the last two.
@@ -753,20 +758,23 @@ SWS/BR: Copy selected CC events in active item to last clicked lane
 SWS/BR: Hide all CC lanes except last clicked lane
 SWS/BR: Hide last clicked CC lane
 
+------------------------------------------------------------------------------
 
 View: Scroll view right/left -- scroll by exactly 488 px regardless of the zoom level (that is 122 x 4, see next)
 
 View: Scroll horizontally [reversed] (MIDI CC relative/mousewheel) -- scroll by exactly 122 px regardless of the zoom level
 
+------------------------------------------------------------------------------
 
 Item: Select item under mouse cursor -- selects item under mouse (or keeps selected), deselects others; deselects all if mouse is outside of items within Arrange
 
 Item: Set focus to item under mouse cursor -- selects item under mouse, keeps others selected; doesn't deselect all if mouse is outside of items within Arrange
 
+------------------------------------------------------------------------------
 
 View: Move edit cursor to mouse cursor (no snapping) -- works along the entire screen Y axis outside of the TCP regardless of whether the program window is under the mouse
 
-
+------------------------------------------------------------------------------
 
 -- 'View: Attach/unattach docker to/from main window' (40313) 
 
@@ -779,7 +787,7 @@ The action toggle state is ON when there's no docker whose attach state was last
 
 -- 'View: Show docker' (40279) doesn't work with the toolbar docker, but does with individual toolbars floating docker
 
-
+------------------------------------------------------------------------------
 
 -- Track: Insert new track at end of mixer (41147)
 
@@ -793,7 +801,7 @@ In this case in Arrange the new track will be inserted after whichever track tha
 
 and which isn't necessarily the same as the last in Arrange.
 
-
+------------------------------------------------------------------------------
 
 -- Vertical scroll and zoom over the track list in Arrange
 
@@ -813,7 +821,6 @@ only work outside of the track list or over the track list with modifiers (scrol
 
 https://forum.cockos.com/showthread.php?t=256938
 
-
 ----------------------------------------------------
 
 -- SWS: Toolbar solo/mute/arm toggle
@@ -828,7 +835,6 @@ https://forum.cockos.com/showthread.php?p=753850#post753850
 OR
 https://forum.cockos.com/showpost.php?p=753850&postcount=1052
 
-
 ----------------------------------------------------
 
 MIDI Editor
@@ -840,7 +846,6 @@ Edit: Move left edge of note to edit cursor
 seems identical
 
 ---------------------------------------------------
-
 
 -- 'Cursor: Advance X' and 'Cursor: Advance X using current note length division type' for the MIDI Editor
 
@@ -856,14 +861,12 @@ if no item is selected it behaves exactly like 'Item navigation: Move cursor lef
 
 'Item navigation: Move cursor left/right to nearest item edge' itself doesn't require item selection to work
 
-
 --------------------------------------------------
 
 -- SWS: Set last touched track to match track selection (deprecated)
 
 
 Same as Track: Set first selected track as last touched track
-
 
 --------------------------------------------------
 
@@ -876,23 +879,50 @@ https://forum.cockos.com/showpost.php?p=2784154&postcount=3323
 
 --------------------------------------------------
 
-
 -- SWS/wol: Toggle enable extended zoom for envelopes in track lane
 
 -- https://forums.cockos.com/showthread.php?t=163122
 
+--------------------------------------------------
+
+Media Explorer
+
+-- Preview: Fast forward a little bit / Preview: Rewind a little bit
+
+Each moves the preview player playhead by 8 ms
 
 --------------------------------------------------
 
+
 -- Track: Go to next track
 
-if selection is made from bottom to top, the track selected is the track after the last selected one
-if selection is made from top to bottom, the track selected is the track after the first selected one
+if Shift+Click or Ctrl+Click selection is made 
+
+from bottom to top, the track selected is the track after the last selected one (last touched)
+from top to bottom, the track selected is the track after the first selected one (last touched)
 
 Track: Go to previous track
 
-if selection is made from bottom to top, the track selected is the track previous to the last selected one
-if selection is made from top to bottom, the track selected is the track previous to the first selected one
+from bottom to top, the track selected is the track previous to the last selected one (last touched)
+from top to bottom, the track selected is the track previous to the first selected one (last touched)
+
+
+!!!! Even though these actions select tracks, in essense what they change is the last touched track and work relative to the last touched track.
+
+That's evident if after manual selection of a track you change the target track for insert/paste by clicking
+
+on another track within Arrange while Prefs -> Editing behavior -> Mouse -> Mouse click/edit in arrange view: Sets track for insert/paste is enabled.
+
+The next/previous track will be relative to the track you clicked the last even if the last clicked track isn't selected.
+
+
+These two actions only work right away if there's an active last touched track (can be indicated by the bracket attached to the edit cursor). 
+
+Last touched track is cleared with mouse click within Arrange below the last track.
+
+So if there's no active last touched track these actions dosn't select a new track but BOTH make the very last track the last touched and select 
+
+it if it's non-selected. A new track will only be selected and made the last touched on the next run provided the last touched track is still active.
 
 
 ============================================================================
@@ -5014,14 +5044,63 @@ All this only works when the Item Media Properties window is focused.
 
 ==============================================================
 
+-- REAPER search filter syntax (REAPER User Guide, chapter 6.2 Using Search Filters)
 
 
+The description mainly uses FX Browser filter examples, but the priciple is the same everywhere.
 
 
+THE SEARCH STRING IS NOT CASE SENSITIVE UNLESS THE CHARACTERS SEARCH TERM IS COMPRISED OF ARE OUTSIDE OF ASCII RANGE
+
+You can search for more than one string within the same name. For example:
+
+eq stereo will find all plugins with both eq and stereo anywhere in their name, regardless of the order in which they appear. eq  AND  stereo would produce exactly the same results.
+
+The filter also supports other boolean search terms notably OR and NOT, and the use of parentheseses, e.g.: comp OR lim  finds and lists all plugins with comp or lim in their name.
+
+eq ( cockos OR melda )  finds all Cockos and Melda plug-ins with eq in their name. You must leave a space both before and after the parentheses.
+
+cockos ( eq OR comp )  finds all Cockos plug-ins with eq or comp in their name.
+
+blue cat NOT ( flange OR phase )   finds and lists all Blue Cat plug-ins except those with flange or phase in their name.
+
+( chorus OR delay ) NOT ( DX: OR JS: )  finds all effects with chorus or delay in their name except Direct X and JS ones.
+
+There are some additional techniques that you can use to make your searches more finely tuned.
+
+Enclosing a search string in quotes (either double or single) will find only those plug-ins where the text is matched exactly. For example: “sony noise”  would find Sony Noise Gate but not Sony Express FX Noise Gate. Likewise “reaverb” would find ReaVerb but not ReaVerbate.
+
+Typing a space immediately after the opening quotes mark will limit the search to those items where the specified string is at the very beginning of a word. For example:
+“ volu” will find plug-ins which include the word volume but not convolution..
+
+Similarly, typing a space at the end of the string will only find those items where one of the words in the FX name ends with that string.
+
+Starting a search string with ^ will find only those items whose name begins with the specified string, and using a $ at the end of a string will find only those names that end with that string.
+
+For example, when working in the media explorer, using ^blues as a filter would list only those items whose names begin with blues.
+Similarly, in the track manager, a filter such as guitar$ would display tracks with names such as lead guitar or rhythm guitar but not guitar solo.
 
 
+==============================================================
 
+-- Media Explorer player actions
 
+Accessibility of these actions depends on the focused part of the Media Explorer window 
+
+and the mouse modifier they're bound to but the relationship between these isn't obvious.
+
+Clarification follows.
+
+Preview: Play/stop (Space) -- work when File list / Preview player is in focus
+Preview: Play/pause (Ctrl+Space) -- works when Folder tree / File list / Preview player is in focus
+Preview: Play (Right arrow key) -- works when Preview player is in focus
+
+The preview player focus is activated when the it's clicked directly, the problem is that in this case the playhead is moved
+to the click location which is indesirable if you want to preview from a specific location.
+There're several ways to activate Preview player focus without moving its playhead: click the Media info box (if open), 
+click the player scrollbar only if the last focused window was File list, click the preview player while holding down Shift
+
+==============================================================
 
 
 
