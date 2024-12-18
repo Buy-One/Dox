@@ -219,7 +219,6 @@ ACT 1 0 "553af33493b3ef4fb18760f9da91ec7f" "Custom: Frank B_Extract sample slice
 ACT 1 0 "9fac5d43d8238c4dbe9280e5df948884" "Custom: gestrument.com_Render VSTi multisample: Core (create midi item with one note, select item and track, configure Render) -- modifiable (SWS)" _SWSMARKERLIST10 _FNG_MIDI_UP_SEMI _FNG_MIDI_UP_SEMI _FNG_MIDI_UP_SEMI _FNG_MIDI_NAME _BR_ITEMS_TO_REGIONS_NOTES 42230
 ACT 1 0 "228d49eb35d5764182e493498ec18967" "Custom: gestrument.com_Render VSTi multisample: Render -- modifiable" _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884
 ACT 1 0 "ae51735217612e4e949c55796326d74e" "Custom: Gianluca Apollaro_Snap multitrack to project BPM (stretch/shrink) - (1. put manually stretch marker at top of one of the items, 2. set grid to 1 bar or other appropriate division, 3. group all items needing adjustment)" 41842 40842 40625 40841 40841 40626 41847 40630 40841 40635
-ACT 1 0 "4067a80aaf38f54b87b6d8c26e8befdc" "Custom: Global startup" _RS4e3caf1b3a350106c6045042b451c0e6c2ce5041 _RS37a865bc197e801d71022ab4eb63f946d3043067 _RS7507a4bbefb6bb43a22048a145a624d40ce55e1b
 ACT 1 0 "c33707c27c44004daa7b1882efefd546" "Custom: Glue and rename" 41588 _XENAKIOS_RENMTAKEANDSOURCE
 ACT 1 0 "6ad27d83e680c04eb20626db5a16d346" "Custom: Go to next item on the track (track and cur item must be selected)" 41173 40417
 ACT 1 0 "76554ce26cccb54f96013bfd015633c1" "Custom: Go to prev item on the track (track and cur item must be selected)" 41173 40416
@@ -523,7 +522,6 @@ ACT 1 0 "fc46e9af5d43dd47899e905e86215e62" "Custom: Preview:  Move cursor to the
 ACT 1 0 "412aedf8dc03324399918bc077863ee3" "Custom: Preview: Move cursor to the next adjacent item on the track and retreat 1 beat (select track) - 1st click is idle" 41173 40417 40842
 ACT 1 0 "a338cb93e29d544c9adc6c4e90df8428" "Custom: Preview: Move cursor to the next adjacent item on the track and retreat 1 beat (select track, place cursor over the 1st item) -- next click after playhead crossed item joint point" 40434 40319 40842
 ACT 1 0 "1945ec1a94a65046b19b42ec39569f85" "Custom: Preview: Move cursor to the next adjacent item on the track, retreat 1 beat and play (select track) - 1st click is idle" 41173 40417 40842 1016 1007
-ACT 1 0 "23ea37b9c57f3a47ae889231665a64b6" "Custom: Project startup" _RSc51246e3b9a24453a7eb34b8aece27b4069dcd3c
 ACT 1 0 "582ea53885b1784d9dc5149ecc1b27bb" "Custom: Propagate track name to selected item(s) on the track (1st select item(s))" _SWS_SELTRKWITEM 40062 40286 _SWS_UNSELONTRACKS 40285 _RS4fa0ff3424b6f0cfd8d1e7ec2c67e8980f5d022e 41120 40117 41121 40285 40005
 ACT 1 0 "3481f6486c626d4eb851ac66ef6ad8e8" "Custom: protoolstoreaper.com_Back to Last Transient" 40625 40626 40421 40434 40376 40289
 ACT 1 0 "e3e021254e772a4b930db21032b56274" "Custom: protoolstoreaper.com_Consolidate Clip" 41588 41173 40289 40635
@@ -604,7 +602,6 @@ ACT 1 0 "72bf71feb131104a87ff57862845eae8" "Custom: Sample slices preview forwar
 ACT 1 0 "298c60bff99a934498b30793fe7f2d05" "Custom: Save project and create a dump list of all FX in the proj. folder" 40026 _RSc979e977b0361f9d3911421dbf4c13f31bae5a4b
 ACT 1 0 "05c656cf0e5f584d99086785c358c4c8" "Custom: Save project with Mixer scroll position" _RS062a837bf6c310a345c899af5345a81d5551a21e 40026
 ACT 1 0 "0960214afde0dd44a84548a5aef9fd2d" "Custom: Save selected item as new file and rename" 41999 40131 _XENAKIOS_RENMTAKEANDSOURCE
-ACT 1 0 "76fc14f36fe9594ab599d95d2c84e8c9" "Custom: Script: my_MIDI Editor startup actions.lua" 40454 _RS57740a944efc47e6d3d9d09be9823772b1236e6b
 ACT 1 0 "c430ef6a523598489d758000b6b07578" "Custom: Scroll BASS track into view" _S&M_CYCLACTION_4 40913 _RS7fb3d74a01cfeae229ad75b83192ca5086acbdbd 40297
 ACT 1 0 "c4591db0d09e994a9c1b1e9e4da92d94" "Custom: Scroll CHORDS track into view" _S&M_CYCLACTION_6 40913 _RS7fb3d74a01cfeae229ad75b83192ca5086acbdbd 40297
 ACT 1 0 "fdfa13f33bda7e4bae99a57ddfcebc34" "Custom: Scroll DELAY buss into view" _S&M_CYCLACTION_8 40913 _RS7fb3d74a01cfeae229ad75b83192ca5086acbdbd
