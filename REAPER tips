@@ -3767,6 +3767,41 @@ reaper.SetToggleCommandState(sectionID, cmdID, state and 1 or 0)
 ////////////////////////////////////////////////////////
 
 
+-- Temporarily change toggle state in order to perform an action without altering the settings permanently, mainly useful for changing options toggle state
+-- MIND THAT NOT ALL ACTIONS LABELED 'TOGGLE' ACTUALLY REPORT THE TOGGLE STATE, SUCH AS THOSE WHICH AFFECT SELECTED OBJECTS
+
+Custom: Temporary toggle to OFF
+  Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+  Options: Toggle snapping
+  Action: Skip next action if CC parameter <0/mid ---------------------- if previous action toggle state had initially been OFF, CC was set to -1, 
+									therefore next action will be skipped and won't run to change the toggle state to OFF, 
+									otherwise it won't be skipped and will run to change the toggle state to OFF
+  Options: Toggle snapping
+  Move edit cursor to start of next measure  --------------------------- run the main action or a sequence thereof which need the toggle action to be OFF
+  Action: Skip next action if CC parameter <0/mid --------------------- if 'Toggle snapping' action toggle state had initially been OFF, CC was set to -1,
+									therefore next action will be skipped and won't run to restore the initial toggle state, 
+									otherwise it won't be skipped and will run to restore the initial toggle 
+									state, that is ON after being set to OFF above
+  Options: Toggle snapping
+
+
+Custom: Temporary toggle to ON
+  Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+  Options: Toggle snapping
+  Action: Skip next action if CC parameter >0/mid ---------------------- if previous action toggle state had initially been OFF, CC was set to -1, 
+									therefore next action won't be skipped and will run to change the toggle state to ON,
+									otherwise it will be skipped and won't run to change the toggle state to ON
+  Options: Toggle snapping
+  Move edit cursor to start of next measure --------------------------- run the main action or a sequence thereof which need the toggle action to be ON
+  Action: Skip next action if CC parameter >0/mid --------------------- if 'Toggle snapping' action toggle state had initially been OFF, CC was set to -1, 
+									therefore next action won't be skipped and will run to restore the initial toggle 
+									state, otherwise it will be skipped and won't run to restore the initial toggle state, 
+									that is OFF after being set to ON above
+  Options: Toggle snapping
+
+
+
+
 sources:
 https://www.stephenschappler.com/2017/05/30/quick-reaper-tip-adjust-item-volume-or-pitch-with-mousewheel/
 https://youtu.be/QO9LTaN_WvE?t=267 -- Advanced item nudging + https://reaperblog.net/2018/01/advanced-item-nudging/
@@ -5078,14 +5113,23 @@ and the mouse modifier they're bound to but the relationship between these isn't
 
 Clarification follows.
 
+
 Preview: Play/stop (Space) -- work when File list / Preview player is in focus
+
 Preview: Play/pause (Ctrl+Space) -- works when Folder tree / File list / Preview player is in focus
+
 Preview: Play (Right arrow key) -- works when Preview player is in focus
 
+
 The preview player focus is activated when the it's clicked directly, the problem is that in this case the playhead is moved
+
 to the click location which is indesirable if you want to preview from a specific location.
+
 There're several ways to activate Preview player focus without moving its playhead: click the Media info box (if open), 
+
 click the player scrollbar only if the last focused window was File list, click the preview player while holding down Shift
+
+
 
 ==============================================================
 
