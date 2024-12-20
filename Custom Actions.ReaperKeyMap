@@ -665,9 +665,12 @@ ACT 1 0 "cccac6adab87ed41aaf2afa9605ebf18" "Custom: Zoom in to 1 measure (REAPER
 ACT 1 0 "096ab3e08206c84d88b6269921e83dcb" "Custom: Zoom in to 2 measurs (REAPER 7.07+)" 42964 41040 40625 40839 40839 40626 40031 40635
 ACT 1 0 "4f1cfc699f76b940b54759ca989df0e5" "Custom: Zoom in to 4 measurs (REAPER 7.07+)" 42964 41040 40625 40839 40839 40839 40839 40626 40031 40635
 ACT 1 0 "8c3cddcde704bd43a4969ab0abd979c4" "Custom: Zoom out project (a little more precise than View: Zoom out project)" 40042 40625 40043 40626 40031 40635
-ACT 1 0 "8561c97f5fcc0043ba1873a1e0f67f7e" "Custom: Crop project to loop and open in new tab Pt. 1" 40623 40049
-ACT 1 0 "21a3c0859629664f9d4dfdfb9e39bd9c" "Custom: Crop project to loop and open in new tab Pt. 2 (switching proj tabs needed to activate new tab, undo restores orig project)" 40296 40210 40297 41929 40862 40861 42398 40862 40029 40861 40297
+ACT 1 0 "e0fefd4067413144927ba68b2a30280b" "Custom: Crop project to loop and open in new tab complete (switching proj tabs needed to activate new tab, no orig project undo)" 40623 40049 40296 40210 41929 40862 40861 42398 40862 40861
+ACT 1 0 "8561c97f5fcc0043ba1873a1e0f67f7e" "Custom: Crop project to loop -- Pt. 1" 40623 40049
+ACT 1 0 "21a3c0859629664f9d4dfdfb9e39bd9c" "Custom: Crop project to loop/region and open in new tab -- Pt. 2 (switching proj tabs needed to activate new tab, undo restores orig project)" 40296 40210 40297 41929 40862 40861 42398 40862 40029 40861 40297
 ACT 0 0 "5838dc821c2e8d43bce5f891af2d4a45" "Custom: Crop project to loop and open in new tab (complete Pt.1&2) (undo points must not be consolidated)" _8561c97f5fcc0043ba1873a1e0f67f7e _21a3c0859629664f9d4dfdfb9e39bd9c
+ACT 1 0 "bde9ae6bf16ebd4f842089cd6cf50bfc" "Custom: Crop project to region -- Pt. 1 (place edit cursor within region)" 40172 40625 40173 40626 40049
+ACT 0 0 "acfe89fc16231f42833741f47aafa27e" "Custom: Crop project to region and open in new tab (complete Pt.1&2) (place edit cursor within region; undo points must not be consolidated)" _bde9ae6bf16ebd4f842089cd6cf50bfc _21a3c0859629664f9d4dfdfb9e39bd9c
 ACT 3 32060 "e25b5bb594aacd4da7dcca3801f869d6" "Custom: Activate Bank/Program select lane and insert event" 40056 40950 40042 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
 ACT 3 32060 "6be4aae340e381468a0af1611d49f1e3" "Custom: Activate Bank/Program select lane and insert event (2)" 40056 40950 40042 _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
 ACT 3 32060 "c5b37366c9095d429d69c41beb99cd2e" "Custom: Activate Bank/Program select lane and insert event (3)" 40056 40950 40042 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
