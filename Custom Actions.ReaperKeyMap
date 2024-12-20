@@ -446,7 +446,7 @@ ACT 1 0 "2bbe73138f0bf14eaa0aff4a38656324" "Custom: PooFox aka foxAsteria Zoom R
 ACT 1 0 "cb5b20312eff43499042b10e60253687" "Custom: PooFox aka foxAsteria Zoom Split and Edit" 41039 40031 40109
 ACT 1 0 "ebaea2d6886b9a4d81c33d3f76abc21e" "Custom: PooFox aka foxAsteria Zoom to Play Cursor" 40151 1012 40151
 ACT 1 0 "71650c01ed970a4fb613a862844f3a74" "Custom: PooFox aka foxAsteria_Duplicate all items in time selection moving later items" 40311 40718 40061 41296 40309
-ACT 3 0 "f8723a9989b8914eb4d2939a676af412" "Custom: prastya28_(Stereo Tool) Stereo Track --> Dual Mono" 40062 _SWS_UNSELONTRACKS _XENAKIOS_SELPREVTRACK 40179 40289 _XENAKIOS_SELNEXTTRACK 40421 40180
+ACT 1 0 "f8723a9989b8914eb4d2939a676af412" "Custom: prastya28_(Stereo Tool) Stereo Track --> Dual Mono" 40062 _SWS_UNSELONTRACKS _XENAKIOS_SELPREVTRACK 40179 40289 _XENAKIOS_SELNEXTTRACK 40421 40180
 ACT 1 0 "fc46e9af5d43dd47899e905e86215e62" "Custom: Preview:  Move cursor to the next adjacent item on the track, retreat 1 beat and play (select all items) -- next click after playhead crossed item joint point" 40434 40319 40842 1016 1007
 ACT 1 0 "412aedf8dc03324399918bc077863ee3" "Custom: Preview: Move cursor to the next adjacent item on the track and retreat 1 beat (select track) - 1st click is idle" 41173 40417 40842
 ACT 1 0 "a338cb93e29d544c9adc6c4e90df8428" "Custom: Preview: Move cursor to the next adjacent item on the track and retreat 1 beat (select track, place cursor over the 1st item) -- next click after playhead crossed item joint point" 40434 40319 40842
@@ -670,30 +670,30 @@ ACT 1 0 "8561c97f5fcc0043ba1873a1e0f67f7e" "Custom: Crop project to loop -- Pt. 
 ACT 1 0 "21a3c0859629664f9d4dfdfb9e39bd9c" "Custom: Crop project to loop/region and open in new tab -- Pt. 2 (switching proj tabs needed to activate new tab, undo restores orig project)" 40296 40210 40297 41929 40862 40861 42398 40862 40029 40861 40297
 ACT 0 0 "5838dc821c2e8d43bce5f891af2d4a45" "Custom: Crop project to loop and open in new tab (complete Pt.1&2) (undo points must not be consolidated)" _8561c97f5fcc0043ba1873a1e0f67f7e _21a3c0859629664f9d4dfdfb9e39bd9c
 ACT 1 0 "bde9ae6bf16ebd4f842089cd6cf50bfc" "Custom: Crop project to region -- Pt. 1 (place edit cursor within region)" 40172 40625 40173 40626 40049
-ACT 1 0 "e000a08d60c1a14ca9d2cec197296944" "Custom: Split region at cursor (place cursor within region at split position, markers within region not allowed)" 40626 40172 40625 40174 40631 40625 40173 40626 41666 40615 40174 40630 40635
 ACT 0 0 "acfe89fc16231f42833741f47aafa27e" "Custom: Crop project to region and open in new tab (complete Pt.1&2) (place edit cursor within region; undo points must not be consolidated)" _bde9ae6bf16ebd4f842089cd6cf50bfc _21a3c0859629664f9d4dfdfb9e39bd9c
-ACT 3 32060 "e25b5bb594aacd4da7dcca3801f869d6" "Custom: Activate Bank/Program select lane and insert event" 40056 40950 40042 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
-ACT 3 32060 "6be4aae340e381468a0af1611d49f1e3" "Custom: Activate Bank/Program select lane and insert event (2)" 40056 40950 40042 _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
-ACT 3 32060 "c5b37366c9095d429d69c41beb99cd2e" "Custom: Activate Bank/Program select lane and insert event (3)" 40056 40950 40042 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
+ACT 1 0 "e000a08d60c1a14ca9d2cec197296944" "Custom: Split region at edit cursor (place cursor within region at split position, markers within region not allowed)" 40626 40172 40625 40174 40631 40625 40173 40626 41666 40615 40174 40630 40635
+ACT 1 32060 "e25b5bb594aacd4da7dcca3801f869d6" "Custom: Activate Bank/Program select lane and insert event" 40056 40950 40042 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
+ACT 1 32060 "6be4aae340e381468a0af1611d49f1e3" "Custom: Activate Bank/Program select lane and insert event (2)" 40056 40950 40042 _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
+ACT 1 32060 "c5b37366c9095d429d69c41beb99cd2e" "Custom: Activate Bank/Program select lane and insert event (3)" 40056 40950 40042 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
 ACT 1 32060 "f52c924c5c81864eb718c24c3ef4daab" "Custom: Activate Bank/Program select lane and insert event - worked in builds prior to 6.11 before bug was fixed [t=236494]" 40056 40950 40042 _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
 ACT 1 32060 "4991c4b024897043a767d26a43dc8b3c" "Custom: Activate Bank/Program select lane and insert event - works" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40369 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40950
 ACT 1 32060 "8c1b4b341c899d41bce3dafceb49f4d8" "Custom: Activate Notation events lane and delete text notation for selected note" _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 42173 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
-ACT 3 32060 "9e9d7eed565f7149bbe4c8f43d1ae78a" "Custom: Activate Notation events lane and delete text notation for selected note (2)" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 42173 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
-ACT 3 32060 "f3c11549e0a9024e82d2972ef4333a3d" "Custom: Activate Notation events lane and delete text notation for selected note (2) (2)" _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 42173 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
-ACT 3 32060 "2aebee1cb4789943bef484b6ee5baf81" "Custom: Activate Notation events lane and delete text notation for selected note (3)" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 42173 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
-ACT 3 32060 "f5c16159d57fdf43b8456d7721903742" "Custom: Activate Notation events lane and insert text ornament (attach lyrics) for selected note" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 41780 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
-ACT 3 32060 "4c6ececae9369040bc2158c84b6a8fa0" "Custom: Activate Notation events lane and insert text ornament (attach lyrics) for selected note (2)" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 41780 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
+ACT 1 32060 "9e9d7eed565f7149bbe4c8f43d1ae78a" "Custom: Activate Notation events lane and delete text notation for selected note (2)" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 42173 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
+ACT 1 32060 "f3c11549e0a9024e82d2972ef4333a3d" "Custom: Activate Notation events lane and delete text notation for selected note (2) (2)" _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 42173 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
+ACT 1 32060 "2aebee1cb4789943bef484b6ee5baf81" "Custom: Activate Notation events lane and delete text notation for selected note (3)" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 42173 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
+ACT 1 32060 "f5c16159d57fdf43b8456d7721903742" "Custom: Activate Notation events lane and insert text ornament (attach lyrics) for selected note" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 41780 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
+ACT 1 32060 "4c6ececae9369040bc2158c84b6a8fa0" "Custom: Activate Notation events lane and insert text ornament (attach lyrics) for selected note (2)" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 41780 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
 ACT 1 32060 "248129e90026c445b1ccd727c2ea4740" "Custom: Activate Notation events lane and insert text ornament for selected note" _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 41780 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
-ACT 3 32060 "62c4c3618bcfc44cadde42d09737424e" "Custom: Activate Notation events lane and insert text ornament for selected note (2)" _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 41780 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
+ACT 1 32060 "62c4c3618bcfc44cadde42d09737424e" "Custom: Activate Notation events lane and insert text ornament for selected note (2)" _BR_ME_CREATE_CC_LAST_CLICKED 40370 40234 41780 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
 ACT 1 32060 "8358a5824b56d04e9eb075e47cffa59a" "Custom: Activate Text events lane and insert event" 40056 40458 40042 _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
-ACT 3 32060 "df7655a80c952841b4b97f8d9a632cb6" "Custom: Activate Text events lane and insert event (2)" 40056 40458 40042 _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
-ACT 3 32060 "d0502e5e9cc9a3429b4e090b4c3520d3" "Custom: Activate Text events lane and insert event at edit cursor" 40056 40458 40042 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
-ACT 3 32060 "db770311605bbd4cbc47e3cda3bdcd55" "Custom: Activate Text events lane and insert event at edit cursor (2)" 40056 40458 40042 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
-ACT 3 32060 "ad9170f6c9f4b04f9583b0c5ceee9c8e" "Custom: Activate Text events lane and insert lyric event at 1st selected note" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40872 40473 40819
+ACT 1 32060 "df7655a80c952841b4b97f8d9a632cb6" "Custom: Activate Text events lane and insert event (2)" 40056 40458 40042 _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
+ACT 1 32060 "d0502e5e9cc9a3429b4e090b4c3520d3" "Custom: Activate Text events lane and insert event at edit cursor" 40056 40458 40042 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
+ACT 1 32060 "db770311605bbd4cbc47e3cda3bdcd55" "Custom: Activate Text events lane and insert event at edit cursor (2)" 40056 40458 40042 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40819
+ACT 1 32060 "ad9170f6c9f4b04f9583b0c5ceee9c8e" "Custom: Activate Text events lane and insert lyric event at 1st selected note" _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40872 40473 40819
 ACT 1 32060 "d061642ac8776c429fd11bd98896be3a" "Custom: Activate Text events lane and insert or edit lyric event at 1st selected note" 40056 40473 40042 _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
-ACT 3 32060 "eafddfef14f6d144930d5b7b1c563b5c" "Custom: Activate Text events lane and insert or edit lyric event at 1st selected note (2)" 40056 40473 40042 _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
-ACT 3 32060 "b60ce45f84b3a240b5ad35d91e05b7a0" "Custom: Activate Text events lane and insert or edit lyric event at 1st selected note (EDIT DOESN'T WORK, EVENT NON-SELECTABLE)" 40752 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40872 40875 40473 40745 40214 40819
-ACT 3 32060 "51e294dd29ef3d458421e33b70614769" "Custom: Activate Text events lane and insert or edit lyric event at 1st selected note (EDIT DOESN'T WORK, EVENT NON-SELECTABLE) (2)" 40752 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40872 40875 40473 40745 40214 40819
+ACT 1 32060 "eafddfef14f6d144930d5b7b1c563b5c" "Custom: Activate Text events lane and insert or edit lyric event at 1st selected note (2)" 40056 40473 40042 _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100
+ACT 1 32060 "b60ce45f84b3a240b5ad35d91e05b7a0" "Custom: Activate Text events lane and insert or edit lyric event at 1st selected note (EDIT DOESN'T WORK, EVENT NON-SELECTABLE)" 40752 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40872 40875 40473 40745 40214 40819
+ACT 1 32060 "51e294dd29ef3d458421e33b70614769" "Custom: Activate Text events lane and insert or edit lyric event at 1st selected note (EDIT DOESN'T WORK, EVENT NON-SELECTABLE) (2)" 40752 _S&M_HIDECCLANES_ME _BR_ME_CREATE_CC_LAST_CLICKED 40370 _BR_ME_HIDE_ALL_NO_LAST_CLICKED _BR_ME_SET_CC_LANES_HEIGHT_100 40872 40875 40473 40745 40214 40819
 ACT 1 32060 "36e86106806c014f86ed11788747f024" "Custom: Arpeggio:6" 40214 40164 40048 40168 40048 40171 40048 40173 40048 40176 40048 40173 40048 40171 40048 40168 40048
 ACT 1 32060 "17ae964ffd642144a74b5ed80299396a" "Custom: Arpeggio:7" 40214 40164 40048 40168 40048 40171 40048 40174 40048 40176 40048 40174 40048 40171 40048 40168 40048
 ACT 1 32060 "0247772c9c845043980941b4bf49f216" "Custom: Arpeggio:7b9" 40214 40164 40048 40165 40048 40168 40048 40171 40048 40176 40048 40171 40048 40168 40048 40165 40048
@@ -722,77 +722,77 @@ ACT 1 32060 "c9f43a2b842e3843a1fc9a04fdf4ccf0" "Custom: Arpeggio:Pedal - Maj" 40
 ACT 1 32060 "15e5ef5d9d49b141bf555c434291be2b" "Custom: Arpeggio:Pedal - Minor" 40214 40164 40048 40166 40048 40164 40048 40167 40048 40164 40048 40169 40048 40164 40048 40171 40048
 ACT 1 32060 "28ac8f0b77dd1545b1a4ee28592f993c" "Custom: Arpeggio:sus2" 40214 40164 40048 40166 40048 40171 40048 40176 40048 40171 40048 40166 40048 40164 40048 40166 40048
 ACT 1 32060 "9a212585b9e1754bbe6b055e5c4a9676" "Custom: Arpeggio:sus4" 40214 40164 40048 40169 40048 40171 40048 40176 40048 40171 40048 40169 40048 40164 40048 40169 40048
-ACT 3 32060 "60897fb04b2d2540bfa5d0d4210bd7f1" "Custom: Augm. Chord" 40164 40168 40172
-ACT 3 32060 "2ad4de52f5228e498fb5fec3473439ad" "Custom: Copy-paste selected (which start on grid) same pitch notes-events by grid 1 by 1" 40872 40010 40639 40048 40889
-ACT 3 32060 "8731b48f851e164cae870045da9ee231" "Custom: Copy-paste selected (which start on grid) same pitch notes-events by grid exponentially" 40872 41746 40010 40639 40048 40889
-ACT 3 32060 "cadec3d2d608c24b84866fee5b172caa" "Custom: Copy-paste selected randomly positioned note(s) by grid" 40872 40010 40889 40184
-ACT 3 32060 "c3984f4a1f74964bab6946aca9f69713" "Custom: Copy-paste selected randomly positioned note(s) by grid exponentially (creates duplicates at the end)" 40872 40434 40010 40889 40184
+ACT 1 32060 "60897fb04b2d2540bfa5d0d4210bd7f1" "Custom: Augm. Chord" 40164 40168 40172
+ACT 1 32060 "2ad4de52f5228e498fb5fec3473439ad" "Custom: Copy-paste selected (which start on grid) same pitch notes-events by grid 1 by 1" 40872 40010 40639 40048 40889
+ACT 1 32060 "8731b48f851e164cae870045da9ee231" "Custom: Copy-paste selected (which start on grid) same pitch notes-events by grid exponentially" 40872 41746 40010 40639 40048 40889
+ACT 1 32060 "cadec3d2d608c24b84866fee5b172caa" "Custom: Copy-paste selected randomly positioned note(s) by grid" 40872 40010 40889 40184
+ACT 1 32060 "c3984f4a1f74964bab6946aca9f69713" "Custom: Copy-paste selected randomly positioned note(s) by grid exponentially (creates duplicates at the end)" 40872 40434 40010 40889 40184
 ACT 1 32060 "7158ed363afa584f98ccfe072b234c37" "Custom: Create a harmonic minor scale from selected note at the beginning of item (set grid, select note)" 40036 40425 40639 40049 40049 40051 40049 40051 40049 40049 40051 40049 40049 40051 40049 40051 40049 40049 40051 40049 40051 40036 40003 40792
 ACT 1 32060 "fedaee8392d62345b2faa4751ac5513b" "Custom: Create a major scale from selected note at the beginning of item (set grid, select note)" 40036 40425 40639 40049 40049 40051 40049 40049 40051 40049 40051 40049 40049 40051 40049 40049 40051 40049 40049 40051 40049 40036 40003 40792
 ACT 1 32060 "726c8dc35e40334ca9020f7bb77cf01f" "Custom: Create a melodic minor scale asc from selected note at the beginning of item (set grid, select note)" 40036 40425 40639 40049 40049 40051 40049 40051 40049 40049 40051 40049 40049 40051 40049 40049 40051 40049 40049 40051 40036 40003 40792
 ACT 1 32060 "43335393a713cf4492f171fc9a7f5f33" "Custom: Create a melodic minor scale desc from selected note at the beginning of item (set grid, select note)" 40036 40425 40639 40049 40049 40051 40049 40051 40049 40049 40051 40049 40049 40051 40049 40051 40049 40049 40051 40036 40003 40792
 ACT 1 32060 "f71db941eb79ba4aaf79d06fcadae2dd" "Custom: Create a natural minor scale from selected note at the beginning of item (set grid, select note)" 40036 40425 40639 40049 40049 40051 40049 40051 40049 40049 40051 40049 40049 40051 40049 40051 40049 40049 40051 40036 40003 40792
-ACT 3 32060 "426a64d0677a014b9221633e0dd96b35" "Custom: Delete all MIDI events in all lanes" 40670 40667
-ACT 3 32060 "079d7690eb13cc4a8fbda2531a857c16" "Custom: Delete all MIDI events in last clicked lane (click lane)" 40668 40667
-ACT 3 32060 "285183bdd7dc61479e608730d476c86b" "Custom: Dimin. 7th Chord" 40164 40167 40170 40174
-ACT 3 32060 "5abbc86ddf923348b0b19b50bb5ed256" "Custom: Dimin. Chord" 40164 40167 40170
-ACT 3 32060 "1c97aeda36dd64468783b5b89b00cc97" "Custom: Domin. 7th Chord" 40164 40168 40171 40174
-ACT 3 32060 "93f18e38b3fd324ab3363571f3900108" "Custom: Duplicate selected notes as 4th (buggy)" 40010 40639 40011 40177 40177 40177 40177 40183 40183 40047
-ACT 3 32060 "d1675fa835f4514b853af8115875f7fb" "Custom: Duplicate selected same pitch notes-events (of full grid length) end-to-end 1 by 1" 40440 40010 40873 40011
-ACT 3 32060 "bc124f7eb8d5bb45b92bbbb31737d1d4" "Custom: Duplicate selected same pitch notes-events (of full grid length) end-to-end exponentially" 40440 41746 40010 40873 40011
+ACT 1 32060 "426a64d0677a014b9221633e0dd96b35" "Custom: Delete all MIDI events in all lanes" 40670 40667
+ACT 1 32060 "079d7690eb13cc4a8fbda2531a857c16" "Custom: Delete all MIDI events in last clicked lane (click lane)" 40668 40667
+ACT 1 32060 "285183bdd7dc61479e608730d476c86b" "Custom: Dimin. 7th Chord" 40164 40167 40170 40174
+ACT 1 32060 "5abbc86ddf923348b0b19b50bb5ed256" "Custom: Dimin. Chord" 40164 40167 40170
+ACT 1 32060 "1c97aeda36dd64468783b5b89b00cc97" "Custom: Domin. 7th Chord" 40164 40168 40171 40174
+ACT 1 32060 "93f18e38b3fd324ab3363571f3900108" "Custom: Duplicate selected notes as 4th (buggy)" 40010 40639 40011 40177 40177 40177 40177 40183 40183 40047
+ACT 1 32060 "d1675fa835f4514b853af8115875f7fb" "Custom: Duplicate selected same pitch notes-events (of full grid length) end-to-end 1 by 1" 40440 40010 40873 40011
+ACT 1 32060 "bc124f7eb8d5bb45b92bbbb31737d1d4" "Custom: Duplicate selected same pitch notes-events (of full grid length) end-to-end exponentially" 40440 41746 40010 40873 40011
 ACT 1 32060 "797dc64d0f667e4fafa17af71da0fa62" "Custom: Extend all notes to the end of take" 40003 40037 40791
-ACT 3 32060 "df1becd18ffec046a761d79fc076263c" "Custom: Half-dimin. 7th Chord" 40164 40167 40170 40174
-ACT 3 32060 "426d70f8d8869b4da535c31893a13e16" "Custom: Insert 1/16T roll at edit cursor" 40692 40692 40692 40692
-ACT 3 32060 "2fb62b8eb0bb484f8ef7645f0a4eb5c9" "Custom: Insert 1/32T roll at edit cursor" 40689 40689 40689 40689
+ACT 1 32060 "df1becd18ffec046a761d79fc076263c" "Custom: Half-dimin. 7th Chord" 40164 40167 40170 40174
+ACT 1 32060 "426d70f8d8869b4da535c31893a13e16" "Custom: Insert 1/16T roll at edit cursor" 40692 40692 40692 40692
+ACT 1 32060 "2fb62b8eb0bb484f8ef7645f0a4eb5c9" "Custom: Insert 1/32T roll at edit cursor" 40689 40689 40689 40689
 ACT 1 32060 "3b58412030534b47b5e320890161d095" "Custom: Insert note at mouse cursor and preview" _BR_ME_STOP_PREV_ACT_ITEM 40214 40001 _BR_ME_PREV_ACT_ITEM_NOTES
 ACT 1 32060 "ea48a9856044fe4cbdb6c6d4d6340061" "Custom: Insert note at velocity 50 (assign to double click in MIDI piano roll mouse modifiers) -- scalable" 40214 40001 40465 40465 40465 40465 40465 40465 40465 40465 40465 40465 40465 40465 40465 40463 40463 40463 40463 40463 40464 40659
 ACT 1 32060 "26f61be727877d41933795baf400dadf" "Custom: Insert note at velocity 100 (assign to double click in MIDI piano roll mouse modifiers) -- scalable" 40214 40001 40465 40465 40465 40465 40465 40465 40465 40465 40465 40465 40465 40465 40465 40463 40463 40463 40463 40463 40463 40463 40463 40463 40463 40464 40659
 ACT 1 32060 "c06f746ba4dda740a6d276bb1fdf1a52" "Custom: Jon_Tidy_Duplicate note (select note)" 40010 40639 40011
-ACT 3 32060 "3cb74264745a634c9e7f7253ec0b180f" "Custom: Jump to loop start & play (2)" 40438 1140
-ACT 3 32060 "c55dee24de820140a18be2f0c571145b" "Custom: Jump to start of item & play" 40036 1140
-ACT 3 32060 "a99281005298834ca14241191990f7e0" "Custom: Major 7th Chord" 40164 40168 40171 40175
-ACT 3 32060 "a29eb72d0e215c469b61989490b1227d" "Custom: Major 7th Chord augm." 40164 40168 40170 40175
-ACT 3 32060 "00cdb93827ccc74faeb49d9cc5060563" "Custom: Major Chord" 40164 40168 40171 40176
-ACT 3 32060 "5999714eccb4c246ba98c7b2ff20bc0e" "Custom: Make selected notes legato, including the last" 40405 40037 40425 _FNG_ME_SELECT_NOTES_NEAR_EDIT_CURSOR 40791 40214 40036
-ACT 3 32060 "6068bf37bfe0e24995719c69907e2334" "Custom: Min/Major 7th Chord" 40164 40167 40171 40175
-ACT 3 32060 "3ebf38b29649ea4496a863c515c34cc1" "Custom: Minor 7th Chord" 40164 40167 40171 40174
-ACT 3 32060 "c97b1afe17a7a14a912c7d862842a905" "Custom: Minor Chord" 40164 40167 40171 40176
-ACT 3 32060 "f1c722eb692869479c361d65b87da2cf" "Custom: Move cursor to end of next note (for legato notes)" 40425 40413 40639 40214
-ACT 3 32060 "55be6ea9fa83514eb598646baa89cbe0" "Custom: Move cursor to end of next note (not for legato notes)" 40413 40639 40214
-ACT 3 32060 "44da2d0f9528fb45810fd065a23e276b" "Custom: Move cursor to end of note (MAY GET STUCK WITH MULTIPLE PITCHES)" 40425 40639 40214
-ACT 3 32060 "9b51ff8eaf41ff41b649722746f2dc83" "Custom: Move cursor to end of note (same pitch, not for legato notes)" 40413 40639 40214
-ACT 3 32060 "e7cf8d811081b54783c50a30422e8bb4" "Custom: Move cursor to end of note (same pitch, not for legato notes) 2" 40413 40440 40639 40214
-ACT 3 32060 "37f5a235e3a83145b3ddcabb81195e6e" "Custom: Move cursor to start of next note (MAY GET STUCK WITH MULTIPLE PITCHES)" 40413 40440 40214
-ACT 3 32060 "50464ff04428c349a7d539681ae45bb0" "Custom: Move cursor to start of note (MAY GET STUCK WITH MULTIPLE PITCHES)" 40425 40414 40440 40214
-ACT 3 32060 "e2b6fa3e79032f4f9cbf20e7707765c1" "Custom: Move cursor to start of previous note" 40414 40414 40440 40214
+ACT 1 32060 "3cb74264745a634c9e7f7253ec0b180f" "Custom: Jump to loop start & play (2)" 40438 1140
+ACT 1 32060 "c55dee24de820140a18be2f0c571145b" "Custom: Jump to start of item & play" 40036 1140
+ACT 1 32060 "a99281005298834ca14241191990f7e0" "Custom: Major 7th Chord" 40164 40168 40171 40175
+ACT 1 32060 "a29eb72d0e215c469b61989490b1227d" "Custom: Major 7th Chord augm." 40164 40168 40170 40175
+ACT 1 32060 "00cdb93827ccc74faeb49d9cc5060563" "Custom: Major Chord" 40164 40168 40171 40176
+ACT 1 32060 "5999714eccb4c246ba98c7b2ff20bc0e" "Custom: Make selected notes legato, including the last" 40405 40037 40425 _FNG_ME_SELECT_NOTES_NEAR_EDIT_CURSOR 40791 40214 40036
+ACT 1 32060 "6068bf37bfe0e24995719c69907e2334" "Custom: Min/Major 7th Chord" 40164 40167 40171 40175
+ACT 1 32060 "3ebf38b29649ea4496a863c515c34cc1" "Custom: Minor 7th Chord" 40164 40167 40171 40174
+ACT 1 32060 "c97b1afe17a7a14a912c7d862842a905" "Custom: Minor Chord" 40164 40167 40171 40176
+ACT 1 32060 "f1c722eb692869479c361d65b87da2cf" "Custom: Move cursor to end of next note (for legato notes)" 40425 40413 40639 40214
+ACT 1 32060 "55be6ea9fa83514eb598646baa89cbe0" "Custom: Move cursor to end of next note (not for legato notes)" 40413 40639 40214
+ACT 1 32060 "44da2d0f9528fb45810fd065a23e276b" "Custom: Move cursor to end of note (MAY GET STUCK WITH MULTIPLE PITCHES)" 40425 40639 40214
+ACT 1 32060 "9b51ff8eaf41ff41b649722746f2dc83" "Custom: Move cursor to end of note (same pitch, not for legato notes)" 40413 40639 40214
+ACT 1 32060 "e7cf8d811081b54783c50a30422e8bb4" "Custom: Move cursor to end of note (same pitch, not for legato notes) 2" 40413 40440 40639 40214
+ACT 1 32060 "37f5a235e3a83145b3ddcabb81195e6e" "Custom: Move cursor to start of next note (MAY GET STUCK WITH MULTIPLE PITCHES)" 40413 40440 40214
+ACT 1 32060 "50464ff04428c349a7d539681ae45bb0" "Custom: Move cursor to start of note (MAY GET STUCK WITH MULTIPLE PITCHES)" 40425 40414 40440 40214
+ACT 1 32060 "e2b6fa3e79032f4f9cbf20e7707765c1" "Custom: Move cursor to start of previous note" 40414 40414 40440 40214
 ACT 1 32060 "7e25db5defcadb45baa4aa937209725b" "Custom: Move edit cursor left by one grid unit (only when snap to grid is disabled)" 40214 1000 40633 40183 40440 40002
-ACT 3 32060 "9fe50064d93d1049b86bd5590e7f2155" "Custom: Move note(s) to next note(s) creating legato (select last note)" 40414 40413 40440 40414 40793
-ACT 3 32060 "934b6cd3cac9aa42ae1ee38dffaf1321" "Custom: Move note(s) to next note(s) creating legato (select last note) with prompt to repeat" 40414 40413 40440 40414 40793 2002
-ACT 3 32060 "b620135166a08d4fb1de113cd5f4f54f" "Custom: Move note(s) to previous note(s) creating legato (select 1st note)" 40413 40414 40639 40413 40755
-ACT 3 32060 "69b77eaa035b8e4c89cf91dc0df33abb" "Custom: Move note(s) to previous note(s) creating legato (select 1st note) with prompt to repeat" 40413 40414 40639 40413 40755 2002
-ACT 3 32060 "5ae27060e5549d47a3e71fd26fb92a33" "Custom: Move notes down 5st" 40178 40178 40178 40178 40178
-ACT 3 32060 "7b8e01f6c7f35048b01245201ebf64a1" "Custom: Move notes down 7st" 40178 40178 40178 40178 40178 40178 40178
-ACT 3 32060 "e00094e598717643b7c661f363e59b57" "Custom: Move notes up 5st" 40177 40177 40177 40177 40177
-ACT 3 32060 "c7b134455bdff645a5ed1a5294f8cb33" "Custom: Move notes up 7st" 40177 40177 40177 40177 40177 40177 40177
+ACT 1 32060 "9fe50064d93d1049b86bd5590e7f2155" "Custom: Move note(s) to next note(s) creating legato (select last note)" 40414 40413 40440 40414 40793
+ACT 1 32060 "934b6cd3cac9aa42ae1ee38dffaf1321" "Custom: Move note(s) to next note(s) creating legato (select last note) with prompt to repeat" 40414 40413 40440 40414 40793 2002
+ACT 1 32060 "b620135166a08d4fb1de113cd5f4f54f" "Custom: Move note(s) to previous note(s) creating legato (select 1st note)" 40413 40414 40639 40413 40755
+ACT 1 32060 "69b77eaa035b8e4c89cf91dc0df33abb" "Custom: Move note(s) to previous note(s) creating legato (select 1st note) with prompt to repeat" 40413 40414 40639 40413 40755 2002
+ACT 1 32060 "5ae27060e5549d47a3e71fd26fb92a33" "Custom: Move notes down 5st" 40178 40178 40178 40178 40178
+ACT 1 32060 "7b8e01f6c7f35048b01245201ebf64a1" "Custom: Move notes down 7st" 40178 40178 40178 40178 40178 40178 40178
+ACT 1 32060 "e00094e598717643b7c661f363e59b57" "Custom: Move notes up 5st" 40177 40177 40177 40177 40177
+ACT 1 32060 "c7b134455bdff645a5ed1a5294f8cb33" "Custom: Move notes up 7st" 40177 40177 40177 40177 40177 40177 40177
 ACT 1 32060 "9a2dc90583e7b643bb71c6f0003c9215" "Custom: NickMoritz_Draw (L drag inser/move note; R drag delete notes/CC events)" 39492 39454
 ACT 1 32060 "bdda0f364f677e4493009c126ea1790f" "Custom: NickMoritz_Draw Move Default (L drag - insert/extend/change pitch; note L drag - move; R drag - marquee select events)" 39481 39289 39449
 ACT 1 32060 "8b83b0d272455942a32e1cc6e13cc5b9" "Custom: NickMoritz_Duplicate selected notes right" 40639 40048 40010 40214 40011
 ACT 1 32060 "a88f06d93930fb4482e5309d3ec084ef" "Custom: NickMoritz_Duplicate selected notes to octave down" 40440 40010 40180 40011
 ACT 1 32060 "07a1df6a1ed7f444a047e256fdd00b6b" "Custom: NickMoritz_Duplicate selected notes to octave up" 40440 40010 40179 40011
 ACT 1 32060 "7731bcde99bf854c95baaeb220036388" "Custom: NickMoritz_Erase (L drag - erase notes; R drag - maruquee select events)" 39483 39449
-ACT 3 32060 "cdeca958b0315e4cacc3f10f4a7a12b0" "Custom: Note velocity +7" 40462 40462 40462 40462 40462 40462 40462
-ACT 3 32060 "6713e3ff46a215479bb9d39cbe3a60fb" "Custom: Note velocity -7" 40464 40464 40464 40464 40464 40464 40464
-ACT 3 32060 "caf613943ed7bd4aaa57565bf1c19d99" "Custom: Notes/Chords grid splitter 1/8T=1/12" 40193 40641 40214
-ACT 3 32060 "6c756056215e7247b46cc9e6fa819030" "Custom: Notes/Chords grid splitter 1/16" 40192 40641 40214
-ACT 3 32060 "5909346f2626d342a2ff89013e2cdada" "Custom: Notes/Chords grid splitter 1/16T=1/24" 40191 40641 40214
-ACT 3 32060 "dcac73fdfaa7ea4eac351f37f97a3846" "Custom: Notes/Chords grid splitter 1/32" 40190 40641 40214
-ACT 3 32060 "175e559ba2aef94ea3b6324bfbce9b26" "Custom: Notes/Chords grid splitter 1/32T=1/48" 40189 40641 40214
-ACT 3 32060 "306d5a3bb80a79499944b902e6c6bc7f" "Custom: PooFox aka foxAsteria Close Editor" 40477
-ACT 3 32060 "cf8314891773e547851f43668e1f7dd9" "Custom: PooFox aka foxAsteria Fit and Select all Notes" 40466
+ACT 1 32060 "cdeca958b0315e4cacc3f10f4a7a12b0" "Custom: Note velocity +7" 40462 40462 40462 40462 40462 40462 40462
+ACT 1 32060 "6713e3ff46a215479bb9d39cbe3a60fb" "Custom: Note velocity -7" 40464 40464 40464 40464 40464 40464 40464
+ACT 1 32060 "caf613943ed7bd4aaa57565bf1c19d99" "Custom: Notes/Chords grid splitter 1/8T=1/12" 40193 40641 40214
+ACT 1 32060 "6c756056215e7247b46cc9e6fa819030" "Custom: Notes/Chords grid splitter 1/16" 40192 40641 40214
+ACT 1 32060 "5909346f2626d342a2ff89013e2cdada" "Custom: Notes/Chords grid splitter 1/16T=1/24" 40191 40641 40214
+ACT 1 32060 "dcac73fdfaa7ea4eac351f37f97a3846" "Custom: Notes/Chords grid splitter 1/32" 40190 40641 40214
+ACT 1 32060 "175e559ba2aef94ea3b6324bfbce9b26" "Custom: Notes/Chords grid splitter 1/32T=1/48" 40189 40641 40214
+ACT 1 32060 "306d5a3bb80a79499944b902e6c6bc7f" "Custom: PooFox aka foxAsteria Close Editor" 40477
+ACT 1 32060 "cf8314891773e547851f43668e1f7dd9" "Custom: PooFox aka foxAsteria Fit and Select all Notes" 40466
 ACT 1 32060 "0a8d378bcee894488a8ca96c59de3714" "Custom: PooFox aka foxAsteria Inverted Scroll" 2004 2003 40433
 ACT 1 32060 "b3dfbfddcece7045a3c17b900316d0db" "Custom: PooFox aka foxAsteria Loop: Set End" 40443 40437
 ACT 1 32060 "c0793a6d689e26419a03318a2ab0bb20" "Custom: PooFox aka foxAsteria Loop: Set Start" 40443 40436
-ACT 3 32060 "03f1a8be081e3a458f19fb779e071675" "Custom: PooFox aka foxAsteria Notes Fill Screen and Selected" 40466 40006
+ACT 1 32060 "03f1a8be081e3a458f19fb779e071675" "Custom: PooFox aka foxAsteria Notes Fill Screen and Selected" 40466 40006
 ACT 0 32060 "694bda9216ca6444bdcd6d8d835defcd" "Custom: PooFox aka foxAsteria Pass All Actions" 40401
 ACT 1 32060 "4d079498c007aa4d9ee278bf7a71cbf8" "Custom: PooFox aka foxAsteria Split Notes at Mouse" 40443 40046
 ACT 1 32060 "d92a08ab7844834693361a8a3e096ce1" "Custom: Restore full custom note view after some were hidden" 40452 40454
@@ -824,10 +824,10 @@ ACT 1 32060 "8cc003a3af8e4b47929b8ef2bf95d110" "Custom: Scale: Phrygian" 40214 4
 ACT 1 32060 "30d911480ddc3d4396510c7267477683" "Custom: Scale: Phrygian Dominant" 40214 40164 40048 40165 40048 40168 40048 40169 40048 40171 40048 40172 40048 40174 40048 40176 40048
 ACT 1 32060 "dec3b60756c88b4f9f57e455ba6b6dce" "Custom: Scale: Scribian" 40214 40164 40048 40165 40048 40168 40048 40171 40048 40173 40048 40176 40048
 ACT 1 32060 "87f7bac361617641b6c38d961b0b37c9" "Custom: Scale: WholeTone" 40214 40164 40048 40166 40048 40168 40048 40170 40048 40172 40048 40174 40048 40176 40048 40164 40048
-ACT 3 32060 "cd6293b530d7e740beab3fbec775851e" "Custom: Set CC lane to Bank/Program Select and insert event" 40369 40950
-ACT 3 32060 "e757d67a11e98e47ba31e90fc1ce1a92" "Custom: Set CC lane to Text events and insert event" 40370 40458
+ACT 1 32060 "cd6293b530d7e740beab3fbec775851e" "Custom: Set CC lane to Bank/Program Select and insert event" 40369 40950
+ACT 1 32060 "e757d67a11e98e47ba31e90fc1ce1a92" "Custom: Set CC lane to Text events and insert event" 40370 40458
 ACT 0 32060 "2cce7e141ec5ab4994b67d33149b3482" "Custom: Solo notes" 40058 40501 40057 40501
-ACT 3 32060 "2c145e8607ed874094fb7fa24ee42115" "Custom: Spread extracted drum break MIDI sequence chromatically up (1st set pitch cursor to pitch of the sequence)" 41746 40659 40214 40036 2001 40413 40440 40667 40049 40693 40440 2002 40003 40405 40214 40037 40414 40791 40214 40036
+ACT 1 32060 "2c145e8607ed874094fb7fa24ee42115" "Custom: Spread extracted drum break MIDI sequence chromatically up (1st set pitch cursor to pitch of the sequence)" 41746 40659 40214 40036 2001 40413 40440 40667 40049 40693 40440 2002 40003 40405 40214 40037 40414 40791 40214 40036
 ACT 0 32060 "58fd6f31f7f43b49b7c30433b7747103" "Custom: Unsolo notes" 40803 40058 40501
 ACT 1 32063 "aab93ef2636111408b36a3f5612c8fb3" "Custom: Preview: Fast foward 80 ms (can be used as a building block for greater disrances)" 40034 40034 40034 40034 40034 40034 40034 40034 40034 40034
 ACT 1 32063 "9998c986fcbb904baf6ed48a1cfc3446" "Custom: Preview: Rewind 80 ms (can be used as a building block for greater disrances)" 40033 40033 40033 40033 40033 40033 40033 40033 40033 40033
