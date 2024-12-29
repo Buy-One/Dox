@@ -665,6 +665,7 @@ ACT 1 0 "cccac6adab87ed41aaf2afa9605ebf18" "Custom: Zoom in to 1 measure (REAPER
 ACT 1 0 "096ab3e08206c84d88b6269921e83dcb" "Custom: Zoom in to 2 measurs (REAPER 7.07+)" 42964 41040 40625 40839 40839 40626 40031 40635
 ACT 1 0 "4f1cfc699f76b940b54759ca989df0e5" "Custom: Zoom in to 4 measurs (REAPER 7.07+)" 42964 41040 40625 40839 40839 40839 40839 40626 40031 40635
 ACT 1 0 "8c3cddcde704bd43a4969ab0abd979c4" "Custom: Zoom out project (a little more precise than View: Zoom out project)" 40042 40625 40043 40626 40031 40635
+ACT 17 0 "8349326e5c10c545a0e099baaefe6087" "Custom: Toko_MG_Adjust item envelope segment with mousewheel (have envelope selected)" 40528 40290 40726 40330 40635 2013 41180 2014 41181
 ACT 1 0 "e0fefd4067413144927ba68b2a30280b" "Custom: Crop project to loop and open in new tab complete (switching proj tabs needed to activate new tab, no orig project undo)" 40623 40049 40296 40210 41929 40862 40861 42398 40862 40861
 ACT 1 0 "8561c97f5fcc0043ba1873a1e0f67f7e" "Custom: Crop project to loop -- Pt. 1" 40623 40049
 ACT 1 0 "21a3c0859629664f9d4dfdfb9e39bd9c" "Custom: Crop project to loop/region and open in new tab -- Pt. 2 (switching proj tabs needed to activate new tab, undo restores orig project)" 40296 40210 40297 41929 40862 40861 42398 40862 40029 40861 40297
