@@ -5493,6 +5493,7 @@ local Get, Set, GetTrackInfo = r.GetTrackSendInfo_Value, r.SetTrackSendInfo_Valu
 			elseif dest_ch_idx < 512 then -- not rearoute loopback output
 			local mono_hw_output_cnt = r.GetNumAudioOutputs() -- only counts mono physical outputs, ignored rearoute loopback outputs
 			local st_hw_output_cnt = mono_hw_output_cnt/2 -- for every 2 mono outputs 1 stereo should be implied and accounted for because it's listed in the outputs menu
+			-- errors need Error_Tooltip() to be displayed
 			local err = hw_output_cnt == 0 and 'no hardware outputs'
 			or (dest_ch_mode == 1 and dest_ch_idx > mono_hw_output_cnt -- mode 1 is mono
 			or dest_ch_mode == 0 and dest_ch_idx > st_hw_output_cnt) -- mode 0 is stereo
