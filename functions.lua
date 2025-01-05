@@ -5272,6 +5272,7 @@ end
 -- src_ch, src_bus, dest_ch, dest_bus = Get_Track_MIDI_Send_Recv_Channels(tr, idx, send)
 
 
+
 function Set_Track_MIDI_Send_Recv_Channels(tr, idx, src_ch, src_bus, dest_ch, dest_bus, send)
 -- whether send or receive is the target depends on send arg, which is boolean
 -- tr arg depends on the send arg, if true track is the send src track
@@ -5327,7 +5328,7 @@ end
 
 
 function Insert_Track_With_One_Regular_And_One_HWOutput_Send(src_ch_st, src_ch_idx, dest_ch_st, dest_ch_idx, hwoutput_st, hwoutput_idx, dest_tr_idx)
--- audio only
+-- audio only, MIDI hardware output is quieried/configured with Get/SetMediaTrackInfo_Value() 'I_MIDIHWOUT'
 -- src_ch_st/dest_ch_st/hwoutput_st are booleans to select stereo channel/hw output, if false/nil mono will be selected
 -- the rest are integers or strings
 -- dest_ch_st and dest_ch_idx are only relevant if dest_tr_idx is valid
@@ -5349,6 +5350,10 @@ function Insert_Track_With_One_Regular_And_One_HWOutput_Send(src_ch_st, src_ch_i
 -- and rearoute_loopback key in reaper.ini for each type respectively
 -- to ensure that it's within range;
 -- the function doesn't support src/dest multi-channel
+-- when sending to hardware output the master send may need to be set to off
+-- also send mode setting can be added with r.GetTrackSendInfo_Value(tr, snd_cat, snd_idx, 'I_SENDMODE', int);
+-- creation of sends to hardware outputs is simpler with ReaInsert plugin
+-- but one plugin is only able to send to 1 stereo hardware output, or 2 mono
 -- https://forum.cockos.com/showthread.php?t=220361
 -- https://old.reddit.com/r/Reaper/comments/1hsul96/new_track_outputs_default_is_it_possible/
 
@@ -5396,9 +5401,11 @@ local src_ch_idx = src_ch_st and src_ch_idx-1 or src_ch_idx-1+1024
 
 -- When a send is just created it's automatically set to stereo 1/2, both for the src and for the dest channel
 
+local CreateSnd, SetSnd = r.CreateTrackSend, r.SetTrackSendInfo_Value
+
 	if dest_tr_idx then
 	local dest_tr = r.GetTrack(0, dest_tr_idx-1)
-	local snd_idx = r.CreateTrackSend(tr, dest_tr) -- if dest_tr were nil a hardware send would be created
+	local snd_idx = CreateSnd(tr, dest_tr) -- if dest_tr were nil a hardware send would be created
 	-- the dest track max number of channels must be greater than or equal to
 	-- the dest_ch_idx value so that the send isn't created into void
 	-- doing this before calculating final dest_ch_idx because if mono if will be added 1024
@@ -5408,13 +5415,14 @@ local src_ch_idx = src_ch_st and src_ch_idx-1 or src_ch_idx-1+1024
 		r.SetMediaTrackInfo_Value(tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the value must be even
 		end
 	local dest_ch_idx = dest_ch_st and dest_ch_idx-1 or dest_ch_idx-1+1024 -- not needed for hardware outputs
-	r.SetTrackSendInfo_Value(tr, 0, snd_idx, 'I_SRCCHAN', src_ch_idx) -- 0 track send category
-	r.SetTrackSendInfo_Value(tr, 0, snd_idx, 'I_DSTCHAN', dest_ch_idx)
+	SetSnd(tr, 0, snd_idx, 'I_SRCCHAN', src_ch_idx) -- 0 track send category
+	SetSnd(tr, 0, snd_idx, 'I_DSTCHAN', dest_ch_idx)
 	end
 
 	if hwoutput_idx then
-	local snd_idx = r.CreateTrackSend(tr)
-	r.SetTrackSendInfo_Value(tr, 1, snd_idx, 'I_SRCCHAN', src_ch_idx) -- 1 hardware output category
+--	r.SetMediaTrackInfo_Value(tr, 'B_MAINSEND', 0) -- turn off master/parent send
+	local snd_idx = CreateSnd(tr)
+	SetSnd(tr, 1, snd_idx, 'I_SRCCHAN', src_ch_idx) -- 1 hardware output category
 	-- hardware output indices convention see at https://github.com/ReaTeam/Doc/blob/master/State%20Chunk%20Definitions
 	-- token HWOUT
 	-- can be set with SetTrackSendInfo_Value() as well
@@ -5431,7 +5439,8 @@ end
 
 
 function Get_Set_Track_Snd_Rec_Src_Dest_Channel(tr, send, hw_output, idx, src_ch_idx, src_ch_mode, dest_ch_idx, dest_ch_mode)
--- only deals with audio routings
+-- only deals with audio routings, MIDI hardware output is quieried/configured 
+-- with Get/SetMediaTrackInfo_Value() 'I_MIDIHWOUT';
 -- send is boolean, if false/nil receive is addressed
 -- hw_output is boolean, if valid send arg is ignored
 -- idx is send/receive index
@@ -5451,18 +5460,23 @@ function Get_Set_Track_Snd_Rec_Src_Dest_Channel(tr, send, hw_output, idx, src_ch
 -- must be looked up at <Preferences -> Audio -> Virtual loopback audio hardware>
 -- and rearoute_loopback key in reaper.ini for each type respectively
 -- to ensure that it's within range;
+-- when sending to hardware output the master send may need to be set to off
+-- also send mode setting can be added with r.GetTrackSendInfo_Value(tr, snd_cat, snd_idx, 'I_SENDMODE', int);
+-- creation of sends to hardware outputs is simpler with ReaInsert plugin
+-- but one plugin is only able to send to 1 stereo hardware output, or 2 mono
+
 
 -- local retval, name = r.GetTrackSendName(tr, send_idx, '') -- for stereo hardware outputs only returns left channel name
 -- local retval, name = r.GetTrackReceiveName(tr, recv_idx, '')
 
 local routing_type = hw_output and 1 or send and 0 or -1 -- -1 receive
-local Get, Set, GetTrackInfo = r.GetTrackSendInfo_Value, r.SetTrackSendInfo_Value, r.GetMediaTrackInfo_Value
+local GetSnd, SetSnd, GetTrackInfo, SetTrackInfo = r.GetTrackSendInfo_Value, r.SetTrackSendInfo_Value, r.GetMediaTrackInfo_Value, r.SetMediaTrackInfo_Value
 
 	if not src_ch_idx and not dest_ch_idx then
-	local bitfield = Get(tr, routing_type, idx, 'I_SRCCHAN')
+	local bitfield = GetSnd(tr, routing_type, idx, 'I_SRCCHAN')
 	local src_mode = bitfield>>10&0x3ffff -- shifting heigher 10 bits, applying 10 bit mask
 	local src_ch_idx = bitfield&0x3ffff - src_mode*1024 -- bit-masking lower 10 bits, 0-based ch index increases by 1024 with each mode hence the subtraction
-	local bitfield = Get(tr, routing_type, idx, 'I_DSTCHAN')
+	local bitfield = GetSnd(tr, routing_type, idx, 'I_DSTCHAN')
 	local dest_mode = bitfield>>10&0x3ffff
 	local dest_ch_idx = bitfield&0x3ffff - dest_mode*1024
 	return src_mode, src_ch_idx, dest_mode, dest_ch_idx -- dest_ch_idx 512+ is rearoute loopback output 0-based index
@@ -5474,21 +5488,21 @@ local Get, Set, GetTrackInfo = r.GetTrackSendInfo_Value, r.SetTrackSendInfo_Valu
 		local tr_ch_cnt = GetTrackInfo(tr, 'I_NCHAN')
 			if tr_ch_cnt < (src_ch_idx+1 + (src_ch_mode == 0 and 1 or 0)) then -- src_ch_idx+1 to match 1-based track channel count because src_ch_idx var is 0-based // adding 1 to src_ch_idx for stereo pair (src_ch_mode 0) because src_ch_idx var only refers to the left channel
 			tr_ch_cnt = (src_ch_idx+1 + (src_ch_mode == 0 and 1 or 0)) - tr_ch_cnt + tr_ch_cnt -- increase track channel count
-			r.SetMediaTrackInfo_Value(tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the value must be even
+			SetTrackInfo(tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the value must be even
 			end
 		local bitfield = (src_ch_mode << 10) | src_ch_idx -- mode number shifted 10 bits leftwards + 0-based channel index, if mode is stereo or multichannel index of the left channel // if channel index exceeds the count of enabled channels the src ch readout isn't updated whle the I/O dialogue is open, to have it update either close and reopen or toggle REAPER window unfocused and focused
-		Set(tr, routing_type, idx, 'I_SRCCHAN', bitfield)
+		SetSnd(tr, routing_type, idx, 'I_SRCCHAN', bitfield)
 		end
 		if dest_ch_idx then
 		local dest_ch_mode = dest_ch_mode or 0 -- if false/nil then stereo
 			if not hw_output then
 			-- the dest track max number of channels must be greater than or equal to
 			-- the dest_ch_idx value so that the send isn't created into void
-			local dest_tr = Get(tr, routing_type, idx, 'P_DESTTRACK') -- returns pointer, not index
+			local dest_tr = GetSnd(tr, routing_type, idx, 'P_DESTTRACK') -- returns pointer, not index
 			local tr_ch_cnt = GetTrackInfo(dest_tr, 'I_NCHAN')
 				if tr_ch_cnt < (dest_ch_idx+1 + (dest_ch_mode == 0 and 1 or 0)) then -- dest_ch_idx+1 to match 1-based track channel count because dest_ch_idx var is 0-based // adding 1 to dest_ch_idx for stereo pair (dest_ch_mode 0) because dest_ch_idx var only refers to the left channel
 				tr_ch_cnt = (dest_ch_idx+1 + (dest_ch_mode == 0 and 1 or 0)) - tr_ch_cnt + tr_ch_cnt -- increase track channel count
-				r.SetMediaTrackInfo_Value(dest_tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the value must be even
+				SetTrackInfo(dest_tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the value must be even
 				end
 			elseif dest_ch_idx < 512 then -- not rearoute loopback output
 			local mono_hw_output_cnt = r.GetNumAudioOutputs() -- only counts mono physical outputs, ignored rearoute loopback outputs
@@ -5509,8 +5523,11 @@ local Get, Set, GetTrackInfo = r.GetTrackSendInfo_Value, r.SetTrackSendInfo_Valu
 			-- if either one is enabled the range of indices is 512 - 1023,
 			-- than many (512) outputs are supported since 6.69
 			end
+			if hw_output then
+		--	SetTrackInfo(tr, 'B_MAINSEND', 0) -- turn off master/parent send
+			end
 		local bitfield = (dest_ch_mode << 10) | dest_ch_idx
-		Set(tr, routing_type, idx, 'I_DSTCHAN', bitfield)
+		SetSnd(tr, routing_type, idx, 'I_DSTCHAN', bitfield)
 		end
 	end
 
@@ -19128,7 +19145,10 @@ M A T H
 
 	is_integer
 	is_decimal
-	is_even
+	is_even1
+	is_even2
+	is_odd1
+	is_odd2
 	round1
 	round2
 	round3
@@ -19210,6 +19230,8 @@ S T R I N G S
 	hex
 	is_utf8_1
 	is_utf8_2
+	selective_case_change
+	remove_duplicate_words
 
 
 T A B L E S
