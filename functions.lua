@@ -226,22 +226,120 @@ end
 
 
 
-function Toggle_Undo_Settings(scr_cmdID, undoflags)
-	if not undoflags and not r.HasExtState(scr_cmdID, 'UNDO FLAGS') then -- enable and store the original value
+function Toggle_Undo_Settings1(scr_cmdID, undoflags)
+
+	local function all_undo_sett_ON(undoflags)
+		for k, bit in ipairs({1,2,8,16,32,128}) do
+			if bit~=128 and undoflags&bit ~= bit
+			or bit==128 and undoflags&bit == bit then
+			return
+			end
+		end
+	return true
+	end
+
+	if not undoflags -- and not r.HasExtState(scr_cmdID, 'UNDO FLAGS') 
+	then -- enable and optionally store the original value
 	local retval, undoflags = r.get_config_var_string('undomask')
 	undoflags = undoflags+0 -- converting into integer with +0 to accommodate Lua 5.4 where implicit conversion of strings to integers doesn't work in bitwise operations
-	local val = (undoflags|1|2|8|16|32)&~128 -- setting all bits besides 'When approaching full undo ...'; bit 128 MIDI events is set when the option is UNchecked therefore to enable the setting the bit must be cleared
-	r.SNM_SetIntConfigVar('undomask', val)
-	-- r.SetExtState(scr_cmdID, 'UNDO FLAGS', undoflags, false) -- persist false
+		if not all_undo_sett_ON(undoflags) then
+		local val = (undoflags|1|2|8|16|32)&~128 -- setting all bits besides 'When approaching full undo ...'; bit 128 MIDI events is set when the option is UNchecked therefore to enable the setting the bit must be cleared
+		r.SNM_SetIntConfigVar('undomask', val)
+		-- r.SetExtState(scr_cmdID, 'UNDO FLAGS', undoflags, false) -- persist false
+		end
 	return undoflags
 	else -- restore
-	r.SNM_SetIntConfigVar('undomask', undoflags)
-	--[[
-	elseif undoflags and r.HasExtState(scr_cmdID, 'UNDO FLAGS') then -- restore
-	r.SNM_SetIntConfigVar('undomask', r.GetExtState(scr_cmdID, 'UNDO FLAGS')) -- string is supported as well
-	r.DeleteExtState(scr_cmdID, 'UNDO FLAGS', true) -- persist true
-	]]
+	local retval, undoflags_cur = r.get_config_var_string('undomask')
+		if undoflags_cur+0 ~= undoflags then
+		r.SNM_SetIntConfigVar('undomask', undoflags)
+		end
 	end
+end
+
+
+
+function Toggle_Undo_Settings2(scr_cmdID, restore)
+-- restore is boolean
+
+	local function all_undo_sett_ON(undoflags)
+		for k, bit in ipairs({1,2,8,16,32,128}) do
+			if bit~=128 and undoflags&bit ~= bit
+			or bit==128 and undoflags&bit == bit then
+			return
+			end
+		end
+	return true
+	end
+
+local stored = r.HasExtState(scr_cmdID, 'UNDO_FLAGS')
+
+	if not restore and not stored then -- enable and store the original value
+	-- this part is run before the menu is (re)opened while RUN ACTIONS is enabled
+	local retval, undoflags = r.get_config_var_string('undomask')
+	undoflags = undoflags+0 -- converting into integer with +0 to accommodate Lua 5.4 where implicit conversion of strings to integers doesn't work in bitwise operations
+		if not all_undo_sett_ON(undoflags) then
+		local val = (undoflags|1|2|8|16|32)&~128 -- setting all bits besides 'When approaching full undo ...'; bit 128 MIDI events is set when the option is UNchecked therefore to enable the setting the bit must be cleared
+		r.SNM_SetIntConfigVar('undomask', val)
+		r.SetExtState(scr_cmdID, 'UNDO_FLAGS', undoflags, false) -- persist false // store original flags
+		end
+	elseif restore and stored then -- restore
+	-- this part is run when ADD ARMED ACTION is disabled and the menu or the script is exited
+	local retval, undoflags = r.get_config_var_string('undomask')
+	local undoflags_stored = r.GetExtState(scr_cmdID, 'UNDO_FLAGS')
+		if undoflags ~= undoflags_stored then
+		r.SNM_SetIntConfigVar('undomask', undoflags_stored) -- string is supported as well as the 2nd argument
+		r.DeleteExtState(scr_cmdID, 'UNDO_FLAGS', true) -- persist true
+		end
+	end
+
+end
+
+
+
+function insert_get_delete_bckgrnd_track(scr_cmdID, delete)
+-- scr_cmdID comes from r.get_action_context(), delete is boolean
+-- used inside force_create_undo_point() below
+local take_GUID = r.GetExtState(scr_cmdID, 'TAKE_GUID')
+local take = #take_GUID > 0 and r.GetMediaItemTakeByGUID(0, take_GUID)
+local tr = take and r.GetMediaItemTake_Track(take)
+	if not tr and not delete then -- create if not yet created or deleted
+	local SET = r.SetMediaTrackInfo_Value
+	r.PreventUIRefresh(1)
+	r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false
+	local idx = r.GetNumTracks()-1
+	tr = r.GetTrack(0, idx)
+	SET(tr, 'B_SHOWINTCP', 0); SET(tr, 'B_SHOWINMIXER', 0);	SET(tr, 'B_MAINSEND', 0)
+	local item = r.AddMediaItemToTrack(tr) -- length is 0 so will be invisible
+	local take = r.AddTakeToMediaItem(item) -- add take to be able to find track via the take and dispense with iterating over all tracks in the project
+	local retval, take_GUID = r.GetSetMediaItemTakeInfo_String(take, 'GUID', '', false) -- setNewValue false
+	r.SetExtState(scr_cmdID, 'TAKE_GUID', take_GUID, false) -- persist false
+	r.PreventUIRefresh(-1)
+	elseif tr and delete then
+	r.DeleteTrack(tr) return
+	end
+return tr, take
+end
+
+
+function force_create_undo_point(scr_cmdID)
+-- scr_cmdID comes from r.get_action_context()
+-- relies on insert_get_delete_bckgrnd_track() above
+
+-- REAPER doesn't create undo points for changes
+-- which don't affect project, such as toggles, action arming,
+-- acton types exclusive to custom actions which only modify
+-- their behavior, or if identical actions follow each other
+-- the undo point is only created for the first one, 
+-- which makes it difficult to create a complete undo sequence
+-- for the tested custom actions
+-- the solution is in making inconsequential changes in the background
+-- so REAPER registers a change to the project, such as setting 
+-- and clearing the label of a background track
+local tr, take = insert_get_delete_bckgrnd_track(scr_cmdID)
+local GETSET = r.GetSetMediaTrackInfo_String
+local retval, tr_name = GETSET(tr, 'P_NAME', '', false) -- setNewValue false
+local is_set = #tr_name:gsub(' ','') > 0
+local set = GETSET(tr, 'P_NAME', is_set and '' or 'name', true) -- setNewValue true
 end
 
 
@@ -4551,6 +4649,31 @@ end
 
 
 
+function insert_get_delete_bckgrnd_track(scr_cmdID, delete)
+-- scr_cmdID comes from r.get_action_context(), delete is boolean
+local take_GUID = r.GetExtState(scr_cmdID, 'TAKE_GUID')
+-- string gGUID = reaper.stringToGuid(string str, string gGUID)
+local take = #take_GUID > 0 and r.GetMediaItemTakeByGUID(0, take_GUID)
+local tr = take and r.GetMediaItemTake_Track(take)
+	if not tr and not delete then -- create if not yet created or deleted
+	local SET = r.SetMediaTrackInfo_Value
+	r.PreventUIRefresh(1)
+	r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false
+	local idx = r.GetNumTracks()-1
+	tr = r.GetTrack(0, idx)
+	SET(tr, 'B_SHOWINTCP', 0); SET(tr, 'B_SHOWINMIXER', 0);	SET(tr, 'B_MAINSEND', 0)
+	local item = r.AddMediaItemToTrack(tr) -- length is 0 so will be invisible
+	local take = r.AddTakeToMediaItem(item) -- add take to be able to find track via the take and dispense with iterating over all tracks in the project
+	local retval, take_GUID = r.GetSetMediaItemTakeInfo_String(take, 'GUID', '', false) -- setNewValue false
+	r.SetExtState(scr_cmdID, 'TAKE_GUID', take_GUID, false) -- persist false
+	r.PreventUIRefresh(-1)
+	elseif tr and delete then
+	r.DeleteTrack(tr) return
+	end
+return tr, take
+end
+
+
 
 function Get_Vis_TCP_Tracklist_Length_px_X_Topmost_Track(unhide, exclusive_track_display) -- return values are used to scroll tracklist all the way up and then, if needed, to restore the position of the track which was the topmost prior to that thereby restoring tracklist scroll position
 
@@ -5486,9 +5609,9 @@ local GetSnd, SetSnd, GetTrackInfo, SetTrackInfo = r.GetTrackSendInfo_Value, r.S
 		-- the src track max number of channels must be greater than or equal to
 		-- the src_ch_idx value so that the send isn't created from void
 		local tr_ch_cnt = GetTrackInfo(tr, 'I_NCHAN')
-			if tr_ch_cnt < (src_ch_idx+1 + (src_ch_mode == 0 and 1 or 0)) then -- src_ch_idx+1 to match 1-based track channel count because src_ch_idx var is 0-based // adding 1 to src_ch_idx for stereo pair (src_ch_mode 0) because src_ch_idx var only refers to the left channel
-			tr_ch_cnt = (src_ch_idx+1 + (src_ch_mode == 0 and 1 or 0)) - tr_ch_cnt + tr_ch_cnt -- increase track channel count
-			SetTrackInfo(tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the value must be even
+			if tr_ch_cnt < (src_ch_idx+1 + (src_ch_mode == 0 and 1 or src_ch_mode > 1 and src_ch_mode*2 or 0)) then -- src_ch_idx+1 to match 1-based track channel count because src_ch_idx var is 0-based // adding 1 to src_ch_idx for stereo pair (src_ch_mode 0) because src_ch_idx var only refers to the left channel, and double the src channel mode number for multichannel because as per the API doc 2 = 4, 3 = 6 etc.
+			tr_ch_cnt = (src_ch_idx+1 + (src_ch_mode == 0 and 1 or src_ch_mode > 1 and src_ch_mode*2 or 0)) - tr_ch_cnt + tr_ch_cnt -- increase track channel count
+			SetTrackInfo(tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the channel count value must be even
 			end
 		local bitfield = (src_ch_mode << 10) | src_ch_idx -- mode number shifted 10 bits leftwards + 0-based channel index, if mode is stereo or multichannel index of the left channel // if channel index exceeds the count of enabled channels the src ch readout isn't updated whle the I/O dialogue is open, to have it update either close and reopen or toggle REAPER window unfocused and focused
 		SetSnd(tr, routing_type, idx, 'I_SRCCHAN', bitfield)
@@ -5500,9 +5623,9 @@ local GetSnd, SetSnd, GetTrackInfo, SetTrackInfo = r.GetTrackSendInfo_Value, r.S
 			-- the dest_ch_idx value so that the send isn't created into void
 			local dest_tr = GetSnd(tr, routing_type, idx, 'P_DESTTRACK') -- returns pointer, not index
 			local tr_ch_cnt = GetTrackInfo(dest_tr, 'I_NCHAN')
-				if tr_ch_cnt < (dest_ch_idx+1 + (dest_ch_mode == 0 and 1 or 0)) then -- dest_ch_idx+1 to match 1-based track channel count because dest_ch_idx var is 0-based // adding 1 to dest_ch_idx for stereo pair (dest_ch_mode 0) because dest_ch_idx var only refers to the left channel
-				tr_ch_cnt = (dest_ch_idx+1 + (dest_ch_mode == 0 and 1 or 0)) - tr_ch_cnt + tr_ch_cnt -- increase track channel count
-				SetTrackInfo(dest_tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the value must be even
+				if tr_ch_cnt < (dest_ch_idx+1 + (dest_ch_mode == 0 and 1 or dest_ch_mode > 1 and dest_ch_mode*2 or 0)) then -- dest_ch_idx+1 to match 1-based track channel count because dest_ch_idx var is 0-based // adding 1 to dest_ch_idx for stereo pair (dest_ch_mode 0) because dest_ch_idx var only refers to the left channel, and double the src channel mode number for multichannel because as per the API doc 2 = 4, 3 = 6 etc.
+				tr_ch_cnt = (dest_ch_idx+1 + (dest_ch_mode == 0 and 1 or dest_ch_mode > 1 and dest_ch_mode*2 or 0)) - tr_ch_cnt + tr_ch_cnt -- increase track channel count
+				SetTrackInfo(dest_tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the channel count value must be even
 				end
 			elseif dest_ch_idx < 512 then -- not rearoute loopback output
 			local mono_hw_output_cnt = r.GetNumAudioOutputs() -- only counts mono physical outputs, ignored rearoute loopback outputs
@@ -6251,22 +6374,32 @@ end
 
 function Is_Env_Visible(env)
 	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes in REAPER builds prior to 7.06
-	local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
-	return env_chunk:match('\nVIS 1 ')
+	local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
+	local retval, chunk, is_vis
+			if build < 7.19 then
+			retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+			else
+			retval, is_vis = r.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false) -- setNewValue false
+			end
+	return is_vis and is_vis == '1' or env_chunk and env_chunk:match('\nVIS 1 ')
 	end
 end
 
 
 function Set_Env_In_Visible(env, vis) -- can be expanded to armed and active
--- vis is boolean, if true the envelope is set to visible
--- if false env is set to hidden
+-- vis is boolean, if true the envelope will be set to visible
+-- if false env will be set to hidden
 	if not env then return end
 	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes in REAPER builds prior to 7.06
-	local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
-	local state = vis and 0 or 1
-		if env_chunk:match('\nVIS '..state) then
-		env_chunk = env_chunk:gsub('\nVIS %d', '\nVIS '..(state~1)) -- ~1 bitwise NOT, flip 0 to 1 or 1 to 0
-		r.SetEnvelopeStateChunk(env, env_chunk, false) -- isundo false
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
+		local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+		local state = vis and 0 or 1 -- invert the value for the sake of evaluation
+			if env_chunk:match('\nVIS '..state) then -- only change if differs
+			env_chunk = env_chunk:gsub('\nVIS %d', '\nVIS '..(state~1)) -- ~1 bitwise NOT, flip 0 to 1 or 1 to 0
+			r.SetEnvelopeStateChunk(env, env_chunk, false) -- isundo false
+			end
+		else
+		r.GetSetEnvelopeInfo_String(env, 'VISIBLE', vis and '1' or '0', true) -- setNewValue true
 		end
 	end
 end
@@ -6275,10 +6408,16 @@ end
 
 function Is_Env_Bypassed(env)
 	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation was enabled at least once without any actual envelope, such ghost envelopes don't have points
-	local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
-	return env_chunk:match('\nACT 0 ')
+	local retval, env_chunk, is_bypassed
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
+		retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false		
+		else
+		retval, is_bypassed = r.GetSetEnvelopeInfo_String(env, 'ACTIVE', '', false) -- setNewValue false
+		end
+	return is_bypassed and is_bypassed == '0' or env_chunk and env_chunk:match('\nACT 0 ')	
 	end
 end
+
 
 
 function Delete_Env(env)
@@ -6291,6 +6430,10 @@ end
 
 function Get_Env_GUID(env, want_vis)
 -- want_vis is boolean to only get GUID if the env is visible
+-- ENVELOPE GUIDs ARE NOT NECESSARILY UNIQUE
+-- IN TRACK/TAKE COPIES ENVELOPES KEEP THE THE SAME GUIDs
+-- AS IN THE SOURCE TRACK/TAKE
+-- IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER MUST BE USED INSTEAD
 
 -- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
 local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
@@ -6299,21 +6442,27 @@ local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
 	and r.CountEnvelopePoints(env) == 0
 	then return end
 
-local retval, GUID, chunk
-	if build >= 24 then
+local retval, GUID, chunk, is_vis
+	if build >= 6.24 then
 	retval, GUID = r.GetSetEnvelopeInfo_String(env, 'GUID', '', false) -- setNewValue false
 		if want_vis then
-		retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+			if build < 7.19 then
+			retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+			else
+			retval, is_vis = r.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false) -- setNewValue false
+			is_vis = is_vis == '1'
+			end
 		end
 	else
 	retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 	GUID = chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
 	end
 
-GUID = (want_vis and chunk:match('\nVIS 1 ') or not want_vis) and GUID
+GUID = (want_vis and (is_vis or chunk and chunk:match('\nVIS 1 ')) or not want_vis) and GUID
 return GUID and #GUID > 0 and GUID
 
 end
+
 
 
 function Get_Vis_Env_GUID(env)
@@ -15429,15 +15578,15 @@ local sws = r.APIExists('BR_Win32_GetWindowRect')
 local dimens_t = sws and {r.BR_Win32_GetWindowRect(r.GetMainHwnd())}
 or {r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)} -- true - work area, false - the entire screen // https://forum.cockos.com/showthread.php?t=195629#4
 	if #dimens_t == 5 then table.remove(dimens_t, 1) end -- remove retval value if BR's function
-local rt, top, lt, bot = table.unpack(dimens_t)
+local lt, top, rt, bot = table.unpack(dimens_t)
 local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
 --local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
 local Top_area_h = sws and top + 65 or tonumber(cont:match('toppane=(.-)\n')) or 65 -- 'toppane' only changes in reaper.ini when dragged so not reliable // Y coordinate, OPTIONAL, can be changed on a case by case basis
 -- https://forums.cockos.com/showpost.php?p=1991096&postcount=11 thanks to mespotine
---local arrange_w_px = lt - TCP_width -- accurate
+--local arrange_w_px = rt - TCP_width -- accurate
 --local sec_in_arrange = arrange_w/r.GetHZoomLevel() -- accurate
 local arrange_w_px = (end_time - start_time)*r.GetHZoomLevel() -- get width of Arrange in pixels; GetHZoomLevel() returns pixels per second
-local TCP_w_dockheight_l = lt - arrange_w_px -- seems more accurate than TCP_width (leftpanewid) by about 10 px upward when left docker is closed; otherwise accounts for open docker as well; plus TCP_width value is not reliable as it only changes when TCP edge is dragged
+local TCP_w_dockheight_l = rt - arrange_w_px -- seems more accurate than TCP_width (leftpanewid) by about 10 px upward when left docker is closed; otherwise accounts for open docker as well; plus TCP_width value is not reliable as it only changes when TCP edge is dragged
 local pos_in_arrange_sec = posInSec - start_time -- WASN'T TESTED WITH PROJECT START OFFSET
 local pos_in_arrange_px = pos_in_arrange_sec*r.GetHZoomLevel() + TCP_w_dockheight_l -- + TCP_width // X coordinate
 return math.ceil(pos_in_arrange_px) - pos_in_arrange_px <= pos_in_arrange_px - math.floor(pos_in_arrange_px) and math.ceil(pos_in_arrange_px) or math.floor(pos_in_arrange_px), -- round up or down
@@ -16464,7 +16613,7 @@ end
 
 ---------------------------------------------
 
-local function Wrapper1(func,...)
+local function Wrapper1(func,...) -- see Wrapper_multi_function() below
 -- wrapper for a 3d function with arguments
 -- to be used with defer() and atexit()
 -- thanks to Lokasenna, https://forums.cockos.com/showthread.php?t=218805 -- defer with args
@@ -16492,7 +16641,7 @@ r.atexit(Wrapper(My_Function, arg1, arg2, arg3)
 
 
 
-local function Wrapper2(...) -- more wordy
+local function Wrapper2(...) -- more wordy, see Wrapper_multi_function() below
 -- to be used with defer() and atexit()
 -- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
 local t = {...}
@@ -16500,6 +16649,26 @@ local func = t[1] -- assign function name val
 table.remove(t,1) -- remove function name arg
 return function() func(table.unpack(t)) end
 end
+
+
+
+function Wrapper_multi_function(...)
+-- the vararg syntax is as follows:
+-- {func1, arg1, arg2, arg3}, {func2, arg1, arg2, arg3} etc.
+local macro = {}
+	for _, t in ipairs({...}) do
+	local func = t[1]
+	macro[func] = {table.unpack(t, 2)}
+	end
+return
+	function()
+		for func, args in pairs(macro) do
+		func(table.unpack(args))
+		end
+	end
+end
+-- USE:
+-- r.atexit(Wrapper_multi_function({func1, arg1, arg2, arg3}, {func2, arg1, arg2, arg3})) etc.
 
 
 
@@ -16834,11 +17003,17 @@ function Get_Armed_Action(path, sep)
 	local f_path = f_path:match('^%u:') and f_path or path..sep..'Scripts'..sep..f_path -- full (starts with the drive letter and a colon) or relative file path; in reaper-kb.ini full path is stored when the script resides outside of the 'Scripts' folder of the REAPER instance being used // NOT SURE THE FULL PATH SYNTAX IS VALID ON OSs OTHER THAN WIN
 	return r.file_exists(f_path)
 	end
-
+	
 local sect_t = {['']=0,['alt']=0,['MIDI Editor']=32060,['MIDI Event List Editor']=32061,
 ['MIDI Inline Editor']=32062,['Media Explorer']=32063}
 
-	if r.GetToggleCommandStateEx(0,40605) == 1 then -- Show action list // only if Action list window is open to force deliberate use of action notes and prevent accidents in case some action is already armed for other purposes
+
+local path = path or r.GetResourcePath()
+local sep = sep or path:match('[\\/]')
+
+
+	if r.GetToggleCommandStateEx(0,40605) == 1 then -- Show action list // only if Action list window is open to force deliberate use of action notes and prevent accidents in case some action is already armed for other purposes --- THIS CONDITION IS REDUNDANT IF 'the action list is closed' ERROR IS RETURNED ABOVE
+	 
 	local cmd, section = r.GetArmedCommand() -- cmd is 0 when no armed action, empty string section is 'Main' section
 	r.ArmCommand(0, section) -- 0 unarm all
 		if cmd > 0 then
@@ -16880,7 +17055,7 @@ local sect_t = {['']=0,['alt']=0,['MIDI Editor']=32060,['MIDI Event List Editor'
 			Error_Tooltip('\n\n '..mess..' \n\n', 1, 1) -- caps, spaced true
 			return end
 	--	return name, scr_exists, mess
-		return cmd, name, sect_t[section] or sect_t[section:match('alt')]
+		return cmd, name, sect_t[section] or sect_t[section:match('alt')] -- OR sect_t['alt']
 		end
 	end
 
@@ -19140,6 +19315,10 @@ U N D O
 	Force_MIDI_Undo_Point2
 	Force_RS5k_Undo_With_Closed_Chain
 	GetUndoSettings
+	Toggle_Undo_Settings1
+	Toggle_Undo_Settings2
+	insert_get_delete_bckgrnd_track
+	force_create_undo_point
 
 M A T H
 
@@ -19372,6 +19551,7 @@ T R A C K S
 	Temp_Track_For_FX
 	Insert_Temp_Track
 	Insert_Delete_Temp_Track
+	insert_get_delete_bckgrnd_track
 	Get_Vis_TCP_Tracklist_Length_px_X_Topmost_Track
 	Scroll_Track_To_Top1
 	Scroll_Track_To_Top2
@@ -19821,6 +20001,7 @@ U T I L I T Y
 	EMERGENCY_TOGGLE
 	Wrapper1
 	Wrapper2
+	Wrapper_multi_function
 	Re_Set_Toggle_State
 	defer_store
 	Count_Proj_Tabs
