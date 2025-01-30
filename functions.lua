@@ -300,22 +300,33 @@ function insert_get_delete_bckgrnd_track(scr_cmdID, delete)
 -- scr_cmdID comes from r.get_action_context(), delete is boolean
 -- used inside force_create_undo_point() below
 local take_GUID = r.GetExtState(scr_cmdID, 'TAKE_GUID')
-local take = #take_GUID > 0 and r.GetMediaItemTakeByGUID(0, take_GUID)
+local take = #take_GUID > 0 and r.GetMediaItemTakeByGUID(0, take_GUID) -- if take isn't found returns nil
 local tr = take and r.GetMediaItemTake_Track(take)
-	if not tr and not delete then -- create if not yet created or deleted
+	if (not take or not tr) and not delete then -- create if not yet created or deleted // take is evaluated first because track can exist without take
 	local SET = r.SetMediaTrackInfo_Value
 	r.PreventUIRefresh(1)
-	r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false
-	local idx = r.GetNumTracks()-1
-	tr = r.GetTrack(0, idx)
-	SET(tr, 'B_SHOWINTCP', 0); SET(tr, 'B_SHOWINMIXER', 0);	SET(tr, 'B_MAINSEND', 0)
-	local item = r.AddMediaItemToTrack(tr) -- length is 0 so will be invisible
-	local take = r.AddTakeToMediaItem(item) -- add take to be able to find track via the take and dispense with iterating over all tracks in the project
-	local retval, take_GUID = r.GetSetMediaItemTakeInfo_String(take, 'GUID', '', false) -- setNewValue false
-	r.SetExtState(scr_cmdID, 'TAKE_GUID', take_GUID, false) -- persist false
+		if not tr then
+		local SET = r.SetMediaTrackInfo_Value		
+		r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false
+		local idx = r.GetNumTracks()-1
+		tr = r.GetTrack(0, idx)
+		SET(tr, 'B_SHOWINTCP', 0); SET(tr, 'B_SHOWINMIXER', 0);	SET(tr, 'B_MAINSEND', 0)
+		end
+		if not take then
+		local item = r.AddMediaItemToTrack(tr) -- length is 0 so will be invisible
+		take = r.AddTakeToMediaItem(item) -- add take to be able to find track via the take and dispense with iterating over all tracks in the project
+		local retval, take_GUID = r.GetSetMediaItemTakeInfo_String(take, 'GUID', '', false) -- setNewValue false
+		r.SetExtState(scr_cmdID, 'TAKE_GUID', take_GUID, false) -- persist false
+		end
 	r.PreventUIRefresh(-1)
 	elseif tr and delete then
 	r.DeleteTrack(tr) return
+	elseif tr then -- if track has been unhidden by the user or its master/parent send was enabled, restore
+		for k, attr in ipairs({'B_SHOWINMIXER','B_SHOWINTCP','B_MAINSEND'}) do
+			if r.GetMediaTrackInfo_Value(tr, attr) == 1 then
+			SET(tr, 0)
+			end
+		end
 	end
 return tr, take
 end
@@ -1506,6 +1517,22 @@ end
 
 
 
+function read_file_in_reverse(file_path, target_str)
+-- target_str is the string which when found stops the search
+-- relies on Esc()
+-- !!!! VERY SLOW because of iteration by 1 byte at a time
+local f, mess = io.open(file_path, 'r')
+	if mess and mess:match('No such file or directory') then return end
+local i, cont = -1
+	repeat
+	local pos = f:seek('end',i)
+	cont = f:read(pos)
+		if cont:match(Esc(target_str)) then break end
+	i = i-1
+	until pos == 1
+return cont
+end
+
 
 function hex(s)
 -- probably can be used to convert binary data (i.e. image file) after getting it
@@ -1620,6 +1647,26 @@ local t = {dups={}, uniq={}}
 
 return table.concat(t.uniq, ' ')
 end
+
+
+
+function construct_table_from_2_lists(list1, list2)
+-- list1 and list2 are long literal strings, i.e. enclosed within square brackets
+-- where each item occupies exactly one line
+-- they should preferably have identical number of lines
+local t = {}
+local i,ii = 0,0
+	repeat
+	local st1, fin1, item1 = list1:find('([^\n]+)', i+1)
+	local st2, fin2, item2 = list2:find('([^\n]+)', ii+1)
+		if st1 and st2 then
+		t[item1] = item2
+		end
+	i,ii = fin1,fin2
+	until not st1 or not st2
+return t
+end
+
 
 
 
@@ -4156,7 +4203,7 @@ local get_info_string = TRACK and r.GetSetMediaTrackInfo_String or ITEM and r.Ge
 					for parm_idx = 0, r.TakeFX_GetNumParams(take, fx_idx)-1 do
 					local env = r.TakeFX_GetEnvelope(take, fx_idx, parm_idx, false) -- create false
 					-- in REAPER builds prior to 7.06 TakeFX_GetEnvelope() returns env even if there's none but parameter mudulation was enabled at least once for the corresponding fx parameter hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
-						if env and r.CountEnvelopePoints(env) > 0 then -- real, not ghost envelope
+						if env and r.CountEnvelopePoints(env) > 0 then -- real, not ghost envelope // SUCH VALIDATION ONLY WORKS FOR VISIBLE TRACK BUILT-IN ENVELOPES EVEN WITHOUT USER CREATED POINTS, FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE; FOR VALID TRACK FX AND ALL TAKE ENVELOPES IT'S ALWAYS TRUE
 						local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 							if chunk:match('GUID ({.-})') == GUID then
 							return tr, item, take, take_idx, fx_idx, parm_idx, env, env_id end
@@ -4738,7 +4785,7 @@ r.CSurf_OnScroll(0, round(topmost_vis_tr_I_TCPY/8))
 ]]
 
 
-function Scroll_Track_To_Top1(tr)
+function Scroll_Track_To_Top1(tr) -- see more versatile v3 below
 local tr_y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
 local dir = tr_y < 0 and -1 or tr_y > 0 and 1 or 0 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
 r.PreventUIRefresh(1)
@@ -4764,7 +4811,7 @@ r.PreventUIRefresh(-1)
 end
 
 
-function Scroll_Track_To_Top2(tr)
+function Scroll_Track_To_Top2(tr) -- see more versatile v3 below
 -- for previous first sel track is scrolled, for next - last
 local GetValue = r.GetMediaTrackInfo_Value
 local tr_y = GetValue(tr, 'I_TCPY')
@@ -4781,6 +4828,38 @@ local Y_init -- to store track Y coordinate between loop cycles and monitor when
 	end
 r.PreventUIRefresh(-1)
 end
+
+
+
+function Scroll_Track_To_Top3(tr, item_Y)
+-- scroll track to any Y coordinate within track, not necessarily to its own Y coordinate
+-- tr is item parent track or track within which the item_Y coordinate is located
+-- item_Y is item I_LASTY attribute or calculated item/take top edge
+-- to scroll to track own Y coordinate item_Y must be 0;
+-- IN CERTAIN CASES OF SCROLLING DOWN (dir var is -1) TO THE COORDINATE WITHIN THE TRACK
+-- THE FUNCTIOM MAY NEED TO BE PRECEDED WITH ANOTHER INSTANCE WHERE item_Y arg is 0
+-- so that in the 2nd instance the scrolling starts from track Y coordinate being 0 
+-- rather than negative because otherwise the condition 'dir > 0 and Y <= item_Y' 
+-- will prevent scrolling since it becomes true at the very beginning of the loop
+
+local item_Y = item_Y*-1 -- converting to negative to reliably compare with track Y coordinate in determining the scroll direction, as a result item_Y coordinate will always be smaller than positive track Y coordinate to condition direction +1 (upwards, scrollbar moves down), and will always be greater than negative track Y coordinate to condition scroll direction -1 (downwards, scrollbar moves up)
+local GetValue = r.GetMediaTrackInfo_Value
+local tr_y = GetValue(tr, 'I_TCPY')
+local dir = tr_y < item_Y and -1 or tr_y > item_Y and 1 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
+r.PreventUIRefresh(1)
+local Y_init -- to store track Y coordinate between loop cycles and monitor when the stored one equals to the one obtained after scrolling within the loop which will mean the scrolling can't continue due to reaching scroll limit when the track is close to the track list end or is the very last, otherwise the loop will become endless because there'll be no condition for it to stop
+	if dir then
+		repeat
+		r.CSurf_OnScroll(0, dir) -- unit is 8 px
+		local Y = GetValue(tr, 'I_TCPY')
+			if Y ~= Y_init then Y_init = Y -- store
+			else break end -- if scroll has reached the end before track has reached the destination to prevent loop becoming endless
+	--	until dir > 0 and Y <= 0 or dir < 0 and Y >= 0
+		until dir > 0 and Y <= item_Y or dir < 0 and Y >= item_Y
+	end
+r.PreventUIRefresh(-1)
+end
+
 
 
 
@@ -4820,7 +4899,7 @@ local arrange_h, header_h, wnd_h_offset = Get_Arrange_Dims() -- only returns val
 	then
 	local t = re_store_sel_trks() -- store
 	r.SetOnlyTrackSelected(tr) -- select track so that it can be affected by the action
-	ACT(40913) -- Track: Vertical scroll selected tracks into view (Master isn't supported, scrolled with Scroll_Track_To_Top() ) // seems to clear take envelope selection, will be restored in the main routine
+	ACT(40913) -- Track: Vertical scroll selected tracks into view (Master isn't supported, scrolled with Scroll_Track_To_Top() ) // seems to clear take envelope selection, must be restored outside of the function
 	re_store_sel_trks(t) -- restore
 	end
 
@@ -6354,8 +6433,22 @@ end
 
 
 function Is_Valid_Envelope(env, want_state)
--- want_state is boolean to get additional properties: visivile, bypassed, armed and GUID
+-- want_state is boolean to get additional properties: visible, bypassed, armed and GUID
+-- envelope GUID isn't necessarily unique, their GUIDs are retained in track and take copies
 -- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
+-- SUCH VALIDATION WORKS FOR VISIBLE TRACK BUILT-IN ENVELOPES EVEN WITHOUT USER CREATED POINTS
+-- FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE
+-- THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
+-- i.e. 'not env_chunk:match('\nPT %d')'
+-- an open envelope by default has 1 point at position 0
+-- in track built-in envelopes without user created points 
+-- such point is ignored when the envelope is closed
+-- while with user created points it's included in the total point count regardless of the visibility
+-- without user created points track enevelope chunk doesn't list any points;
+-- IT ALSO WORKS FOR TRACK FX ENVELOPES AND ALL TAKE ENVELOPES BOTH VISIBLE AND HIDDEN
+-- because their point count doesn't depend on visibility
+-- and presence of user created points
+
 	if env and tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.06
 	and r.CountEnvelopePoints(env) > 0
 	or env then
@@ -6373,10 +6466,9 @@ end
 
 
 function Is_Env_Visible(env)
-	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes in REAPER builds prior to 7.06
-	local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
+	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
 	local retval, chunk, is_vis
-			if build < 7.19 then
+			if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 			retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 			else
 			retval, is_vis = r.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false) -- setNewValue false
@@ -6390,7 +6482,7 @@ function Set_Env_In_Visible(env, vis) -- can be expanded to armed and active
 -- vis is boolean, if true the envelope will be set to visible
 -- if false env will be set to hidden
 	if not env then return end
-	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes in REAPER builds prior to 7.06
+	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 		local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 		local state = vis and 0 or 1 -- invert the value for the sake of evaluation
@@ -6407,7 +6499,7 @@ end
 
 
 function Is_Env_Bypassed(env)
-	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation was enabled at least once without any actual envelope, such ghost envelopes don't have points
+	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation was enabled at least once without any actual envelope, such ghost envelopes don't have points // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
 	local retval, env_chunk, is_bypassed
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 		retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false		
@@ -6436,6 +6528,18 @@ function Get_Env_GUID(env, want_vis)
 -- IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER MUST BE USED INSTEAD
 
 -- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
+-- SUCH VALIDATION WORKS FOR VISIBLE TRACK BUILT-IN ENVELOPES EVEN WITHOUT USER CREATED POINTS
+-- FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE
+-- THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
+-- an open envelope by default has 1 point at position 0
+-- in track built-in envelopes without user created points 
+-- such point is ignored when the envelope is closed
+-- while with user created points it's included in the total point count regardless of the visibility
+-- without user created points track enevelope chunk doesn't list any points;
+-- IT ALSO WORKS FOR TRACK FX ENVELOPES AND ALL TAKE ENVELOPES BOTH VISIBLE AND HIDDEN
+-- because their point count doesn't depend on visibility
+-- and presence of user created points
+
 local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
 	if not env
 	or env and build < 7.06
@@ -6535,7 +6639,7 @@ local tr = r.GetMasterTrack(0)
 			for j = 0, r.TakeFX_GetCount(take)-1 do
 				for k = 0, r.TakeFX_GetNumParams(take, j)-1 do
 				local env = r.TakeFX_GetEnvelope(tr, j, k, false) -- create is false
-				env_cnt = r.CountEnvelopePoints(env) > 0 and env_cnt + 1 or env_cnt -- When param modulation was enabled at least once, in REAPER builds prior to 7.06 TakeFX_GetEnvelope() returns parameter envelope even if there's none, if it's a ghost envelope there're no points
+				env_cnt = r.CountEnvelopePoints(env) > 0 and env_cnt + 1 or env_cnt -- When param modulation was enabled at least once, in REAPER builds prior to 7.06 TakeFX_GetEnvelope() returns parameter envelope even if there's none, if it's a ghost envelope there're no points // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
 				end
 			end
 		end
@@ -6672,7 +6776,7 @@ function Is_Track_Or_Take_Env(env)
 local env = r.GetCursorContext() == 2
 local env = env and r.GetSelectedEnvelope(0)
 ]]
-local env = not env and r.GetSelectedEnvelope(0) or env -- arg either is not or is provided
+local env = not env and r.GetSelectedEnvelope(0) or env -- arg either is or is not provided
 local is_tr_env = env and r.GetEnvelopeInfo_Value(env, 'P_TRACK') -- if take env is selected returns 0.0, otherwise pointer
 local is_take_env = env and r.GetEnvelopeInfo_Value(env, 'P_TAKE') -- if track env is selected returns 0.0, otherwise pointer
 return is_tr_env ~= 0 and is_tr_env,  is_take_env ~= 0 and is_take_env
@@ -9573,6 +9677,7 @@ return rightmost_itm_r_edge
 end
 
 
+
 function Generate_Consistent_IID_Sequence(itm) -- for items overlapping the one passed in the arg, included // uses chunk functions
 -- same as using native actions:
 --ACT(40068) -- Item lanes: Move item up one lane (when showing overlapping items in lanes)
@@ -9722,6 +9827,7 @@ local overlap_itm_cnt, outermost_itm = 0
 	end
 return outermost_itm, outermost_itm and r.IsMediaItemSelected(outermost_itm), overlap_itm_cnt > 1 and overlap_itm_cnt-1 or 0 -- accounting for the item against which evaluation is being done to exclude it
 end
+
 
 
 function Overlapping_Itms_Props(itm, count_overlap, count_sel)
@@ -9897,6 +10003,43 @@ local t = {} -- table to avoid chaos in items order when they start being moved,
 	r.SetMediaItemInfo_Value(itm, 'D_POSITION', st+val)
 	end
 end
+
+
+
+function Is_Overlapping_In_Lanes(item, want_count)
+-- want_count is boolean to return the actual count of items 
+-- overlapping the source one and including it;
+-- prior to build 6.54 overlapping items lanes could collapse of the track height wasn't sufficient
+-- to accommodate them, since that build items are always displayed in lanes as long as the setting
+-- at Preferences -> Appearance -> Zoom/Scroll/Offset -> Offset by ... of item height is not 0
+-- the Preference path is as of build 7.22, in earlier builds it was different
+	if r.GetToggleCommandStateEx(0, 40507) == 1 then -- Options: Offset overlapping media items vertically AKA Show overlapping media items in lanes (when room)
+	local GetItem, GetTrack = r.GetMediaItemInfo_Value, r.GetMediaTrackInfo_Value
+	local tr = r.GetMediaItemTrack(item)
+	-- check if there're items overlapping the current one by comparing item and track height
+	-- the difference between item_h and tr_h is greater than the offset measured with item_y
+	-- even without the icon bar there's still difference, across all tested themes it's 4 px
+		and GetTrack(tr, 'I_TCPH')-GetItem(item, 'I_LASTH')-GetItem(item, 'I_LASTY') > 4 -- I_LASTH doesn't include icon top bar if any, so if the difference is greater than 4 px the TCP size is greater than needed to accommodate 1 item which means there's at least 1 overlapping item
+		then
+			if not want_count then return true end
+		local start = GetItem(item, 'D_POSITION')
+		local length = GetItem(item, 'D_POSITION')
+		local count = 1 -- accounting for the source item
+		local item_idx
+			for i = 0, r.GetTrackNumMediaItems(tr)-1 do
+			local tr_itm = r.GetTrackMediaItem(tr, i)
+			local st = GetItem(tr_itm, 'D_POSITION')
+			local len = GetItem(tr_itm, 'D_LENGTH')
+				if tr_itm ~= item and st < start+length and st+len > start then
+				count = count+1
+				elseif tr_itm == item then
+				item_idx = i
+				end
+			end
+		return count, item_idx -- item index doesn't necessarily indicate the index of its lane if the option 'Arrange in order they were created' isn't enabled at Preferences -> Appearance -> Zoom/Scroll/Offset
+	end
+end
+
 
 
 function Count_Sel_Itms_Unique_Tracks(t)
@@ -11118,6 +11261,26 @@ chunk_proc = chunk_proc..'\n>' -- close item chunk
 
 SetObjChunk(item, chunk_proc)
 
+end
+
+
+function Item_Has_Top_Icon_Bar(item)
+-- top icon bar is enabled if 'Draw labels above the item' and 'Volume knob'
+-- are enabled at Preferences -> Appearance -> Media
+-- doesn't support FIP mode
+local item_y = r.GetMediaItemInfo_Value(item, 'I_LASTY')
+	if item_y == 15 then return true end
+local tr = r.GetMediaItemTrack(item)
+local item_h = r.GetMediaItemInfo_Value(item, 'I_LASTH')
+local mode = r.GetMediaTrackInfo_Value(tr, 'I_FREEMODE')
+local FIL = mode == 2 and r.GetMediaTrackInfo_Value(tr, 'C_LANESCOLLAPSED') == 0
+	if FIL then -- FIL mode
+	local FIL_cnt = r.GetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES') 
+	local FIL_idx = r.GetMediaItemInfo_Value(item, 'I_FIXEDLANE')
+	return item_y - item_h * FIL_idx >= 15 -- OR item_y - item_h * (FIL_cnt-1) >= 15 -- in FIL mode the gap may be bigger hence >= 15
+	elseif mode == 0 then -- applies to overlapping items displayed in lanes
+		return item_y%item_h ~= 0 -- when there's top icon bar, Y coordinate of an overlapping item in any lane will be divided by item height with remainder that is non-integer quotient
+	end
 end
 
 
@@ -14621,12 +14784,19 @@ return mess:match('Permission denied') and path..sep -- dir exists // this one i
 end
 
 
-function File_Exists(path)
+function File_Exists1(path)
 local f, mess = io.open(path, 'r')
 	if mess and mess:match('No such file or directory') then return
 	else f:close() return true
 	end
 end
+
+
+function File_Exists2(name, path, ext, sep)
+local path = path:match('.+[\\/]$') and path or path..sep -- add trailing separator if not included
+return package.searchpath(name, path..'?.'..ext)
+end
+
 
 
 -- Validate path supplied in the user settings
@@ -15158,6 +15328,7 @@ return fullpath_init:match('.+[\\/](.+)') == scr_name
 end
 
 
+-- 'loadfile' syntax
 -- execute external file placing its global variables in a separate table
 -- from which the loaded file will retrieve them
 -- so they don't accidentally overwrite global variables of the host file
@@ -15167,7 +15338,7 @@ end
 -- https://stackoverflow.com/questions/9744693/how-can-i-pass-parameters-to-a-lua-file-when-loading-it-from-another-lua-file
 -- http://web.archive.org/web/20240105055546/http://lua-users.org/wiki/SandBoxes
 -- https://www.gammon.com.au/scripts/doc.php?lua=setfenv
-local func = assert( loadfile( path, 't', setmetatable({}, { __index = _G } ) ) )(...) -- load and create a function // the appended parentheses can be ommitted if no arguments need passing to the loaded file
+local func = assert( loadfile( path, 't', setmetatable({}, { __index = _G } ) ) )(...) -- load and create a function // the appended parentheses with vararg can be ommitted if no arguments need passing to the loaded file (THAT'S PROBABLY NOT TRUE AND THE PARENTHESIS MUST STAY WITH OR WITHOUT VARARG)
 func() -- execute
 --[[ OR, which isn't supported by ReaScript or the latest Lua version
 local func = assert(loadfile(path)) -- load and create a function
@@ -15175,6 +15346,77 @@ local env = {} -- declare new table
 setfenv(func,env) -- set loaded function environment to this custom table
 func() -- execute
 ]]
+
+
+-- 'require' syntax for loading module from the same path
+-- as the host script
+local is_new_value, scr_name, sect_ID, cmdID_init, mode, resol, val, contextstr = reaper.get_action_context()
+package.path = scr_name:match('.+[\\/]') .. '?.lua'
+local t = require('my module') -- OR require 'my dodule'
+
+
+
+function load_functions_from_file(file_path)
+-- allows placing all functions at the end of the script
+-- and calling them at the beginning of the script
+-- as a table
+-- the functions must be initialized within a function
+-- which is returned from the script and which itself
+-- returns a table containing them, the syntax is:
+--[[
+return function()
+local t = {}
+ -- CODE which results in table being {func1, func2, func3, ...}
+return t
+end
+]]
+-- if the loaded functions need to use local upvalues 
+-- from the main code which are not passed as arguments
+-- these must be additonally included in the returned function
+-- otherwise only global variables from the main code
+-- are accessible to the loaded functions
+-- alternatively, the upvalues should be passed as arguments
+-- to the returned function, e.g.
+--[[
+return function(upvalue1, upvalue2, upvalue3)
+local t = {}
+ -- CODE
+return t
+end
+]]
+-- and passed to pcall() function below as 2nd, 3d etc. arguments
+-- in order for function call evaluation to succeed
+
+
+local func = ''
+	for line in io.lines(file_path) do
+		if line then
+			if line:match('return function') or #func > 0 then
+			func = func..(#func > 0 and '\n' or '')..line
+			end
+		end
+	end
+
+func = func:match('.+(return function.+end)') -- exclude any trailing and preceding content, only the last 'return function' is included in case it occurs elsewhere in the script, should not feature in the nested functions 
+
+	if func then
+	-- https://stackoverflow.com/questions/48629129/what-does-load-do-in-lua
+	-- https://forum.luanti.org/viewtopic.php?t=27810
+	local func, err = load(func)() -- closing double brackets are a must even though they're not mentioned in Lua documentation, they turn the namespace into an executable function
+		if err then return err
+		else
+		local ok, t = pcall(func) -- t is a table returned by the function // if the called function has arguments, they all or their substitues must follow as pcall arguments, i.e. pcall(func, arg1, arg2, arg3), in order for evaluation to succeed (this will be the case if the returned function loaded with load() has arguments), if there're multiple return values, the are all returned after ok return value
+			if ok then return t
+			else
+			r.MB('The function is frought with errors', 'ERROR', 0)
+			end
+		end
+	end
+end
+-- USE:
+-- local is_new_value, scr_name, sect_ID, cmdID_init, mode, resol, val, contextstr = r.get_action_context()
+-- local t = get_function_from_file(scr_name)
+
 
 
 function Parse_ReaBank_File(file_name)
@@ -19082,7 +19324,6 @@ r.SetMasterTrackVisibility(state~2) -- in the Mixer
 
 -- Functions to query if track/item is selected
 
-
 reaper.GetMediaTrackInfo_Value(track, "I_SELECTED") -- 0=unselected, 1=selected or false/true
 
 reaper.IsTrackSelected(track)
@@ -19121,7 +19362,6 @@ local parent = r.CSurf_TrackFromID(idx, false) -- mpcview false
 --===================================================================================
 
 -- Functions to get item parent track
-
 
 r.GetMediaItemTrack(item)
 
@@ -19211,9 +19451,7 @@ r.SetMediaItemInfo_Value(item, 'I_CURTAKE', take_idx)
 
 --===================================================================================
 
-
 -- Functions to get take PCM source
-
 
 reaper.GetMediaItemTake_Source(take)
 
@@ -19406,11 +19644,13 @@ S T R I N G S
 	format_timestr_alt
 	magiclines
 	parse_lines_in_reverse
+	read_file_in_reverse
 	hex
 	is_utf8_1
 	is_utf8_2
 	selective_case_change
 	remove_duplicate_words
+	construct_table_from_2_lists
 
 
 T A B L E S
@@ -19555,6 +19795,7 @@ T R A C K S
 	Get_Vis_TCP_Tracklist_Length_px_X_Topmost_Track
 	Scroll_Track_To_Top1
 	Scroll_Track_To_Top2
+	Scroll_Track_To_Top3
 	Scroll_Track_To_Bottom
 	Scroll_Track_Into_View
 	Scroll_Visible_Track_Into_View
@@ -19752,6 +19993,7 @@ I T E M S
 	Are_Itms_Overlapping_Selected_Collapsed
 	Are_Overlapping_Itm_Lanes_Collapsed
 	Shift_Overlapping_Items_Together
+	Is_Overlapping_In_Lanes
 	Count_Sel_Itms_Unique_Tracks
 	Get_Item_Greatest_And_1st_Availab_Group_IDs1
 	Get_Item_Greatest_And_1st_Availab_Group_IDs2
@@ -19786,6 +20028,7 @@ I T E M S
 	Is_Item_Under_Mouse_Locked
 	Insert_Image
 	Split_Item_Into_Takes_And_Reconstruct
+	Item_Has_Top_Icon_Bar
 
 
 C O L O R
@@ -19901,7 +20144,8 @@ F I L E S
 	Invalid_Script_Name3
 	Dir_Exists1
 	Dir_Exists2
-	File_Exists
+	File_Exists1
+	File_Exists2
 	Validate_Folder_Path
 	print_or_write_to_file
 	ScanPath1
@@ -19929,6 +20173,9 @@ F I L E S
 	Get_Set_Script_Cont
 	Get_File_Size
 	Script_Is_Installed
+	(loadfile syntax)
+	(require syntax)
+	load_functions_from_file
 	Parse_ReaBank_File
 	Get_CommID_By_Script_Name
 	GetUserFileNameForRead_Alt
