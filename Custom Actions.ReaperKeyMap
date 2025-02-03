@@ -551,7 +551,7 @@ ACT 1 0 "d241969cd087914590ded06767554607" "Custom: Shift time selection left by
 ACT 1 0 "ba74d0ed8183854d9b7f7cbf725f1e39" "Custom: Shift time selection left by grid" 40630 40646 40625 40631 40646 40626
 ACT 1 0 "83f9bae2e14886429c266018d6aeb195" "Custom: Shift time selection left by time selection length with prompt to repeat" 40037 2002
 ACT 1 0 "8892b9eb94e9cd4395658db4b83124c4" "Custom: Shift time selection right by 1 beat (relative to grid)" 40630 40841 40625 40631 40841 40626
-ACT 1 0 "9cd8dde90740054d9bc66d763bc7c9c8" "Custom: Shift time selection right by grid" 40630 40647 40625 40631 40647 40626
+ACT 1 0 "9cd8dde90740054d9bc66d763bc7c9c8" "Custom: Shift time selection right by grid" 40631 40647 40626 40630 40647 40625
 ACT 1 0 "27315a49542d0048b6e05e41a3ec25d0" "Custom: Shift time selection right by time selection length with prompt to repeat" 40038 2002
 ACT 1 0 "34b3148aca19bf469eda5d5244e1934f" "Custom: SHOW ALL TRACKS in TCP and MCP ignoring track templates" _SWSTL_SHOWALL 40297 _S&M_CYCLACTION_96 _SWS_SELCHILDREN2 _SWSTL_HIDE
 ACT 1 0 "08b774f9fcd6d540930860a7c92bf2ce" "Custom: Show BASS track(s) hide others" _SWSCONSOLE_CUST3 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
