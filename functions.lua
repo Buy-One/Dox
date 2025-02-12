@@ -19062,8 +19062,7 @@ local t = {
 		with = unicode_to_utf8(with)
 		-- replace one case character instances with their other case instances
 		-- doing that 1 by 1, one character per repeat loop cycle
-		-- which is supposedly safer and more reliable especially when
-		-- str is long because string.gsub only supports a max of 32 replacements
+		-- which is supposedly safer and more
 		local i = 1
 			repeat
 			str, cnt = str:gsub(what, with, 1) -- 1 instance only
