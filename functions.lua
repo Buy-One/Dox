@@ -639,7 +639,142 @@ return str:match('0x') and tonumber(str) or tonumber(str,16)
 end
 
 
+function dec2hex(dec_int)
+-- https://www.rapidtables.com/convert/number/decimal-to-hex.html algo
+
+	if not dec_int then return end
+	
+local dec_int2
+
+	if dec_int > 0xfffffffffffff then  -- 2^52
+	-- math.maxinteger is supported from Lua 5.3
+		if tonumber(_VERSION:match('[%.%d]+')) < 5.3 or math.maxinteger == 0x7fffffff then -- either Lua older than 5.3 or 32 bit system, 0x7fffffff == 2147483647
+		return dec_int -- on a 32 bit system integers above 2^31 Lua encodes as double floating point numbers while in older Lua versions all integers are encoded as double floating point numbers; in all versions of Lua floating point precision limit is 2^53-1 (about 15 - 17 decimal places) after which rounding errors start to occur, so in these two cases no point to convert a number above 2^53-1 (in practical terms above 2^52, because in division and modulo operations employed for conversion into hex this is the limit of accuracy) because it will be fed in with rounding erros from the outset
+		end
+	-- the following assumes that integers up to 2^53-1 are represented natively rather than as floating point numbers, 
+	-- which is good for REAPER since native integer representaion is supported in Lua 5.3+
+	-- run by all REAPER versions with Lua support
+	local diff = math.floor(math.log(dec_int)/math.log(2))-52 -- find by how much the input exponent exceeds the Lua max floating point number precision limit which is 53 bit i.e. ~15-17 decimal places, because numbers whose decimal places exceed this limit lose precision and cause wrong calculation result, this workround is needed because the employed conversion method to hex relies on division and modulo operaions which produce decimal numbers for which precision is important; using value 52 instead of 53 because in division and modulo operations the limit of accuracy is 52 bit; formula to calculate exponend of the value by specific base comes from  https://www.gammon.com.au/scripts/doc.php?lua=math.log
+	dec_int, dec_int2 = dec_int >> diff, dec_int >> 52 -- shift the input value right by the difference to only leave bits whose total doesn't affect precision, then shift the input value right by 52 bits to isolate the remaining upper bits, those which have been discarted in shifting right by the difference // this is the correct splitting method for subsequent string concatenaton because it produces parts with different bit width just as would occur in splitting a string for example '256' into '56' and '2', because maintaining original width i.e. '056' and '200' would not allow accurate concatenation resulting in 200056
+	end
+
+local hex = ''
+local t  = {[0]=0,1,2,3,4,5,6,7,8,9,'a','b','c','d','e','f'}
+	repeat
+	local quotient = math.modf(dec_int/16) -- OR math.floor(dec_int/16)
+	hex = t[dec_int%16]..hex
+-- OR
+--	hex = t[dec_int-16*quotient] and t[dec_int-16*quotient]..hex or hex
+	dec_int = quotient
+	until quotient == 0
+
+local hex2
+	if dec_int2 then -- if the input number exponent exceeds the Lua floating point number max precision limit, convert the remaining upper bits, those which exceed 52 bits and concatenate the results placing the upper bits conversion result at the front as that's where they're placed in the bitfield
+	hex2 = dec2hex(dec_int2)
+	hex = hex2:sub(3)..hex
+	end
+	
+return '0x'..hex
+end
+-- for inverse operation: hex 2 dec
+-- dec = tonumber(hex:match('0x(%x+)'), 16) -- OR hex:sub(3) // hex string sans 0x
+
+
 -- a % b == a - math.floor(a/b)*b
+
+
+function get_integer_length(int)
+	if not int or not tonumber(int) then return 0 end
+local int = math.abs(tonumber(int)) -- rectify negative	
+	for i = 0, math.huge do
+		if int == 0 or int >= 10^i and int < 10^(i+1)
+		then return i+1 end
+	end
+end
+-- OR #(integer..'') -- convert to string and measure string length
+
+
+function un_pack_integers(t, length, packed_int)
+-- ONLY ABLE TO ACCURATELY UNPACK A TOTAL NUMBER OF 16 DIGITS
+-- DUE Lua FLOATING POINT PRECISION LIMIT OF 10^15
+-- i.e. 16 single digit integers at length 1, 
+-- 8 two digit integers at length 2, 
+-- 4 four digit integers at length 4
+-- and a mix of those, however the length used to accommodate
+-- longer integers will affect the limit because shorter integers
+-- will use it as well, i.e. at length 2 single digit integers 
+-- will be treated as two digit therefore their total count
+-- which can be packed alongside two digit integers will be reduced
+-- to (16 - length of all two digit integers)/2 
+-- OR to 8 (the max count of two digit integers) - the total count of 
+-- two digit integers in array;
+-- 0 cannot be packed;
+-- t is an array containing integers to be packed into a single integer
+-- length is the max number of digits allowed in the integer set for packing
+-- i.e. if length is 2 the function will only be able to accurately pack
+-- and unpack integers consisting of no more than two digits, that is exlcuding
+-- integers from 100 upwards, it can exceed the length of the longest
+-- integer but not fall short of it
+-- the length can be determined dinamically based on the longest integer in the array
+-- but then it must be returned along with the packed integer to allow accurate
+-- unpacking, in this case pass it as nil/false;
+-- packed_int is the resulting integer to be passed at the unpacking stage;
+-- if packed_int is invalid, packing routine is activated, otherwise unpacking;
+-- relies on get_integer_length() function if length arg isn't supplied;
+-- the function uses fixed base exponent method which is increased by 1
+-- for each next integer, i.e.
+-- a*10^(length*0) + a*10^(length*1) + c*10^(length*2) etc.
+-- length is the fixed component
+-- this allows easy unpacking without having to know 
+-- the length of original integers as required in other methods
+-- but it comes at the cost of wasting much more space;
+-- the employed method isn't described in the below links, so they're only
+-- for general reference
+-- https://clivesyabb.com/2021/10/01/encoding-multiple-values-in-a-single-number/ +
+-- https://www.quora.com/How-do-you-combine-two-numbers-into-one-and-extract-them-back-integers-compression-math
+-- https://stackoverflow.com/questions/5302562/packing-4-integers-as-one-integer
+-- https://stackoverflow.com/a/5302596/8883033
+-- https://stackoverflow.com/questions/4550891/packing-values-into-a-single-int
+
+local length = length
+
+	if not length then
+		for k, int in ipairs(t) do
+		local int_length = get_integer_length(int)
+		length = (not length or length < int_length) and int_length or length
+		end
+	end
+
+	if not packed_int then
+	local packed = 0
+		for k, int in ipairs(t) do
+		packed = packed + int*10^((k-1)*length)
+			if packed > 10^15 then
+			r.ReaScriptError('Storage limit has been exceeded: '..packed)
+			return end
+		end
+	return packed, length
+	else
+		if not length then return packed end
+	local unpacked_t = {}
+	local floor = math.floor
+	local mult = 10^length
+		repeat
+		unpacked_t[#unpacked_t+1] = floor(packed_int%mult)
+		packed_int = floor(packed_int/mult) -- reduce for the next cycle by the unpacked integer
+		until packed_int < 1
+	return unpacked_t
+	end
+
+end
+--[[ USE:
+local packed = un_pack_integers(t, 2) -- t contains the integers, storing 2 digit integers
+local unpacked_t = local packed = un_pack_integers(t, 2, packed) -- t arg is irrelevant, unpacking 2 digit integers
+OR
+local packed, length = un_pack_integers(t) -- t contains the integers
+local unpacked_t = local packed = un_pack_integers(t, length, packed) -- t arg is irrelevant
+]]
+
 
 
 function calculate_median_value(array_t)
@@ -650,6 +785,7 @@ table.sort(array_t, function(a,b) return a < b end) -- make sure that the sequen
 local idx = (#array_t+1)/2 -- adding 1 allows dividing odd length (number of values) without remainder and thus figuring out the center index, e.g. in table 1,2,3 the center index is 2 which will be calculated by dividing 4 (3+1) by 2
 -- if the length (number of values) is even, e.g. 1,2,3,4, dividing 5 (4+1) by 2 will produce 2.5
 -- which in turn will point at two incices 2 and 3 which share the center
+	
 	if (#array_t+1)%2 == 0 then -- OR math.floor(idx) == idx // divided without remainder, i.e. odd number sequence
 	val = array_t[idx]
 	else -- even number sequence, calculate between two cenral values
@@ -659,6 +795,18 @@ local idx = (#array_t+1)/2 -- adding 1 allows dividing odd length (number of val
 return val
 
 end
+
+
+function split_combine_64bit_integer(hi, lo)
+	if not lo then
+	local hi = math.floor(num / 2^32)  -- Extract upper 32 bits
+	local lo = num%2^32              -- Extract lower 32 bits
+	return hi, lo
+	else
+	return hi * 2^32 + lo  -- Combine back into a 64-bit integer
+	end
+end
+
 
 
 --================================ M A T H  E N D ===================================
@@ -1669,6 +1817,56 @@ end
 
 
 
+function embellish_string(str, ornam_code_t, want_spaces)
+-- ornam_code_t is a table of integers corresponding to indices of keys 
+-- holding utf-8 char codes in the below tables
+-- want_spaces is boolean to apply the ornament to space char as well;
+-- the description is relevant to ornament display in the menu
+-- 1 - sparse dashed underline (lower under digits)
+-- 2/17 - sparse dotted underline; 4/12 - bold dotted underline; 5 - solid underline; 
+-- 6/16 - bold dashed underline; 7 - tilde strikethrough; 8 - dash srtikethrough;
+-- 9 - solid line strikethrough; 10/11 - short/long slash srikethrough;
+-- 13 - solid bold overline; 14 - tilde overline (lower above digits); 
+-- 15 - sold bold underline; 18 - dotted overline which crosses characters at the top;
+
+-- when ornament is applied to spaces its level under/above the line
+-- may differ from that applied to characters when displayed in the menu;
+-- the level under/above numerals may also differ from the level under/above 
+-- alphabetic chars when displayed in the menu;
+-- https://www.charset.org/utf-8
+local t = {'\xCC\xA0','\xCC\xA3','\xCC\xA4','\xCC\xA5','\xCC\xB2','\xCC\xB3','\xCC\xB4',
+'\xCC\xB5','\xCC\xB6','\xCC\xB7','\xCC\xB8','\xCC\xBB','\xCC\xBF','\xCD\x82','\xCD\x87',
+'\xCD\x9A','\xDF\xB2','\xDF\xB3'}
+--[[ OR
+local t = {'\204\160','\204\163','\204\164','\204\165','\204\178','\204\179','\204\180',
+'\204\181','\204\182','\204\183','\204\184','\204\187','\204\191','\205\130','\205\135',
+'\205\154','\223\178','\223\179'}
+--]]
+table.sort(ornam_code_t) -- some chars may not mix well if inserted not in ascending order 
+-- e.g. 18,5 or 18,1
+local ornam = ''
+	for k, v in ipairs(ornam_code_t) do
+	ornam = ornam..t[v]
+	end
+local str = str:gsub('[\192-\255]*.[\128-\191]*', function(c) return not want_spaces and #c:gsub(' ','') == 0 and c or c..ornam end) -- accounting for non-ASCII characters by including leading and trailing bytes if any
+return str
+end
+
+
+function bytes2string(input)
+-- character byte sequence passed as a regular string, i.e '\114\101\116'
+-- Lua automatically interprets and outputs as text
+-- therefore explicit conversion of byte sequence into characters isn't necessary
+-- unless it's passed as a literal string, i.e. [['\114\101\116]],
+-- only in this case #input:gsub('\\%x+','') == 0 will be true
+
+	if #input > 0 and #input:gsub('\\%x+','') == 0 then -- byte sequence, convert to string
+	return input:gsub('\\%x+', function(c) return c:match('%x+'):char() end)
+	end
+
+return input -- if not literal byte sequence return as is
+
+end
 
 
 --=========================== S T R I N G S  E N D ==============================
@@ -15394,6 +15592,17 @@ local func = ''
 			if line:match('return function') or #func > 0 then
 			func = func..(#func > 0 and '\n' or '')..line
 			end
+		--[[ OR
+		-- the function may be marked by text signifying its start and end so the loop doesn't accidentally
+		-- capture unrelated content
+		-- the use of lines 'RETURN THIS FUNCTION START/END' typed out in reverse in the loop 
+		-- ensures that the code capture doesn't start at this exact loop as would likely be the case
+		-- had the lines been typed out normally
+			if line:match(('TRATS NOITCNUF SIHT NRUTER'):reverse()) or #func > 0 then
+			func = func..(#func > 0 and '\n' or '')..line
+			elseif line:match(('DNE NOITCNUF SIHT NRUTER'):reverse()) then break
+			end
+			]]
 		end
 	end
 
@@ -15504,11 +15713,10 @@ return cont
 end
 
 
-function sanitize_file_name(name)
+function sanitize_file_name1(name)
 -- the name must exclude extension
 -- https://stackoverflow.com/questions/1976007/what-characters-are-forbidden-in-windows-and-linux-directory-names
 local OS = r.GetAppVersion()
-Msg(OS)
 local lin, mac = OS:match('lin'), OS:match('OS')
 local win = not lin and not mac
 local t = win and {'<','>',':','"','/','\\','|','?','*'}
@@ -15526,6 +15734,13 @@ local win_illegal = 'CON,PRN,AUX,NUL,COM1,COM2,COM3,COM4,COM5,COM6,COM7,COM8,COM
 	return name
 	end
 end
+
+
+function sanitize_filename2(filename)
+-- https://github.com/ReaTeam/ReaScripts/blob/04c8142b91a09ba84f0dcd766fdbacc744a3d7c8/Tracks/Tylereddington_Smart_Track_Manager_Package.lua
+return filename:gsub("[\\/:*?\"<>|]", "_")
+end
+
 
 
 function sanitize_file_path(f_path)
@@ -18694,6 +18909,28 @@ end
 --============================ C O N V E R S I O N S ==============================
 
 
+function hex2dec(str)
+-- https://stackoverflow.com/questions/27294310/convert-hexadecimal-to-decimal-number
+return str:match('0x') and tonumber(str) or tonumber(str,16)
+end
+
+
+function dec2hex(dec_int)
+-- https://www.rapidtables.com/convert/number/decimal-to-hex.html algo
+	if not dec_int then return end
+local hex = ''
+local t  = {[0]=0,1,2,3,4,5,6,7,8,9,'a','b','c','d','e','f'}
+	repeat	
+	local quotient = math.modf(dec_int/16)
+	hex = t[dec_int%16]..hex -- OR t[dec_int-16*quotient]
+	dec_int = quotient
+	until quotient == 0
+return '0x'..hex
+end
+-- for inverse operation: hex 2 dec
+-- dec = tonumber(hex:match('0x(%x+)'), 16) -- OR hex:sub(3) // hex string sans 0x
+
+
 function char_to_bytes(char)
 -- returns a string of bytes which comprise a character
 -- e.g. '\195\128' 'À', '\196\141' 'č'
@@ -19595,6 +19832,9 @@ M A T H
 	toBits3
 	count_bits_in_number
 	hex2dec
+	dec2hex
+	get_integer_length
+	un_pack_integers
 	calculate_median_value
 
 
@@ -19651,6 +19891,8 @@ S T R I N G S
 	selective_case_change
 	remove_duplicate_words
 	construct_table_from_2_lists
+	embellish_string
+	bytes2string
 
 
 T A B L E S
@@ -20325,6 +20567,8 @@ U T I L I T Y
 
 C O N V E R S I O N S
 
+	hex2dec
+	dec2hex
 	char_to_bytes
 	unicode_to_utf8
 	utf8_to_unicode
