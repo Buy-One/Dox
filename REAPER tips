@@ -244,9 +244,7 @@ Mute the output to avoid feedback loop
 
 =======================================================
 
-To record MIDI output of a track create a MIDI send to the recording track, right click it's Record buttom and set Record: output -> Record: output (MIDI), 
-
-Input:none (if doesn't work, then Input: MIDI -> All MIDI inputs -> All Channels). Both menus are available on the TCP as well.
+To record MIDI output of a track create a MIDI send to the recording track, right click it's Record buttom and set Record: output -> Record: output (MIDI), Input:none (if doesn't work, then Input: MIDI -> All MIDI inputs -> All Channels). Both menus are available on the TCP as well.
 
 =======================================================
 
@@ -264,9 +262,7 @@ Arm record track, the meter must indicate signal.
 
 =======================================================
 
-When using multiout setup, despite the mono output number of the plugin being 1 the actual send mono channel ordinal number corresponds to its number in the 
-
-overall list of channels nboth mono and stereo, where stereo channels precede the mono.
+When using multiout setup, despite the mono output number of the plugin being 1 the actual send mono channel ordinal number corresponds to its number in the overall list of channels nboth mono and stereo, where stereo channels precede the mono.
 Hence if there're 16 stereo outputs and then some mono, mono output 1 equals to mono channel 17 (the first after 16) in the send mono channels list and so forth.
 
 For multiout setup to work the number of channels on the track with the multiout plugin inserted must be changed to reflect the number of required outputs
@@ -283,9 +279,7 @@ To both recieve a multiout plugin output and send MIDI to it using the same trac
 
 =======================================================
 
-To control send level of children tracks to an effect outside of a folder firsr rlink oute them to a link track inside the folder, disable its master/parent send 
-
-output, group it with the folder track as a volume slave while folder track volume is a master, and route it to the outside effect channel.
+To control send level of children tracks to an effect outside of a folder firsr rlink oute them to a link track inside the folder, disable its master/parent send output, group it with the folder track as a volume slave while folder track volume is a master, and route it to the outside effect channel.
 
 =======================================================
 
@@ -295,9 +289,7 @@ ReaFIR as a match EQ
 * Check Automatically build noise profile...
 * Play the reference track or section as many times as it takes for the audio to stop coming through (create spectrum profile).
 * When profile created. Un-Check Automatically build noise profile...
-* With the spectrum profile created. Switch ReaFir to Compressor mode (or EQ in which case use Ctrl+mouse drag the curve up to increase volume, but the sound 
-
-differs).
+* With the spectrum profile created. Switch ReaFir to Compressor mode (or EQ in which case use Ctrl+mouse drag the curve up to increase volume, but the sound differs).
 * Apply the ReaFir the to the target track(s)
 optimal FFT size is 1024, anything above will introduce latency 
 
@@ -315,9 +307,7 @@ Vocal Rider
 7.) Lower the 'Strength' slider to 0%
 8.) Set the 'Direction' to negative
 
-Now hit play and adjust the strength, attack, and release sliders until you get a little bit of gain reduction. You don't want a lot, but just enough to catch the 
-
-peaks. You might also want to adjust the 'Min volume' slider.
+Now hit play and adjust the strength, attack, and release sliders until you get a little bit of gain reduction. You don't want a lot, but just enough to catch the peaks. You might also want to adjust the 'Min volume' slider.
 
 https://forum.cockos.com/showpost.php?p=517645&postcount=10
 
@@ -377,15 +367,11 @@ https://forum.cockos.com/showthread.php?t=166544
 
 All the MIDI on a track will be sent to the plug-in. There are options for the plug-in to receive MIDI, and, if so, on which bus (MIDI Bus #1 is the default). 
 
-Within the plug-in, different processing can be applied to MIDI on different MIDI channels (e.g. Kontakt, SampleTank etc can route the different channels to 
-
-different instruments, but Reaper knows nothing of that).
+Within the plug-in, different processing can be applied to MIDI on different MIDI channels (e.g. Kontakt, SampleTank etc can route the different channels to different instruments, but Reaper knows nothing of that).
 
 There are also options for the output of MIDI from that plug-in:
 -- it can be disabled, in which case the MIDI input to the plug-in is passed to the next plug-in
--- it can replace the MIDI input completely (that's the default) in which case the MIDI input to the plug-in is discarded and the MIDI output by the plug-in passed 
-
-to the next plug-in
+-- it can replace the MIDI input completely (that's the default) in which case the MIDI input to the plug-in is discarded and the MIDI output by the plug-in passed to the next plug-in
 -- they can be merged, so the next plug-in gets both sets of MIDI.
 -- you can put the MIDI on any MIDI bus
 
@@ -404,76 +390,48 @@ MIDI Busses in Reaper can be thought of as 16 separate steams of MIDI, each of w
 * plug-ins can receive MIDI from any selected MIDI Bus,
 * plug-ins can output MIDI to any selected MIDI Bus,
 
-One of uses for MIDI busses is for VST3 plugins that support multiple MIDI ports (like Vienna Instruments Pro), you can link MIDI busses to MIDI ports and 
-
-essentially send over more than 16 MIDI channels to one plugin.
+One of uses for MIDI busses is for VST3 plugins that support multiple MIDI ports (like Vienna Instruments Pro), you can link MIDI busses to MIDI ports and essentially send over more than 16 MIDI channels to one plugin.
 
 
 https://forum.cockos.com/showthread.php?t=197276
 
 User guide might provide information on Midi Buses in section 17.19. 
 
-Each track features a Midi chain allowing plugins to receive Midi events from and send Midi events to. By default any plugin digests all events from the previous 
+Each track features a Midi chain allowing plugins to receive Midi events from and send Midi events to. By default any plugin digests all events from the previous one in the chain, so that only those it sends are propagated, but Reaper also can be configured to propagate the events present at that plugin's input and merge them with it's output (see "n in m out" -> "I/O" menu).
 
-one in the chain, so that only those it sends are propagated, but Reaper also can be configured to propagate the events present at that plugin's input and merge 
+The primary input to that chain is handled in a very similar way to audio information (track input selection from "hardware" devices, arming the track, routing between tracks, ...).
 
-them with it's output (see "n in m out" -> "I/O" menu).
+Very similar to audio streams, the output of the chain (i.e. of the last plugin in the FX "plugin chain") can be routed to the input of other tracks and/or to Midi output "hardware" devices.
 
-The primary input to that chain is handled in a very similar way to audio information (track input selection from "hardware" devices, arming the track, routing 
+Additionally there are 16 Midi buses that are accessible by plugins globally (independent of their location in an FX chain) as a source and a destination of Midi events (configurable via the "n in m out" -> "I/O" menu).
 
-between tracks, ...).
-
-Very similar to audio streams, the output of the chain (i.e. of the last plugin in the FX "plugin chain") can be routed to the input of other tracks and/or to Midi 
-
-output "hardware" devices.
-
-Additionally there are 16 Midi buses that are accessible by plugins globally (independent of their location in an FX chain) as a source and a destination of Midi 
-
-events (configurable via the "n in m out" -> "I/O" menu).
-
-The dedicated plugin "ReaControlMidi" can read and send Midi messages (in the normal way configurable from/to the appropriate FX-chain or a Midi Bus). Besides 
-
-other things, it can link Midi CC messages to automatable parameters of other plugins in that track in a bidirectional way (providing possibilities for complex 
-
-realtime automation between plugins and midi based hardware controllers). Moreover, it can show ("log") the Midi traffic.
+The dedicated plugin "ReaControlMidi" can read and send Midi messages (in the normal way configurable from/to the appropriate FX-chain or a Midi Bus). Besides other things, it can link Midi CC messages to automatable parameters of other plugins in that track in a bidirectional way (providing possibilities for complex realtime automation between plugins and midi based hardware controllers). Moreover, it can show ("log") the Midi traffic.
 
 
-Besides the tracks' FX Midi chains and the 16 Midi Buses, there is yet another global Midi Bus called the "Reaper control path", which is dedicated to feeding Midi 
-
-events to any functionality that is not provided by a plugin loaded in an FX chain such as:
+Besides the tracks' FX Midi chains and the 16 Midi Buses, there is yet another global Midi Bus called the "Reaper control path", which is dedicated to feeding Midi events to any functionality that is not provided by a plugin loaded in an FX chain such as:
 - Events can be fired by Midi events occurring in the "Reaper control path".
 - The Midi "learn" functionality of the "param" menu (provided for any plugin) accesses the "Reaper control path".
-- Reaper extensions (e.g. "SWS Live Configs", see the user Guide of same on how it makes use of the "Reaper control path") and ReaScripts (???) can access the 
-
-"Reaper control path" (but not the tracks' Midi chains nor the Midi Buses).
+- Reaper extensions (e.g. "SWS Live Configs", see the user Guide of same on how it makes use of the "Reaper control path") and ReaScripts (???) can access the "Reaper control path" (but not the tracks' Midi chains nor the Midi Buses).
 - ... ? ? ?
 
 The only (?) functionality, which is not provided by a plugin, that accesses tracks' FX Midi chains or one of the 16 Midi Buses, is what is provided by
 ..... "Param" -> "FX parameter List" -> "Param modulation / Midi Link" -> "..." -> "Link from MIDI or FX parameter" -> "MIDI" ....
 Here, the functionality can be configured to Read Midi CC events from the track's FX chain or one of the 16 global Midi buses.
 
-The "hardware" input to the "Reaper control path" is configured in the "Midi devices" section of the configuration menu by checking "Enable input for control 
-
-messages".
+The "hardware" input to the "Reaper control path" is configured in the "Midi devices" section of the configuration menu by checking "Enable input for control messages".
 
 The only other input to the "Reaper control path" (I know of) is provided by the dedicated "MidiToReaControlPath" VST plugin.
 
 (AFAIK) There is no hardware output from the "Reaper control path".
 
-Of course the Midi I/O devices can be called "buses", as well as the outputs can be used to feed multiple track inputs, while the outputs get the messages routed 
+Of course the Midi I/O devices can be called "buses", as well as the outputs can be used to feed multiple track inputs, while the outputs get the messages routed to them and merged from multiple tracks. 
 
-to them and merged from multiple tracks. 
-
-There is yet another midi bus I forgot: The output of the "Virtual Keyboard" can be routed to multiple tracks. I seem to remember that I once have been told, that 
-
-there are other functionalities that feed this bus, but I can't remember what they are. 
+There is yet another midi bus I forgot: The output of the "Virtual Keyboard" can be routed to multiple tracks. I seem to remember that I once have been told, that there are other functionalities that feed this bus, but I can't remember what they are. 
 
 
 https://forum.cockos.com/showpost.php?p=2091135&postcount=4
 
-MIDI ports is not the same thing as MIDI busses. Reaper supports up to 64 hardware MIDI ports (source: https://askjf.com/index.php?q=3779s), yes. 16 MIDI busses 
-
-are used internally for routing purposes. Completely different things.
+MIDI ports is not the same thing as MIDI busses. Reaper supports up to 64 hardware MIDI ports (source: https://askjf.com/index.php?q=3779s), yes. 16 MIDI busses are used internally for routing purposes. Completely different things.
 
 If you read page 350-351 of the Reaper manual, it starts out with routing MIDI then goes in routing using buses.
 
@@ -482,9 +440,7 @@ If you read page 350-351 of the Reaper manual, it starts out with routing MIDI t
 
 the volume of RS5K can be controlled by CC7 in the Midi Editor. An "Offset" of -50% & Scale at 100%, will give you +0.0dB when CC7 = 127.
 
-The graph is tied to "Min vol" which is actually a "Velocity Intensity" dynamic control. If you set the "Min vol" ot a -66.2dB, you will get the maximum volume 
-
-change with velocities 1 to 127. Any changes from -66.2dB to -inf are ineffective and have no affect.
+The graph is tied to "Min vol" which is actually a "Velocity Intensity" dynamic control. If you set the "Min vol" ot a -66.2dB, you will get the maximum volume change with velocities 1 to 127. Any changes from -66.2dB to -inf are ineffective and have no affect.
 
 https://forum.cockos.com/showpost.php?p=1741277&postcount=5
 
@@ -650,25 +606,19 @@ Remember my answer for this script.
 ///////////////////////////////////////////////////////////////////////////////////
 
 
-in reaper-kb.ini the value 4 next to a script command ID changes to 516 (after selecting "launch a new instance" as the answer) when the answer to the dialogue is 
-
-saved. Restoration to 4 resets it.
+in reaper-kb.ini the value 4 next to a script command ID changes to 516 (after selecting "launch a new instance" as the answer) when the answer to the dialogue is saved. Restoration to 4 resets it.
 
 from the reaper-kb.ini file reference (https://mespotin.uber.space/Ultraschall/Reaper-Filetype-Descriptions.html#Reaper-kb.ini
 /Docs/REAPER Filetype-descriptions.html#Reaper-extstate.ini)
 
 Quote:
 4 - Dialog window appears (Terminate, New Instance, Abort), if another instance of a given script is started, that's already running
-260 - always Terminate All(!) Instances, if you try to run another instance of a script, that's already running. When no instance is running, it simply starts the 
-
-script.
+260 - always Terminate All(!) Instances, if you try to run another instance of a script, that's already running. When no instance is running, it simply starts the script.
 516 - always start a New Instance of the script, that's already running
 
 =============================================================================
 
-Reaper understands the bank/program part of Cakewalk instrument definition files, so if you can find these for your devices you're set. All Reaper dialogs that can 
-
-load a *.reabank can also load *.ins.
+Reaper understands the bank/program part of Cakewalk instrument definition files, so if you can find these for your devices you're set. All Reaper dialogs that can load a *.reabank can also load *.ins.
 
 
 =============================================================================
@@ -698,17 +648,13 @@ https://old.reddit.com/r/Reaper/comments/g414wy/quick_question_about_megababy/
 ==============================================================================
 
 
-If you save Full Track Mix Snapshot with SWS utility, when you right-click on the snapshot, Show snapshot details, you will get a listing of all the settings. 
-
-Right click, Select All... Copy, this way you get entire mix detailed, including FX used, sends and receives.
+If you save Full Track Mix Snapshot with SWS utility, when you right-click on the snapshot, Show snapshot details, you will get a listing of all the settings. Right click, Select All... Copy, this way you get entire mix detailed, including FX used, sends and receives.
 
 https://old.reddit.com/r/Reaper/comments/aloyvo/is_it_possible_to_export_a_list_of_all_track_names/efl6znt/
 
 ================================================================================
 
-In video editing using secveral video files after syncing them the best thing to do is check "ignore audio" in the items source properties. It significantly 
-
-improves playback performance. these multi-layer videos can be extremely taxing on the system
+In video editing using secveral video files after syncing them the best thing to do is check "ignore audio" in the items source properties. It significantly improves playback performance. these multi-layer videos can be extremely taxing on the system
 
 https://www.youtube.com/watch?v=2sQKpDBHFk8
 
@@ -776,9 +722,7 @@ SWS/FNG: Move selected items to edit cursor (unaffected by grouping)
 
 ------------------------------------------------------------------------------
 
-These work relative to the item edge closest to cursor if several of them are selected, so all are moved as one unit and at cursor ends up only the item whose edge 
-
-is the closest to cursor
+These work relative to the item edge closest to cursor if several of them are selected, so all are moved as one unit and at cursor ends up only the item whose edge is the closest to cursor
 
 Xenakios/SWS: Move selected items to edit cursor - moves all selected items to edit cursor independently of one another
 
@@ -828,25 +772,17 @@ Item: Set focus to item under mouse cursor -- selects item under mouse, keeps ot
 
 ------------------------------------------------------------------------------
 
-View: Move edit cursor to mouse cursor (no snapping) -- works along the entire screen Y axis outside of the TCP regardless of whether the program window is under 
-
-the mouse
+View: Move edit cursor to mouse cursor (no snapping) -- works along the entire screen Y axis outside of the TCP regardless of whether the program window is under the mouse
 
 ------------------------------------------------------------------------------
 
 -- 'View: Attach/unattach docker to/from main window' (40313) 
 
-When the toggle state is ON it cannot be set to OFF if there're no visible dockers, its toggle state is linked to the state of the last docker to be 
-
-attached/unattached with the option 'Attach docker to main window' (including a toolbar docker) and only such docker can be toggled using it, undocking a window by 
-
-dragging doesn't set the action toggle state to OFF;
+When the toggle state is ON it cannot be set to OFF if there're no visible dockers, its toggle state is linked to the state of the last docker to be attached/unattached with the option 'Attach docker to main window' (including a toolbar docker) and only such docker can be toggled using it, undocking a window by dragging doesn't set the action toggle state to OFF;
 
 when there're no visible dockers and its toggle state is OFF, toggling it invokes the last toggled docker and changes the docker's attach state
 
-The action toggle state is ON when there's no docker whose attach state was last toggled with it (which happens when windows were undocked by dragging) and when 
-
-the toolbar docker is hidden, if the toolbar docker is visible in this scenario, the action toggle state is OFF
+The action toggle state is ON when there's no docker whose attach state was last toggled with it (which happens when windows were undocked by dragging) and when the toolbar docker is hidden, if the toolbar docker is visible in this scenario, the action toggle state is OFF
 
 
 -- 'View: Show docker' (40279) doesn't work with the toolbar docker, but does with individual toolbars floating docker
@@ -1032,18 +968,10 @@ https://forum.cockos.com/showpost.php?p=2142756&postcount=7
 
 ===========================================================================
 
-To be able to record a video demo with sound and voiceover concurrently, add line rearoute_loopback=8 into the reaper.ini file in [REAPER] section. The number can 
+To be able to record a video demo with sound and voiceover concurrently, add line rearoute_loopback=8 into the reaper.ini file in [REAPER] section. The number can vary. Then reload the program. The newly added inputs and outputs should be listed in the Audio Hardware Outputs list in the Master track routing window.
+Then to record you use two projects side by side in different tabs, one for the demo, the second for voiceover recording. In the demo project Master track routing window add a loopback output while in the voiceover project add a new track and select a loopback input with the same number as the output in the demo project. Thus in the voiceover project you have two tracks, one is for voice and another is for audio coming from the demo project.
 
-vary. Then reload the program. The newly added inputs and outputs should be listed in the Audio Hardware Outputs list in the Master track routing window.
-Then to record you use two projects side by side in different tabs, one for the demo, the second for voiceover recording. In the demo project Master track routing 
-
-window add a loopback output while in the voiceover project add a new track and select a loopback input with the same number as the output in the demo project. 
-
-Thus in the voiceover project you have two tracks, one is for voice and another is for audio coming from the demo project.
-
-This may work out of the box provided 'Run background projects' option is enabled, but these additional outputs/inputs allow recording specific tracks without 
-
-soloing them in the source project
+This may work out of the box provided 'Run background projects' option is enabled, but these additional outputs/inputs allow recording specific tracks without soloing them in the source project
 
 https://www.youtube.com/watch?v=E52s-RaYKuM
 https://www.youtube.com/watch?v=sBuFHJlZ19Q
@@ -1054,9 +982,7 @@ May be irrelevant for the latest versions of REAPER
 
 Justin:
 
-You can set rearoute_loopback=1 in your reaper.ini (right under [REAPER]), and then you will have loopback inputs and outputs which you can use to send between 
-
-projects. (if you are on Windows, this will mean you lose ReaRoute capability, though, but you probably don't need it).
+You can set rearoute_loopback=1 in your reaper.ini (right under [REAPER]), and then you will have loopback inputs and outputs which you can use to send between projects. (if you are on Windows, this will mean you lose ReaRoute capability, though, but you probably don't need it).
 
 
 https://forum.cockos.com/showthread.php?p=1796913#post1796913
@@ -1108,7 +1034,7 @@ reaper.Undo_EndBlock("undo text", extraflags)
 extraflags values
 
 
-UNDO_STATE_ALL      = -1
+UNDO_STATE_ALL      = -1 OR 0xFFFFFFFF as per the specs https://www.reaper.fm/sdk/plugin/reaper_plugin.h (which probably doesn't matter much)
 UNDO_STATE_TRACKCFG =  1 -- has track/master vol/pan/routing, ALL envelopes (master included)
 UNDO_STATE_FX       =  2 -- track/master fx
 UNDO_STATE_ITEMS    =  4 -- track items
@@ -1118,25 +1044,11 @@ UNDO_STATE_FREEZE   = 16 -- freeze state -- note that isfreeze is used independe
 
 schwa:
 
-Undo_BeginBlock will suppress REAPER creating any undo points until Undo_EndBlock is called. This allows the extension to perform more complex tasks that call in 
+Undo_BeginBlock will suppress REAPER creating any undo points until Undo_EndBlock is called. This allows the extension to perform more complex tasks that call in to multiple API functions that would ordinarily create undo points, without the overhead of creating individual points for what is effectively a single consolidated action.
 
-to multiple API functions that would ordinarily create undo points, without the overhead of creating individual points for what is effectively a single 
+The whichState parameter to the Undo_OnStateChange functions is a bitmask that is used with the UNDO_STATE_* flags that are declared in reaper_plugin.h. For example, if your extension changes both media items (perhaps by changing their length) and tracks (perhaps by adding a track), you might call Undo_OnStateChangeEx("text for undo point", UNDO_STATE_ITEMS|UNDO_STATE_TRACKCFG, -1).
 
-consolidated action.
-
-The whichState parameter to the Undo_OnStateChange functions is a bitmask that is used with the UNDO_STATE_* flags that are declared in reaper_plugin.h. For 
-
-example, if your extension changes both media items (perhaps by changing their length) and tracks (perhaps by adding a track), you might call Undo_OnStateChangeEx
-
-("text for undo point", UNDO_STATE_ITEMS|UNDO_STATE_TRACKCFG, -1).
-
-If you want to create a new actions section (similar to the Main or MIDI sections), you must create a new KbdSectionInfo. However, you probably would only want to 
-
-do that if you have created an entirely new context for these actions, such as a new dialog window similar to the MIDI editor or Media Explorer. If your actions 
-
-are meant to be used in an existing context, such as the main arrange view or the MIDI editor, it would be easier to simply add the actions to the appropriate 
-
-existing actions section.
+If you want to create a new actions section (similar to the Main or MIDI sections), you must create a new KbdSectionInfo. However, you probably would only want to do that if you have created an entirely new context for these actions, such as a new dialog window similar to the MIDI editor or Media Explorer. If your actions are meant to be used in an existing context, such as the main arrange view or the MIDI editor, it would be easier to simply add the actions to the appropriate existing actions section.
 
 The SWS source is usually the best place to look for hints on API questions. In fact, that's where I looked to see where the UNDO_STATE_* flags were published
 
@@ -1146,17 +1058,11 @@ https://forum.cockos.com/showthread.php?t=100849
 
 schwa:
 
-I'm not sure if this is fully documented (if not we'll add it), but the flag passed to Undo_EndBlock() controls how much of the project needs to be serialized for 
+I'm not sure if this is fully documented (if not we'll add it), but the flag passed to Undo_EndBlock() controls how much of the project needs to be serialized for the undo point. -1 means "everything changed," so everything gets serialized, every track, media item, fx, the timeline, routing, and ARA state. As you've seen, serializing the ARA state may take a while -- this is completely out of REAPER's control, all we can do is ask the plugin for its state.
 
-the undo point. -1 means "everything changed," so everything gets serialized, every track, media item, fx, the timeline, routing, and ARA state. As you've seen, 
-
-serializing the ARA state may take a while -- this is completely out of REAPER's control, all we can do is ask the plugin for its state.
-
-If you know that your script can only have affected certain parts of the project, you can pass that information as the flag argument to Undo_EndBlock which will 
-
-make it much more efficient.
-
-UNDO_STATE_ALL -1
+If you know that your script can only have affected certain parts of the project, you can pass that information as the flag argument to Undo_EndBlock which will make it much more efficient.
+ 
+UNDO_STATE_ALL -1 OR 0xFFFFFFFF as per the specs https://www.reaper.fm/sdk/plugin/reaper_plugin.h (which probably doesn't matter much)
 UNDO_STATE_TRACKCFG 1 // track/master vol/pan/routing, routing/hwout envelopes too
 UNDO_STATE_FX 2 // track/master fx
 UNDO_STATE_ITEMS 4 // track items
@@ -1167,9 +1073,7 @@ UNDO_STATE_FXENV 64 // FX envelopes, implied by UNDO_STATE_FX too
 UNDO_STATE_POOLEDENVS 128 // contents of automation items -- not position, length, rate etc of automation items, which is part of envelope state
 UNDO_STATE_FX_ARA 256 // ARA state
 
-So if your script may have affected tracks and media items only but not FX, you could pass flag=5 (1+4) for example. If your script may have affected everything 
-
-but freeze state, automation items and ARA state, you could pass flag=111 (1+2+4+8+32+64), etc.
+So if your script may have affected tracks and media items only but not FX, you could pass flag=5 (1+4) for example. If your script may have affected everything but freeze state, automation items and ARA state, you could pass flag=111 (1+2+4+8+32+64), etc.
 
 
 https://forum.cockos.com/showpost.php?p=2090533&postcount=27
@@ -1382,9 +1286,7 @@ Accessing custom action from Inline MIDI Editor
 
 To be accessed from the Inline MIDI Editor section a custom action must be created there to begin with.
 
-The way to access this section from the actual Inline MIDI editor is pretty convoluted. For this 'Show action list' action from the Main action list needs to be 
-
-added to the Media Item Context menu which is then can be opened by right clicking on the Inline MIDI Editor ribbon.
+The way to access this section from the actual Inline MIDI editor is pretty convoluted. For this 'Show action list' action from the Main action list needs to be added to the Media Item Context menu which is then can be opened by right clicking on the Inline MIDI Editor ribbon.
 
 https://forum.cockos.com/showthread.php?t=228547
 
@@ -1478,13 +1380,9 @@ https://forum.cockos.com/showthread.php?t=247397
 -- ReaPack versioning
 
 
-ReaPack version numbers are not decimal (they're an infinite list of integer and alphabetic components). Because 2.1 from the previous PR is lower than 1.03, I 
+ReaPack version numbers are not decimal (they're an infinite list of integer and alphabetic components). Because 2.1 from the previous PR is lower than 1.03, I renamed it to 2.4 for the update to be distributed.
 
-renamed it to 2.4 for the update to be distributed.
-
-While 2.11 is valid (higher than 2.4), releasing this will prevent any versions from 2.5 to 2.10 from being released as updates in the future. Patch updates should 
-
-increment a third integer component: eg. 2.4.1.
+While 2.11 is valid (higher than 2.4), releasing this will prevent any versions from 2.5 to 2.10 from being released as updates in the future. Patch updates should increment a third integer component: eg. 2.4.1.
 
 
 https://github.com/ReaTeam/ReaScripts/pull/693#issuecomment-809623218
@@ -1786,9 +1684,7 @@ Green (GG) - low-order word.
 Blue (BB) - high-order word.
 
  
-The picture shows bytes in memory, in little-endian format, where the byte order is reverse than in hexadecimal representation (0xHHHHLLLL) and bit-shift operator 
-
-names. 
+The picture shows bytes in memory, in little-endian format, where the byte order is reverse than in hexadecimal representation (0xHHHHLLLL) and bit-shift operator names. 
 
 The low-order word adds its exact value to the total value of the int. The high-order word adds its value multiplied by 0x10000 (left-shifted by 16 bits).
 
@@ -1827,15 +1723,11 @@ https://www.quickmacros.com/help/Other/IDP_HIWORD.html
 
 This expression uses bit masking and bit shifting.
 
-First (x & 0x0000FFFF) is a bitwise AND (&) of x and a mask value which is given in hexadecimal. Each digit of a hexadecimal number is 4 bits, so the fact that 
-
-there are 8 digits tells you that this is a 32-bit value. F is the hex for the binary pattern 1111, so 0x0000FFFF is the binary value:
+First (x & 0x0000FFFF) is a bitwise AND (&) of x and a mask value which is given in hexadecimal. Each digit of a hexadecimal number is 4 bits, so the fact that there are 8 digits tells you that this is a 32-bit value. F is the hex for the binary pattern 1111, so 0x0000FFFF is the binary value:
 
 00000000000000001111111111111111
 
-A logical AND has the property that the result contains a 1 wherever both the original operands have a 1 in a given position. Since the mask contains all 1s in the 
-
-bottom 16 bits, this operation has the effect of ‘letting through’ the bottom 16 bits of x, while forcing the top 16 bits to be 0.
+A logical AND has the property that the result contains a 1 wherever both the original operands have a 1 in a given position. Since the mask contains all 1s in the bottom 16 bits, this operation has the effect of ‘letting through’ the bottom 16 bits of x, while forcing the top 16 bits to be 0.
 
 e.g.
 
@@ -1849,35 +1741,23 @@ The other part of the expression:
 
 << 16 is a leftwise shift by 16 binary places. >> 16 is a rightwise shift by 16 binary places.
 
-A left or right shift is fairly self-explanatory - it just shifts the bits left or right. Bits that fall off the end are lost, and ‘new’ bits shifted in are set to 
-
-0.
+A left or right shift is fairly self-explanatory - it just shifts the bits left or right. Bits that fall off the end are lost, and ‘new’ bits shifted in are set to 0.
 
 So something like:
 
 000110110 << 2 → 011011000
 
-So in the original expression, having masked off the high 16 bits, they are shifted down to become the low 16 bits. And, the low 16 bits having been isolated are 
-
-shifted up to the high 16 bits.
+So in the original expression, having masked off the high 16 bits, they are shifted down to become the low 16 bits. And, the low 16 bits having been isolated are shifted up to the high 16 bits.
 
 So after those two operations, the top 16 bits of x are now at the bottom, and the bottom 16 bits of x are now at the top.
 
-All that remains is to recombine them into a single 32-bit value. That’s what the logical OR (|) operator does. A logical OR yields a 1 where either of the 
-
-original operands are a 1. However, since all of the high 16 bits are a 0 in the first expression after the shift, and all of the low 16 bits are a 0 in the second 
-
-expression after the shift, it simply copies the original bits unchanged to the result, effectively reglueing the two parts together.
+All that remains is to recombine them into a single 32-bit value. That’s what the logical OR (|) operator does. A logical OR yields a 1 where either of the original operands are a 1. However, since all of the high 16 bits are a 0 in the first expression after the shift, and all of the low 16 bits are a 0 in the second expression after the shift, it simply copies the original bits unchanged to the result, effectively reglueing the two parts together.
 
 So the result is that the high 16 bits end up in the low 16 bits, and the low 16 bits end up in the high 16 bits. The upper and lower 16 bits have swapped places.
 
 So that’s what it does.
 
-The bigger question of why it does this is unanswered. It’s possibly part of some bit-smooshing operation in cryptography or at least obfuscation. Very similar 
-
-code is used to swap the endianness of values received over a network (big endian) to a little-endian processor (or vice versa), but in that case the values would 
-
-be operated on in chunks of 8 bits, not 16 like this.
+The bigger question of why it does this is unanswered. It’s possibly part of some bit-smooshing operation in cryptography or at least obfuscation. Very similar code is used to swap the endianness of values received over a network (big endian) to a little-endian processor (or vice versa), but in that case the values would be operated on in chunks of 8 bits, not 16 like this.
 
 https://www.quora.com/x-0x0000FFFF-16-x-0xFFFF0000-16-here-x-is-any-decimal-number-What-does-this-expression-mean
 
@@ -1896,9 +1776,7 @@ Below is an example of extracting a subset of the bits in the value:
 Mask:   00001111b
 Value:  01010101b
 
-Applying the mask to the value means that we want to clear the first (higher) 4 bits, and keep the last (lower) 4 bits. Thus we have extracted the lower 4 bits. 
-
-The result is:
+Applying the mask to the value means that we want to clear the first (higher) 4 bits, and keep the last (lower) 4 bits. Thus we have extracted the lower 4 bits. The result is:
 
 Mask:   00001111b
 Value:  01010101b
@@ -1912,9 +1790,7 @@ uint8_t stuff(...) {
   return mask & value;
 }
 
-Here is a fairly common use-case: Extracting individual bytes from a larger word. We define the high-order bits in the word as the first byte. We use two operators 
-
-for this, &, and >> (shift right). This is how we can extract the four bytes from a 32-bit integer:
+Here is a fairly common use-case: Extracting individual bytes from a larger word. We define the high-order bits in the word as the first byte. We use two operators for this, &, and >> (shift right). This is how we can extract the four bytes from a 32-bit integer:
 
 void more_stuff(uint32_t value) {             // Example value: 0x01020304
     uint32_t byte1 = (value >> 24);           // 0x01020304 >> 24 is 0x01 so
@@ -1928,9 +1804,7 @@ void more_stuff(uint32_t value) {             // Example value: 0x01020304
     ...
 }
 
-Notice that you could switch the order of the operators above, you could first do the mask, then the shift. The results are the same, but now you would have to use 
-
-a different mask:
+Notice that you could switch the order of the operators above, you could first do the mask, then the shift. The results are the same, but now you would have to use a different mask:
 
 uint32_t byte3 = (value & 0xff00) >> 8;
 
@@ -1994,9 +1868,7 @@ Each hexadecimal digit stands for four bits.
 
 To convert the hex number 0XFFFF to decimal (or any other hexadecimal number for that matter), you follow these steps:
 
-Step 1) Multiply the last digit by 1, Multiply the second to last digit by 16, Multiply the third to the last digit by 16 x 16, Multiply the fourth to the last 
-
-digit by 16 x 16 x 16, Multiply the fifth to the last digit by 16 x 16 x 16 x 16 and so on until all the digits are used.
+Step 1) Multiply the last digit by 1, Multiply the second to last digit by 16, Multiply the third to the last digit by 16 x 16, Multiply the fourth to the last digit by 16 x 16 x 16, Multiply the fifth to the last digit by 16 x 16 x 16 x 16 and so on until all the digits are used.
 
 Step 2) Add up all the products you got from Step 1 to get the answer to 0XFFFF in decimal.
 
@@ -2141,28 +2013,20 @@ https://forum.cockos.com/showthread.php?t=245738#2
 
 Automatic cutting up! :)
 
-Say you know that your audio/midi performance should only play on bars 4-8 before you record it. But you also know, that you need to start playing/listening before 
-
-bar 4 and your last note/input will continue after bar 8.
+Say you know that your audio/midi performance should only play on bars 4-8 before you record it. But you also know, that you need to start playing/listening before bar 4 and your last note/input will continue after bar 8.
 
 Then you put an empty item on the track (to which recording is being done).
 
-Now, if you record something from bars 1-12 on that track, it will be broken up into three items: 1->4, 4->8, and 8->12. This would make deleting the areas outside 
+Now, if you record something from bars 1-12 on that track, it will be broken up into three items: 1->4, 4->8, and 8->12. This would make deleting the areas outside of 4->8 only a few clicks.
 
-of 4->8 only a few clicks.
-
-Personally, I think it's easier/better to do this editing after the fact for most use-cases. One workflow where this would be useful is if you're recording 
-
-yourself with a loop of the section you're working on. You could:
+Personally, I think it's easier/better to do this editing after the fact for most use-cases. One workflow where this would be useful is if you're recording yourself with a loop of the section you're working on. You could:
 
     Put a loop from the point you need to start listening to the point where you'll be ready for another pass.
     Put an empty item roughly where the actual take will happen (inside the loop area).
     Now you can hit record, walk away from the computer and do as many takes as you need.
     When you get back, it will be trivial to remove any noise in the pre/post-roll sections.
 
-Again, this is very niche, but it is a valid workflow. In most cases, it's probably faster to edit manually, but it might be useful in some scenarios where things 
-
-are off-grid.
+Again, this is very niche, but it is a valid workflow. In most cases, it's probably faster to edit manually, but it might be useful in some scenarios where things are off-grid.
 
 (Caveat: I'm assuming the default Reaper behaviour)
 
@@ -2409,9 +2273,7 @@ Use SWS 'Reposition selected items..' which acts in one go, all must be selected
 
 About the new TrackFX_SetNamedConfigParm(), TrackFX_GetNamedConfigParm(), TakeFX_SetNamedConfigParm(), and TakeFX_GetNamedConfigParm() APIs:
 
-These are designed to allow setting/getting plug-in specific parameters that are not exposed as normal VST-style parameters. The first use of this is for 
-
-ReaSamplomatic5k, to allow getting/setting the list of sample files.
+These are designed to allow setting/getting plug-in specific parameters that are not exposed as normal VST-style parameters. The first use of this is for ReaSamplomatic5k, to allow getting/setting the list of sample files.
 
 Lua examples:
 
@@ -2431,9 +2293,7 @@ ok = reaper.TrackFX_SetNamedConfigParm(track,fx, "-FILE*", "") -- remove all sam
 
 -- Finally, when the script is finished updating the samples, it should call (this will trigger actually loading the samples from disk, adding an undo point, etc):
 reaper.TrackFX_SetNamedConfigParm(track,fx, "DONE","")
-If other REAPER plug-ins have parameters that you'd like having script access to, let me know. I suppose having this for JSFX filename-parameters would be handy 
-
-too.
+If other REAPER plug-ins have parameters that you'd like having script access to, let me know. I suppose having this for JSFX filename-parameters would be handy too.
 
 https://forum.cockos.com/showthread.php?p=1817782#post1817782
 https://forum.cockos.com/showpost.php?p=1817782&postcount=5
@@ -2584,9 +2444,7 @@ https://old.reddit.com/r/Reaper/comments/ogs0d0/about_audio_quantization/
 
 -- Preferences -> Media -> Video/Import/Misc -> Media with embedded tempo information -> When media suggests BPM 
 
-The bpm-in-filename conversion only works if the filename starts with a number, which yours does, and the file is (within error bars) an exact number of beats or 
-
-half-beats using that tempo, which yours is not. The point is to avoid converting based on numbers that aren't tempos.
+The bpm-in-filename conversion only works if the filename starts with a number, which yours does, and the file is (within error bars) an exact number of beats or half-beats using that tempo, which yours is not. The point is to avoid converting based on numbers that aren't tempos.
 
 https://forum.cockos.com/showpost.php?p=2216061&postcount=5
 
@@ -2709,11 +2567,7 @@ https://github.com/reaper-oss/sws/issues/1566#issuecomment-981122671
 
 -- schwa on Parameter modulation frequency
 
-Parameter modulation, like any FX parameter move (including moving a knob on the GUI or moving a physical controller), is sent once per buffer block, that's 
-
-unfortunately not something that anybody can change. Well-designed plugins will interpolate parameter moves internally to avoid zippering, for example if a filter 
-
-plugin advertises "smooth sweeps" that's what they mean. For volume and pan parameter modulation, JS/utility/volume_pan does internal smoothing.
+Parameter modulation, like any FX parameter move (including moving a knob on the GUI or moving a physical controller), is sent once per buffer block, that's unfortunately not something that anybody can change. Well-designed plugins will interpolate parameter moves internally to avoid zippering, for example if a filter plugin advertises "smooth sweeps" that's what they mean. For volume and pan parameter modulation, JS/utility/volume_pan does internal smoothing.
 
 If you have a plugin that you want to modulate but you hear zipper noise, you will need to lower the buffer size.
 
@@ -2725,7 +2579,9 @@ https://forum.cockos.com/showthread.php?t=45497
 
 Create a template MIDI item which then fill in with dummy (even muted) notes somewhere on the margins covering the octaves you need and then hide the unused rows.
 
-These notes can be located outside of the piano roll boundaries when the item is trimmed down to its desired length. Then activate option "Hide unused note rows".
+These notes can be located outside of the piano roll boundaries when the item is trimmed down to its desired length (they will be invisible). 
+
+Then activate option "Hide unused note rows".
 
 Alternatively create a MIDI note name map file only naming the notes of certain octaves, load it and activate option "Hide unused and unnamed note rows".
 
@@ -2847,9 +2703,7 @@ then load by double clicking on the aforementioned section name in the Tweaker a
 It's v5 default IDE color scheme
 
 [REAPER_IDE_THEME]
-ide_colors=c0c0c0 000000 c0c0c0 0000c0 000000 00c0c0 00ffff 000000 00ff00 000000 6080c0 000000 c0c0c0 c00000 ffff00 000000 ff8080 000000 00c0ff 000000 ffc0c0 
-
-000000 c0ff80 000000 000000 00c0c0 c0c0c0 c00000 c0c000 000000
+ide_colors=c0c0c0 000000 c0c0c0 0000c0 000000 00c0c0 00ffff 000000 00ff00 000000 6080c0 000000 c0c0c0 c00000 ffff00 000000 ff8080 000000 00c0ff 000000 ffc0c0 000000 c0ff80 000000 000000 00c0c0 c0c0c0 c00000 c0c000 000000
 
 https://old.reddit.com/r/Reaper/comments/je0mf3/cant_see_text_in_jsfx_internal_editor/g9cqbtq/
 
@@ -3188,9 +3042,7 @@ https://forum.cockos.com/showthread.php?t=165974
 https://www.youtube.com/watch?v=ckjl-rpzDPA
 https://www.youtube.com/watch?v=JHGGZiXUnqI
 
-1. Trim/Read - allows previewing and trimming the envelope by moving/affecting the control of the parameter being automated without affecting the actual curve, so 
-
-effectively changing envelope Base parameter available also in automation item properties.
+1. Trim/Read - allows previewing and trimming the envelope by moving/affecting the control of the parameter being automated without affecting the actual curve, so effectively changing envelope Base parameter available also in automation item properties.
 When activated, the control setting is transfered to the envelope while the control itself is reset, which allows trimming.
 During playback the control of the automated parameter doesn't follow the envelope's existing curve.
 
@@ -3507,9 +3359,7 @@ As a rule MIDI Editor settings are item specific.
 
 * If one MIDI editor per item option is enabled at Preferences -> Editing behavior -> MIDI Editor, then each item always retains its settings
 
-* If one MIDI editor per project is enabled, then settings enabled for specific item will be carried over to any other item if after opening one item another one 
-
-is opened without the first being closed beforehand
+* If one MIDI editor per project is enabled, then settings enabled for specific item will be carried over to any other item if after opening one item another one is opened without the first being closed beforehand
 
 * If one MIDI editor per track is enabled the settings are only carried over between items on the same track
 
@@ -3651,11 +3501,7 @@ For live input or VST instruments you'll want to do the same thing.., except you
 
 One of the cool things to remember is that each project can be set to different BPM and PlayRates.
 
-Oh..., one other thing, if you want to record what is comming out of all playing projects, you can use the command "Save live output to disk(bounce)' found under 
-
-the File menu or actions list. In the dialog window that opens, you'll probably what to enable the option 'Stop saving output on first stop'.., this will stop the 
-
-recording when you click on the transport stop button.
+Oh..., one other thing, if you want to record what is comming out of all playing projects, you can use the command "Save live output to disk(bounce)' found under the File menu or actions list. In the dialog window that opens, you'll probably what to enable the option 'Stop saving output on first stop'.., this will stop the recording when you click on the transport stop button.
 
 
 https://forums.cockos.com/showthread.php?t=143150 
@@ -3678,15 +3524,9 @@ https://forum.cockos.com/showthread.php?t=272227
 -- MIDI velocity envelope
 
 
-not many are aware of that the Volume (Pre-FX) automation affects MIDI velocity as well. So you could do the same with a pre-FX volume envelope and no MIDI FX on 
+not many are aware of that the Volume (Pre-FX) automation affects MIDI velocity as well. So you could do the same with a pre-FX volume envelope and no MIDI FX on the track. It's a bit weird because you have dB values, not percentage but it's ok to work with nevertheless. I am just sometimes too lazy to create the MIDI FX and go this way.
 
-the track. It's a bit weird because you have dB values, not percentage but it's ok to work with nevertheless. I am just sometimes too lazy to create the MIDI FX 
-
-and go this way.
-
-Track > Envelopes > Toggle volume (pre-FX) active. This now puts an envelope on your MIDI track that can be edited like a regular envelope, but controls the MIDI 
-
-velocity, thereby retaining any dynamics in your VSTi instrument samples!
+Track > Envelopes > Toggle volume (pre-FX) active. This now puts an envelope on your MIDI track that can be edited like a regular envelope, but controls the MIDI velocity, thereby retaining any dynamics in your VSTi instrument samples!
 
 
 https://forum.cockos.com/showthread.php?p=311511
@@ -3781,21 +3621,13 @@ https://forum.cockos.com/showpost.php?p=2429972&postcount=1555
 
 The numbers for standard Windows cursor can be found here: LoadCursor function.
 
-The list of REAPER's custom cursors are here: Custom Cursors. This list is outdated though, and doesn't include recent additions such as notation key signature 
+The list of REAPER's custom cursors are here: Custom Cursors. This list is outdated though, and doesn't include recent additions such as notation key signature cursors.
 
-cursors.
+The numbers in this list are also misleading. The IDs that you use for setcursor are 105 for adjustfade, then 182-191 for some others, etc. (Thanks to cfillion and Xenakios for telling me this recently. They also referred me to Resource Hacker to find all the actual IDs.) I don't know all the correct IDs yet.
 
-The numbers in this list are also misleading. The IDs that you use for setcursor are 105 for adjustfade, then 182-191 for some others, etc. (Thanks to cfillion and 
+The first time that you use a certain string as the second parameter in the function (even an empty string, AFAIK), that string becomes the user-specified "name" for the cursor number. Next time you use that string, it will override whatever number you used. I think that name will remain in memory until you restart REAPER.
 
-Xenakios for telling me this recently. They also referred me to Resource Hacker to find all the actual IDs.) I don't know all the correct IDs yet.
-
-The first time that you use a certain string as the second parameter in the function (even an empty string, AFAIK), that string becomes the user-specified "name" 
-
-for the cursor number. Next time you use that string, it will override whatever number you used. I think that name will remain in memory until you restart REAPER.
-
-For example, if you run gfx.setcursor(182, "dragdrop"), you can later load the cursor again using a dummy number such as gfx.setcursor(1, "dragdrop"). But if you 
-
-try gfx.setcursor(183, "dragdrop"), it will also override 183 and load dragdrop instead.
+For example, if you run gfx.setcursor(182, "dragdrop"), you can later load the cursor again using a dummy number such as gfx.setcursor(1, "dragdrop"). But if you try gfx.setcursor(183, "dragdrop"), it will also override 183 and load dragdrop instead.
 
 This may get confusing, so it may be better to stick with numbers gfx.setcursor(n, tostring(n)).
 
@@ -3873,9 +3705,7 @@ Custom: Toggle alternate M shortcut
 
 Custom: Toggle alternate M shortcut
   Action: Skip next action, set CC parameter to relative +1 if action armed, 0 otherwise.
-  Action: Skip next action if CC parameter >0/mid <----------------- any action can be used for arming as long as it itself doesn't perform a specific action, can 
-
-be  armed from a toolbar button, toggle actions cannot be armed
+  Action: Skip next action if CC parameter >0/mid <----------------- any action can be used for arming as long as it itself doesn't perform a specific action, can be  armed from a toolbar button, toggle actions cannot be armed
   Action: Skip next action if CC parameter >0/mid
   Markers: Insert marker at current position
   Action: Skip next action if CC parameter ==0/mid
@@ -3951,11 +3781,7 @@ Custom: Temporary toggle to OFF
 									otherwise it won't be skipped and will run to change the toggle state to OFF
   Options: Toggle snapping
   Move edit cursor to start of next measure  --------------------------- run the main action or a sequence thereof which need the toggle action to be OFF
-  Action: Skip next action if CC parameter <0/mid --------------------- if 'Toggle snapping' action toggle state had initially been OFF, CC was set to -1, 		
-
-									therefore next action will be skipped and won't run to restore the initial toggle state, 	
-
-									otherwise it won't be skipped and will run to restore the initial toggle 
+  Action: Skip next action if CC parameter <0/mid --------------------- if 'Toggle snapping' action toggle state had initially been OFF, CC was set to -1, 											therefore next action will be skipped and won't run to restore the initial toggle state, 										otherwise it won't be skipped and will run to restore the initial toggle 
 									state, that is ON after being set to OFF above
   Options: Toggle snapping
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
@@ -3970,9 +3796,7 @@ Custom: Temporary toggle to ON
 									otherwise it will be skipped and won't run to change the toggle state to ON
   Options: Toggle snapping
   Move edit cursor to start of next measure --------------------------- run the main action or a sequence thereof which need the toggle action to be ON
-  Action: Skip next action if CC parameter >0/mid --------------------- if 'Toggle snapping' action toggle state had initially been OFF, CC was set to -1, 		
-
-									therefore next action won't be skipped and will run to restore the initial toggle 
+  Action: Skip next action if CC parameter >0/mid --------------------- if 'Toggle snapping' action toggle state had initially been OFF, CC was set to -1, 											therefore next action won't be skipped and will run to restore the initial toggle 
 									state, otherwise it will be skipped and won't run to restore the initial toggle state, 
 									that is OFF after being set to ON above
   Options: Toggle snapping
@@ -4236,11 +4060,7 @@ Edit: Select all events in time selection (in all visible CC lanes)
 3) zoom in and match markers with transients if necessary (the more accurately you tapped, the less there is to do here)
 4) go to the menu bar and look for "Extensions -> Tempo -> Convert project markers to tempo markers..."
 5) set the correct time signature, indicate how many markers count for a measure (depending on 2), check "Remove project markers", and press "Convert"
-This will not only create a tempo map as in the video, but also add stretch markers to all items which give the flexibility to move items around and quantize them 
-
-to the grid. This is useful when trying to sketch out a song from fragments of a jam session that was recorded without a click. Unfortunately, the process is just 
-
-as tedious as in the video. Wish there was an easier way to do this.
+This will not only create a tempo map as in the video, but also add stretch markers to all items which give the flexibility to move items around and quantize them to the grid. This is useful when trying to sketch out a song from fragments of a jam session that was recorded without a click. Unfortunately, the process is just as tedious as in the video. Wish there was an easier way to do this.
 
 https://www.youtube.com/watch?v=2SB73rGeIXQ
 
@@ -4320,9 +4140,7 @@ For this you need 2 tracks with the same audio material
 
 2. from another track you send audio to the first one on channels 3/4 or any other except 1/2
 
-3. in the first track enable parameter modulation from audio signal for 'Velocity add' slider of MIDI Velocity Control plugin, the audio source should be channels 
-
-3/4, that is audio coming in from the second track
+3. in the first track enable parameter modulation from audio signal for 'Velocity add' slider of MIDI Velocity Control plugin, the audio source should be channels 3/4, that is audio coming in from the second track
 
 then it's a matter of playing with parameter modulation settings
 
@@ -4575,21 +4393,11 @@ Schwa
 
 ...the behavior is complex!
 
-In general, existing envelope points that exist outside of automation items are hidden if you then enable "bypass envelope outside of automation items", regardless 
+In general, existing envelope points that exist outside of automation items are hidden if you then enable "bypass envelope outside of automation items", regardless of whether or not the envelope is displayed in its own lane. Toggling that option doesn't create new automation items.
 
-of whether or not the envelope is displayed in its own lane. Toggling that option doesn't create new automation items.
+When envelopes are displayed in their own lanes by default, and envelopes are bypassed outside of automation items, activating a new envelope does not automatically create an automation item on the envelope, because it's obvious the new envelope exists.
 
-When envelopes are displayed in their own lanes by default, and envelopes are bypassed outside of automation items, activating a new envelope does not 
-
-automatically create an automation item on the envelope, because it's obvious the new envelope exists.
-
-When envelopes are not displayed in their own lanes by default, and envelopes are bypassed outside of automation items, you have a problem when you activate a 
-
-brand-new envelope: you have no way to see that the envelope exists. The option "Options: Automatically insert automation item when activating envelope that is 
-
-bypassed outside of automation items and not displayed in envelope lane" exists to handle that problem, by automatically inserting an automation item in the media 
-
-lane when you create a new envelope in that situation.
+When envelopes are not displayed in their own lanes by default, and envelopes are bypassed outside of automation items, you have a problem when you activate a brand-new envelope: you have no way to see that the envelope exists. The option "Options: Automatically insert automation item when activating envelope that is bypassed outside of automation items and not displayed in envelope lane" exists to handle that problem, by automatically inserting an automation item in the media lane when you create a new envelope in that situation.
 
 
 https://forum.cockos.com/showthread.php?p=1975784#5
@@ -5252,17 +5060,11 @@ The options menu controls what happens when you record the *first* overlapping m
 
 3. Both of those options disabled: in this case one of the other behaviors in the options menu applies (split items, tape mode, etc).
 
-These options only affect what happens when the first overlapping item is recorded, in other words the options menu defines the default behavior for overlapping 
+These options only affect what happens when the first overlapping item is recorded, in other words the options menu defines the default behavior for overlapping items.
 
-items.
+Once an overlapping item has been recorded on a track, then the track settings determine the behavior. The track's "recording -> add lanes in layers" setting determines whether newly recorded lanes play in addition to previously playing lanes, or play exclusively.
 
-Once an overlapping item has been recorded on a track, then the track settings determine the behavior. The track's "recording -> add lanes in layers" setting 
-
-determines whether newly recorded lanes play in addition to previously playing lanes, or play exclusively.
-
-The "record into first available lane" track setting is independent of all of the above behavior. If that is enabled, new recording will go into the first lane 
-
-*that does not have an earlier recording above it*. The idea is that if you have overlapping recordings, the earlier recording is always above the later one.
+The "record into first available lane" track setting is independent of all of the above behavior. If that is enabled, new recording will go into the first lane *that does not have an earlier recording above it*. The idea is that if you have overlapping recordings, the earlier recording is always above the later one.
 
 
 https://forums.cockos.com/showthread.php?p=2750447#8
@@ -5300,13 +5102,9 @@ THE SEARCH STRING IS NOT CASE SENSITIVE UNLESS THE CHARACTERS SEARCH TERM IS COM
 
 You can search for more than one string within the same name. For example:
 
-eq stereo will find all plugins with both eq and stereo anywhere in their name, regardless of the order in which they appear. eq  AND  stereo would produce exactly 
+eq stereo will find all plugins with both eq and stereo anywhere in their name, regardless of the order in which they appear. eq  AND  stereo would produce exactly the same results.
 
-the same results.
-
-The filter also supports other boolean search terms notably OR and NOT, and the use of parentheseses, e.g.: comp OR lim  finds and lists all plugins with comp or 
-
-lim in their name.
+The filter also supports other boolean search terms notably OR and NOT, and the use of parentheseses, e.g.: comp OR lim  finds and lists all plugins with comp or lim in their name.
 
 eq ( cockos OR melda )  finds all Cockos and Melda plug-ins with eq in their name. You must leave a space both before and after the parentheses.
 
@@ -5318,20 +5116,14 @@ blue cat NOT ( flange OR phase )   finds and lists all Blue Cat plug-ins except 
 
 There are some additional techniques that you can use to make your searches more finely tuned.
 
-Enclosing a search string in quotes (either double or single) will find only those plug-ins where the text is matched exactly. For example: “sony noise”  would 
+Enclosing a search string in quotes (either double or single) will find only those plug-ins where the text is matched exactly. For example: “sony noise”  would find Sony Noise Gate but not Sony Express FX Noise Gate. Likewise “reaverb” would find ReaVerb but not ReaVerbate.
 
-find Sony Noise Gate but not Sony Express FX Noise Gate. Likewise “reaverb” would find ReaVerb but not ReaVerbate.
-
-Typing a space immediately after the opening quotes mark will limit the search to those items where the specified string is at the very beginning of a word. For 
-
-example:
+Typing a space immediately after the opening quotes mark will limit the search to those items where the specified string is at the very beginning of a word. For example:
 “ volu” will find plug-ins which include the word volume but not convolution..
 
 Similarly, typing a space at the end of the string will only find those items where one of the words in the FX name ends with that string.
 
-Starting a search string with ^ will find only those items whose name begins with the specified string, and using a $ at the end of a string will find only those 
-
-names that end with that string.
+Starting a search string with ^ will find only those items whose name begins with the specified string, and using a $ at the end of a string will find only those names that end with that string.
 
 For example, when working in the media explorer, using ^blues as a filter would list only those items whose names begin with blues.
 Similarly, in the track manager, a filter such as guitar$ would display tracks with names such as lead guitar or rhythm guitar but not guitar solo.
@@ -5366,6 +5158,77 @@ click the player scrollbar only if the last focused window was File list, click 
 
 
 ==============================================================
+
+
+-- Changing tempo value of several tempo markers at once
+
+
+1. Change the tempo envelope range max or min setting to the target value depending on whether the target tempo 
+
+is greater or smaller than the points current tempo value
+
+(right click any point -> Range/scaling for the envelope -> Tempo envelope: range)
+
+2. Select the envelope points (must all be initially set to the same tempo value, won't work if their tempo values differ)
+
+3. Drag them all the way up or down depending on whether the target tempo is greater or smaller than then point current tempo value
+
+4. Restore the envelope range
+
+
+If points intial tempo values differ, the method is still useful but the points must be dragged all the way up/down one by one
+
+The good thing is that if there're points whose tempo value greater/smaller than the max/min range value which you change the setting to
+
+they keep their values regardless of the range temporary max/min value, unless dragged explicitly up or down
+
+
+==============================================================
+
+
+-- Reducing plugin control range by 50% in both negative and positive directions with parameter modulation
+
+Baseline: middle
+
+Offset: 50%
+
+Scale: 50%
+
+Range -200 +200 will become -100 +100
+
+==============================================================
+
+
+-- Property names for the functions FNG_Get/SetMidiNoteIntProperty
+
+
+VELOCITY, PITCH, POSITION, LENGTH, CHANNEL, SELECTED, MUTED
+
+
+https://github.com/reaper-oss/sws/blob/master/Fingers/RprMidiTake.cpp#L103
+
+
+==============================================================
+
+
+-- Langpack files public URL (direct links Landoleet are prohibited by the server policy)
+
+
+https://www.reaper.fm/files/7.x/reaperXXX.ReaperLangPack
+
+
+where XXX is 3 digits of the version number, e.g, reaper733.ReaperLangPack
+
+however for REAPER 7 it's reaper70.ReaperLangPack
+
+
+https://forum.cockos.com/showthread.php?t=298338
+
+
+==============================================================
+
+
+
 
 
 
