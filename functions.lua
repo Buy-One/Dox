@@ -1549,6 +1549,12 @@ end
 -- USE NORMALLY
 -- str:len()
 
+-- OR
+function utf8_len(str)
+-- borrowed and streamlined from REAPER stock lyrics.lua
+return utf8.len(str) or #str -- utf8.len() returns false if invalid bytes hence the fallback value
+end
+
 
 -- reverse non-ASCII string
 -- this will overwrite the stock function in the global environment
@@ -4534,6 +4540,20 @@ Msg(env_id, 'ENV ID')
 
 --=================================== T R A C K S ==================================
 
+--[[ SEND SETTINGS
+-- Between the quotes insert number corresponding
+-- to the send mode:
+-- 1 - Post-Fader (Post-Pan)
+-- 2 - Pre-Fader (Post-FX)
+-- 3 - Pre-Fader (Pre-FX)
+-- empty or invalid defaults to 1 - Post-Fader (Post-Pan)
+SEND_MODE = ""
+
+local send_modes_t = {['1'] = 0, ['2'] = 3, ['3'] = 1}
+Msg(send_modes_t[SEND_MODE])
+local send_mode = send_modes_t[SEND_MODE] or 0
+]]
+
 
 r.TrackList_AdjustWindows(r.GetToggleCommandStateEx(0,41146) == 0) -- Mixer: Toggle autoarrange // isMinor arg depends on the setting to only auto-arrange in the Mixer when the setting is enabled
 
@@ -5083,7 +5103,8 @@ end
 
 function Scroll_Track_Into_View(tr, take, parent_tr_y)
 -- parent_tr_y is original I_TCPY coordinate of the track
--- before it's affected by the script
+-- before it's affected by the function
+-- relies on re_store_sel_trks() function
 
 -- scroll track vertically into view if out of sight
 local tr = take and r.GetMediaItemTake_Track(take) or tr
@@ -5109,6 +5130,7 @@ function Scroll_Visible_Track_Into_View(tr, tr_y_orig, want_middle, want_arrange
 -- want_middle is boolean to scroll to the middle of the tracklist
 -- in Arrange, otherwise to the top
 -- want_arrange is boolean to force the function target Arrange tracklist if the Mixer is open
+-- relies on re_store_sel_trks() function
 
 	if not tr then return end
 
@@ -5141,7 +5163,7 @@ local tr_vis = is_Master and r.GetMasterTrackVisibility()&1 == 1 or Get(tr, PARA
 					-- SCROLL TO THE MIDDLE OF THE TRACKLIST
 					local t = re_store_sel_trks() -- store
 					r.SetOnlyTrackSelected(tr) -- select track so that it can be affected by the action
-					ACT(40913) -- Track: Vertical scroll selected tracks into view (Master isn't supported, scrolled with (Master isn't supported, scrolled with Scroll_Track_To_Top() )
+					ACT(40913) -- Track: Vertical scroll selected tracks into view (Master isn't supported, scrolled with Scroll_Track_To_Top() )
 					re_store_sel_trks(t) -- restore
 					end
 				end
@@ -5991,16 +6013,48 @@ end
 --================================== F O L D E R S ====================================
 
 
-function Count_And_Store_Children(tr)
+function Store_Children_And_Grandchildren(tr)
+	if r.GetMediaTrackInfo_Value(tr, 'I_FOLDERDEPTH') == 0 then return end -- not a folder parent track
+local depth = r.GetTrackDepth(tr)
 local t = {}
-local cnt = 0
+	for i = r.CSurf_TrackToID(tr, false), r.CountTracks(0)-1 do -- mcpView false // starting loop from the 1st child
+	local chld_tr = r.GetTrack(0, i)	
+	--	if r.GetParentTrack(chld_tr) == tr then -- wrong since will be false for grandchildren in nested folders
+		if r.GetTrackDepth(chld_tr) > depth then
+		t[#t+1] = chld_tr
+		else return t
+		end
+	end
+end
+
+
+function get_track_children_and_grandchildren(tr)
+local st_idx = r.CSurf_TrackToID(tr, false) -- mcpView false // starting loop from the 1st child
+local depth = r.GetTrackDepth(tr)
+return function()
+	local chld_tr = r.GetTrack(0,st_idx)
+		if if chld_tr and r.GetTrackDepth(chld_tr) > depth then
+		st_idx=st_idx+1
+		return chld_tr
+		end
+	end
+end
+--[[ USE:
+for child in get_track_children_and_grandchildren(tr) do
+
+end
+]]
+
+
+
+function Store_Children(tr)
+	if r.GetMediaTrackInfo_Value(tr, 'I_FOLDERDEPTH') == 0 then return end -- not a folder parent track
+local t = {}
 	for i = r.CSurf_TrackToID(tr, false), r.CountTracks(0)-1 do -- mcpView false // starting loop from the 1st child
 	local chld_tr = r.GetTrack(0, i)
-	--	if r.GetParentTrack(chld_tr) == tr then -- wrong since will be false for grandchildren in nested folders
-		if r.GetTrackDepth(chld_tr) > 0 then -- correct
+		if r.GetParentTrack(chld_tr) == tr then
 		t[#t+1] = chld_tr
-		cnt = cnt+1
-		else return t, cnt
+		else return t
 		end
 	end
 end
@@ -6009,7 +6063,7 @@ end
 function Are_All_Children_Selected(tr)
 	for i = r.CSurf_TrackToID(tr, false), r.CountTracks(0)-1 do -- starting loop from the 1st child
 	local chld_tr = r.GetTrack(0, i)
-	local is_parent = r.GetParentTrack(sibl_tr) == tr
+	local is_parent = r.GetParentTrack(chld_tr) == tr
 		if is_parent and not r.IsTrackSelected(chld_tr) then
 		return false
 		elseif not is_parent then break
@@ -6077,7 +6131,7 @@ local child_idx = tonumber(child_idx) or r.CSurf_TrackToID(child_idx, false)-1 -
 end
 
 
-function Get_All_Track_Parents(start_tr)
+function Get_All_Track_Parents1(start_tr) -- see more efficient versions below
 -- VISIBILITY IS NOT EVALUATED
 local parent = r.GetParentTrack(start_tr)
 local parents_t = {}
@@ -6090,6 +6144,35 @@ local parents_t = {}
 	end
 return parents_t
 end
+
+
+function Get_All_Track_Parents2(start_tr)
+-- VISIBILITY IS NOT EVALUATED
+local parent = r.GetParentTrack(start_tr)
+local parents_t = {}	
+	repeat
+	parent = r.GetParentTrack(parent)
+		if parent then
+		parents_t[#parents_t+1] = parent
+		end
+	until not parent	
+return parents_t
+end
+
+
+
+function get_track_parents(parent)
+	return function()
+	parent = r.GetParentTrack(parent) -- assigning to a global value (or upvalue passed as the argument) is crucial to make it work so that the var is constantly updated during the loop, returning r.GetParentTrack(parent) directly won't work because the var isn't updated, the var won't be accessible outside of the loop
+	return parent
+	end
+end
+--[[ USE:
+	for parent in get_track_parents(r.GetSelectedTrack(0,0)) do	
+
+	end
+]]
+
 
 
 function Get_Topmost_Uncollapsed_TCP_Parent(child_idx, child_tr, t) -- t is a table
@@ -11994,10 +12077,43 @@ end
 ]]
 
 
+function get_track_parents(parent)
+	return function()
+	parent = r.GetParentTrack(parent) -- assigning to a global value (or upvalue passed as the argument) is crucial to make it work so that the var is constantly updated during the loop, returning r.GetParentTrack(parent) directly won't work because the var isn't updated, the var won't be accessible outside of the loop
+	return parent
+	end
+end
+--[[ USE:
+	for parent in get_track_parents(r.GetSelectedTrack(0,0)) do	
+
+	end
+]]
+
+
+function get_track_children_and_grandchildren(tr)
+local st_idx = r.CSurf_TrackToID(tr, false) -- mcpView false // starting loop from the 1st child
+local depth = r.GetTrackDepth(tr)
+return function()
+	local chld_tr = r.GetTrack(0,st_idx)
+		if if chld_tr and r.GetTrackDepth(chld_tr) > depth then
+		st_idx=st_idx+1
+		return chld_tr
+		end
+	end
+end
+--[[ USE:
+for child in get_track_children_and_grandchildren(tr) do
+
+end
+]]
+
+
+
+
 -- https://github.com/TeamAudio/reaspeech/blob/main/reascripts/common/libs/ReaIter.lua
 -- https://github.com/TeamAudio/reaspeech/blob/main/reascripts/ReaSpeech/tests/TestTranscriptAnnotations.lua
 ReaIter = {}
-ReaIter._make_iterator = function(count_f, item_f)
+ReaIter._make_iterator = function(count_f, item_f) -- count_f stands for count function, item_f stands for item function, see below
   return function(proj)
     proj = proj or 0
     local i = 0
@@ -16254,6 +16370,7 @@ for key in pairs(reaper) do _G[key] = reaper[key] end  -- MPL: get rid of 'reape
 -- supported since build 7.03
 -- script flag for auto-relaunching after termination in reaper-kb.ini is 516, e.g. SCR 516, but if changed
 -- directly while REAPER is running the change doesn't take effect, so in builds older than 7.03 user input is required
+-- to enable setting in the ReaScript task control dialogue
 if r.set_action_options then r.set_action_options(1|2) end
 
 
@@ -16339,6 +16456,20 @@ file:write(message)
 file:close()
 end
 os.execute('start "" '..'"C:\\ReascriptLog.txt"')
+
+
+-- https://github.com/ReaTeam/ReaScripts/blob/master/Items%20Editing/amagalma_Smart%20Crossfade.lua
+local Debug = false
+	if Debug then reaper.ClearConsole() end
+local function Msg(...)
+  if Debug then 
+    local args = {...}
+    for i = 1, #args do
+      args[i] = tostring(args[i])
+    end
+    reaper.ShowConsoleMsg(table.concat(args,"\t").."\n")
+  end
+end
 
 
 
@@ -17031,12 +17162,79 @@ local retval = Reload_Menu_at_Same_Pos2(menu)
 ]]
 
 
-function Re_Store_Ext_State(section, key, persist, val) -- section & key args are strings, persist is boolean if false/nil global ext state is only stored for the duration of REAPER session, only relevant for storage stage; presence of val arg is anything which needs storage, determines whether the state is loaded or stored
-	if not val then
+
+function Menu_With_Toggle_Options(scr_cmd_ID, sett_t, menu_t, default_sett_state)
+-- scr_cmd_ID comes from get_action_context()
+-- default_sett_state is optional, the format is e.g. '111', i.e. all 3 options
+-- are On by default, the string length must be equal to #sett_t
+-- if invalid or not equal to #sett_t defaults to all Off;
+-- relies on Reload_Menu_at_Same_Pos2() function
+
+::RELOAD::
+
+local sett_t = sett_t or {'My setting 1', 'My setting 2', 'My setting 3'}
+local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',  sett_t[2]..'|', 'Item 3|', sett_t[3]..'|'}
+
+	for menu_idx, item in ipairs(menu_t) do
+		for sett_idx, sett in ipairs(sett_t) do
+			if item:gsub('|','') == sett then
+			sett_indices_t[menu_idx] = sett_idx -- store settings array index under menu index
+			break end
+		end
+	end
+
+local default_sett_state = default_sett_state and #default_sett_state == #sett_t and default_sett_state 
+or ('0'):rep(#sett_t) -- if invalid or length doesn't match sett_t length default to all Off
+local sett_indices_t = {}
+local sett = r.GetExtState(scr_cmd_ID, 'SETTINGS')
+local sett_bools_t = {(#sett > 0 and sett or default_sett_state):match(('(%d)'):rep(#sett_t))} -- initializing defaults if first load
+
+	-- Checkmark enabled settings in the menu
+	for sett_idx, bool in ipairs(sett_bools_t) do
+		for menu_idx, v in pairs(sett_indices_t) do
+			if v+0 == sett_idx then -- a setting index in the menu has been found
+			local sett = menu_t[menu_idx]
+			menu_t[menu_idx] = bool == '1' and '!'..sett or sett
+			break end
+		end
+	end
+
+local output = Reload_Menu_at_Same_Pos(table.concat(menu_t), 1) -- keep_menu_open true
+	
+	if output == 0 then return
+	elseif sett_indices_t[output] then
+	local idx = sett_indices_t[output]
+	local i = 0
+	sett = table.concat(sett_bools_t):gsub('%d', function(c) i=i+1 if i==idx then return math.floor(c+0~1) end end) -- flipping the bit
+	else -- expand with other menu items if necessary
+	end
+	
+	if sett_indices_t[output] then -- this condition will likely need expansion to include indices of other menu items which aren't settings
+	r.SetExtState(scr_cmd_ID, 'SETTINGS', sett, false) -- persist false
+	goto RELOAD end
+	
+end
+--[[ USE:
+local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context()
+local named_ID = r.ReverseNamedCommandLookup(cmd_ID) -- convert to named
+or debug.getinfo(1,'S').source:match('^@?(.+)') -- if an non-installed script is run via 'ReaScript: Run (last) ReaScript (EEL2 or lua)' actions get_action_context() won't return valid command ID, in which case fall back on the script full path
+Menu_With_Toggle_Options(named_ID, sett_t, menu_t, default_sett_state)
+]]
+
+
+
+function Re_Store_Ext_State(section, key, persist, val) 
+-- section & key args are strings, 
+-- persist is boolean, if false/nil global ext state 
+-- is only stored for the duration of REAPER session, 
+-- only relevant for storage stage; 
+-- presence of val arg is anything which needs storage, 
+-- determines whether the state is loaded or stored
+	if not val then -- load
 	local ret, state = r.GetProjExtState(0, section, key)
 	local state = (not ret or #state == 0) and r.GetExtState(section, key) or state
 	return state
-	else
+	else -- store
 	r.SetExtState(section, key, val, persist)
 	r.SetProjExtState(0, section, key, val)
 	end
@@ -19021,7 +19219,7 @@ end
 
 function convert_case_in_unicode(str, want_upper_case)
 -- by default converts to lower case
--- want_case is boolean to convert to upper case
+-- want_upper_case is boolean to convert to upper case
 -- if false/nil convertion into lower will be done
 -- https://stackoverflow.com/questions/41855842/converting-utf-8-string-to-ascii-in-pure-lua/41859181#41859181
 -- https://stackoverflow.com/questions/13235091/extract-the-first-letter-of-a-utf-8-string-with-lua
@@ -19062,8 +19260,8 @@ local t = {
 		with = unicode_to_utf8(with)
 		-- replace one case character instances with their other case instances
 		-- doing that 1 by 1, one character per repeat loop cycle
-		-- which is supposedly safer and more
-		local i = 1
+		-- which is supposedly safer and more reliable
+		local i, cnt = 1
 			repeat
 			str, cnt = str:gsub(what, with, 1) -- 1 instance only
 			i = i+1
@@ -20068,13 +20266,17 @@ T R A C K S
 
 F O L D E R S
 
-	Count_And_Store_Children
+	Store_Children_And_Grandchildren
+	get_track_children_and_grandchildren
+	Store_Children
 	Are_All_Children_Selected
 	Count_And_Store_Siblings
 	Are_All_Siblings_Selected
 	Get_Folder_First_Track
 	Get_Folder_Last_Track
-	Get_All_Track_Parents
+	Get_All_Track_Parents1
+	Get_All_Track_Parents2
+	get_track_parents
 	Get_Topmost_Uncollapsed_TCP_Parent
 	get_last_uncollapsed_parent
 	Find_Last_Uncollapsed_MCP_Parent
@@ -20298,6 +20500,8 @@ C L O S U R E S
 	LoopOverSelectedItems
 	return_captures
 	gmatch_alt
+	get_track_parents
+	ReaIter._make_iterator
 
 
 M A R K E R S  &  R E G I O N S
@@ -20485,6 +20689,7 @@ U T I L I T Y
 	Show_Menu_Dialogue
 	Reload_Menu_at_Same_Pos1
 	Reload_Menu_at_Same_Pos2
+	Menu_With_Toggle_Options
 	Re_Store_Ext_State
 	EMERGENCY_TOGGLE
 	Wrapper1
