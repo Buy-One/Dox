@@ -1537,6 +1537,14 @@ return #str:gsub('[\128-\191]','') -- OR #str:gsub('[\x80-\xbf]','') -- same in 
 end
 
 
+function utf8_len(str)
+-- REAPER stock lyrics.lua
+local a = utf8.len(str);
+  if a == nil then return str:len() end -- or return #str
+  return a;
+end
+
+
 -- this will overwrite the stock function in the global environment
 -- doesn't affect # operator
 string.len = 	function(self) -- self here is the source string
@@ -1550,7 +1558,7 @@ end
 -- str:len()
 
 -- OR
-function utf8_len(str)
+function utf8_len2(str)
 -- borrowed and streamlined from REAPER stock lyrics.lua
 return utf8.len(str) or #str -- utf8.len() returns false if invalid bytes hence the fallback value
 end
@@ -1576,14 +1584,6 @@ end
 for c in str:gmatch(".[\128-\191]*") do
 -- OR for c in str:gmatch('[\192-\255]*.[\128-\191]*') do -- with leading bytes
 -- DO STUFF
-end
-
-
-function utf8_len(str)
--- REAPER stock lyrics.lua
-local a = utf8.len(str);
-  if a == nil then return str:len() end -- or return #str
-  return a;
 end
 
 
@@ -5030,7 +5030,6 @@ end
 
 
 function Scroll_Track_To_Top2(tr) -- see more versatile v3 below
--- for previous first sel track is scrolled, for next - last
 local GetValue = r.GetMediaTrackInfo_Value
 local tr_y = GetValue(tr, 'I_TCPY')
 local dir = tr_y < 0 and -1 or tr_y > 0 and 1 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
@@ -17217,10 +17216,78 @@ end
 --[[ USE:
 local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context()
 local named_ID = r.ReverseNamedCommandLookup(cmd_ID) -- convert to named
-or debug.getinfo(1,'S').source:match('^@?(.+)') -- if an non-installed script is run via 'ReaScript: Run (last) ReaScript (EEL2 or lua)' actions get_action_context() won't return valid command ID, in which case fall back on the script full path
+or scr_name -- if an non-installed script is run via 'ReaScript: Run (last) ReaScript (EEL2 or lua)' actions get_action_context() won't return valid command ID, in which case fall back on the script full path
 Menu_With_Toggle_Options(named_ID, sett_t, menu_t, default_sett_state)
 ]]
 
+
+function ShowMessageBox_Menu(message_lines, buttons_t, title)
+-- message_lines is a multi-line literal string
+-- a line per menu item, empty lines are supported
+-- buttons_t is a table of button captions
+-- title is the dialogue title to be displayed at the very top
+-- if invalid 'PROMPT' title is used
+-- relies on Reload_Menu_at_Same_Pos2() function
+
+	local function center_text(t, max_len)
+		for k, line in ipairs(t) do
+		local line_len = #line:gsub('[\128-\191]','')
+		local diff = (max_len-line_len)/4
+		diff = math.floor(diff*3+0.5) -- figured out empirically, 3/4 or 4/5 of the difference give the best result with English though not ideal, for Russian 5/6
+		t[k] = (' '):rep(diff)..line -- add leading spaces to center the line // may not be accurate if lines text is in different register
+		end
+	return t
+	end
+
+local message_lines = message_lines or [[
+Lorem ipsum dolor sit amet, consectetur
+adipiscing elit, sed do eiusmod tempor incididunt ut
+labore et dolore magna aliqua. Ut enim ad minim veniam,
+quis nostrud exercitation ullamco laboris nisi ut
+aliquip ex ea commodo consequat.
+Duis aute irure dolor in reprehenderit in
+voluptate velit esse cillum dolore eu fugiat
+nulla pariatur. Excepteur sint occaecat cupidatat
+non proident, sunt in culpa qui officia deserunt
+mollit anim id est laborum.
+]]
+
+message_lines = not message_lines:sub(-1):match('\n') and message_lines..'\n' or message_lines -- OR message_lines:sub(-1) ~= '\n' etc. -- ensures that the last line is captured with gmatch search
+local buttons_t = buttons_t or {'Button 1', 'Button 2', 'Button 3'}
+
+local message_t, max_len = {}, 0
+
+	for line in message_lines:gmatch('(.-)\n') do -- accounting for empty lines if any
+		if line then
+		line = line:match('(%S.-)%s*$') or line -- trimming both leading and trailing spaces if any, leading spaces will be added for centering inside center_text()
+		local line_len = #line:gsub('[\128-\191]','') -- removing continuation (trailing) bytes
+		max_len = math.max(line_len, max_len)
+		message_t[#message_t+1] = line..'|'
+		end
+	end
+	
+-- Center the message
+message_t = center_text(message_t, max_len)
+buttons_t = center_text(buttons_t, max_len)
+	
+local title = title or 'PROMPT'
+local menu = title..'||'..table.concat(message_t)..'||'..table.concat(buttons_t,'|')
+
+::RELOAD::
+local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open is true
+
+	if output == 0 then return
+	elseif output > #message_t+1 then -- a button was pressed, +1 to account for the title
+	return output-#message_t-1 -- return button index, -1 to account for the title
+	end
+
+	if output <= #message_t+1 then -- if message menu item was clicked, +1 to account for the title
+	goto RELOAD
+	end
+
+end
+-- USE:
+-- local user_choice = ShowMessageBox_Menu()
 
 
 function Re_Store_Ext_State(section, key, persist, val) 
@@ -20076,6 +20143,9 @@ S T R I N G S
 	Convert_Text_To_Menu
 	multibyte_str_len
 	utf8_len
+	string.len
+	utf8_len2
+	string.reverse
 	utf8_chars_to_bytes
 	format_time
 	format_timestr_alt
@@ -20690,6 +20760,7 @@ U T I L I T Y
 	Reload_Menu_at_Same_Pos1
 	Reload_Menu_at_Same_Pos2
 	Menu_With_Toggle_Options
+	ShowMessageBox_Menu
 	Re_Store_Ext_State
 	EMERGENCY_TOGGLE
 	Wrapper1
