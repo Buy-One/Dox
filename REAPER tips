@@ -5227,6 +5227,72 @@ https://forum.cockos.com/showthread.php?t=298338
 
 ==============================================================
 
+-- Ensuring clean encoding of an audio into a lossless format, including streaming
+
+
+The master should peak at -1 dBTP (true peak decibels)
+
+Or at -2 dBTP if it's louder than -15 LUFS
+
+If the master is already hitting close to 0 dBFS, it's advised to measure true peaks 
+
+and reduce the level accordingly
+
+
+Ian Shepherd
+https://productionadvice.co.uk/spotify-upload-true-peak/
+
+
+From experience, reducing by 0.3 dB the level of a 16 bit 44100 Hz wav file peaking at 0 dB
+
+ensures that conversion into mp3 doesn't produce overs
+
+
+useful: https://www.loudnesspenalty.com/ Find out if your music will be turned down by YouTube, Spotify, TIDAL, Apple Music and more
+
+
+==============================================================
+
+-- Recommended loudness of a master
+
+
+No louder than -10 LUFS short-term at the loudest moments (with True Peaks no higher than -1)
+
+If you follow this suggestion, you’ll be in great shape, in almost any genre. Your songs will 
+
+be loud enough to sound “competitive”, whilst still retaining plenty of punch and dynamic contrast. 
+
+They’ll stand shoulder to shoulder with anything else, on all the streaming platforms, 
+
+and they won’t get turned down by a huge amount.
+
+LFUS Integrated isn't a good metric because it's an average and two masters with the same average
+
+may sound very different loudness wise.
+
+
+Ian Shepherd
+http://productionadvice.co.uk/how-loud/
+
+
+==============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
