@@ -927,6 +927,8 @@ end
 
 function strip_spaces(str) -- keeps chars and punctuation, strips leading and trailing spaces and control chars
 --return str:match('[%w%p]?.*[%w%p]*') -- accommodating both mutlti- and single char string
+-- OR
+-- return str:match('[%w%p]*[%w%p]') -- accounting for a single character in the string
 return str:match('^%s*(.-)%s*$') -- seems more reliable
 -- OR
 -- return str:match('(%S.-)%s*$')
@@ -1649,6 +1651,11 @@ local s = '' -- some string
 	for line in magiclines(s) do
 	-- DO STUFF WITH LINE
 	end
+-- SAME AS:
+local s = s:sub(-1)~='\n' and s..'\n' or s
+	for line in s:gmatch('(.-)\n') do
+	-- DO STUFF WITH LINE
+	end
 ]]
 
 
@@ -1870,7 +1877,7 @@ function bytes2string(input)
 	return input:gsub('\\%x+', function(c) return c:match('%x+'):char() end)
 	end
 
-return input -- if not literal byte sequence return as is
+return input -- if not literal byte sequence, return as is
 
 end
 
@@ -5865,64 +5872,80 @@ function Get_Set_Track_Snd_Rec_Src_Dest_Channel(tr, send, hw_output, idx, src_ch
 -- send is boolean, if false/nil receive is addressed
 -- hw_output is boolean, if valid send arg is ignored
 -- idx is send/receive index
--- src_ch_idx/dest_ch_idx 0-based channel or or hardware output index
--- src_ch_mode/dest_ch_mode - false/nil/0 stereo, 1 mono, 2 - 4 channel multi-channel, 3 - 6 channel multi0channel, etc.
+-- src_ch_idx/dest_ch_idx 0-based channel or hardware output index
+-- src_ch_mode - false/nil/0 stereo, 1 mono, 2 - 4 channel multi-channel, 3 - 6 channel multi0channel, etc.
+-- DEST CHANNEL MODE IS DETERMINED BY src_ch_mode
+-- because send requires the same number of channels at source and at the destination
+-- it's not allowed to route different channel counts, i.e. stereo/mono to multichannel, 
+-- or one multichannel count to another, BUT IT'S ALLOWED TO MIX TO MONO AT THE DESTINATION
 -- src_ch_idx, src_ch_mode, dest_ch_idx, dest_ch_mode must be ommitted at Get stage, they're irrelevant
--- if src_ch_mode/dest_ch_mode is false/nil/0 (stereo) src_ch_idx/dest_ch_idx refer to the index of the left channel,
--- if src_ch_mode/dest_ch_mode is an even number above 0 (multichannel), src_ch_idx/dest_ch_idx
--- refer to the 0-based index of the first channel in a multichannel routing
+-- if src_ch_mode is false/nil/0 (stereo) src_ch_idx/dest_ch_idx refer to the index of the left channel,
+-- dest_ch_mode at Set stage is only needed to signal mixing to mono at the destination
+-- if ommitted, it will be the same as src_ch_mode;
+-- if src_ch_mode is an even number above 0 (multichannel), then src_ch_idx/dest_ch_idx
+-- refer to the 0-based index of the first channel in a multichannel routing;
+-- 0-based channel index: when the mode is mono it's straghtforward
+-- in stereo mode index is left channel, index+1 is right channel
+-- in multichan mode index is the first channel, index-1+mode*2 is last channel;
 -- at Set stage besides other arguments only src_ch_idx/src_ch_mode or dest_ch_idx/dest_ch_mode can be specified
 -- if only source or destination channel needs setting;
 -- virtual loopback output index range for dest_ch_idx argument starts at 0-based number 512
 -- (officially supported, named Loopback Output in the output list)
--- and 768 (unofficially supported via reaper.ini, named Aux Loopback), IF BOTH TYPES ARE ENABLED,
+-- and 768 (unofficially supported via reaper.ini key rearoute_loopback=, 
+-- named 'Aux Loopback' in the hw outputs list, 512 channels since build 6.69), 
+-- PROVIDED BOTH TYPES ARE ENABLED,
 -- if only one type is enabled, the range start index is 512,
 -- but before creating a send using the supplied index the configured number of outputs
 -- must be looked up at <Preferences -> Audio -> Virtual loopback audio hardware>
 -- and rearoute_loopback key in reaper.ini for each type respectively
 -- to ensure that it's within range;
 -- when sending to hardware output the master send may need to be set to off
--- also send mode setting can be added with r.GetTrackSendInfo_Value(tr, snd_cat, snd_idx, 'I_SENDMODE', int);
+-- also send mode setting can be added with r.SetTrackSendInfo_Value(tr, snd_cat, snd_idx, 'I_SENDMODE', int);
 -- creation of sends to hardware outputs is simpler with ReaInsert plugin
 -- but one plugin is only able to send to 1 stereo hardware output, or 2 mono
 
 
--- local retval, name = r.GetTrackSendName(tr, send_idx, '') -- for stereo hardware outputs only returns left channel name
--- local retval, name = r.GetTrackReceiveName(tr, recv_idx, '')
+-- local retval, name = r.GetTrackSendName(tr, send_idx) -- for stereo hardware outputs only returns left channel name which can be complemented using dest_ch_mode value, i.e. if stereo then add name with channel number incremented by 1, e.g. 'Output 1 / Output 2'; for hw outputs 0-based send_idx is in the range of 0 - r.GetTrackNumSends(tr, 1)-1 (category 1 hw outputs), for track sends r.GetTrackNumSends(tr, 1) - r.GetTrackNumSends(tr, 0)-1 (category 0 track sends)
+-- local retval, name = r.GetTrackReceiveName(tr, recv_idx)
 
 local routing_type = hw_output and 1 or send and 0 or -1 -- -1 receive
 local GetSnd, SetSnd, GetTrackInfo, SetTrackInfo = r.GetTrackSendInfo_Value, r.SetTrackSendInfo_Value, r.GetMediaTrackInfo_Value, r.SetMediaTrackInfo_Value
 
-	if not src_ch_idx and not dest_ch_idx then
+	if not src_ch_idx and not dest_ch_idx then -- GET
 	local bitfield = GetSnd(tr, routing_type, idx, 'I_SRCCHAN')
 	local src_mode = bitfield>>10&0x3ffff -- shifting heigher 10 bits, applying 10 bit mask
 	local src_ch_idx = bitfield&0x3ffff - src_mode*1024 -- bit-masking lower 10 bits, 0-based ch index increases by 1024 with each mode hence the subtraction
 	local bitfield = GetSnd(tr, routing_type, idx, 'I_DSTCHAN')
+--[[ this only works for HW outputs
 	local dest_mode = bitfield>>10&0x3ffff
 	local dest_ch_idx = bitfield&0x3ffff - dest_mode*1024
-	return src_mode, src_ch_idx, dest_mode, dest_ch_idx -- dest_ch_idx 512+ is rearoute loopback output 0-based index
-	else
+	]]
+	local dest_mode = bitfield&1024==1024 and 1 or src_mode -- dest channel mode is always the same as the source's unless mono
+	local dest_ch_idx = dest_mode == 1 and bitfield&0x3ffff-1024 or bitfield&0x3ffff -- subtracting 1024 if mono
+	local is_rearoute = bitfield&512==512 -- seems useless for operations with sends, so just for info
+	return src_mode, src_ch_idx, dest_mode, dest_ch_idx, is_reatoute -- dest_ch_idx 512+ is rearoute loopback output 0-based index
+	else -- SET
 		if src_ch_idx then
 		local src_ch_mode = src_ch_mode or 0 -- if false/nil then stereo
 		-- the src track max number of channels must be greater than or equal to
 		-- the src_ch_idx value so that the send isn't created from void
 		local tr_ch_cnt = GetTrackInfo(tr, 'I_NCHAN')
 			if tr_ch_cnt < (src_ch_idx+1 + (src_ch_mode == 0 and 1 or src_ch_mode > 1 and src_ch_mode*2 or 0)) then -- src_ch_idx+1 to match 1-based track channel count because src_ch_idx var is 0-based // adding 1 to src_ch_idx for stereo pair (src_ch_mode 0) because src_ch_idx var only refers to the left channel, and double the src channel mode number for multichannel because as per the API doc 2 = 4, 3 = 6 etc.
-			tr_ch_cnt = (src_ch_idx+1 + (src_ch_mode == 0 and 1 or src_ch_mode > 1 and src_ch_mode*2 or 0)) - tr_ch_cnt + tr_ch_cnt -- increase track channel count
+			tr_ch_cnt = (src_ch_idx+1 + (src_ch_mode == 0 and 1 or src_ch_mode > 1 and src_ch_mode*2 or 0)) + tr_ch_cnt -- increase track channel count
 			SetTrackInfo(tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the channel count value must be even
 			end
-		local bitfield = (src_ch_mode << 10) | src_ch_idx -- mode number shifted 10 bits leftwards + 0-based channel index, if mode is stereo or multichannel index of the left channel // if channel index exceeds the count of enabled channels the src ch readout isn't updated whle the I/O dialogue is open, to have it update either close and reopen or toggle REAPER window unfocused and focused
+		local bitfield = (src_ch_mode << 10) | src_ch_idx -- mode number shifted 10 bits leftwards + 0-based channel index, if mode is stereo or multichannel, index of the left channel // if channel index exceeds the count of enabled channels the src ch readout isn't updated whle the I/O dialogue is open, to have it update either close and reopen or toggle REAPER window unfocused and focused
 		SetSnd(tr, routing_type, idx, 'I_SRCCHAN', bitfield)
 		end
 		if dest_ch_idx then
-		local dest_ch_mode = dest_ch_mode or 0 -- if false/nil then stereo
+		local dest_ch_mode = dest_ch_mode and 1 or src_ch_mode -- if not explicitly provided to signal mono routing (integer 1), use src_ch_mode as required by REAPER design
 			if not hw_output then
 			-- the dest track max number of channels must be greater than or equal to
 			-- the dest_ch_idx value so that the send isn't created into void
 			local dest_tr = GetSnd(tr, routing_type, idx, 'P_DESTTRACK') -- returns pointer, not index
 			local tr_ch_cnt = GetTrackInfo(dest_tr, 'I_NCHAN')
 				if tr_ch_cnt < (dest_ch_idx+1 + (dest_ch_mode == 0 and 1 or dest_ch_mode > 1 and dest_ch_mode*2 or 0)) then -- dest_ch_idx+1 to match 1-based track channel count because dest_ch_idx var is 0-based // adding 1 to dest_ch_idx for stereo pair (dest_ch_mode 0) because dest_ch_idx var only refers to the left channel, and double the src channel mode number for multichannel because as per the API doc 2 = 4, 3 = 6 etc.
-				tr_ch_cnt = (dest_ch_idx+1 + (dest_ch_mode == 0 and 1 or dest_ch_mode > 1 and dest_ch_mode*2 or 0)) - tr_ch_cnt + tr_ch_cnt -- increase track channel count
+				tr_ch_cnt = (dest_ch_idx+1 + (dest_ch_mode == 0 and 1 or dest_ch_mode > 1 and dest_ch_mode*2 or 0)) + tr_ch_cnt -- increase track channel count
 				SetTrackInfo(dest_tr, 'I_NCHAN', tr_ch_cnt&1 == 0 and tr_ch_cnt or tr_ch_cnt+1) -- if odd number make even because as per the API doc the channel count value must be even
 				end
 			elseif dest_ch_idx < 512 then -- not rearoute loopback output
@@ -5942,13 +5965,80 @@ local GetSnd, SetSnd, GetTrackInfo, SetTrackInfo = r.GetTrackSendInfo_Value, r.S
 			-- must be looked up which is value of loopback_size= key in reaper.ini,
 			-- for indices 768 - 1023 it's the value of rearoute_loopback= key in reaper.ini,
 			-- if either one is enabled the range of indices is 512 - 1023,
-			-- than many (512) outputs are supported since 6.69
+			-- that many (512) outputs are supported since 6.69
 			end
 			if hw_output then
 		--	SetTrackInfo(tr, 'B_MAINSEND', 0) -- turn off master/parent send
 			end
 		local bitfield = (dest_ch_mode << 10) | dest_ch_idx
 		SetSnd(tr, routing_type, idx, 'I_DSTCHAN', bitfield)
+		end
+	end
+
+end
+
+
+
+function Audio_Send_Exists(snd_type, src_tr, dest_tr, send_mode, snd_src_ch, snd_src_ch_mode, snd_dest_ch, snd_dest_ch_mode, loopback_mode)
+-- snd_type < 0 receves, 0 track sends, > 0 hardware sends
+-- if snd_type > 0 (hw outputs), dest_tr arg is irrelevant;
+-- snd_dest_ch_mode arg must be valid only if evaluating mono routing at the destination (integer 1)
+-- in all other cases it's identical to snd_src_ch_mode;
+-- channel modes, i.e. snd_src_ch_mode and snd_dest_ch_mode: 0 - stereo, 1 mono, 2 - 4 channels, 3 - 6 channels etc.
+-- 0-based channel index: when the mode is mono it's straghtforward
+-- in stereo mode index is left channel, index+1 is right channel
+-- in multichan mode index is the first channel, index-1+mode*2 is last channel
+-- snd_src_ch and snd_dest_ch args are 0-based channel indices, 
+-- for stereo routing only the left channel index
+-- for multichannel routing only the lowest channel index;
+-- loopback_mode arg is optional, 1 if evaluating rearoute loopback output channels
+-- officially supported since REAPER v7, whose count starts from 0-based index of 512, 
+-- or 2 if evaluating rearoute loopback channels supported unofficially 
+-- in earlier builds via reaper.ini rearoute_loopback= key, since 6.69 supports 512 channels, 
+-- whose count starts at 0-based index of 768 IF BOTH TYPES ARE ENABLED,
+-- alternatively, to address rearoute outputs enabled via reaper.ini 
+-- loopback_mode 1 could be used but snd_dest_ch index must start from 256,
+-- i.e. 256 - 0, 257 - 1 etc.,
+-- only applies to snd_dest_ch arg,
+-- if loopback_mode arg is supplied snd_dest_ch index
+-- args doesn't need adjustment, value 0 will be mapped to 512 for loopback_mode 1
+-- or to 768 for loopback_mode 2, etc.
+
+
+
+	local function is_ch_within_range(input_ch_idx, input_ch_mode, ch_idx, ch_mode)
+	-- looking if a channel is already present in a send/receive
+	-- input_ch_idx is a channel index which is evaluated
+	-- ch_idx, ch_mode are props of the send/receive against which input_ch_idx is evaluated
+	local key = function(ch_mode) return ch_mode > 1 and -1 or ch_mode end -- creating universal table key for all multichannel mode values for noth input and evaluated mode args
+	local hi_t = {[0]=function(ch_idx)return ch_idx+1 end,[1]=function(ch_idx)return ch_idx end,
+	[-1]=function(ch_idx,ch_mode)return ch_idx-1+ch_mode*2 end} -- using functions to be able to use the table for both types of arguments
+	return input_ch_idx and input_ch_idx >= ch_idx -- lower channel in the range
+	and hi_t[key(input_ch_mode)](input_ch_idx, input_ch_mode) <= hi_t[key(ch_mode)](ch_idx, ch_mode) -- upper channel in the range
+	end
+
+local snd_dest_ch_mode = snd_dest_ch_mode and 1 or snd_src_ch_mode -- if not explicitly provided, to signify mono routing (integer 1) use snd_src_ch_mode as required by REAPER design
+local snd_dest_ch =  snd_dest_ch + (loopback_mode == 1 and 512 or loopback_mode == 2 and 768 or 0)
+local SendInfo = r.GetTrackSendInfo_Value
+
+	for i=0, r.GetTrackNumSends(src_tr, snd_type)-1 do
+		if SendInfo(src_tr, 0, i, 'P_DESTTRACK') == dest_tr or snd_type > 0 then -- send to the dest_tr already exists or hardware output
+		-- Evaluate properties, whether identical
+--		local send_mode_cur = SendInfo(src_tr, snd_type, i, 'I_SENDMODE') -- irrelevant
+		local bitfield = SendInfo(src_tr, snd_type, i, 'I_SRCCHAN')
+		local snd_src_ch_mode_cur = bitfield>>10&0x3ffff -- shifting heigher 10 bits, applying 10 bit mask
+		local snd_src_ch_cur = bitfield&0x3ffff - snd_src_ch_mode_cur*1024 -- bit-masking lower 10 bits, 0-based ch index increases by 1024 with each mode hence the subtraction
+		local bitfield = SendInfo(src_tr, snd_type, i, 'I_DSTCHAN')
+	--[[ this only works for HW outputs
+		local snd_dest_ch_mode_cur = bitfield>>10&0x3ffff
+		local snd_dest_ch_cur = bitfield&0x3ffff - snd_dest_ch_mode_cur*1024
+		]]
+		local snd_dest_ch_mode_cur = bitfield&1024==1024 and 1 or snd_src_ch_mode_cur -- dest channel mode is always the same as the source's unless mono
+		local snd_dest_ch_cur = snd_dest_ch_mode_cur == 1 and bitfield&0x3ffff-1024 or bitfield&0x3ffff -- subtracting 1024 if mono
+			if is_ch_within_range(snd_src_ch, snd_src_ch_mode, snd_src_ch_cur, snd_src_ch_mode_cur)
+			and is_ch_within_range(snd_dest_ch, snd_dest_ch_mode, snd_dest_ch_cur, snd_dest_ch_mode_cur)
+			then return true -- if the evaluated src and dest channels both feature in any send routing, such send is considered existing, no point in duplicating the signal by creating another send featuring these channels
+			end
 		end
 	end
 
@@ -16371,6 +16461,11 @@ for key in pairs(reaper) do _G[key] = reaper[key] end  -- MPL: get rid of 'reape
 -- directly while REAPER is running the change doesn't take effect, so in builds older than 7.03 user input is required
 -- to enable setting in the ReaScript task control dialogue
 if r.set_action_options then r.set_action_options(1|2) end
+-- prevent ReaScript task control dialogue when the running script is clicked again to be terminated,
+-- supported since build 7.03
+-- script flag for auto-relaunching after termination in reaper-kb.ini is 4, e.g. SCR 4, but if changed
+-- directly while REAPER is running the change doesn't take effect, so in builds older than 7.03 user input is required
+if r.set_action_options then r.set_action_options(1) end	
 
 
 function Msg(param) -- X-Raym's
@@ -16400,17 +16495,35 @@ end
 
 
 local Debug = ""
-function Msg(...) -- caption first (must be string otherwise ignored) or none, accepts functions with only one return value
-local t = {...}
-	if #t > 1 then
-	local cap, param = table.unpack(t) -- assign arguments to vars
-	local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
-	displ = cap..tostring(param)..'\n'
-	elseif #t == 1 then
-	displ = tostring(...)..'\n'
-	end
+function Msg(...) -- caption first (must be string otherwise ignored) or none, accepts functions with only one return value	
 	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
-	r.ShowConsoleMsg(displ)
+	local t = {...}
+		if #t > 1 then
+		local cap, param = table.unpack(t) -- assign arguments to vars
+		local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
+		displ = cap..tostring(param)..'\n'
+		elseif #t == 1 then
+		displ = tostring(...)..'\n'
+		r.ShowConsoleMsg(displ)
+		end	
+	end
+end
+
+
+local Debug = ""
+function Msg(...) 
+-- accepts either a single arg, or multiple pairs of caption and value
+	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	local t = {...}
+	local str = #t > 1 and '' or tostring(t[1])..'\n'
+		if #t > 1 then -- OR if #str == 0
+			for i=1,#t,2 do
+				if i > #t then break end
+			local cap, val = t[i], t[i+1]			
+			str = str..tostring(cap)..' = '..tostring(val)..'\n'
+			end
+		end
+	reaper.ShowConsoleMsg(str)
 	end
 end
 
@@ -17232,8 +17345,10 @@ function ShowMessageBox_Menu(message_lines, buttons_t, title)
 	local function center_text(t, max_len)
 		for k, line in ipairs(t) do
 		local line_len = #line:gsub('[\128-\191]','')
-		local diff = (max_len-line_len)/4
-		diff = math.floor(diff*3+0.5) -- figured out empirically, 3/4 or 4/5 of the difference give the best result with English though not ideal, for Russian 5/6
+	--	local diff = (max_len-line_len)/4
+	--	diff = math.floor(diff*3+0.5) -- figured out empirically, 3/4 or 4/5 of the difference give the best result with English though not ideal, for Russian 5/6 // ideally pixels must be counted rathen than characters
+	-- OR simply
+		local diff = (max_len-line_len) * 4/5
 		t[k] = (' '):rep(diff)..line -- add leading spaces to center the line // may not be accurate if lines text is in different register
 		end
 	return t
@@ -20330,6 +20445,7 @@ T R A C K S
 	Set_Track_MIDI_Send_Recv_Channels
 	Insert_Track_With_One_Regular_And_One_HWOutput_Send
 	Get_Set_Track_Snd_Rec_Src_Dest_Channel
+	Audio_Send_Exists
 	GetTrackTree
 	Fixed_Lane_Comping_Enabled
 
