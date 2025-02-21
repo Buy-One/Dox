@@ -5277,18 +5277,48 @@ http://productionadvice.co.uk/how-loud/
 
 ==============================================================
 
+-- Quick routing creation in projects with long track count so that there's no need 
+
+-- to pull the cable from the source track to the detination track while scrolling
 
 
+1. Place all your main destination tracks (busse, FX returns) at the top of the track list
+
+2. Create a routing by right clicking the I/O (routing) button on the TCP/MCP
+
+and select the destination track from the list in the context menu where it will be found
+
+at the top of the list so no scrolling is needed
+
+Alternatively left click the I/O (routing) button on the TCP/MCP and select the destinaion track
+
+from the pull-up list.
+
+Yet another alternative is using the Routing Matrix (Alt+R).
 
 
+https://reddit.com/r/Reaper/comments/1iu5pxo/increase_scrolling_speed_when_drag_and_dropping_a/
 
 
+=============================================================
+
+-- Spot files to their original position at the moment of recording
 
 
+Works with files with embedded BWF chunk. REAPER does write the relevant into the recorded files.
+
+1. Drop files into the project
+
+2. Keep them selected or select all
+
+3. Run action Item: Move to media source preferred position (BWF start offset)
+
+This works provided the item source is looped (Loop source option is enabled) and its start matches its source start or its source is not looped
+
+https://reddit.com/r/Reaper/comments/1iueutr/insert_into_project_at_origin/
 
 
-
-
+=============================================================
 
 
 
