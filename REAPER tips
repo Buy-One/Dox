@@ -5305,7 +5305,7 @@ https://reddit.com/r/Reaper/comments/1iu5pxo/increase_scrolling_speed_when_drag_
 -- Spot files to their original position at the moment of recording
 
 
-Works with files with embedded BWF chunk. REAPER does write the relevant into the recorded files.
+Works with files with embedded BWF chunk. REAPER does write the relevant info into the recorded files.
 
 1. Drop files into the project
 
