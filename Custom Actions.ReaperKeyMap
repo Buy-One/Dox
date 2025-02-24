@@ -677,6 +677,7 @@ ACT 1 0 "2e5b83f5f3285d4892413631c9f85870" "Custom: Toggle Play selected items /
 ACT 1 0 "e0b83e1b9aa0f94693d3fa46d2f95106" "Custom: Create envelope segment at time selection and move down (keep env selected) - adjustable" 40726 41181 41181 41181 41181 41181 41181 41181 41181 41181 41181 41181 41181 41181 41181
 ACT 1 0 "87126ea4bbd09145848c776840a2500a" "Custom: Create envelope segment at time selection and move up (keep env selected) - adjustable" 40726 41180 41180 41180 41180 41180 41180 41180 41180 41180 41180 41180 41180 41180 41180
 ACT 1 0 "bdd5c3c27d9be446957b81ec77fd64c1" "Custom: Split items under cursor with mouse indicator (1st run - enable indicator, 2nd run - split, disable indicator) -- supported since 7.19" 2022 43194 2014 43194 2013 42577 2013 43194
+ACT 1 0 "e061811d56e4bf4d80b0522668d47aab" "Custom: Move item contents with mousewheel (mouse outward - right, mouse inward - left)" 2013 40124 2014 40123
 ACT 1 0 "e0fefd4067413144927ba68b2a30280b" "Custom: Crop project to loop and open in new tab complete (switching proj tabs needed to activate new tab, no orig project undo)" 40623 40049 40296 40210 41929 40862 40861 42398 40862 40861
 ACT 1 0 "8561c97f5fcc0043ba1873a1e0f67f7e" "Custom: Crop project to loop -- Pt. 1" 40623 40049
 ACT 1 0 "21a3c0859629664f9d4dfdfb9e39bd9c" "Custom: Crop project to loop/region and open in new tab -- Pt. 2 (switching proj tabs needed to activate new tab, undo restores orig project)" 40296 40210 40297 41929 40862 40861 42398 40862 40029 40861 40297
