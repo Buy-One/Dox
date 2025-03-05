@@ -578,13 +578,14 @@ ACT 1 0 "f5f9a9e5a98be14b92d57d895957c09c" "Custom: Split item at zero crossing 
 ACT 1 0 "65250ce8b5cb1f4d812765db1126e290" "Custom: Split item(s) at edit cursor on slelected track(s)" _XENAKIOS_SELITEMSUNDEDCURSELTX 40757 40289
 ACT 1 0 "9405ecc299e8704bae86f43e1011770b" "Custom: Split items at project markers (no crossfades)" _SWS_SAVEXFD 41119 40931 _SWS_RESTOREXFD
 ACT 1 0 "c4fbfc80d1741e449180047bcd3fe51e" "Custom: Split items at timeline grid (no crossfades)" _SWS_SAVEXFD 41119 40932 _SWS_RESTOREXFD
+ACT 1 0 "2efc877eab1b75449322e1026aaa787b" "Custom: Split items at mouse cursor ignoring snap (modifiable by changing the split action)" 2022 1157 2013 1157 42575 2013 1157
+ACT 1 0 "3673420aeadd5640ac558d2f788a2aa2" "Custom: Split items at mouse cursor ignoring snap (modifiable by changing the split action) -- using edit cursor" 40514 40757
 ACT 1 0 "470f8ba701f8b84194c1818e3df43921" "Custom: Split items selected on the same track at take markers (only with dialogue to continue)" 2001 41173 42394 40759 2002
 ACT 1 0 "0ae79f4579d6fd4795504edc78dde32a" "Custom: Split MIDI item preserving contents in both parts (select item and its track, place edit cursor)" 40698 41311 40290 40630 40001 42398 40631 41305 40117 40005 40286 40038 40718 40635
 ACT 1 0 "639306cee949a845b015472c6476ba94" "Custom: Split selected item at each bar" 41173 _BR_SAVE_CURSOR_POS_SLOT_1 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 40759 40839 _BR_RESTORE_CURSOR_POS_SLOT_1
 ACT 1 0 "7b127717db5fcc449d74d3494645649a" "Custom: Split selected item at each bar with prompt to repeat" 41173 _BR_SAVE_CURSOR_POS_SLOT_1 2001 40839 40759 2002 _BR_RESTORE_CURSOR_POS_SLOT_1
 ACT 1 0 "5cd392bebfbf1b4ba6b289c2425d0a3f" "Custom: Split selected items at loop" 40632 40759 40633 40758 40289
 ACT 1 0 "3ac24bc403290047a553221934cfe852" "Custom: Split selected items at loop through time selection" _SWS_SAVETIME5 40623 40061 40635 _SWS_RESTTIME5
-ACT 1 0 "2efc877eab1b75449322e1026aaa787b" "Custom: Split items at mouse cursor ignoring snap (modifiable by changing the split action)" 2022 1157 2013 1157 42575 2013 1157
 ACT 1 0 "6d0934b75be4ed4c8e81b02ec79bbf0d" "Custom: Spread ALL sequential adjacent items except 1st to separate tracks (select track with items) -- repeat as needed" 2001 40289 _XENAKIOS_SELFIRSTITEMSOFTRACKS 41174 40625 40043 40626 40289 40718 40118 40285 2002 40635
 ACT 1 0 "66d1647164d3d847bb41fdbb1a5e79ff" "Custom: Spread ALL sequential adjacent items except 1st to separate tracks (select track with items) -- repeat as needed (all native)" 2001 40421 41173 40625 41667 40626 40289 40718 41174 40625 40043 40626 40289 40718 40118 40285 2002 40635
 ACT 1 0 "68f923aa7ff4d84fbe3069f80b894af1" "Custom: stephenschappler.com_Adjust ttem volume with mousewheel by 1 dB" 40528 2014 41924 2013 41925
