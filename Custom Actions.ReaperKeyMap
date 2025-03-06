@@ -151,6 +151,7 @@ ACT 1 0 "8639e13dd1342b41b162ae1ca98d2e50" "Custom: Extend selected item to next
 ACT 1 0 "507dcdc76c562241b00f6d33bb65ecba" "Custom: Extend selected item to previous item (1st select item)" 41173 40416 41174 _BR_SAVE_CURSOR_POS_SLOT_1 40417 _BR_RESTORE_CURSOR_POS_SLOT_1 41305 40289
 ACT 1 0 "9d523300200e434b8c037c75dbdbc29c" "Custom: Extend selected item to previous item (1st select prev item)" 41174 _BR_SAVE_CURSOR_POS_SLOT_1 40417 _BR_RESTORE_CURSOR_POS_SLOT_1 41305 40289
 ACT 1 0 "9c8a8b8a58a09049bbaecc12be0c12c2" "Custom: Extend selected item(s) to next item(s) (Tie Object By Length Change Rightward)-2" 40528 41174 41168 41311
+ACT 1 0 "becb52d7f83fef40b3bbcbe8b8275f2e" "Custom: Extend selected item to the closest grid line (disabling source looping)" 40636 41174 40647 40611 40547
 ACT 1 0 "83abb90ed313ea4e94efc3334964c96e" "Custom: Extend time selection to items (across tracks) incrementally leftwards no prompt" _SWS_SAVETIME5 _SWS_RESTTIME5 40630 40625 40631 40626 40318 40625 _SWS_SAVETIME5
 ACT 1 0 "e274953d4db11940b9e9f7cb996a3b7e" "Custom: Extend time selection to items (across tracks) incrementally leftwards with prompt" 40625 40626 2001 40318 40625 2002
 ACT 1 0 "5e61e025a14fd94ea1ba893984c50b88" "Custom: Extend time selection to items (across tracks) incrementally rightwards no prompt" _SWS_SAVETIME5 _SWS_RESTTIME5 40630 40625 40631 40319 40626 _SWS_SAVETIME5
