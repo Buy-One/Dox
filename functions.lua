@@ -18,6 +18,8 @@ O B J E C T S
 
 T R A C K S
 
+S E N D S / R E C E I V E S
+
 F O L D E R S
 
 E N V E L O P E S
@@ -2275,12 +2277,12 @@ local mid
 	while lo < hi do
 	mid = math.floor((lo+hi)/2)
 		if t[mid] < value then
-			lo = mid+1
+		lo = mid+1
 		else
-			hi = mid
+		hi = mid
 		end
 	end
-	return lo
+return lo
 end
 
 
@@ -4565,9 +4567,28 @@ local send_mode = send_modes_t[SEND_MODE] or 0
 r.TrackList_AdjustWindows(r.GetToggleCommandStateEx(0,41146) == 0) -- Mixer: Toggle autoarrange // isMinor arg depends on the setting to only auto-arrange in the Mixer when the setting is enabled
 
 
-function Get_TCP_Under_Mouse() -- based on the function Get_Object_Under_Mouse_Curs()
--- r.GetTrackFromPoint() covers the entire track timeline hence isn't suitable for getting the TCP
--- master track is supported
+function Get_TCP_MCP_Under_Mouse(want_mcp)
+-- takes advantage of the fact that the action 'View: Move edit cursor to mouse cursor'
+-- doesn't move the edit cursor when the mouse cursor is over the TCP;
+-- r.GetTrackFromPoint() covers the entire track timeline hence isn't suitable for getting the TCP;
+-- master track is supported;
+-- want_mcp is boolean to address MCP under mouse, supported in builds 6.36+
+
+-- in builds < 6.36 the function also detects MCP under mouse regardless of want_mcp argument
+-- because when the mouse cursor is over the MCP the action 'View: Move edit cursor to mouse cursor'
+-- does move the edit cursor unless the focused MCP is situated to the left of the Arrange view start
+-- or to the right of the Arrange view end depending on the 'View: Show TCP on right side of arrange'
+-- setting, which makes 'new_cur_pos == edge or new_cur_pos == 0' expression true because the edit cursor
+-- being unable to move to the mouse cursor is moved to the Arrange view start_time/end_time,
+-- in later builds this is prevented by conditioning the return value with info:match('tcp')
+-- so that the focus is solely on TCP if want_mcp arg is false
+
+-- for builds 6.36+ where GetThingFromPoint() is supported
+local tr, info = table.unpack(r.GetThingFromPoint and {r.GetThingFromPoint(r.GetMousePosition())} or {})
+	if info then
+	return (want_mcp and info:match('mcp') or not want_mcp and info:match('tcp')) and tr
+	end
+
 local right_tcp = r.GetToggleCommandStateEx(0,42373) == 1 -- View: Show TCP on right side of arrange
 local curs_pos = r.GetCursorPosition() -- store current edit curs pos
 local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start, screen_x_end are 0 to get full arrange view coordinates // get time of the current Arrange scroll position to use to move the edit cursor away from the mouse cursor // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and end_time should be on the screen when non-zero when isSet is true // when the Arrange is scrolled all the way to the start the function ignores project start time offset and any offset start still treats as 0
@@ -4600,7 +4621,6 @@ function Track_Visible_In_Arrange_Or_Mixer(tr)
 -- not suitable for all cases because the truth depends on Mixer window being open
 return r.IsTrackVisible(tr, r.GetToggleCommandState(40078) == 1) -- View: Toggle mixer visible // whether vis in the Mixer if mixer toggle state is ON or in Arrange if it's OFF
 end
-
 
 
 function Get_Top_Left_most_Visible_Track(want_selected)
@@ -4679,7 +4699,7 @@ return tr and info_code < 1 and tr -- not envelope and not docked FX window
 end
 
 
-function collapse_TCP1(tr) -- INSTEAD USE r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1)
+function collapse_TCP1(tr) -- INSTEAD OF THE ACTON USE r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1)
 -- Since botched track zoom overhaul in 6.76 https://forum.cockos.com/showthread.php?t=278646 only works invisibly with PreventUIRefresh(), but then monitoring of track height change won't work because the UI won't update, see alternative collapse_TCP2()
 	repeat
 	local tr_height = r.GetMediaTrackInfo_Value(tr, 'I_TCPH')
@@ -4690,7 +4710,7 @@ end
 
 
 -- VERY SLUGGISH, AND THAT'S JUST ONE TRACK
-function collapse_TCP2(tr) -- INSTEAD USE r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1)
+function collapse_TCP2(tr) -- INSTEAD OF THE ACTON USE r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1)
 -- Since botched track zoom overhaul in 6.76 https://forum.cockos.com/showthread.php?t=278646 only works invisibly with PreventUIRefresh()
 r.PreventUIRefresh(1)
 local count = 0
@@ -4731,35 +4751,6 @@ local locked
 	end
 r.PreventUIRefresh(-1)
 return locked
-end
-
-
-function Collect_Snd_Data(tr) -- dest track and channels // blueprint of dealing with sends/receives
-local t = {}
-	for snd_idx = 0, r.GetTrackNumSends(tr, 0)-1 do -- 0 is sends
-	local dest_tr = r.GetTrackSendInfo_Value(tr, 0, snd_idx, 'P_DESTTRACK') -- 0 is sends
-	local src_ch = r.GetTrackSendInfo_Value(tr, 0, snd_idx, 'I_SRCCHAN') -- 0 is sends
--- St channel count: 0 = 1/2, 1 = 2/3, 2 = 3/4, 3 = 4/5 etc
--- To get stereo source both ch indices, 1-based, add 1 and 2 to the return value, e.g. 0+1, 0+2 = 1/2 (index 0), 3+1, 3+2 = 4/5 (index 3)
--- Mono channel count starts from 1024, to evaluate if channel is mono do src_ch&1024==1024
--- To get mono source regular ch index, 0-based, subtract 1024 from the return value (src_ch), e.g. 1024-1024 = 0 (ch 1), 1025-1024 = 1 (ch 2) etc.
-	local mono = src_ch&1024 == 1024
-	t[dest_tr] = mono and {(src_ch-1024)+1} or {src_ch+1, src_ch+2} -- saving 1-based channel indices
-	end
-return t
-end
-
-
-
-function GetSetTrackSendInfo_Value(tr, cat, send_idx, param, val) -- param is a string, last two args are for setting
-	if not param or not val then
-	local t = {B_MUTE = 0, B_PHASE = 0, B_MONO = 0, D_VOL = 0, D_PAN = 0, D_PANLAW = 0, I_SENDMODE = 0, I_AUTOMODE = 0, I_SRCCHAN = 0, I_DSTCHAN = 0, I_MIDIFLAGS = 0, P_DESTTRACK = 0, P_SRCTRACK = 0, ['P_ENV:<VOLENV'] = 0, ['P_ENV:<PANENV'] = 0, ['P_ENV:<MUTEENV'] = 0}
-		for k in pairs(t) do
-		t[k] = reaper.GetTrackSendInfo_Value(tr, cat, send_idx, k)
-		end
-	return t
-	elseif param and val return reaper.SetTrackSendInfo_Value(tr, cat, send_idx, param, val)
-	end
 end
 
 
@@ -5010,18 +5001,41 @@ r.CSurf_OnScroll(0, round(topmost_vis_tr_I_TCPY/8))
 ]]
 
 
-function Scroll_Track_To_Top1(tr) -- see more versatile v3 below
-local tr_y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
+
+
+--[[
+
+-- In certain cases, scrolling may need to be preceded
+-- by resetting the entire track list scroll position
+-- to ensure that repeated scrolls don't cause drifts
+-- in the TCP final Y coordinate, so do this
+
+r.PreventUIRefresh(1)
+Scroll_Track_To_Top(r.GetTrack(0,0)) -- first scroll the very 1st track to top resetting tracklist scroll position to ensure that the the target track scroll position doesn't drift with each script run which happens because after each scroll the Y coordinate it stops at slightly changes
+Scroll_Track_To_Top(tr) -- scroll to the target track
+r.PreventUIRefresh(-1)
+]]
+
+
+function Scroll_Track_To_Top1(tr, env) -- see more versatile v3 below
+-- env arg is optional, only if the first envelope
+-- displayed in its own lane needs to be scrolled to
+
+local GetValue = r.GetMediaTrackInfo_Value
+local tr_y = GetValue(tr, 'I_TCPY')
+--local tr_h = GetValue(tr, 'I_TCPH')
+local env_y = env and r.GetEnvelopeInfo_Value(env, 'I_TCPY') or 0 -- the result is the same as with tr_h
+
 local dir = tr_y < 0 and -1 or tr_y > 0 and 1 or 0 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
 r.PreventUIRefresh(1)
 local cntr, Y_init = 0 -- to store track Y coordinate between loop cycles and monitor when the stored one equals to the one obtained after scrolling within the loop which will mean the scrolling can't continue due to reaching scroll limit when the track is close to the track list end or is the very last, otherwise the loop will become endless because there'll be no condition for it to stop
     repeat
     r.CSurf_OnScroll(0, dir) -- unit is 8 px
-    local Y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
+    local Y = GetValue(tr, 'I_TCPY')
 		if Y ~= Y_init then Y_init = Y -- store
 		else cntr = cntr+1
 		end
-	until not Y or dir > 0 and Y <= 0 or dir < 0 and Y >= 0 or cntr == 1 -- not Y if tr is invalid
+	until not Y or dir > 0 and Y+env_y <= 0 or dir < 0 and Y+env_y >= 0 or cntr == 1 -- not Y if tr is invalid
 --[[OR
 	repeat
     r.CSurf_OnScroll(0, dir) -- unit is 8 px
@@ -5036,9 +5050,15 @@ r.PreventUIRefresh(-1)
 end
 
 
-function Scroll_Track_To_Top2(tr) -- see more versatile v3 below
+function Scroll_Track_To_Top2(tr, env) -- see more versatile v3 below
+-- env arg is optional, only if the first envelope
+-- displayed in its own lane needs to be scrolled to
+
 local GetValue = r.GetMediaTrackInfo_Value
 local tr_y = GetValue(tr, 'I_TCPY')
+--local tr_h = GetValue(tr, 'I_TCPH')
+local env_y = env and r.GetEnvelopeInfo_Value(env, 'I_TCPY') or 0 -- the result is the same as with tr_h
+
 local dir = tr_y < 0 and -1 or tr_y > 0 and 1 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
 r.PreventUIRefresh(1)
 local Y_init -- to store track Y coordinate between loop cycles and monitor when the stored one equals to the one obtained after scrolling within the loop which will mean the scrolling can't continue due to reaching scroll limit when the track is close to the track list end or is the very last, otherwise the loop will become endless because there'll be no condition for it to stop
@@ -5048,7 +5068,7 @@ local Y_init -- to store track Y coordinate between loop cycles and monitor when
 		local Y = GetValue(tr, 'I_TCPY')
 			if Y ~= Y_init then Y_init = Y -- store
 			else break end -- if scroll has reached the end before track has reached the destination to prevent loop becoming endless
-		until dir > 0 and Y <= 0 or dir < 0 and Y >= 0
+		until dir > 0 and Y+env_y <= 0 or dir < 0 and Y+env_y >= 0
 	end
 r.PreventUIRefresh(-1)
 end
@@ -5084,6 +5104,54 @@ local Y_init -- to store track Y coordinate between loop cycles and monitor when
 r.PreventUIRefresh(-1)
 end
 
+
+
+function Scroll_Closest_Track_To_Top(last_idx)
+-- relies on Scroll_Track_To_Top2()
+-- first find track which is likely visible, i.e. its TCP Y coordinate is >= 0
+-- or Y < 0 and Y+height > 0, to prevent changing the scroll state drastically,
+-- if within view nothing is found, first matching track
+-- out of sight at the bottom will be brought into view,
+-- if such track wasn't be found, search is performed again from
+-- the first visible track up in reverse,
+-- that is among tracks out of sight at the top,
+-- so that always the track closest to the visible tracklist start
+-- is scrolled into view at the top
+
+local tr_cnt = r.GetNumTracks()
+local last_idx = last_idx
+local st, fin, dir = table.unpack(not last_idx and {0,tr_cnt-1,1} or {last_idx-1,0,-1})
+
+	for i=st, fin, dir do
+	local tr = r.GetTrack(0,i)
+	local retval, flags = r.GetTrackState(tr)
+		if flags&512 ~= 512 then -- visible in TCP
+		local Y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
+	--	local H = r.GetMediaTrackInfo_Value(tr, 'I_TCPH') -- excluding envelopes
+		local H = r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl envelopes
+			if not last_idx and (Y >= 0 or Y < 0 and Y+H > 0) or last_idx then
+			last_idx = i
+			------------- Script specific condition -----------------
+			----- that determines which track needs scrolling, ------
+			---------------- subject to change ----------------------
+				for i=0, r.CountTrackEnvelopes(tr)-1 do
+				local env = r.GetTrackEnvelope(tr,i)
+					if Is_Env_Visible(env) then
+			----------------------------------------------------------
+					r.PreventUIRefresh(1)
+					Scroll_Track_To_Top2(r.GetTrack(0,0)) -- first scroll the very 1st track to top resetting tracklist scroll position to ensure that the ECP scroll position doesn't drift with each script run which happens because after each scroll the Y coordinate it stops at slightly changes
+					Scroll_Track_To_Top2(tr,env) -- scroll to the target track ECP
+					r.PreventUIRefresh(-1)
+					return true
+					end
+				end
+			end
+		end
+	end
+	
+return Scroll_Closest_Track_To_Top(last_idx) -- if not found after the first visible track run the loop again from the first visible at last_idx backwards to the tracklist start
+
+end
 
 
 
@@ -5648,6 +5716,64 @@ end
 -- local name, folder, sel, fx_On, fx_exist, mute, solo, SIP, rec_arm, rec_mon, rec_mon_auto, TCP_hid, MCP_hid = GetTrackState(tr)
 
 
+
+function GetTrackTree(idx, t, depth, menu)
+-- the arguments are only used in the recursive loop, start out as nils
+-- doesn't account for track visibility
+local idx = idx or 0
+local t = t or {}
+local menu = menu or ''
+local tr_cnt = r.CountTracks(0)
+local depth_last = depth or 0
+
+	for i = idx, tr_cnt-1 do
+		if not t[i+1] then -- ensures that a track isn't stored twice if it was already stored in the folder recursive loop, because the main loop continues from the same track it was exited at into the recursive one // i+1 because table is indexed from 1
+		local tr = r.GetTrack(0,i)
+		local tr_name = r.GetTrackState(tr)
+		tr_name = #tr_name:gsub(' ','') == 0 and 'Track #'..(i+1) or tr_name -- display track number if name is empty
+		local tr_depth = r.GetTrackDepth(tr)
+			if tr_depth < depth_last and tr_depth > 0 then
+			break -- ensures exit in the folder recursive loop once current folder level is exited, while being false in the main loop to be able to store top level tracks whose depth is 0
+			else
+			t[#t+1] = tr
+			local space = tr_depth > 0 and ' ' or ''
+			menu = menu..(#menu > 0 and '|' or '')..(INDENT_TYPE):rep(INDENT_LENGTH):rep(tr_depth)..space..tr_name -- INDENT_TYPE (string punctuation mark) and INDENT_LENGTH (string integer) come from user settings
+				if r.GetMediaTrackInfo_Value(tr, 'I_FOLDERDEPTH') == 1 then -- folder
+				t, menu = GetTrackTree(i+1, t, tr_depth, menu) -- go recursive to scan folders // i+1 to start recursive loop from first child track
+					if #t == tr_cnt then break end -- if track list ends with a folder, exit to prevent any higher level loop from continuing
+				end
+			end
+		depth_last = tr_depth -- keep track of last track depth to use as a condition of exiting the recursive loop above
+		end
+	end
+
+return t, menu
+
+end
+
+
+function Fixed_Lane_Comping_Enabled(tr)
+--[[
+FIXEDLANES 9 0 0 0 0 -- Big Lanes (lanes maximized)
+FIXEDLANES 9 0 2 0 0 -- lanes collapsed (imploded) down to one visible lane, option 'Fixed item lanes' is disabled
+FIXEDLANES token is absent if Small Lanes (lanes minimized)
+FIXEDLANES 33 0 0 0 0 -- Small Lanes + Hide Lane Buttons
+FIXEDLANES 41 0 0 0 0 -- Big Lanes + Hide Lane Buttons
+LANESOLO 8 0 0 0 0 0 0 0 -- absent in track with no lanes, same as r.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') ~= 2
+]]
+local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
+return chunk:match('LANEREC [%-%d]+ 0 [%-%d]+') -- when disabled the 2nd flag is -1
+end
+
+
+
+--================================ T R A C K S  E N D ================================
+
+
+
+--===================== T R A C K   S E N D S / R E C E I V E S =======================
+
+
 function Is_Send_Dest_Track(src_tr, dest_tr)
 -- returns true if dest_tr is found
 	for snd_idx=0,r.GetTrackNumSends(src_tr, 0)-1 do -- category 0 send
@@ -5866,6 +5992,35 @@ end
 
 
 
+function Collect_Snd_Data(tr) -- dest track and channels // blueprint of dealing with sends/receives
+local t = {}
+	for snd_idx = 0, r.GetTrackNumSends(tr, 0)-1 do -- 0 is sends
+	local dest_tr = r.GetTrackSendInfo_Value(tr, 0, snd_idx, 'P_DESTTRACK') -- 0 is sends
+	local src_ch = r.GetTrackSendInfo_Value(tr, 0, snd_idx, 'I_SRCCHAN') -- 0 is sends
+-- St channel count: 0 = 1/2, 1 = 2/3, 2 = 3/4, 3 = 4/5 etc
+-- To get stereo source both ch indices, 1-based, add 1 and 2 to the return value, e.g. 0+1, 0+2 = 1/2 (index 0), 3+1, 3+2 = 4/5 (index 3)
+-- Mono channel count starts from 1024, to evaluate if channel is mono do src_ch&1024==1024
+-- To get mono source regular ch index, 0-based, subtract 1024 from the return value (src_ch), e.g. 1024-1024 = 0 (ch 1), 1025-1024 = 1 (ch 2) etc.
+	local mono = src_ch&1024 == 1024
+	t[dest_tr] = mono and {(src_ch-1024)+1} or {src_ch+1, src_ch+2} -- saving 1-based channel indices
+	end
+return t
+end
+
+
+
+function GetSetTrackSendInfo_Value(tr, cat, send_idx, param, val) -- param is a string, last two args are for setting
+	if not param or not val then
+	local t = {B_MUTE = 0, B_PHASE = 0, B_MONO = 0, D_VOL = 0, D_PAN = 0, D_PANLAW = 0, I_SENDMODE = 0, I_AUTOMODE = 0, I_SRCCHAN = 0, I_DSTCHAN = 0, I_MIDIFLAGS = 0, P_DESTTRACK = 0, P_SRCTRACK = 0, ['P_ENV:<VOLENV'] = 0, ['P_ENV:<PANENV'] = 0, ['P_ENV:<MUTEENV'] = 0}
+		for k in pairs(t) do
+		t[k] = reaper.GetTrackSendInfo_Value(tr, cat, send_idx, k)
+		end
+	return t
+	elseif param and val return reaper.SetTrackSendInfo_Value(tr, cat, send_idx, param, val)
+	end
+end
+
+
 function Get_Set_Track_Snd_Rec_Src_Dest_Channel(tr, send, hw_output, idx, src_ch_idx, src_ch_mode, dest_ch_idx, dest_ch_mode)
 -- only deals with audio routings, MIDI hardware output is quieried/configured 
 -- with Get/SetMediaTrackInfo_Value() 'I_MIDIHWOUT';
@@ -6004,8 +6159,6 @@ function Audio_Send_Exists(snd_type, src_tr, dest_tr, send_mode, snd_src_ch, snd
 -- args doesn't need adjustment, value 0 will be mapped to 512 for loopback_mode 1
 -- or to 768 for loopback_mode 2, etc.
 
-
-
 	local function is_ch_within_range(input_ch_idx, input_ch_mode, ch_idx, ch_mode)
 	-- looking if a channel is already present in a send/receive
 	-- input_ch_idx is a channel index which is evaluated
@@ -6046,57 +6199,7 @@ end
 
 
 
-
-function GetTrackTree(idx, t, depth, menu)
--- the arguments are only used in the recursive loop, start out as nils
--- doesn't account for track visibility
-local idx = idx or 0
-local t = t or {}
-local menu = menu or ''
-local tr_cnt = r.CountTracks(0)
-local depth_last = depth or 0
-
-	for i = idx, tr_cnt-1 do
-		if not t[i+1] then -- ensures that a track isn't stored twice if it was already stored in the folder recursive loop, because the main loop continues from the same track it was exited at into the recursive one // i+1 because table is indexed from 1
-		local tr = r.GetTrack(0,i)
-		local tr_name = r.GetTrackState(tr)
-		tr_name = #tr_name:gsub(' ','') == 0 and 'Track #'..(i+1) or tr_name -- display track number if name is empty
-		local tr_depth = r.GetTrackDepth(tr)
-			if tr_depth < depth_last and tr_depth > 0 then
-			break -- ensures exit in the folder recursive loop once current folder level is exited, while being false in the main loop to be able to store top level tracks whose depth is 0
-			else
-			t[#t+1] = tr
-			local space = tr_depth > 0 and ' ' or ''
-			menu = menu..(#menu > 0 and '|' or '')..(INDENT_TYPE):rep(INDENT_LENGTH):rep(tr_depth)..space..tr_name -- INDENT_TYPE (string punctuation mark) and INDENT_LENGTH (string integer) come from user settings
-				if r.GetMediaTrackInfo_Value(tr, 'I_FOLDERDEPTH') == 1 then -- folder
-				t, menu = GetTrackTree(i+1, t, tr_depth, menu) -- go recursive to scan folders // i+1 to start recursive loop from first child track
-					if #t == tr_cnt then break end -- if track list ends with a folder, exit to prevent any higher level loop from continuing
-				end
-			end
-		depth_last = tr_depth -- keep track of last track depth to use as a condition of exiting the recursive loop above
-		end
-	end
-
-return t, menu
-
-end
-
-
-function Fixed_Lane_Comping_Enabled(tr)
---[[
-FIXEDLANES 9 0 0 0 0 -- Big Lanes (lanes maximized)
-FIXEDLANES 9 0 2 0 0 -- lanes collapsed (imploded) down to one visible lane, option 'Fixed item lanes' is disabled
-FIXEDLANES token is absent if Small Lanes (lanes minimized)
-FIXEDLANES 33 0 0 0 0 -- Small Lanes + Hide Lane Buttons
-FIXEDLANES 41 0 0 0 0 -- Big Lanes + Hide Lane Buttons
-LANESOLO 8 0 0 0 0 0 0 0 -- absent in track with no lanes, same as r.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') ~= 2
-]]
-local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
-return chunk:match('LANEREC [%-%d]+ 0 [%-%d]+') -- when disabled the 2nd flag is -1
-end
-
-
---================================ T R A C K S  E N D ================================
+--===================== T R A C K   S E N D S / R E C E I V E S  E N D =======================
 
 
 --================================== F O L D E R S ====================================
@@ -10796,7 +10899,7 @@ local x, y = r.GetMousePosition()
 local item, take = table.unpack(item and {r.GetItemFromPoint(x, y, false)} or {nil}) -- allow_locked false
 local tr, info = table.unpack(not item and {r.GetTrackFromPoint(x, y)} or {nil})
 
-	if item then -- without item the segments will be relevant for the track along the entire timeline which is also useful, in which case item parameters aren't needed; if limited to TCP with Get_TCP_Under_Mouse() can be used to divide TCP to segments
+	if item then -- without item the segments will be relevant for the track along the entire timeline which is also useful, in which case item parameters aren't needed; if limited to TCP with Get_TCP_MCP_Under_Mouse() can be used to divide TCP to segments
 	local tr = r.GetMediaItemTrack(item)
 	local tr_y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
 	local tr_h = r.GetMediaTrackInfo_Value(tr, 'I_TCPH') -- no envelopes
@@ -10838,7 +10941,7 @@ local tr, info = table.unpack(not item and {r.GetTrackFromPoint(x, y)} or {nil})
 		return t
 		end
 
-	elseif tr then -- if limited to TCP with Get_TCP_Under_Mouse() can be used to divide TCP to segments
+	elseif tr then -- if limited to TCP with Get_TCP_MCP_Under_Mouse() can be used to divide TCP to segments
 	local tr_y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
 	local tr_h = r.GetMediaTrackInfo_Value(tr, 'I_TCPH') -- no envelopes
 	local tr_y_glob = tr_y + header_h + wnd_h_offset -- distance between the screen top top and the track top edge accounting for shrunk program window if sws extension is installed
@@ -10877,7 +10980,7 @@ local env = info == 1
 local GetObj = item and r.GetItemFromPoint or r.GetTrackFromPoint
 local GetVal = item and r.GetMediaItemInfo_Value or r.GetMediaTrackInfo_Value
 
-	if item then -- without item the segments would be relevant for the track along the entire timeline which is also useful, in which case item parameters aren't needed; if limited to TCP with Get_TCP_Under_Mouse() can be used to divide TCP to segments;
+	if item then -- without item the segments would be relevant for the track along the entire timeline which is also useful, in which case item parameters aren't needed; if limited to TCP with Get_TCP_MCP_Under_Mouse() can be used to divide TCP to segments;
 	local tr = r.GetMediaItemTrack(item)
 	local itm_y = GetVal(item, 'I_LASTY') -- within track
 	local itm_h = GetVal(item, 'I_LASTH')
@@ -10902,7 +11005,7 @@ local GetVal = item and r.GetMediaItemInfo_Value or r.GetMediaTrackInfo_Value
 		end
 	return t
 --	elseif not want_item and tr then -- do not target track when want_item is true // AN OPTION
-	elseif tr then -- if limited to TCP with Get_TCP_Under_Mouse() can be used to divide TCP to segments
+	elseif tr then -- if limited to TCP with Get_TCP_MCP_Under_Mouse() can be used to divide TCP to segments
 	local tr_y = GetVal(tr, 'I_TCPY')
 	local tr_h = GetVal(tr, 'I_TCPH') -- no envelopes
 	local t = {}
@@ -11655,6 +11758,41 @@ end
 
 
 
+function Get_Default_Take_Rank_Scale()
+-- the one defined at Preferences -> Editing behavior -> Take marker ranking level
+-- the nested tables contain max and min scale values
+-- respectively
+local t = {[1]={1,0},[2]={2,0},[3]={3,0},[4]={4,0},[5]={5,0}, -- or 257 - 261
+[17]={1,1},[18]={2,1},[19]={3,1},[20]={4,1},[21]={5,1}} -- or 273 - 277
+local ret, scale = r.get_config_var_string('itemranks')
+-- 256 is added to the value when the option Up/down/cycle actions skip 'no ranking' is Off
+return t[scale+0] or t[scale-256]
+end
+
+
+function Get_Take_Rank(take, rank_scale_t)
+-- rank_scale_t is a table stemming from Get_Take_Rank_Scale()
+-- which contains the number of positive ranks as the 1st value
+-- and the number of negative ones as the 2nd, which can be 0
+-- optional, if you want to evaluate whether the
+-- marker rank is within the current default scale;
+-- 1st return value is current rank: 
+-- 0 no rank, -1 negative rank (only one level is supported)
+-- or positive;
+-- 2nd optional return value is boolean indicating whether
+-- the take rank is within the currently set default scale;
+-- only the first found ranked marker is evaluated;
+-- the function complies with stock rank scales
+-- defined at Preferences -> Editing behavior -> Take marker ranking level
+	for i=0, r.GetNumTakeMarkers(take)-1 do
+	local retval, name, color = reaper.GetTakeMarker(take, i)
+		if name:match('^:[%(%)]') then -- rank marker, because it starts with a colon and a parenthesis
+		local cur_rank = name:match('%(') and -1 or select(2,name:gsub('%)','')) or 0 -- 0 is no rank
+		return cur_rank, rank_scale_t and cur_rank <= rank_scale_t[1] and cur_rank >= rank_scale_t[2]*-1 -- multiplying by -1 to make the lowest rank compatible with the 1st return value in case it's negative
+		end
+	end
+end
+
 
 --================================ I T E M S   E N D ==================================
 
@@ -12353,7 +12491,7 @@ function Get_Marker_Reg_At_Time_OR_Mouse_Or_EditCursor(time, want_mouse, want_ne
 -- can be used to get marker/region at time or edit/mouse cursor
 -- if time is false/nil
 -- without the need to traverse all of them
--- if want_mouse is true, relies on Get_TCP_Under_Mouse()
+-- if want_mouse is true, relies on Get_TCP_MCP_Under_Mouse()
 -- if want_next_prev_reg is integer 1 next, -1 prev
 -- to return either next or previous region, if any,
 -- when there's no region at time/cursor
@@ -12377,7 +12515,7 @@ local tr, info = r.GetTrackFromPoint(r.GetMousePosition())
 
 local cur_pos = time or r.GetCursorPosition() -- store in case want_mouse is true
 
-	if not time want_mouse and tr and not Get_TCP_Under_Mouse() and info ~= 2 then -- not FX window
+	if not time want_mouse and tr and not Get_TCP_MCP_Under_Mouse() and info ~= 2 then -- not FX window
 	r.PreventUIRefresh(1)
 	r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping) // more sensitive than with snapping
 	end
@@ -14285,6 +14423,7 @@ end
 
 
 function Find_Window_SWS(wnd_name, want_main_children)
+-- THE FUNCTION IS CASE-AGNOSTIC
 -- finds main window children, their siblings, their grandchildren and their siblings, including docked ones, floating windows and probably their children as well
 -- want_main_children is boolean to search for internal or non-dockable main window children and for their children regardless of the dock being open, the dock condition in the routine is only useful for validating visibility of windows which can be docked
 
@@ -14440,6 +14579,67 @@ local i, t = 0, {}
 return #t > 0 and t
 end
 
+
+
+function Get_All_Parent_Windows(wnd)
+local wnd = wnd
+	repeat
+	wnd = r.BR_Win32_GetParent(wnd)
+	local retval, title = r.BR_Win32_GetWindowText(wnd)
+	until not wnd
+end
+
+
+
+function Get_Top_Parent_Window(wnd, ignore_dock)
+-- ignore_dock is boolean to ignore internal 'REAPER_dock' window
+-- get window top parent window
+-- the one inclding the window title,
+-- excluding REAPER main window,
+-- useful for windows with many child windows
+-- which may be parents to one another
+-- in which case a single instance of BR_Win32_GetParent won't be enough
+-- as is the case with track routing window
+local wnd = wnd
+	repeat
+	local parent = r.BR_Win32_GetParent(wnd)
+	local retval, title = r.BR_Win32_GetWindowText(parent)
+--Msg('par handle', wnd, 'par title', title)
+		if title:match('REAPER') and
+		(ignore_dock and title ~= 'REAPER_dock' or not ignore_dock)
+		then return wnd -- if REAPER main window, return the previous window
+		else
+		wnd = parent
+		end
+	until not parent
+end
+
+
+
+function Is_Window_Docked(wnd)
+-- includes floating docker as well
+local wnd = wnd
+	repeat
+	wnd = r.BR_Win32_GetParent(wnd)	
+	local retval, title = r.BR_Win32_GetWindowText(wnd)
+		if title == 'REAPER_dock' then return true end
+	until not wnd
+end
+
+
+
+function Is_Window_Visible(handle)
+-- OR BR_Win32_IsWindowVisible()
+-- handle arg is the target window handle, either a string created with BR_Win32_HwndToString()
+-- or light user data, i.e. direct handle
+-- because it can be stored in extended state
+-- and rettieved later to evaluate new state of the window it points at
+-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowlonga
+-- https://learn.microsoft.com/en-us/windows/win32/winmsg/window-styles
+local wnd = type(handle) == 'string' and r.BR_Win32_StringToHwnd(string_handle) or handle
+local long = r.BR_Win32_GetWindowLong(wnd, -16) -- -16 GWL_STYLE // 0x10000000L WS_VISIBLE
+return long&0x10000000 == 0x10000000 -- true if visible, false if not
+end
 
 
 function GetSet_SWS_Notes_Wnd_Scroll_Pos(notes_wnd, scroll_pos)
@@ -14766,6 +14966,27 @@ local Send = r.BR_Win32_SendMessage
 
 --Send(wnd, 0x0201, 0x0001, 1+1<<16) -- WM_LBUTTONDOWN 0x0201, MK_LBUTTON 0x0001, x (low order) and y (high order) are 1, in lParam client window refers to the actual target window, x and y coordinates are relative to the client window and have nothing to do with the actual mouse cursor position, 1 px for both is enough to hit the window
 --Send(wnd, 0x0202, 0x0001, 1+1<<16) -- WM_LBUTTONUP 0x0202, MK_LBUTTON 0x0001, x and y are 1
+end
+
+
+function Is_Floating_FX_Window(title)
+return title:match('[2ACDJLPSTUVX]+i?:') or title:match(' %[%d+/%d+%]') 
+or title:match(' %- Item') or title:match(' %- Track %d+')
+or title:match(' %- Master Track') or title:match(' %- Monitoring')
+end
+
+
+function Is_FX_Chain_Window(title)
+return title:match('FX: Track') or title:match('FX: Item') 
+or title:match('FX: Master') or title:match('FX: Monitoring')
+end
+
+
+function Is_Window_Fully_Minimized(wnd)
+-- function to minimize fully
+-- r.BR_Win32_ShowWindow(wnd, 2) -- 2 SW_SHOWMINIMIZED, only leaves window title bar			
+local retval, lt, t, rt, b = r.BR_Win32_GetWindowRect(wnd)
+return rt-lt == 160 and b-t == 24
 end
 
 
@@ -16454,7 +16675,7 @@ local r = reaper
 
 for key in pairs(reaper) do _G[key] = reaper[key] end  -- MPL: get rid of 'reaper.' table key in functions
 
-
+-- ReaScript TASK CONTROL
 -- prevent ReaScript task control dialogue when the running script is clicked again so it's re-launched automatically,
 -- supported since build 7.03
 -- script flag for auto-relaunching after termination in reaper-kb.ini is 516, e.g. SCR 516, but if changed
@@ -16595,6 +16816,30 @@ local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, e
 local proj_time_offset = r.GetProjectTimeOffset(0, false) -- rndframe false
 return start_time == proj_time_offset
 end
+
+
+
+function ProjExtStates_2_Table(sect_name)
+-- project extended state keys are iterated over
+-- in the alphabetic order
+-- so if the order in which data was stored
+-- is important, the keys should preferably
+-- be numeric or the data must be collected
+-- into a table and the table must be sorted
+-- based on certain criteria, such as coordinates
+-- timestamp etc.
+local i, t = 0, {}
+	repeat
+	local retval, key, val = r.EnumProjExtState(0, sect_name, i)
+		if retval then
+		t[#t+1] = {key=key,val=val}
+		end
+	i=i+1
+	until not retval
+table.sort(t, function(a,b) return a.val:match('%d+') < b.val:match('%d+') end) -- task specific
+return t
+end
+
 
 
 ---- VALIDATE VARIABLES
@@ -17348,7 +17593,7 @@ function ShowMessageBox_Menu(message_lines, buttons_t, title)
 	--	local diff = (max_len-line_len)/4
 	--	diff = math.floor(diff*3+0.5) -- figured out empirically, 3/4 or 4/5 of the difference give the best result with English though not ideal, for Russian 5/6 // ideally pixels must be counted rathen than characters
 	-- OR simply
-		local diff = (max_len-line_len) * 4/5
+		local diff = math.floor((max_len-line_len) * 4/5 + 0.5)
 		t[k] = (' '):rep(diff)..line -- add leading spaces to center the line // may not be accurate if lines text is in different register
 		end
 	return t
@@ -17848,7 +18093,6 @@ local sect_t = {['']=0,['alt']=0,['MIDI Editor']=32060,['MIDI Event List Editor'
 local path = path or r.GetResourcePath()
 local sep = sep or path:match('[\\/]')
 
-
 	if r.GetToggleCommandStateEx(0,40605) == 1 then -- Show action list // only if Action list window is open to force deliberate use of action notes and prevent accidents in case some action is already armed for other purposes --- THIS CONDITION IS REDUNDANT IF 'the action list is closed' ERROR IS RETURNED ABOVE
 	 
 	local cmd, section = r.GetArmedCommand() -- cmd is 0 when no armed action, empty string section is 'Main' section
@@ -17898,6 +18142,20 @@ local sep = sep or path:match('[\\/]')
 
 end
 
+
+-- local is_new_value, fullpath, sectionID, cmdID, mode, resolution, val = reaper.get_action_context()
+function Condition_Action_By_Armed_State(cmdID, sectionID)
+local cmd, section = r.GetArmedCommand() -- cmd is 0 when no armed action, empty string section is 'Main' section
+local sect_t = {['']=0,['alt']=0,['MIDI Editor']=32060,['MIDI Event List Editor']=32061,
+['MIDI Inline Editor']=32062,['Media Explorer']=32063}
+	if cmd == cmdID and (sect_t[section] == sectionID
+	or sect_t[section:match('alt')] and sectionID == 0) then
+	r.ArmCommand(0, section) -- 0 unarm all
+	-- DO STUFF
+	-- OR
+	-- return true
+	end
+end
 
 
 
@@ -18073,7 +18331,7 @@ return mouse_pos
 end
 
 
-function Get_Mouse_Time_Pos() -- isn't suitable for use during playback as it stops it (this seems wrong), won't return true mouse cursor position if it's over TCP, Get_TCP_Under_Mouse() must be used to ascertain that it's outside of it
+function Get_Mouse_Time_Pos() -- isn't suitable for use during playback as it stops it (this seems wrong), won't return true mouse cursor position if it's over TCP, Get_TCP_MCP_Under_Mouse() must be used to ascertain that it's outside of it
 local cur_pos_init = r.GetCursorPosition()
 r.Main_OnCommand(40514, 0) -- View: Move edit cursor to mouse cursor (no snapping)
 local cur_pos = r.GetCursorPosition()
@@ -18084,7 +18342,7 @@ end
 
 
 function Get_Mouse_Or_Edit_Curs_Pos()
--- relies on Get_TCP_Under_Mouse() to ensure that the mouse cursor is not over TCP
+-- relies on Get_TCP_MCP_Under_Mouse() to ensure that the mouse cursor is not over TCP
 -- if it is, edit cursor pos is returned
 
 local edit_curs_pos = r.GetCursorPosition() -- store
@@ -18093,7 +18351,7 @@ local cur_pos
 local tr, info = r.GetTrackFromPoint(r.GetMousePosition())
 -- ensuring that mouse cursor is over Arrange allows ignoring mouse position
 -- when the script is run via toolbar button, menu item or from the Action list
-	if tr and not Get_TCP_Under_Mouse() and info ~= 2 then -- not FX window
+	if tr and not Get_TCP_MCP_Under_Mouse() and info ~= 2 then -- not FX window
 	r.PreventUIRefresh(1)
 	r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping) // more sensitive than with snapping
 	cur_pos = r.GetCursorPosition()
@@ -18604,7 +18862,7 @@ end
 
 
 function Is_Mouse_Over_Arrange3(ignore_items)
--- relies on Get_TCP_Under_Mouse()
+-- relies on Get_TCP_MCP_Under_Mouse()
 -- ignore_items is boolean, if true, only cursor outside of items in Arrange is respected
 
 local x, y = r.GetMousePosition()
@@ -18614,14 +18872,14 @@ local x, y = r.GetMousePosition()
 	then return not ignore_items end
 
 local tr, info = r.GetTrackFromPoint(x, y)
-	if tr and info ~= 2 and not Get_TCP_Under_Mouse() then return tr end -- info 2 is FX window
+	if tr and info ~= 2 and not Get_TCP_MCP_Under_Mouse() then return tr end -- info 2 is FX window
 
 	if not tr then -- the cursor might be located within Arrange but below the last track in which case tr will be nil
 --	r.PreventUIRefresh(1) -- doesn't help much
 	local tr_idx = not r.GetTrack(0,0) and 0 or r.GetNumTracks()-1 -- insert temp track if no tracks or cursor is lower than the last track in which case tr cannot be valid
 	r.InsertTrackAtIndex(tr_idx, false) -- wantDefaults false
 	local temp_tr = r.GetTrack(0, tr_idx) -- track to be deleted
-		if r.GetTrackFromPoint(x, y) and not Get_TCP_Under_Mouse()
+		if r.GetTrackFromPoint(x, y) and not Get_TCP_MCP_Under_Mouse()
 		then
 		r.DeleteTrack(temp_tr) -- temp track
 	--	r.PreventUIRefresh(-1)
@@ -18637,7 +18895,7 @@ local tr, info = r.GetTrackFromPoint(x, y)
 	r.DeleteTrack(temp_tr) -- temp track
 --	r.PreventUIRefresh(-1)
 	r.CSurf_OnScroll(0,1000) -- scroll back to the track list end since expansion of the last makes the list scroll up
-	return not Get_TCP_Under_Mouse() and tr
+	return not Get_TCP_MCP_Under_Mouse() and tr
 	end
 
 end
@@ -18646,7 +18904,7 @@ end
 
 function Get_Cursor_Contexts(allow_locked, sectionID, cmd_ID)
 -- uses Cursor_outside_pianoroll(), Get_Mouse_Coordinates_MIDI(),
--- Get_TCP_Under_Mouse() and Is_Mouse_Over_Arrange()
+-- Get_TCP_MCP_Under_Mouse() and Is_Mouse_Over_Arrange()
 
 local allow_locked = not allow_locked and false or true
 local x, y = r.GetMousePosition()
@@ -18665,7 +18923,7 @@ local tr, info = table.unpack(build_6_36 and {r.GetThingFromPoint(x, y)} or {r.G
 		return arrange or fx or env and 'envelope' or tcp or mcp -- in this order because when env and fx, tcp or mcp are also true
 		else
 		local env, fx = info == 1 and 'envelope', info == 2 and 'fx' -- env regardless of env selection
-		return env or fx or tr and (Get_TCP_Under_Mouse() and 'tcp' or 'arrange')
+		return env or fx or tr and (Get_TCP_MCP_Under_Mouse() and 'tcp' or 'arrange')
 		end
 	elseif sectionID == 32060 then
 	local ME = r.MIDIEditor_GetActive()
@@ -18680,7 +18938,7 @@ local tr, info = table.unpack(build_6_36 and {r.GetThingFromPoint(x, y)} or {r.G
 	else
 	local trans = info:match('trans')
 	return trans and 'transport'
---	return trans and 'transport' or Get_TCP_Under_Mouse() and 'tcp' or 'arrange' // WORKS BUT FOREGOING THIS OPTION IN FAVOR OF OPENING LAST STORED LAYER WHEN NO VALID CONTEXT, OTHERWISE IF THE SCRIPT IS RUN FROM A TOOLBAR/MENU THE CONTEXT ALWAYS WILL BE EITHER TCP OR ARRANGE DEPENDING ON THE TOOLBAR/MENU LOCATION
+--	return trans and 'transport' or Get_TCP_MCP_Under_Mouse() and 'tcp' or 'arrange' // WORKS BUT FOREGOING THIS OPTION IN FAVOR OF OPENING LAST STORED LAYER WHEN NO VALID CONTEXT, OTHERWISE IF THE SCRIPT IS RUN FROM A TOOLBAR/MENU THE CONTEXT ALWAYS WILL BE EITHER TCP OR ARRANGE DEPENDING ON THE TOOLBAR/MENU LOCATION
 	end
 
 --[[UNUSED, FOR INFO
@@ -20397,7 +20655,7 @@ O B J E C T S
 
 T R A C K S
 
-	Get_TCP_Under_Mouse
+	Get_TCP_MCP_Under_Mouse
 	Track_Visible_In_Arrange_Or_Mixer
 	Get_Top_Left_most_Visible_Track
 	Get_First_Visible_Track
@@ -20408,8 +20666,6 @@ T R A C K S
 	Deselect_All_Tracks1
 	Deselect_All_Tracks2
 	Track_Controls_Locked
-	Collect_Snd_Data
-	GetSetTrackSendInfo_Value
 	Preserve_TCP_Heights_When_Bot_Dock_Open
 	Re_Store_Track_Heights_Selection_x_Scroll
 	Temp_Track_For_FX
@@ -20438,16 +20694,24 @@ T R A C K S
 	Update_Track_MIDI_Note_Names
 	Get_Track_MIDI_Note_Names
 	GetTrackState
+	GetTrackTree
+	Fixed_Lane_Comping_Enabled
+	
+
+
+S E N D S / R E C E I V E S
+	
 	Is_Send_Dest_Track
 	Is_Recv_Src_Track
 	Remove_Track_Receives
 	Get_Track_MIDI_Send_Recv_Channels
 	Set_Track_MIDI_Send_Recv_Channels
 	Insert_Track_With_One_Regular_And_One_HWOutput_Send
+	Collect_Snd_Data
+	GetSetTrackSendInfo_Value
 	Get_Set_Track_Snd_Rec_Src_Dest_Channel
 	Audio_Send_Exists
-	GetTrackTree
-	Fixed_Lane_Comping_Enabled
+
 
 
 F O L D E R S
@@ -20658,6 +20922,8 @@ I T E M S
 	Insert_Image
 	Split_Item_Into_Takes_And_Reconstruct
 	Item_Has_Top_Icon_Bar
+	Get_Default_Take_Rank_Scale
+	Get_Take_Rank
 
 
 C O L O R
@@ -20752,11 +21018,18 @@ W I N D O W S
 	Get_Child_Windows_JS2
 	Get_Window_And_Children_JS
 	Get_Child_Windows_SWS
+	Get_All_Parent_Windows
+	Get_Top_Parent_Window
+	Is_Window_Docked
+	Is_Window_Visible
 	GetSet_SWS_Notes_Wnd_Scroll_Pos
 	Scroll_SWS_Notes_Window
 	Insert_String_Into_Field
 	Scroll_Region_Mngr_JS
 	Mouse_Click
+	Is_Floating_FX_Window
+	Is_FX_Chain_Window
+	Is_Window_Fully_Minimized
 	Activate_Context
 	Set_Horiz_Zoom_Level
 
@@ -20848,6 +21121,7 @@ U T I L I T Y
 	printf
 	DebugMsg
 	Is_Project_Start
+	ProjExtStates_2_Table
 	Validate_Positive_Integer
 	is_set
 	validate_sett
@@ -20897,6 +21171,7 @@ U T I L I T Y
 	GetUserInputs_Alt
 	Get_Type_Of_Action
 	Get_Armed_Action
+	Condition_Action_By_Armed_State
 	timed_tooltip1
 	timed_tooltip2
 	Error_Tooltip1
