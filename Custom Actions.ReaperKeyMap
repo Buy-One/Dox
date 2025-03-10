@@ -683,6 +683,7 @@ ACT 1 0 "bdd5c3c27d9be446957b81ec77fd64c1" "Custom: Split items under cursor wit
 ACT 1 0 "e061811d56e4bf4d80b0522668d47aab" "Custom: Move contents of selected items with mousewheel (mouse outward - right, mouse inward - left)" 2013 40124 2014 40123
 ACT 1 0 "275791efcffbdc48b87edade95b6ff09" "Custom: Move contents of selected item to mouse cursor (can be bound to mousewheel, direction doesn't matter)" 40514 41308
 ACT 1 0 "536e22334197734e87ac6db1469b08d7" "Custom: Change selected item stereo channel view to mono (play both channels)" 2022 40435 2013 40435 40698 40603 45000 40179 45001 40180 2022 40437 2013 40437
+ACT 1 0 "e07d92ce00488249860ce4ce43e9f5fc" "Custom: Create envelope segment in time selection preserving curve" 42082 42088
 ACT 1 0 "e0fefd4067413144927ba68b2a30280b" "Custom: Crop project to loop and open in new tab complete (switching proj tabs needed to activate new tab, no orig project undo)" 40623 40049 40296 40210 41929 40862 40861 42398 40862 40861
 ACT 1 0 "8561c97f5fcc0043ba1873a1e0f67f7e" "Custom: Crop project to loop -- Pt. 1" 40623 40049
 ACT 1 0 "21a3c0859629664f9d4dfdfb9e39bd9c" "Custom: Crop project to loop/region and open in new tab -- Pt. 2 (switching proj tabs needed to activate new tab, undo restores orig project)" 40296 40210 40297 41929 40862 40861 42398 40862 40029 40861 40297
