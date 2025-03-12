@@ -856,3 +856,5 @@ ACT 1 32063 "aab93ef2636111408b36a3f5612c8fb3" "Custom: Preview: Fast foward 80 
 ACT 1 32063 "9998c986fcbb904baf6ed48a1cfc3446" "Custom: Preview: Rewind 80 ms (can be used as a building block for greater disrances)" 40033 40033 40033 40033 40033 40033 40033 40033 40033 40033
 ACT 1 32063 "f1a2032ccfb4134788e740460beb1d48" "Custom: Select next sample and insert into active sample player" 40030 42121
 ACT 1 32063 "286813b3c4177c4ea2e1b13dd4b51313" "Custom: Select previous sample and insert into active sample player" 40029 42121
+ACT 1 32063 "7097dbda25b3ca4895eba5800ac1e985" "Custom: Play next file" 40030 1008
+ACT 1 32063 "8e2f72ec78351b4cb97a86a07974f858" "Custom: Play previous file" 40029 1008
