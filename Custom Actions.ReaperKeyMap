@@ -685,6 +685,8 @@ ACT 1 0 "275791efcffbdc48b87edade95b6ff09" "Custom: Move contents of selected it
 ACT 1 0 "536e22334197734e87ac6db1469b08d7" "Custom: Change selected item stereo channel view to mono (play both channels)" 2022 40435 2013 40435 40698 40603 45000 40179 45001 40180 2022 40437 2013 40437
 ACT 1 0 "e07d92ce00488249860ce4ce43e9f5fc" "Custom: Create segment in active envelope in time selection preserving curve" 42082 42088
 ACT 1 0 "40ec462a2fb10043949d5fe59397c819" "Custom: Create segment in active envelope in time selection preserving curve -- SWS" 40726 40331 40630 _BR_ENV_SEL_PREV_POINT 40631 _BR_ENV_SEL_NEXT_POINT 40333
+ACT 1 0 "d16766a9126a58419dbec7ec55ec6b99" "Custom: Resfresh current theme (useful when modifying a teme to see changes) -- 1" 40381 40382
+ACT 1 0 "d14036b9bba02341b94acbd85722d910" "Custom: Resfresh current theme (useful when modifying a teme to see changes) -- 2" 40382 40381
 ACT 1 0 "e0fefd4067413144927ba68b2a30280b" "Custom: Crop project to loop and open in new tab complete (switching proj tabs needed to activate new tab, no orig project undo)" 40623 40049 40296 40210 41929 40862 40861 42398 40862 40861
 ACT 1 0 "8561c97f5fcc0043ba1873a1e0f67f7e" "Custom: Crop project to loop -- Pt. 1" 40623 40049
 ACT 1 0 "21a3c0859629664f9d4dfdfb9e39bd9c" "Custom: Crop project to loop/region and open in new tab -- Pt. 2 (switching proj tabs needed to activate new tab, undo restores orig project)" 40296 40210 40297 41929 40862 40861 42398 40862 40029 40861 40297
