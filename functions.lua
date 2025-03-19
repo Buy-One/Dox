@@ -228,7 +228,9 @@ end
 
 
 
-function Toggle_Undo_Settings1(scr_cmdID, undoflags)
+function Toggle_Undo_Settings1(undoflags)
+-- undoflags value is returned at setting stage
+-- and is passed as arg at the restoration stage
 
 	local function all_undo_sett_ON(undoflags)
 		for k, bit in ipairs({1,2,8,16,32,128}) do
@@ -257,10 +259,16 @@ function Toggle_Undo_Settings1(scr_cmdID, undoflags)
 		end
 	end
 end
+-- USE:
+-- local undoflags = Toggle_Undo_Settings1()
+-- Toggle_Undo_Settings1(undoflags)
 
 
 
 function Toggle_Undo_Settings2(scr_cmdID, restore)
+-- undoflags value is stored as extended state
+-- rather than being returned at the setting stage
+-- as in Toggle_Undo_Settings1() above
 -- restore is boolean
 
 	local function all_undo_sett_ON(undoflags)
@@ -356,7 +364,7 @@ local set = GETSET(tr, 'P_NAME', is_set and '' or 'name', true) -- setNewValue t
 end
 
 
--- see also Force_MIDI_Undo_Point1, Force_MIDI_Undo_Point1 in M I D I
+-- see also Force_MIDI_Undo_Point1, Force_MIDI_Undo_Point1 in  M I D I
 -- Force_RS5k_Undo_With_Closed_Chain() in FX
 
 
@@ -815,6 +823,25 @@ end
 
 
 --=========================== S T R I N G S  S T A R T ==============================
+
+'✘ ✗ ✔ ✓'
+
+--[[
+
+CHARACTERS WHICH CAN BE USED TO DELIMIT MENU ITEMS
+
+-- empty space, dot . , underscore _ , hyphen - , horiz line ─ ,
+-- double oblique hyphen ⸗ , colons :, ꞉, ⁞,
+-- equal sign/double horizontal line = or ꞊ or ═ ,
+-- almost equal ≈ , identical to ≡ , ellipsis … , double dot ‥ ,
+-- light vertical │ , double vertical line ‖ , broken bar ¦ ,
+-- asterisk *, tilde ~, Greek ῀, multiply × , primes ′ , ″ , ‴ ,
+-- single quote ' , double angle quote », slash ⁄ or / , sharp ♯ ,
+-- right arrowhead ˃ (U+02C3), Greek capical Xi Ξ ,
+-- any of ░ ▒ ▓ ;
+
+]]
+
 
 local function str(...)
 return tostring(...)
@@ -2424,7 +2451,79 @@ end
 function pack(...) -- same as table.pack()
 -- https://www.gammon.com.au/scripts/doc.php?lua=pcall
 -- http://lua-users.org/lists/lua-l/2009-11/msg00269.html
+-- https://www.gammon.com.au/scripts/doc.php?lua=select
 return {n = select("#", ...); ...}
+-- OR
+-- return {n = #{...}, ...}
+end
+
+
+function build_array_of_multiple_repeating_items(t)
+-- t is an array containing nested 2-part arrays
+-- consisting of the item needing repetition and the number
+-- of such repetitions, e.g. { {a,2}, {b,3} }
+-- var 'a' should be repeated twice, var 'b' should be repeated trice
+-- the resulting table is supposed to contain
+-- 2 instances of var 'a' followed by 3 instances of var 'b'
+-- and be 5 fields long
+local t2 = {}
+	for k, data in ipairs(t) do
+		for i=1,data[2] do
+		table.insert(t2, data[1]) -- inserting at the last index, index arg (2) is ommitted
+	-- OR
+	--	t2[#t2+1] = data[1]
+		end
+	end
+return t2
+end
+
+
+
+function deep_copy1(obj, seen)
+-- https://gist.github.com/tylerneylon/81333721109155b2d244
+-- Handle non-tables and previously-seen tables.
+	if type(obj) ~= 'table' then return obj end
+	if seen and seen[obj] then return seen[obj] end
+
+-- New table; mark it as seen and copy recursively.
+local s = seen or {}
+local res = {}
+s[obj] = res
+	for k, v in pairs(obj) do
+-- OR better to invoke the for loop with 'for k, v in next, obj do', 
+-- to avoid triggering a __pairs metamethod. e.g.
+--	for k, v in next obj do
+	res[deep_copy1(k, s)] = deep_copy1(v, s) 
+	end
+-- set the metatable after copying the data, 
+-- otherwise you risk triggering __index and __newindex metamethods, 
+-- which will change the semantics.
+return setmetatable(res, getmetatable(obj))
+
+end
+
+
+function deep_copy2(orig, copies)
+-- http://lua-users.org/wiki/CopyTable
+-- -- Save copied tables in `copies`, indexed by original table
+copies = copies or {}
+local orig_type = type(orig)
+local copy
+	if orig_type == 'table' then
+		if copies[orig] then
+		copy = copies[orig]
+		else
+		copy = {}
+		copies[orig] = copy
+			for orig_key, orig_value in next, orig, nil do
+			copy[deepcopy2(orig_key, copies)] = deepcopy2(orig_value, copies)
+			end
+		setmetatable(copy, deepcopy2(getmetatable(orig), copies))
+		end
+		else -- number, string, boolean, etc
+	copy = orig
+	end
+return copy
 end
 
 
@@ -2507,8 +2606,12 @@ local dock_pos = r.DockGetPosition(dockermode_idx) -- -1=not found, 0=bottom, 1=
 	then return ME, dock_pos
 -- the MIDI Editor is docked in an open floating docker
 	elseif ME and floating then
-		-- INSTEAD OF THE LOOP the following function can be used
-		-- local ret, val = r.get_config_var_string('dockermode'..dockermode_idx)
+		-- INSTEAD OF THE LOOP below the following function can be used
+		local ret, val = r.get_config_var_string('dockermode'..dockermode_idx)
+			if val == '32768' then -- OR val ~= '98304' // open floating docker OR not closed floating docker
+			return ME, 4
+			end
+		--[[ OR
 		for line in io.lines(r.get_ini_file()) do
 			if line:match('dockermode'..dockermode_idx)
 			and line:match('32768') -- open floating docker
@@ -2517,6 +2620,7 @@ local dock_pos = r.DockGetPosition(dockermode_idx) -- -1=not found, 0=bottom, 1=
 			then return ME, 4 -- here dock_pos will always be floating i.e. 4
 			end
 		end
+		--]]
 	end
 end
 
@@ -4073,7 +4177,7 @@ Re_Store_Selected_Objects(t1, t2) -- restore
 --------------------------------------------
 
 
-function re_store_sel_trks(t)
+function re_store_sel_trks1(t)
 -- with deselection; t is the stored tracks table to be fed in at restoration stage
 	if not t then
 	local sel_trk_cnt = reaper.CountSelectedTracks2(0,true) -- plus Master, wantmaster true
@@ -4105,6 +4209,30 @@ function re_store_sel_trks(t)
 	r.PreventUIRefresh(-1)
 	end
 end
+
+
+
+function re_store_sel_trks2(track_indices)
+-- for storage as extended state
+
+	if not tracks_indices then -- store
+	local track_indices = ''
+		for i=0, r.CountSelectedTracks2(0, true)-1 do -- wantmaster true
+		local idx = r.CSurf_TrackToID(r.GetSelectedTrack2(0,i, true), false) -- wantmaster true, mcpview false // idx 0 is Master track
+		track_indices = track_indices..','..idx
+		end
+	return track_indices
+	else -- restore
+		for idx in track_indices:gmatch('%d+') do
+			if idx then
+			local tr = r.CSurf_TrackFromID(idx, false) -- mcpview false
+			r.SetTrackSelected(tr, true) -- selected true
+			end
+		end
+	end
+
+end
+
 
 
 function ReStoreSelectedItems(t, keep_last_selected)
@@ -5178,7 +5306,7 @@ end
 function Scroll_Track_Into_View(tr, take, parent_tr_y)
 -- parent_tr_y is original I_TCPY coordinate of the track
 -- before it's affected by the function
--- relies on re_store_sel_trks() function
+-- relies on re_store_sel_trks1() function
 
 -- scroll track vertically into view if out of sight
 local tr = take and r.GetMediaItemTake_Track(take) or tr
@@ -5190,10 +5318,10 @@ local arrange_h, header_h, wnd_h_offset = Get_Arrange_Dims() -- only returns val
 	or tr_h / 2 + tr_top < 0 -- fully or mainly out of sight at the top
 	or arrange_h and tr_h / 2 + tr_top > arrange_h) -- fully or mainly out of sight at the bottom
 	then
-	local t = re_store_sel_trks() -- store
+	local t = re_store_sel_trks1() -- store
 	r.SetOnlyTrackSelected(tr) -- select track so that it can be affected by the action
 	ACT(40913) -- Track: Vertical scroll selected tracks into view (Master isn't supported, scrolled with Scroll_Track_To_Top() ) // seems to clear take envelope selection, must be restored outside of the function
-	re_store_sel_trks(t) -- restore
+	re_store_sel_trks1(t) -- restore
 	end
 
 end
@@ -5204,7 +5332,7 @@ function Scroll_Visible_Track_Into_View(tr, tr_y_orig, want_middle, want_arrange
 -- want_middle is boolean to scroll to the middle of the tracklist
 -- in Arrange, otherwise to the top
 -- want_arrange is boolean to force the function target Arrange tracklist if the Mixer is open
--- relies on re_store_sel_trks() function
+-- relies on re_store_sel_trks1() function
 
 	if not tr then return end
 
@@ -5235,10 +5363,10 @@ local tr_vis = is_Master and r.GetMasterTrackVisibility()&1 == 1 or Get(tr, PARA
 					Scroll_Track_To_Top(tr) -- SCROLL TO TOP
 					else
 					-- SCROLL TO THE MIDDLE OF THE TRACKLIST
-					local t = re_store_sel_trks() -- store
+					local t = re_store_sel_trks1() -- store
 					r.SetOnlyTrackSelected(tr) -- select track so that it can be affected by the action
 					ACT(40913) -- Track: Vertical scroll selected tracks into view (Master isn't supported, scrolled with Scroll_Track_To_Top() )
-					re_store_sel_trks(t) -- restore
+					re_store_sel_trks1(t) -- restore
 					end
 				end
 			end
@@ -5765,6 +5893,12 @@ local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
 return chunk:match('LANEREC [%-%d]+ 0 [%-%d]+') -- when disabled the 2nd flag is -1
 end
 
+
+
+function Track_Controls_Locked(tr)
+local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
+return chunk:match('NAME.-LOCK 1') -- when not locked LOCK attribute is absent in the chunk
+end
 
 
 --================================ T R A C K S  E N D ================================
@@ -7909,7 +8043,6 @@ local loop_iter
 return st_pt_idx, end_pt_idx
 
 end
-
 
 
 
@@ -11361,7 +11494,7 @@ r.Main_OnCommand(40547,0) -- Item properties: Loop section of audio item source 
 end
 
 
-function Get_Take_Phase(take, item) -- relies on GetObjChunk2() function
+function Get_Take_Polarity(take, item) -- relies on GetObjChunk2() function
 -- the function redundant because it can be evaluated with
 -- r.GetMediaItemTakeInfo_Value(take, 'D_VOL') < 0 -- when polarity is flipped
 
@@ -11792,6 +11925,55 @@ function Get_Take_Rank(take, rank_scale_t)
 		end
 	end
 end
+
+
+function Get_Set_Take_Marker_Length(take, mrkr_idx, length)
+-- mrkr_idx is 0-based index
+-- length arg is a floating number, take marker length in seconds
+-- if length arg is invalid GET routine is activated
+-- otherwise SET
+-- relies on Esc() function
+
+local take_cnt = r.GetNumTakeMarkers(take)
+  if take_cnt == 0 or take_cnt-1 < mrkr_idx then return end
+  
+local ret, chunk = r.GetItemStateChunk(r.GetMediaItemTake_Item(take), '', false) -- isundo false
+local GetSet = r.GetSetMediaItemTakeInfo_String
+local ret, take_GUID = GetSet(take, 'GUID', '', false) -- setNewValue false
+local index, take_chunk, found = 0, length and {}
+local mrkr_props
+
+for line in chunk:gmatch('[^\r\n]+') do
+	if line and line:match(Esc(take_GUID)) then found = 1 end
+	if found then
+	local marker = line:match('^TKM [%.%d]+') -- take marker props lie
+		if not length and marker and index == mrkr_idx then -- GET
+		return line:match('TKM .-([%d%.]+)$') -- last field in marker props which is its length value if supported
+		elseif length then -- SET, first collect the take chunk starting from its GUID
+		take_chunk[#take_chunk+1] = line
+		end
+	index = marker and index+1 or index
+		if line:match('^GUID {') and not line:match(Esc(take_GUID)) then break end -- next take
+	end
+end
+  
+	if take_chunk and #take_chunk > 0 then -- SET
+	local take_chunk_init = Esc(table.concat(take_chunk,'\n')) -- store here before it's modified in the loop below
+		for line_idx, line in ipairs(take_chunk) do
+			if line:match('TKM .-([%.%d]+)$') then -- first take marker props
+			local target_idx = line_idx+mrkr_idx -- calc index of the target marker line in the table
+			local line = take_chunk[target_idx]
+			take_chunk[target_idx] = line:match('(.-)[%.%d]+$')..length -- update
+			break
+			end
+		end
+	local take_chunk_upd = table.concat(take_chunk,'\n'):gsub('%%','%%%%') -- escape
+	chunk = chunk:gsub(take_chunk_init, take_chunk_upd)
+	r.SetItemStateChunk(item, chunk, false) -- isundo false
+	end
+
+end
+
 
 
 --================================ I T E M S   E N D ==================================
@@ -13070,8 +13252,6 @@ return t, curs_pos_init
 end
 
 
-
-
 --========================== M A R K E R S  &  R E G I O N S  E N D =========================
 
 --=======================================  G F X  ===========================================
@@ -14164,44 +14344,7 @@ end
 
 
 
-function GetSet_SWS_Notes_Wnd_Scroll_Pos(search_term, scroll_dir, notes_wnd, scroll_pos)
--- Applies to SWS Notes window
--- works successfully with Track Notes
--- search_term is any character sure to be found in the Notes or single empty space
--- scroll_dir is string, either 'v', 'SB_VERT' or 'VERT' for vertical scrollbar
--- and 'h', 'SB_HORZ' or 'HORZ' for horizontal
--- notes_wnd, scroll_pos are values returned at the Get stage and are only relevant at the Set stage
--- arg 1 is only relevant for Get stage, arg 2 for both Get and Set stages, 3-4 only for the Set stage
-
-	if not r.JS_Window_Find then return end
-
-	if not notes_wnd then -- Get
-	local parent_wnd
-		for k, title in ipairs({'Notes', 'Notes (docked)'}) do -- the names cover docked and undocked wrapper window
-		parent_wnd = r.JS_Window_Find(title, true) -- exact true
-			if parent_wnd then break end
-		end
-		if parent_wnd then
-		local notes_wnd = r.JS_Window_FindChild(parent_wnd, search_term, false) -- exact false, Track notes window containing text can be found with blank space or 0 or colon (:) which is very likely to be included in the Notes, the entire Notes content is returned as Track notes child window title with JS_Window_GetTitle(), if not found there're no Notes
-			if notes_wnd then
-			local retval, top_pos, pageSize, min_px, max_px, scroll_pos = r.JS_Window_GetScrollInfo(notes_wnd, scroll_dir) -- the shorter the window the greater the bottomost/rightmost scroll_pos value // when window is a list (to be handled with functions JS_ListView), min and max are the lowest and highest 0-based row index, the scroll position is the number of hidden rows at the top
-			return notes_wnd, scroll_pos
-			end
-		end
-	else -- Set
-	r.JS_Window_SetScrollPos(notes_wnd, scroll_dir, scroll_pos)
-	end
-
-end
---[[ USE:
-local notes_wnd, scroll_pos = GetSet_SWS_Notes_Wnd_Scroll_Pos(search_term, scroll_dir) -- store
--- DO STAFF
-GetSet_SWS_Notes_Wnd_Scroll_Pos(search_term, scroll_dir, notes_wnd, scroll_pos) -- restore, search_term can be nil
-]]
-
-
-
-function Window_Is_Visible(hwnd)
+function Is_Window_Visible1(hwnd)
 -- takes advantage of the fact that the following functions don't affect invisible windows
 -- docked windows will be considered invisible because focus and foreground status can't be applied to them, they're children windows
 -- r.JS_Window_IsVisible() isn't suitable since it may return true for invisible (closed) windows as well, such as FX chain;
@@ -14228,11 +14371,27 @@ return focus == hwnd
 end
 
 
+
+function Is_Window_Visible2(handle)
+-- OR BR_Win32_IsWindowVisible()
+-- handle arg is the target window handle, either a string created with BR_Win32_HwndToString()
+-- or light user data, i.e. direct handle
+-- because it can be stored in extended state
+-- and retrieved later to evaluate new state of the window it points at
+-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowlonga
+-- https://learn.microsoft.com/en-us/windows/win32/winmsg/window-styles
+local wnd = type(handle) == 'string' and r.BR_Win32_StringToHwnd(string_handle) or handle
+local long = r.BR_Win32_GetWindowLong(wnd, -16) -- -16 GWL_STYLE // 0x10000000L WS_VISIBLE
+return long&0x10000000 == 0x10000000 -- true if visible, false if not
+end
+
+
+
 function Exclude_Visible_Windows(t) -- t stems from Re_Store_Windows_Props_By_Names[_And_Handles]() functions
 	for i=#t,1,-1 do
 	local wnd = t[i]
 	local hwnd = r.JS_Window_Find(wnd.tit, true) -- exact true
-		if Window_Is_Visible(hwnd) then
+		if Is_Window_Visible1(hwnd) then
 		table.remove(t,i)
 		end
 	end
@@ -14628,21 +14787,69 @@ end
 
 
 
-function Is_Window_Visible(handle)
--- OR BR_Win32_IsWindowVisible()
--- handle arg is the target window handle, either a string created with BR_Win32_HwndToString()
--- or light user data, i.e. direct handle
--- because it can be stored in extended state
--- and rettieved later to evaluate new state of the window it points at
--- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowlonga
--- https://learn.microsoft.com/en-us/windows/win32/winmsg/window-styles
-local wnd = type(handle) == 'string' and r.BR_Win32_StringToHwnd(string_handle) or handle
-local long = r.BR_Win32_GetWindowLong(wnd, -16) -- -16 GWL_STYLE // 0x10000000L WS_VISIBLE
-return long&0x10000000 == 0x10000000 -- true if visible, false if not
+function Traverse_List1(list_wnd, col_cnt)
+-- go over columns for each row
+-- hidden colums are still accessible to the functions
+-- but only traversing the visible ones may not yield
+-- the positive result because the loop
+-- won't reach the correct one and the item won't be found
+-- so all columns must be traversed
+
+	if not list_wnd then return end
+
+local col_cnt = col_cnt or 1 -- only traverse 1st column if arg isn't provided
+local itm_cnt = r.JS_ListView_GetItemCount(list_wnd) -- number of rows
+	
+local row_idx = 0
+	repeat
+	local col_idx, text = 0
+		repeat
+		text = r.JS_ListView_GetItemText(list_wnd, row_idx, col_idx)
+		col_idx=col_idx+1
+		until col_idx == col_cnt
+	row_idx=row_idx+1
+	until row_idx == itm_cnt or not text
+
+end
+	
+
+function Traverse_List2(list_wnd, col_cnt)
+-- go over rows for each column
+-- hidden colums are still accessible to the functions
+-- but only traversing the visible ones may not yield
+-- the positive result because the loop
+-- won't reach the correct one and the item won't be found
+-- so all columns must be traversed
+
+	if not list_wnd then return end
+
+local col_cnt = col_cnt or 1 -- only traverse 1st column if arg isn't provided
+local itm_cnt = r.JS_ListView_GetItemCount(list_wnd) -- number of rows
+	
+local col_idx = 0
+	repeat
+	local row_idx, text = 0
+		repeat
+		text = r.JS_ListView_GetItemText(list_wnd, row_idx, col_idx)
+		row_idx=row_idx+1
+		until row_idx == itm_cnt or not text
+	col_idx=col_idx+1
+	until col_idx == col_cnt
+
 end
 
 
-function GetSet_SWS_Notes_Wnd_Scroll_Pos(notes_wnd, scroll_pos)
+
+
+
+function GetSet_SWS_Notes_Wnd_Scroll_Pos(search_term, scroll_dir, notes_wnd, scroll_pos)
+-- Applies to SWS Notes window
+-- works successfully with Track Notes
+-- search_term is any character sure to be found in the Notes or single empty space
+-- scroll_dir is string, either 'v', 'SB_VERT' or 'VERT' for vertical scrollbar
+-- and 'h', 'SB_HORZ' or 'HORZ' for horizontal
+-- notes_wnd, scroll_pos are values returned at the Get stage and are only relevant at the Set stage
+-- arg 1 is only relevant for Get stage, arg 2 for both Get and Set stages, 3-4 only for the Set stage;
 -- meant to store and restore scroll position
 -- can be repurposed for any other window
 -- for general reference:
@@ -14658,21 +14865,21 @@ function GetSet_SWS_Notes_Wnd_Scroll_Pos(notes_wnd, scroll_pos)
 			if parent_wnd then break end
 		end
 		if parent_wnd then
-		local notes_wnd = r.JS_Window_FindChild(parent_wnd, ':', false) -- exact false, Track notes window containing text can be found with blank space or 0 or colon (:) which is very likely to be included in the Notes, the entire Notes content is returned as Track notes child window title with JS_Window_GetTitle(), if not found there're no Notes
+		local notes_wnd = r.JS_Window_FindChild(parent_wnd, search_term, false) -- exact false, Track notes window containing text can be found with blank space or 0 or colon (:) which is very likely to be included in the Notes (depending on the content), the entire Notes content is returned as Track notes child window title with JS_Window_GetTitle(), if not found there're no Notes
 			if notes_wnd then
-			local retval, top_pos, pageSize, min_px, max_px, scroll_pos = r.JS_Window_GetScrollInfo(notes_wnd, 'VERT') -- 'v' vertical scrollbar, or 'SB_VERT', or 'VERT' // the shorter the window the greater the bottomost scroll_pos value
+			local retval, top_pos, pageSize, min_px, max_px, scroll_pos = r.JS_Window_GetScrollInfo(notes_wnd, scroll_dir) -- the shorter the window the greater the bottomost scroll_pos value // when window is a list (to be handled with functions JS_ListView), min and max are the lowest and highest 0-based row index, the scroll position is the number of hidden rows at the top
 			return notes_wnd, scroll_pos
 			end
 		end
 	else -- Set
-	r.JS_Window_SetScrollPos(notes_wnd, 'v', scroll_pos) -- 'v' vertical scrollbar, or 'SB_VERT', or 'VERT'
+	r.JS_Window_SetScrollPos(notes_wnd, scroll_dir, scroll_pos)
 	end
 
 end
---[[USE:
-local notes_wnd, scroll_pos = GetSet_SWS_Notes_Wnd_Scroll_Pos() -- store
--- DO STUFF
-GetSet_SWS_Notes_Wnd_Scroll_Pos(notes_wnd, scroll_pos) -- restore
+--[[ USE:
+local notes_wnd, scroll_pos = GetSet_SWS_Notes_Wnd_Scroll_Pos(search_term, scroll_dir) -- store
+-- DO STAFF WHICH CHANGES SCROLL POSITION
+GetSet_SWS_Notes_Wnd_Scroll_Pos(search_term, scroll_dir, notes_wnd, scroll_pos) -- restore, search_term can be nil
 ]]
 
 
@@ -14811,95 +15018,18 @@ local i, notes = 1
 end
 
 
+function Scroll_Window(wnd, line_idx)
+-- line_idx is 1-based index of the target line
 
-function Insert_String_Into_Field(parent_wnd, str)
--- window of a field for text input is usually a child of the main window
--- and lacks a title, if the field is filled out the actual text is returned as its name
--- parent_wnd is window returned with Find_Window_SWS() or JS_Window_Find() functions
--- str is string to be inserted into the input field
--- when string is inserted the field is cleared of any current string
--- the function was originally designed to be applied to Region/Marker Manager
-
-	if not parent_wnd then return end
-
-local child = r.BR_Win32_GetWindow(parent_wnd, 5) -- 5 = GW_CHILD, returns 1st child
-
-	if not child then return end
-
-	local function is_input_field(title)
-	-- 'Region/Marker Manager' filter field window is nameless unless filled out
-	-- the window title list is as of build 7.22,
-	-- the list will differ for other parent windows,
-	-- the titles of all child windows can be retrieved with Get_Child_Windows_SWS()
-		for k, tit in ipairs({'Clear', 'List2', 'Markers',
-		'Options', 'Regions', 'Render Matrix...', 'Take markers'}) do
-			if title == tit then return end -- if title matches any other child window title return false
+	if wnd then
+	local SendMsg = r.BR_Win32_SendMessage
+	--	set scrollbar to top to procede from there on down by lines
+	SendMsg(wnd, 0x0115, 6, 0) -- msg 0x0115 WM_VSCROLL, 6 SB_TOP, 7 SB_BOTTOM, 2 SB_PAGEUP, 3 SB_PAGEDOWN, 1 SB_LINEDOWN, 0 SB_LINEUP https://learn.microsoft.com/en-us/windows/win32/controls/wm-vscroll
+		for i=1, line_idx-1 do -- -1 to stop scrolling at the target line and not scroll past it
+		SendMsg(wnd, 0x0115, 1, 0) -- msg 0x0115 WM_VSCROLL, lParam 0, wParam 1 SB_LINEDOWN scrollbar moves down / 0 SB_LINEUP scrollbar moves up that's how it's supposed to be as per explanation at https://learn.microsoft.com/en-us/windows/win32/controls/wm-vscroll but in fact the message code must be passed here as lParam while wParam must be 0, same as at https://stackoverflow.com/questions/3278439/scrollbar-movement-setscrollpos-and-sendmessage
+		-- WM_VSCROLL is equivalent of EM_SCROLL 0x00B5 https://learn.microsoft.com/en-us/windows/win32/controls/em-scroll
 		end
-	return true
 	end
-
-
-local SendMsg = r.BR_Win32_SendMessage
-local i = 1
-	repeat
-	local ret, txt = r.BR_Win32_GetWindowText(child)
-		if ret and is_input_field(txt) then -- 'Region/Marker Manager' filter field window is nameless unless filled out
-		--------------- CLEAR ROUTINE  --------------------------------------------
-			if #txt > 0 then -- clear filter string, if any
-		--	r.BR_Win32_SetFocus(child)	-- this is unnecessary unless the window must be made a target for keyboard input
-
-		--	SendMsg(child, 0x0007, 0, 0) -- WM_SETFOCUS 0x0007 -- makes Region/Marker Manager unresponsive to clicks even though does place a cursor in the filter field
-		--	https://ecs.syr.edu/faculty/fawcett/Handouts/CoreTechnologies/windowsprogramming/WinUser.h
-		-- https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-keydown
-		-- https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
-		-- https://learn.microsoft.com/en-us/windows/win32/inputdev/about-keyboard-input#keystroke-message-flags -- scan codes are listed in a table in 'Scan 1 Make' column in Scan Codes paragraph
-		-- https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
-		-- 'Home' (extended key) scan code 0xE047 (move cursor to start of the line) or 0x0047, 'Del' (extended key) scan code 15, Backspace scancode 0x000E or 0x0E (14), Forward delete (regular delete) 0xE053 (extended), Left arrow 0xE04B (extended key), Left Shift 0x002A or 0x02A, Right shift 0x0036 or 0x036 // all extended key codes start with 0xE0
-		-- BR_Win32_SendMessage only needs the scan code, not the entire composite 32 bit value, not even the extended key flag (24th bit), the repeat count, i.e. bits 0-15, is ignored, no matter the integer the command only runs once
-		--[[ -- the calculations of lParam value are correct but useless
-			local home = 1 + (0xE047 << 16) + (1 << 24) -- WORKS
-			local back = 1 + (14 << 16) --+ (1 << 24)
-			local left = 1 + (0xE04B << 16) + (1 << 24) -- WORKS
-			local forw_del = 1 + (0xE053 << 16) + (1 << 24) -- WORKS
-			local shift = 1 + (0x02A << 16)
-		--	SendMsg(child, 0x0100, 0x25, left) -- WORKS
-		--	SendMsg(child, 0x0100, 0x24, home) -- WORKS
-		--	SendMsg(child, 0x0100, 0x2E, forw_del) -- WORKS
-		--	SendMsg(child, 0x0100, 0x08, back) -- DOESN'T WORK
-		--	SendMsg(child, 0x0100, 0x10, shift) -- DOESN'T WORK
-		--	SendMsg(child, 0x0100, 1, 0x08) -- WM_KEYDOWN 0x0100, WM_KEYUP 0x0101, VK_CLEAR 0x0C, VK_BACK 0x08 BACKSPACE key, VK_HOME 0x24 HOME key, VK_SHIFT 0x10 SHIFT key, VK_LEFT 0x25 LEFT ARROW key, VK_DELETE	0x2E DEL key
-		--	SendMsg(child, 0x0303, 0, 0) -- WM_CLEAR 0x0303; WM_CUT 0x0300 // ONLY WORKS IF TEXT IS SELECTED (HIGHLIGHTED), BUT COULD MAKE SHIFT WORK TO HIGHLIGHT IT WITH Left arrow key
-		--]]
-			-- #txt count works accurately here for Unicode characters as well for some reason
-
-			-- move cursor to start of the line
-			SendMsg(child, 0x0100, 0x24, 0xE047) -- 0x0100 WM_KEYDOWN, virtual key code 0x24 VK_HOME HOME key, 0xE047 HOME key scan code
-				for i=1,#txt do -- run Delete for each character
-				SendMsg(child, 0x0100, 0x2E, 0xE053) -- 0x2E VK_DELETE DEL key, 0xE053 DEL key scan code
-				end
-			--[[ -- OR
-				for i=1,#txt do -- move cursor from line end leftwards character by character deleting them
-				SendMsg(child, 0x0100, 0x25, 0xE04B) -- 0x0100 WM_KEYDOWN, LEFT ARROW key virtual key code 0x25, scan code 0xE04B
-				SendMsg(child, 0x0100, 0x2E, 0xE053) -- 0x0100 WM_KEYDOWN, VK_DELETE DEL key virtual key code 0x2E, scan code 0xE053
-				end
-			--]]
-			--[[ -- OR
-			-- https://learn.microsoft.com/en-us/windows/win32/controls/em-setsel
-			-- https://learn.microsoft.com/en-us/windows/win32/dataxchg/wm-clear
-			SendMsg(child, 0x00B1, 0, -1) -- EM_SETSEL 0x00B1, wParam start char index, lParam -1 to select all text or end char index
-			SendMsg(child, 0x0303, 0, 0) -- WM_CLEAR 0x0303
-			--]]
-			end
-		r.CF_SetClipboard(str)
-		SendMsg(child, 0x0302, 0, 0) -- WM_PASTE 0x0302 // gets input from clipboard, undocumented in the SWS API doc
-	-- https://learn.microsoft.com/en-us/windows/win32/dataxchg/wm-paste
-		break
-		end
-	-- get for the next cycle
-	child = r.BR_Win32_GetWindow(child, 2) -- 2 = GW_HWNDNEXT // get next sibling of each next found child window advancing until no child is found or the right one is found above
-	i=i+1
-	until not child
-
 end
 
 
@@ -14956,6 +15086,102 @@ end
 
 
 
+function Insert_String_Into_Field_SWS(parent_wnd, str)
+-- window of a field for text input is usually a child of the main window
+-- and lacks a title, if the field is filled out the actual text is returned as its name
+-- parent_wnd is window returned with Find_Window_SWS() or JS_Window_Find() functions
+-- str is string to be inserted into the input field
+-- when string is inserted the field is cleared of any current string
+-- the function was originally designed to be applied to Region/Marker Manager
+
+	if not parent_wnd then return end
+
+local child = r.BR_Win32_GetWindow(parent_wnd, 5) -- 5 = GW_CHILD, returns 1st child
+
+	if not child then return end
+
+	local function is_input_field(title)
+	-- 'Region/Marker Manager' filter field window is nameless unless filled out
+	-- the window title list is as of build 7.22,
+	-- the list will differ for other parent windows,
+	-- the titles of all child windows can be retrieved with Get_Child_Windows_SWS()
+		for k, tit in ipairs({'Clear', 'List2', 'Markers',
+		'Options', 'Regions', 'Render Matrix...', 'Take markers'}) do
+			if title == tit then return end -- if title matches any other child window title return false
+		end
+	return true
+	end
+
+
+local SendMsg = r.BR_Win32_SendMessage
+local i = 1
+	repeat
+	local ret, txt = r.BR_Win32_GetWindowText(child)
+		if ret and is_input_field(txt) then -- 'Region/Marker Manager' filter field window is nameless unless filled out
+		--------------- CLEAR ROUTINE  --------------------------------------------
+			if #txt > 0 then -- clear filter string, if any
+
+		--	SendMsg(child, 0x0007, 0, 0) -- WM_SETFOCUS 0x0007 -- makes Region/Marker Manager unresponsive to clicks even though does place a cursor in the filter field
+		--	https://ecs.syr.edu/faculty/fawcett/Handouts/CoreTechnologies/windowsprogramming/WinUser.h
+		-- https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-keydown
+		-- https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+		-- https://learn.microsoft.com/en-us/windows/win32/inputdev/about-keyboard-input#keystroke-message-flags -- scan codes are listed in a table in 'Scan 1 Make' column in Scan Codes paragraph
+		-- https://handmade.network/forums/articles/t/2823-keyboard_inputs_-_scancodes%252C_raw_input%252C_text_input%252C_key_names
+		-- 'Home' (extended key) scan code 0xE047 (move cursor to start of the line) or 0x0047, 'Del' (extended key) scan code 15, Backspace scancode 0x000E or 0x0E (14), Forward delete (regular delete) 0xE053 (extended), Left arrow 0xE04B (extended key), Left Shift 0x002A or 0x02A, Right shift 0x0036 or 0x036 // all extended key codes start with 0xE0
+		-- BR_Win32_SendMessage only needs the scan code, not the entire composite 32 bit value, not even the extended key flag (24th bit), the repeat count, i.e. bits 0-15, is ignored, no matter the integer the command only runs once
+		--[[ -- the calculations of lParam value are correct but useless
+			local home = 1 + (0xE047 << 16) + (1 << 24) -- WORKS
+			local back = 1 + (14 << 16) --+ (1 << 24)
+			local left = 1 + (0xE04B << 16) + (1 << 24) -- WORKS
+			local forw_del = 1 + (0xE053 << 16) + (1 << 24) -- WORKS
+			local shift = 1 + (0x02A << 16)
+		--	SendMsg(child, 0x0100, 0x25, left) -- WORKS
+		--	SendMsg(child, 0x0100, 0x24, home) -- WORKS
+		--	SendMsg(child, 0x0100, 0x2E, forw_del) -- WORKS
+		--	SendMsg(child, 0x0100, 0x08, back) -- DOESN'T WORK
+		--	SendMsg(child, 0x0100, 0x10, shift) -- DOESN'T WORK
+		--	SendMsg(child, 0x0100, 1, 0x08) -- WM_KEYDOWN 0x0100, WM_KEYUP 0x0101, VK_CLEAR 0x0C, VK_BACK 0x08 BACKSPACE key, VK_HOME 0x24 HOME key, VK_SHIFT 0x10 SHIFT key, VK_LEFT 0x25 LEFT ARROW key, VK_DELETE	0x2E DEL key
+		--	SendMsg(child, 0x0303, 0, 0) -- WM_CLEAR 0x0303; WM_CUT 0x0300 // ONLY WORKS IF TEXT IS SELECTED (HIGHLIGHTED), BUT COULD MAKE SHIFT WORK TO HIGHLIGHT IT WITH Left arrow key
+		--]]
+			-- #txt count works accurately here for Unicode characters as well for some reason
+
+			-- move cursor to start of the line
+			SendMsg(child, 0x0100, 0x24, 0xE047) -- 0x0100 WM_KEYDOWN, virtual key code 0x24 VK_HOME HOME key, 0xE047 HOME key scan code
+				for i=1,#txt do -- run Delete for each character
+				SendMsg(child, 0x0100, 0x2E, 0xE053) -- 0x2E VK_DELETE DEL key, 0xE053 DEL key scan code
+				end
+			--[[ -- OR
+				for i=1,#txt do -- move cursor from line end leftwards character by character deleting them
+				SendMsg(child, 0x0100, 0x25, 0xE04B) -- 0x0100 WM_KEYDOWN, LEFT ARROW key virtual key code 0x25, scan code 0xE04B
+				SendMsg(child, 0x0100, 0x2E, 0xE053) -- 0x0100 WM_KEYDOWN, VK_DELETE DEL key virtual key code 0x2E, its scan code is 0xE053
+				end
+			--]]
+			--[[ -- OR
+			-- https://learn.microsoft.com/en-us/windows/win32/controls/em-setsel
+			-- https://learn.microsoft.com/en-us/windows/win32/dataxchg/wm-clear
+			r.BR_Win32_SetFocus(child)	-- necessary to make EM_SETSEL work // NOT REQUIRED FOR TEXT DELETION WITH THE ABOVE ALTERNATIVES
+			SendMsg(child, 0x00B1, 0, -1) -- EM_SETSEL 0x00B1, wParam start char index, lParam -1 to select all text or end char index
+			SendMsg(child, 0x0303, 0, 0) -- WM_CLEAR 0x0303 // OR WM_CUT 0x0300
+			--[=[
+				r.JS_Window_SetFocus(child_wnd)
+				r.JS_WindowMessage_Send(child_wnd, 0x00B1, 0, 0, -1, 0)
+				r.JS_WindowMessage_Send(child_wnd, 0x0303, 0, 0, 0, 0)
+			]=]
+			--]]
+			end
+		r.CF_SetClipboard(str)
+		-- https://learn.microsoft.com/en-us/windows/win32/dataxchg/wm-paste
+		SendMsg(child, 0x0302, 0, 0) -- WM_PASTE 0x0302 // gets input from clipboard, undocumented in the SWS API doc
+		break
+		end
+	-- get for the next cycle
+	child = r.BR_Win32_GetWindow(child, 2) -- 2 = GW_HWNDNEXT // get next sibling of each next found child window advancing until no child is found or the right one is found above
+	i=i+1
+	until not child
+
+end
+
+
 function Mouse_Click(wnd)
 local Send = r.BR_Win32_SendMessage
 --	https://learn.microsoft.com/en-us/windows/win32/inputdev/wm-lbuttondown
@@ -14967,6 +15193,12 @@ local Send = r.BR_Win32_SendMessage
 --Send(wnd, 0x0201, 0x0001, 1+1<<16) -- WM_LBUTTONDOWN 0x0201, MK_LBUTTON 0x0001, x (low order) and y (high order) are 1, in lParam client window refers to the actual target window, x and y coordinates are relative to the client window and have nothing to do with the actual mouse cursor position, 1 px for both is enough to hit the window
 --Send(wnd, 0x0202, 0x0001, 1+1<<16) -- WM_LBUTTONUP 0x0202, MK_LBUTTON 0x0001, x and y are 1
 end
+
+
+-- Enter key press
+r.JS_WindowMessage_Post(child_wnd, 'WM_KEYDOWN', 0x0D, 0, 0x001C, 0) -- 0x0100 WM_KEYDOWN, 0x0D is VK_RETURN i.e. Enter key virtual key code, its scan code is 0x001C, on the keypad its 0xE01C
+-- SendMessage() doesn't work
+
 
 
 function Is_Floating_FX_Window(title)
@@ -15071,6 +15303,190 @@ local dir = r.GetHZoomLevel() > target_val and -1 or r.GetHZoomLevel() < target_
 end
 
 
+function get_gfx_scale()
+-- https://forum.cockos.com/showthread.php?t=230120
+-- ideally should be included in the defer function as well to monitor any changes
+-- by the user at runtime or moving the window to a monitor with different scale
+-- for retina detection the function must be run twice, before and after gfx.init()
+-- to make gfx.ext_retina value update if retina is supported on the user monitor
+-- on Mac the retina value must not be applied to gfx window size because there it
+-- will update automatically, but must be applied to all other elements;
+-- gfx.ext_retina arg must be passed to the 2nd instance of the function
+
+local retval, dpi = r.ThemeLayout_GetLayout('tcp', -3)
+--[[
+-- the scale unit is 256/100 because 256 is scale 1 and 512 is scale 2 which correspond to values 1 and 2 in Pref -> General -> Advanced UI/system tweaks -> Scale UI elements of .., the minimal step between 1 and 2 is 0.01, so 100 in total, after calculation decimal values are rounded off, e.g. scale 1.01 = 259 (rounded 256+2.56), scale 1.02 = 261 (rounded 256+2.56*2)
+local cur_scale = ((dpi+0-256)/100/2.56) -- OR (dpi+0-256)/2.56/100
+cur_scale = math.floor(cur_scale*100+0.5)/100 + 1 -- if cur_scale value is < 1, 0.5 is too big and roudning off will produce 0, hence temporarily updscaling the value and then restoring, adding 1 since no scaling equals 1, plus if user scaling value is < 1 cur_scale value will be negative because dpi < 256 and +1 will rectify it into a correct positive one
+]]
+-- OR much simpler
+local cur_scale = dpi/256 -- 256 is scale 1, 512 is 2
+	if not gfx.ext_retina then -- initial gfx.ext_retina value is nil, once set to 1 will auto-update to 2 on second function call after gfx.init() to indicate retina support if any otherwise will be set to 0
+	gfx.ext_retina = 1
+	end
+local mult = gfx.ext_retina == 2 and gfx.ext_retina or 1
+return cur_scale * mult -- multiplying by retina value which will be set to 2 if retina is supported, otherwise no change in the scale because when no retina mult var will be set to 1
+end
+--[[ USE:
+get_gfx_scale() -- run 1st time to intialize gfx.ext_retina value before gfx.init()
+gfx.init() or function based on it
+cur_scale = get_gfx_scale() -- run 2nd time after gfx.init() to update gfx.ext_retina if retina is supported and accounr for it in the scale value // this value is fed into gfx.init() or function based on it
+]]
+
+
+
+function click_pad(scr_cmdID, w, h, cur_scale)
+-- the gfx click pad simplifies menu handling, because otherwise
+-- one would have to devise a way to keep the script running in defer loop
+-- without displaying the menu and display it only on click,
+-- to detect click get_action_context() val could have probably been used
+-- and the menu display location would have to be decided upon;
+-- w 265 and h 30 seem optimal
+-- cur_scale arg stems from get_gfx_scale()
+
+-- gfx window to receive mouse clicks for menu opening for instance
+local scale = cur_scale or 1
+local w, h = w*scale, h*scale
+local stored_coord = r.GetExtState(scr_cmdID, 'LAST_GFX_COORDINATES') -- load coordinates stored last during session with store_or_update_coordinates_after_quitting() function below
+local x, y = stored_coord:match('(%d+),(%d+)')
+local mouse_x, mouse_y = r.GetMousePosition()
+x, y = table.unpack(x and {x,y} or {mouse_x-w/2, mouse_y-23-h/2}) -- when opening for the first time during session open so that the box center is at mouse, 23 is the height of the box top bar not included in its height value, then during session open at the last position, stored in close_gfx_wnd_and_store_coordinates() // mouse_x-w to place the window's upper right hand corner at the mouse
+gfx.init('TITLE', w, h, 0, x, y) -- height value doesn't include the top bar whose height is 23 px
+gfx.setfont(1,"Arial Black", 16*scale)
+-- both following alternatives work, the first may be preferable for handling manual window resize
+--[-[
+--local char_w, char_h = gfx.measurechar('C')
+local str = ('CLICK'):gsub('.','%0'..(' '):rep(8))..'K'
+local str_w, str_h = gfx.measurestr(str)
+gfx.x, gfx.y = (w-str_w)/2, (h-str_h)/2
+gfx.drawstr(str)
+--]]
+--[[
+gfx.x, gfx.y = 50*scale, 7*scale
+gfx.drawstr(('CLICK'):gsub('.','%0'..(' '):rep(8)))
+--]]
+end
+
+
+
+function keep_click_pad_size(w, h, cur_scale)
+local scale = cur_scale or 1
+local w, h = w*scale, h*scale
+	if gfx.w ~= w or gfx.h ~= h then
+	gfx.init('', w, h)
+	end
+-- the crucial part is the empty window name
+-- Thanks to Justin & amagalma
+-- https://www.askjf.com/?q=5895s
+-- https://forum.cockos.com/showpost.php?p=2493416&postcount=40
+
+-- this must always run because when the window is resized the text disappears,
+-- can't be restored fast enough in the block above probably needs more time
+-- both alternatives work, the first may be preferable for handling manual window resize
+--[-[
+local str = ('CLIC'):gsub('.','%0'..(' '):rep(8))..'K'
+local str_w, str_h = gfx.measurestr(str)
+gfx.x, gfx.y = (w-str_w)/2, (h-str_h)/2
+gfx.drawstr(str)
+--]]
+--[[
+gfx.x, gfx.y = 50*scale, 7*scale
+gfx.drawstr(('CLICK'):gsub('.','%0'..(' '):rep(8)))
+--]]
+end
+
+
+function gfx_mouse_click()
+-- detects mouse click within the gfx window
+gfx.x, gfx.y = 0, 0 -- reset for mouse capture
+--local left, bott = gfx.x + gfx.w, gfx.y + gfx.h
+return gfx.mouse_cap&1 == 1 and gfx.mouse_x > gfx.x and gfx.mouse_x < gfx.w
+and gfx.mouse_y > gfx.y and gfx.mouse_y < gfx.h
+end
+
+
+function store_or_update_coordinates_after_quitting1(scr_cmdID)
+-- must run inside main defer function
+-- THE STORAGE ROUTINE IN THIS FUNCTION ENSURES THAT
+-- the window is always re-opened at the same location
+-- regardless of whether it was closed by clicking its
+-- close button or with Esc and regardless of the current
+-- mouse cursor position
+
+-- when gfx window has been closed by mouse click or with a key press
+-- gfx.clienttoscreen(0,0) will only return zeros because there's no window any longer
+-- however fetching coordinates relative to the mouse cursor
+-- allows calculating the window more or less exact original location on the screen;
+-- when closing with the click on the close button located in the upper right hand corner:
+-- x = mouse_x-gfx.w+5 (or 10), accounting for gfx window width because the close button
+-- is located opposite to the X axis start but short of the window's right edge
+-- y = mouse_y-10, accounting for mouse location which is below the gfx window top edge
+-- by about 10 px;
+-- otherwise the coordinates need to be updated constantly while the script runs
+-- this however isn't suitable for closing with key press because mouse cursor can be anywhere
+
+-- https://forums.cockos.com/showthread.php?p=2015361
+local click, escape = gfx.getchar() == -1, gfx.getchar() == 27
+
+	if click or escape then -- WITH ESCAPE AND LIKELY ANY KEY PRESS THIS REQUIRES LONG PRESS UNTIL IT'S REGISTERED, HOWEVER IN THE MAIN DEFER FUNCTION THIS FUNCTION RUNS INSIDE gfx.getchar() == 27 CAN BE REGISTERED IMMEDIATELY WITH THE FOLLOWING SYNTAX:
+	-- 'if gfx.getchar() == 27 or gfx.getchar() == -1 then'
+	-- INSIDE THIS FUNCTION HOWEVER EVEN THIS ORDER OF CONDITIONS DOESN'T PRODUCE IMMEDIATE RESPONSE
+	-- the code inside the function doesn't need adjustment, just add the same condition outside of it 
+	-- in the main defer function
+	-- on top of the condition inside it, i.e.:
+	--[[ if gfx.getchar() == 27 or gfx.getchar() == -1 then -- gfx.getchar() == 27 doesn't work immediately if preceded by gfx.getchar() == -1
+		store_or_update_coordinates_after_quitting(cmdID)
+		end
+	]]
+
+	local stored_coord = r.GetExtState(scr_cmdID, 'LAST_GFX_COORDINATES') -- load coordinates stored last during session
+	local x, y = stored_coord:match('(%d+),(%d+)')
+	local cur_x, cur_y = table.unpack(click and {r.GetMousePosition()} or escape and {gfx.clienttoscreen(0,0)} or {})
+
+		if not x or cur_x ~= x+0 or cur_y+0 ~= y then
+		x, y = table.unpack(click and {cur_x-gfx.w+5, cur_y-10} or escape and {cur_x, cur_y}) -- if click, subtraction of the window width ensures that when re-opened it's situated more or less at the same spot, otherwise the window will be re-opened at the last click coordinate which is the close button X location thus shifting righwards by its length from the last location // +5 (10 also works) and -10 adjust the coordinates so if the mouse cursor stays put the window will open with the close button presicely under the cursor, because the close button doesn't sit on the window's right edge so gfx.w is greater than cursor's cur_x value at the moment of the click, likewise cursor's cur_y value doesn't match the window y coordinate exactly because the close button sits lower than the window's top edge
+		r.SetExtState(scr_cmdID, 'LAST_GFX_COORDINATES', math.floor(x)..','..math.floor(y), false) -- persist false // truncating the trailing decimal zero from integers
+	--	gfx.quit() -- only needed if quitting at a key press rathen than by a click on the close button, placed here to allow getting coordinates above while the window is open // REDUNDANT BECAUSE IN THE MAIN DEFER FUNCTION THIS FUNCTION WILL BE FOLLOWED BY A RETURN STATEMENT TO QUIT THE SCRIPT SO THE WINDOW WILL CLOSE ALL THE SAME, gfx.quit() alone won't make the window close on Esc
+		end
+
+	end
+
+end
+
+
+function store_or_update_coordinates_after_quitting2(scr_cmdID)
+-- must run inside main defer function
+-- THE STORAGE ROUTINE IN THIS FUNCTION ENSURES THAT
+-- if the window is closed by clicking its close button
+-- the window is re-opened at the last location regardless 
+-- of the current mouse cursor position;
+-- if closed by Esc, it's opened with the close button being
+-- directly under the mouse cursor
+
+-- when gfx window has been closed by mouse click or with a key press
+-- gfx.clienttoscreen(0,0) will only return zeros because there's no window any longer
+-- however fetching coordinates relative to the mouse cursor
+-- allows calculating the window more or less exact original location on the screen;
+-- when closing with the click on the close button located in the upper right hand corner:
+-- x = mouse_x-gfx.w+5 (or 10), accounting for gfx window width because the close button
+-- is located opposite to the X axis start but short of the window's right edge
+-- y = mouse_y-10, accounting for mouse location which is below the gfx window top edge
+-- by about 10 px;
+-- otherwise the coordinates need to be updated constantly while the script runs
+-- this however isn't suitable for closing with key press because mouse cursor can be anywhere
+
+local stored_coord = r.GetExtState(scr_cmdID, 'LAST_GFX_COORDINATES') -- load coordinates stored last during session
+local x, y = stored_coord:match('(%d+),(%d+)')
+local mouse_x, mouse_y = r.GetMousePosition() -- coordinates of the mouse cursor relative when the gfx window close button is clicked
+
+	if not x or mouse_x ~= x+0 or mouse_y+0 ~= y then -- if current coordinates differ from the stored, update or store for the 1st time if absent
+	r.SetExtState(scr_cmdID, 'LAST_GFX_COORDINATES', math.floor(mouse_x-gfx.w+5)..','..math.floor(mouse_y-10), false) -- persist false // truncating the trailing decimal zero from integers; subtraction of the window width and y coordinate ensures that when re-opened it's situated more or less at the same spot, otherwise the window will be re-opened at the last click coordinate which is the close button X location thus shifting righwards by its length from the last location // +5 (10 also works) and -10 adjust the coordinates so if the mouse cursor stays put the window will open with the close button presicely under the cursor, because the close button doesn't sit on the window's right edge so gfx.w is greater than cursor's mouse_x value at the moment of the click, likewise cursor's mouse_y value doesn't match the window y coordinate exactly because the close button sits lower than the window's top edge
+	end
+
+end
+
+
+
 --==================================== W I N D O W S   E N D ====================================
 
 
@@ -15115,6 +15531,7 @@ local scr_name = scr_name:match('[^\\/]+_(.+)%.%w+') -- without path, scripter n
 local scr_name = scr_name:match('.+[\\/].-_(.+)%.%w+') -- without path, scripter name and file ext // due to .+[\\/] WILL ONLY WORK IF THE SCRIPT ISN'T LOCATED IN THE ROOT OF THE /Scripts folder
 local scr_name = scr_name:match('.+[\\/](.+)') -- whole script name without path // due to .+[\\/] WILL ONLY WORK IF THE SCRIPT ISN'T LOCATED IN THE ROOT OF THE /Scripts folder
 local named_ID = r.ReverseNamedCommandLookup(cmd_ID) -- to ensure more unique extended state section name, diff sections may probably have identical numeric cmd_IDs // script aplhanumeic command IDs in different Action list sections differ in the alphabetic prefix
+or scr_name -- if an non-installed script is run via 'ReaScript: Run (last) ReaScript (EEL2 or lua)' actions get_action_context() won't return valid command ID, in which case fall back on the script full path
 local path = r.GetResourcePath()
 local sep = r.GetResourcePath():match('[\\/]')
 local sep = r.GetOS():match('Win') and '\\' or '/'
@@ -15246,6 +15663,7 @@ return table.unpack(t,1,t_len) -- not sure why this works, not documented anywhe
 end
 
 
+
 function Parse_Script_Name3(scr_name, ...)
 -- meant for multi-functional scripts with mutually exclusive functionalities
 -- which depend on the script name, e.g.
@@ -15337,6 +15755,7 @@ Rep(9)..[[or reinstall it.]], 'ERROR', 0)
 return true
 
 end
+
 
 
 function Invalid_Script_Name3(scr_name,...)
@@ -15635,6 +16054,7 @@ return r.ExecProcess('forfiles /P '..dir..' /M "'..file_name..'" /C "cmd /c echo
 end
 
 
+
 function open_dir_in_file_browser(dir)
 -- REAPER Profile terminal_CLEAN.lua
 local OS = r.GetOS():sub(1,3)
@@ -15727,23 +16147,28 @@ return cont
 end
 
 
-function Check_reaper_ini(section, key, val)
+function Check_reaper_ini(section, key, value)
 -- the args must be strings
 -- section is the one found in reaper.ini file
 -- and needs not to include square brackets
+-- if the key isn't subsumed under any section
+-- section arg can be nil
+-- however to get values of standalone keys
+-- reaper.get_config_var_string() is more efficient;
+-- value arg is optional, only useful if
+-- you expect a certain value to be able
+-- to verify if it's set
 
 --[-[-- METHOD 1
-	if section then
-	local found
-		for line in io.lines(r.get_ini_file()) do
-			if section and line == '['..section..']' then found = 1
-			elseif not section then
-			val = line:match(key..'=(.+)')
-				if val then return val, val == value end
-			elseif found then
-			local val = line:match(key..'=(.+)')
-				if val then return val, val == value end
-			end
+local found
+	for line in io.lines(r.get_ini_file()) do
+		if section and line == '['..section..']' then found = 1
+		elseif not section then
+		val = line:match(key..'=(.+)')
+			if val then return val, val == value end
+		elseif found then
+		local val = line:match(key..'=(.+)')
+			if val then return val, val == value end
 		end
 	end
 --]]
@@ -15768,6 +16193,7 @@ end
 
 
 function Extract_reaper_ini_val(key) -- the arg must be string
+-- same as reaper.get_config_var_string()
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
@@ -15916,17 +16342,34 @@ return not new_cont and cont
 end
 
 
-function Get_File_Size(path)
+function Get_File_Size1(path)
 -- https://www.lua.org/pil/21.3.html
 local f = io.open(path,'rb')
 	if f then
 	local curr = f:seek() -- get current position
-	local size = f:seek('end') -- get file size
+	local size, err = f:seek('end') -- get file size
 	f:seek('set', curr) -- restore position
 	f:close()
 	return size, size/1024, size/(1024^2) -- return bytes, kbytes and mbytes
 	end
 end
+
+
+function Get_File_Size2(file_handle)
+-- https://stackoverflow.com/questions/10712622/how-to-get-the-file-size-and-delete-file-in-lua
+file_handle:seek('set',0) -- reset to start
+local size, err = file_handle:seek('end')
+return size, size/1024, size/(1024^2) -- return bytes, kbytes and mbytes
+end
+
+
+function Get_File_Size3(filename)
+-- https://stackoverflow.com/a/36766381/8883033
+-- returns file size (or nil if the file doesn't exist or unable to open)
+local command = 'cmd /d/c for %f in ("'..filename..'") do @echo(%~zf'
+return tonumber(io.popen(command):read('*a')) -- OR r.ExecProcess(command, 0) -- timeoutmsec 0 -- no limit
+end
+
 
 
 -- if run via dofile() from another script in which case get_action_context()
@@ -15988,7 +16431,14 @@ function load_functions_from_file(file_path)
 -- which is returned from the script and which itself
 -- returns a table containing them, the syntax is:
 --[[
+-- MAIN CODE
 return function()
+	local func1()
+	end
+	local func2()
+	end
+	local func3()
+	end
 local t = {}
  -- CODE which results in table being {func1, func2, func3, ...}
 return t
@@ -15996,7 +16446,7 @@ end
 ]]
 -- if the loaded functions need to use local upvalues 
 -- from the main code which are not passed as arguments
--- these must be additonally included in the returned function
+-- these must be additonally included inside the returned function
 -- otherwise only global variables from the main code
 -- are accessible to the loaded functions
 -- alternatively, the upvalues should be passed as arguments
@@ -16004,28 +16454,33 @@ end
 --[[
 return function(upvalue1, upvalue2, upvalue3)
 local t = {}
- -- CODE
+	local func1(upvalue1)
+	end
+	local func2(upvalue2)
+	end
+	local func3(upvalue3)
+	end
+ -- CODE which results in table being {func1, func2, func3, ...}
 return t
 end
 ]]
 -- and passed to pcall() function below as 2nd, 3d etc. arguments
 -- in order for function call evaluation to succeed
 
-
 local func = ''
 	for line in io.lines(file_path) do
 		if line then
-			if line:match('return function') or #func > 0 then
+			if line:match('return function') or #func > 0 then -- the main code must not feature another 'return function' line so that the function capture doesn't begin ahead of time and include irrelevant content, see another way to ensure this in the comment below
 			func = func..(#func > 0 and '\n' or '')..line
 			end
 		--[[ OR
 		-- the function may be marked by text signifying its start and end so the loop doesn't accidentally
 		-- capture unrelated content
-		-- the use of lines 'RETURN THIS FUNCTION START/END' typed out in reverse in the loop 
+		-- the use of lines 'RETURN THIS FUNCTION START/END' typed out in reverse in this loop 
 		-- ensures that the code capture doesn't start at this exact loop as would likely be the case
 		-- had the lines been typed out normally
 			if line:match(('TRATS NOITCNUF SIHT NRUTER'):reverse()) or #func > 0 then
-			func = func..(#func > 0 and '\n' or '')..line
+			func = func..(#func > 0 and '\n' or '')..line -- collect target function content
 			elseif line:match(('DNE NOITCNUF SIHT NRUTER'):reverse()) then break
 			end
 			]]
@@ -16040,6 +16495,8 @@ func = func:match('.+(return function.+end)') -- exclude any trailing and preced
 	local func, err = load(func)() -- closing double brackets are a must even though they're not mentioned in Lua documentation, they turn the namespace into an executable function
 		if err then return err
 		else
+		-- https://www.gammon.com.au/scripts/doc.php?lua=pcall
+		-- http://lua-users.org/lists/lua-l/2009-11/msg00269.html
 		local ok, t = pcall(func) -- t is a table returned by the function // if the called function has arguments, they all or their substitues must follow as pcall arguments, i.e. pcall(func, arg1, arg2, arg3), in order for evaluation to succeed (this will be the case if the returned function loaded with load() has arguments), if there're multiple return values, the are all returned after ok return value
 			if ok then return t
 			else
@@ -16733,14 +17190,19 @@ end
 
 local Debug = ""
 function Msg(...) 
--- accepts either a single arg, or multiple pairs of caption and value
-	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+-- accepts either a single arg, or multiple pairs of value and caption
+-- caption must follow value because if value is nil
+-- and the vararg ends with it, it will be ignored
+-- because nil isn't a valid table value, and won't be displayed
+-- so vararg must not be allowed to end with nil when multiple
+-- arguments are passed, i.e. always end with a caption
+	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
 	local t = {...}
 	local str = #t > 1 and '' or tostring(t[1])..'\n'
 		if #t > 1 then -- OR if #str == 0
 			for i=1,#t,2 do
 				if i > #t then break end
-			local cap, val = t[i], t[i+1]			
+			local val, cap = t[i], t[i+1]
 			str = str..tostring(cap)..' = '..tostring(val)..'\n'
 			end
 		end
@@ -17387,7 +17849,8 @@ end
 
 
 function Reload_Menu_at_Same_Pos1(menu, keep_menu_open, left_edge_dist)
--- only useful for looking up the result of a toggle action, below see a more practical example
+-- only useful for looking up the result of a toggle action, 
+-- see a more practical example as Reload_Menu_at_Same_Pos2() below
 -- keep_menu_open is boolean
 -- left_edge_dist is integer to only display the menu
 -- when the mouse cursor is within the sepecified distance in px from the screen left edge
@@ -17411,7 +17874,6 @@ left_edge_dist = left_edge_dist and left_edge_dist > 0 and math.floor(left_edge_
 local x, y = r.GetMousePosition()
 
 	if left_edge_dist and x <= left_edge_dist or not left_edge_dist then -- 100 px within the screen left edge
-
 	-- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 	-- https://forum.cockos.com/showthread.php?t=280658#25
 	-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
@@ -17437,10 +17899,9 @@ local x, y = r.GetMousePosition()
 	gfx.x = coord_t and coord_t.x or gfx.mouse_x
 	gfx.y = coord_t and coord_t.y or gfx.mouse_y
 	local retval = gfx.showmenu(menu) -- menu string
-			if retval > 0 then
-			goto RELOAD
-			end
-
+		if retval > 0 then
+		goto RELOAD
+		end
 	end
 
 end
@@ -17519,8 +17980,24 @@ local retval = Reload_Menu_at_Same_Pos2(menu)
 ]]
 
 
+-- to be used with a gfx window to open the menu when the window is clicked
+function Reload_Menu_at_Same_Pos_gfx(menu)
+	if gfx.mouse_y > gfx.y and gfx.mouse_y < gfx.h then
+	gfx.y = gfx.mouse_y + 3 -- open the menu 3 px under the mouse cursor to prevent activation of the top item submenu, only when the menu is opened by a mouse click, otherwise (when armed action is added) it will open at gfx window 0 y coordinate which doesn't include the title bar
+	end
+return gfx.showmenu(menu) -- menu string
+end
+--[[ USE:
+::RELOAD::
+local output = Reload_Menu_at_Same_Pos_gfx(menu)
+	if output > 0 then
+	-- DO STUFF
+	goto RELOAD
+	end
+]]
 
-function Menu_With_Toggle_Options(scr_cmd_ID, sett_t, menu_t, default_sett_state)
+
+function Menu_With_Toggle_Options1(scr_cmd_ID, sett_t, menu_t, default_sett_state)
 -- scr_cmd_ID comes from get_action_context()
 -- default_sett_state is optional, the format is e.g. '111', i.e. all 3 options
 -- are On by default, the string length must be equal to #sett_t
@@ -17532,6 +18009,7 @@ function Menu_With_Toggle_Options(scr_cmd_ID, sett_t, menu_t, default_sett_state
 local sett_t = sett_t or {'My setting 1', 'My setting 2', 'My setting 3'}
 local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',  sett_t[2]..'|', 'Item 3|', sett_t[3]..'|'}
 
+local sett_indices_t = {}
 	for menu_idx, item in ipairs(menu_t) do
 		for sett_idx, sett in ipairs(sett_t) do
 			if item:gsub('|','') == sett then
@@ -17542,7 +18020,6 @@ local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',  sett_t[2]..'|',
 
 local default_sett_state = default_sett_state and #default_sett_state == #sett_t and default_sett_state 
 or ('0'):rep(#sett_t) -- if invalid or length doesn't match sett_t length default to all Off
-local sett_indices_t = {}
 local sett = r.GetExtState(scr_cmd_ID, 'SETTINGS')
 local sett_bools_t = {(#sett > 0 and sett or default_sett_state):match(('(%d)'):rep(#sett_t))} -- initializing defaults if first load
 
@@ -17556,11 +18033,11 @@ local sett_bools_t = {(#sett > 0 and sett or default_sett_state):match(('(%d)'):
 		end
 	end
 
-local output = Reload_Menu_at_Same_Pos(table.concat(menu_t), 1) -- keep_menu_open true
+local output = Reload_Menu_at_Same_Pos2(table.concat(menu_t), 1) -- keep_menu_open true
 	
 	if output == 0 then return
 	elseif sett_indices_t[output] then
-	local idx = sett_indices_t[output]
+	local idx = sett_indices_t[output] -- extract index relevant for sett_t table
 	local i = 0
 	sett = table.concat(sett_bools_t):gsub('%d', function(c) i=i+1 if i==idx then return math.floor(c+0~1) end end) -- flipping the bit
 	else -- expand with other menu items if necessary
@@ -17577,6 +18054,74 @@ local named_ID = r.ReverseNamedCommandLookup(cmd_ID) -- convert to named
 or scr_name -- if an non-installed script is run via 'ReaScript: Run (last) ReaScript (EEL2 or lua)' actions get_action_context() won't return valid command ID, in which case fall back on the script full path
 Menu_With_Toggle_Options(named_ID, sett_t, menu_t, default_sett_state)
 ]]
+
+
+function Menu_With_Toggle_Options2(scr_cmd_ID, sett_t, menu_t, default_sett_state)
+-- this version stores enabled settings as a bitfield 
+-- rather than as a literal base 2 value;
+-- scr_cmd_ID comes from get_action_context()
+-- default_sett_state is a bitfield, optional, the format is 
+-- e.g. 1|2|4|8|16 etc., i.e. all 5 options are On by default, 
+-- 1|4 - options 1 and 3 are On by defaullt,
+-- 2|8|16 - options 2,4 and 5 are On by default
+-- relies on Reload_Menu_at_Same_Pos2() function
+
+::RELOAD::
+
+local sett_t = sett_t or {'My setting 1', 'My setting 2', 'My setting 3'}
+local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',  sett_t[2]..'|', 'Item 3|', sett_t[3]..'|'}
+
+local sett_indices_t = {}
+	for menu_idx, item in ipairs(menu_t) do
+		for sett_idx, sett in ipairs(sett_t) do
+		if item:gsub('|','') == sett then
+		sett_indices_t[menu_idx] = sett_idx -- store settings array index under menu index
+		break end
+		end
+	end
+
+local bitfield = r.GetExtState(scr_cmd_ID, 'SETTINGS')
+bitfield = #bitfield > 0 and bitfield+0 or default_sett_state or 0
+
+-- Extract set bits
+local sett_bools_t = {}
+	for k in ipairs(sett_t) do
+	local bit = 2^(k-1)
+	sett_bools_t[k] = bitfield&bit == bit
+	end
+
+	-- Checkmark enabled settings in the menu
+	for sett_idx, truth in ipairs(sett_bools_t) do
+		for menu_idx, v in pairs(sett_indices_t) do
+			if v+0 == sett_idx then -- a setting index in the menu has been found
+			local sett = menu_t[menu_idx]
+			menu_t[menu_idx] = truth and '!'..sett or sett
+			break end
+		end
+	end
+
+local output = Reload_Menu_at_Same_Pos2(table.concat(menu_t), 1) -- keep_menu_open true
+  
+	if output == 0 then return
+	elseif sett_indices_t[output] then -- toggle the setting
+	local idx = sett_indices_t[output] -- extract index relevant for sett_t table
+	sett_bools_t[idx] = not sett_bools_t[idx] -- flip because it's a toggle
+	else -- expand with other menu items if necessary
+	end
+  
+	if sett_indices_t[output] then -- this condition will likely need expansion to include indices of other menu items which aren't settings
+	-- Store new bitfield
+	local bitfield = 0
+		for k, truth in ipairs(sett_bools_t) do
+			if truth then
+			bitfield = bitfield|2^(k-1)
+			end
+		end
+	r.SetExtState(scr_cmd_ID, 'SETTINGS', bitfield, false) -- persist false
+	goto RELOAD end
+  
+end
+
 
 
 function ShowMessageBox_Menu(message_lines, buttons_t, title)
@@ -18073,9 +18618,10 @@ function Get_Armed_Action(path, sep)
 -- relies on Esc() function
 -- for full functionality requires build 6.71+ or SWS extension
 
--- only run the function if Action list window is open to force deliberate use and prevent accidents in case some action is already armed for other purposes
+	-- only run the function if Action list window is open to force deliberate use 
+	-- and prevent accidents in case some action is already armed for other purposes
 	if r.GetToggleCommandStateEx(0,40605) == 0 then -- Show action list
-	Error_Tooltip('\n\n the action list is closed \n\n', 1, 1, gfx.clienttoscreen(0,0)) -- caps, spaced true // coordinates match those of the click pad gfx window so the tooltip overlays it
+	Error_Tooltip('\n\n the action list is closed \n\n', 1, 1) -- caps, spaced true
 	return end
 
 	local function script_exists(line, name)
@@ -18086,9 +18632,12 @@ function Get_Armed_Action(path, sep)
 	return r.file_exists(f_path)
 	end
 	
+	local function space(length)
+	return (' '):rep(length)
+	end
+	
 local sect_t = {['']=0,['alt']=0,['MIDI Editor']=32060,['MIDI Event List Editor']=32061,
 ['MIDI Inline Editor']=32062,['Media Explorer']=32063}
-
 
 local path = path or r.GetResourcePath()
 local sep = sep or path:match('[\\/]')
@@ -18099,12 +18648,12 @@ local sep = sep or path:match('[\\/]')
 	r.ArmCommand(0, section) -- 0 unarm all
 		if cmd > 0 then
 		local named_cmd = r.ReverseNamedCommandLookup(cmd) -- if the cmd belongs to a native action or is 0 the return value is nil
-		local name, scr_exists, mess = false, true -- mess is nil // scr_exists is true by default to accomodate actions which can't be removed, if removed they can't be armed since they're removed directly from reaper-kb.ini unlike scripts which are only referenced there
-			if cmd > 0 and not named_cmd and not (r.kbd_getTextFromCmd or r.CF_GetCommandText) then -- native action is armed; without kbd_getTextFromCmd() which was added in build 6.71 and CF_GetCommandText() there's no way to retrieve native action name, only script and custom action names via reaper-kb.ini; without the sws extension cycle actions aren't available
+		local name, scr_exists, mess = false, true -- mess is nil // scr_exists is true by default to accomodate actions which can't be removed, if removed, such as custom actions, they can't be armed since they're removed directly from reaper-kb.ini unlike scripts which are only referenced there and appear in the Action list even after having been removed from their original location
+			if cmd > 0 and not named_cmd and not r.kbd_getTextFromCmd and not r.CF_GetCommandText then -- native action is armed; without kbd_getTextFromCmd() which was added in build 6.71 and CF_GetCommandText() there's no way to retrieve native action name, only script and custom action names via reaper-kb.ini; without the sws extension cycle actions aren't available
 		--	Error_Tooltip('\n\n'..space(6)..'since the sws extension \n\n'..space(11)..'is not installed \n\n only non-cycle custom actions \n\n'..space(4)..'and scripts are supported \n\n')
 		--	return
 			mess = space(4)..'Since REAPER build is older \n\n than 6.71 and the sws extension \n\n'..space(13)..'is not installed \n\n  only non-cycle custom actions \n\n'..space(6)..'and scripts are supported'
-			elseif named_cmd and not (r.kbd_getTextFromCmd or r.CF_GetCommandText) then -- without kbd_getTextFromCmd() which was added in build 6.71 and CF_GetCommandText() there's no way to retrieve the sws extension action names, only custom actions and scripts from reaper-kb.ini; without the sws extension cycle actions aren't available anyway
+			elseif named_cmd and not r.kbd_getTextFromCmd and not r.CF_GetCommandText then -- without kbd_getTextFromCmd() which was added in build 6.71 and CF_GetCommandText() there's no way to retrieve the sws extension action names, only custom actions and scripts from reaper-kb.ini; without the sws extension cycle actions aren't available anyway
 		--	local f = io.open(path..sep..'reaper-kb.ini', 'r')
 		--	local cont = f:read('*a')
 		--	f:close()
@@ -18119,9 +18668,9 @@ local sep = sep or path:match('[\\/]')
 				end
 			elseif cmd > 0 then -- either build 6.71+ or sws extension is installed
 			local section = sect_t[section] or sect_t[section:match('alt')]
-			local args = r.kbd_getTextFromCmd and {cmd, section} or r.CF_GetCommandText and {section,cmd} -- the order of args in the functionsargs in the functions differ
-		--	name = cmd > 0 and (named_cmd or cmd)..' "'..r.CF_GetCommandText(sect_t[section], cmd)..'"' -- add quotes to match data being retrieved form reaper-kb.ini to simplify creation of section title // if script, returns name with prefix 'Script:' as they're listed in the Action list even though in reaper-kb.ini script names are prefixed with 'Custom:' just like custom action names
-		name = cmd > 0 and GetCommandText(table.unpack(args))
+			local args = r.kbd_getTextFromCmd and {cmd, section} or r.CF_GetCommandText and {section,cmd} -- the order of args in the functions differ
+			--	name = cmd > 0 and (named_cmd or cmd)..' "'..r.CF_GetCommandText(sect_t[section], cmd)..'"' -- add quotes to match data being retrieved form reaper-kb.ini to simplify creation of section title // if script, returns name with prefix 'Script:' as they're listed in the Action list even though in reaper-kb.ini script names are prefixed with 'Custom:' just like custom action names
+			name = cmd > 0 and GetCommandText(table.unpack(args))
 				if name and name:match('Script:') then -- script
 				local scr_name = name:gsub('Script:', 'Custom:') -- evaluate if script exists having made a replacement to conform to the reaper-kb.ini syntax
 					for line in io.lines(path..sep..'reaper-kb.ini') do
@@ -18133,12 +18682,15 @@ local sep = sep or path:match('[\\/]')
 			end
 			mess = mess or not scr_exists and '  the script doesn\'t exist \n\n at the registered location'
 			if mess then
-			Error_Tooltip('\n\n '..mess..' \n\n', 1, 1) -- caps, spaced true
-			return end
+		--	Error_Tooltip('\n\n '..mess..' \n\n', 1, 1) -- caps, spaced true
+			return mess
+			end
 	--	return name, scr_exists, mess
 		return cmd, name, sect_t[section] or sect_t[section:match('alt')] -- OR sect_t['alt']
-		end
-	end
+		
+		end -- 'if cmd > 0' condition end
+	
+	end -- 'if r.GetToggleCommandStateEx(0,40605) == 1' cond. end
 
 end
 
@@ -18202,9 +18754,12 @@ function Error_Tooltip1(text, caps, spaced, x2, y2)
 -- not directly under the mouse the tooltip sticks if mouse is over Arrange
 -- but soon disappears if mouse is in the TCP area but not over the TCP
 -- and immediately disappears if the mouse is over the TCP
--- caps and spaced are booleans
+-- caps and spaced are booleans, caps doesn't apply to non-ANSI characters
 -- x2, y2 are integers to adjust tooltip position by
 local x, y = r.GetMousePosition()
+--[[ IF USING WITH gfx
+local x, y = 0,0 -- set to 0 so that they can be overridden with x2 and y2 arguments which are passed as gfx.clienttoscreen(0,0) so that the tooltip is displayed over the gfx window
+]]
 local text = caps and text:upper() or text
 local utf8 = '[\0-\127\194-\244][\128-\191]*'
 local text = spaced and text:gsub(utf8,'%0 ') or text -- supporting UTF-8 char
@@ -18230,11 +18785,14 @@ function Error_Tooltip2(text, caps, spaced, x2, y2, want_color, want_blink)
 -- not directly under the mouse the tooltip sticks if mouse is over Arrange
 -- but soon disappears if mouse is in the TCP area but not over the TCP
 -- and immediately disappears if the mouse is over the TCP
--- caps and spaced are booleans
+-- caps and spaced are booleans, caps doesn't apply to non-ANSI characters
 -- x2, y2 are integers to adjust tooltip position by
 -- want_color is boolean to enable temporary ruler coloring to emphasize the error
 -- want_blink is boolean to enable ruler color blinking
 local x, y = r.GetMousePosition()
+--[[ IF USING WITH gfx
+local x, y = 0,0 -- set to 0 so that they can be overridden with x2 and y2 arguments which are passed as gfx.clienttoscreen(0,0) so that the tooltip is displayed over the gfx window
+]]
 local text = caps and text:upper() or text
 local utf8 = '[\0-\127\194-\244][\128-\191]*'
 local text = spaced and text:gsub(utf8,'%0 ') or text -- supporting UTF-8 char
@@ -19405,8 +19963,8 @@ end
 
 
 
-function Get_Region_Marker_Mngr_Settings()
-
+function Get_Region_Marker_Mngr_Settings1()
+-- https://forum.cockos.com/showthread.php?p=2822621
 local sett_flags, sort_flag
 	for line in io.lines(r.get_ini_file()) do
 		if line == '[regmgr]' then found = 1
@@ -19466,6 +20024,113 @@ end
 
 
 
+function Get_Region_Marker_Mngr_Settings2()
+-- https://forum.cockos.com/showthread.php?p=2822621
+local found, flags, sorting
+	for line in io.lines(r.get_ini_file()) do
+		if line == '[regmgr]' then found = 1
+		elseif found then
+		flags = flags or line:match('flags=(%d+)')
+		sorting = sorting or line:match('sort=(%d+)')
+		elseif flags and sorting then break
+		end	
+	end
+local flags_t = {
+[1]=1, -- Markers
+[2]=2, -- Regions
+[3]=4, -- Seek playback when selecting a marker or region
+[4]=32, -- Play region through then repeat or stop when selecting a region
+[5]=64, -- Show track render dropdown list nested by folders
+[6]=128, -- Take markers
+[7]=256, -- List markers, regions and take markers separately
+[8]=512, -- Add/remove child tracks to render list when adding/removing folder parent
+[9]=1024 -- Only display visible take markers in active takes
+}
+	for k, bit in ipairs(flags_t) do
+	-- bits 1, 32, 128, 512 are set when the setting is enabled
+	-- the rest are set when the corresponding setting is disabled
+	local exp = math.log(bit)/math.log(2)
+	flags_t[k] = (exp == 0 or exp > 1 and exp%2 ~= 0) and (flags+0)&bit == bit -- exp 0,5,7,9
+	or (exp==1 or exp > 0 and exp%2 == 0) and (flags+0)&bit ~= bit -- exp 1,2,6,8,10
+	end
+local sort_t = {[0]='col desc',[1]='index asc',[2]='name asc',[3]='start asc',
+[4]='end asc',[5]='len asc',[6]='rend track list desc',[7]='info desc',
+[16]='col asc',[17]='index desc',[18]='name desc',[19]='start desc',
+[20]='end desc',[21]='len desc',[22]='rend track list asc',[23]='info asc'}
+return flags_t, sort_t[sorting+0]
+end
+
+
+
+function Get_Media_Explorer_Show_Submenu_Options(bitfield)
+-- bitfield stems from Check_reaper_ini() with section arg '[reaper_explorer]'
+-- and key arg 'displayall'
+-- evaluates whether option is enabled
+-- so enabled true, disabled false
+
+local bitfield = not bitfield and Check_reaper_ini('reaper_explorer', 'displayall')
+
+	if bitfield+0 == 1228 then return end -- all are disabled
+
+local opts = {
+-- unused bits: &16, &512
+-- values are logarithm for base 2
+[1]=0, -- All files // &1
+[2]=7, -- Folders // &128 disabled
+[3]=6, -- File extension even when file type displayed // &64 disabled
+
+-- next two options are mutually exclusive but both can be turned off
+[4]=2, -- Leading path in databases and searches // &4 disabled
+[5]=8, -- Full path in databases and searches // &256 disabled
+
+[6]=3, -- Path drop-down box // &8 disabled
+[7]=10, -- Scrollbars on preview waveform // &1024 disabled
+[8]=11, -- Automatically expand shortcuts while browsing file list // &2048 disabled
+[9]=12, -- Display preview position in beats for audio files, using embedded or estimated tempo // &4096 disabled
+[10]=1, -- Display preview position in wholes seconds and beats // &2
+}
+	for k, exp in ipairs(opts) do
+	local bit = 2^exp
+	-- only for two options bits are set when they are enabled
+	-- for the rest bits are set when they're disabled
+	opts[k] = exp < 2 and bitfield+0&bit == bit or exp > 1 and bitfield+0&bit ~= bit
+	end
+return opts
+
+-- view= 0 -- columns (Details), 1 -- List (file/folder names onky)
+
+end
+
+
+
+function Get_Media_Explorer_Column_Count()
+-- as of build 7.22 default column count is 25
+-- on top of which custom user columns may exist
+-- when column is hidden its value in reaper.ini is 0
+-- in the format colX=0 where X is a column 0-based index
+-- whether default or user column
+-- hidden columns are still accessible to window functions
+-- so to find an item all must be traversed
+
+local hidden_col_count, total_col_cnt, found = 0, 25
+	for line in io.lines(r.get_ini_file()) do
+		if line == '[reaper_explorer]' then found = 1
+		elseif found then
+			if line:match('col%d+=0') then
+			hidden_col_count = hidden_col_count+1
+			elseif line:match('user%d+_key=') then
+			total_col_cnt = total_col_cnt+1 -- adding user colums to the total
+			end
+			if line:match('%[.-%]') then -- new section
+			break end
+		end
+	end
+
+return total_col_cnt, total_col_cnt - hidden_col_count -- total and visible
+
+end
+
+
 function trackselonmouse()
 -- 'trackselonmouse' key of the preference at
 -- Prefs -> Editing behavior -> Mouse -> Mouse click/edit in arrange view: Selects track... Sets target track for insert/paste...
@@ -19488,6 +20153,47 @@ function generate_custom_action_ID()
 -- https://stackoverflow.com/a/2867925/8883033 how GUID is constructed
 return r.genGuid(''):lower():gsub('[%-{}]+','') -- convert to lower register and remove hyphens and curly brackets
 end
+
+
+
+function en_de_code_bitfield(t, bitfield)
+-- only stores the max of 63 values on a 64 bit systems
+-- and 52 on 32 bit systems
+-- https://stackoverflow.com/questions/46442411/how-big-can-a-64-bit-unsigned-integer-be
+-- https://stackoverflow.com/questions/6003492/how-big-can-a-64bit-signed-integer-be
+
+local limit = math.maxinteger == 9223372036854775807 and 63 or 52 -- OR math.maxinteger == 2^63 // setting the limit depending on the system bit width, because a max signed integer Lua v5.3+ can handle on a 32 bit system is 9007199254740991 or 0x1fffffffffffff, i.e. 2^53-1, in practical terms of conversion into hex value with dec2hex() function it's 2^52 0xfffffffffffff which prevents loss of precision, so the function can store a max of first 52 boolean thruths, while on a 64 bit system it's 9223372036854775807 or 0x7fffffffffffffff, i.e. 2^63, and a max of first 63 boolean thruths // only a max of FIRST 63 or 52 boolean thruths respectively can be stored because the storage depends on the index of the truth in the sequence which corresponds to the bit position in the bitfield, and depending on the system the integer created by bit setting cannot exceed 2^63 or 2^52 respectively // using numbers here to avoid calculation of rasing to power
+
+local s = ' '
+
+	if not bitfield then -- encode
+	local bitfield = 0
+		for k, truth in ipairs(t) do
+			if truth then
+				-- must be placed before bit setting in case the limit has been reached while there're still unaccounted for disabled actions, if it were placed after the setting it wouldn't be possible to ascertain that there're unaccounted for disabled actions because that could have been the loop end, so a counter would have to be employed
+				if k > limit then return
+			-- OR
+			--	if bitfield == 9223372036854775807 then return -- only valid for 64 bit system
+				s:rep(7)..'The system doesn\'t support\n\n'..s:rep(8)..'storage of disabled actions'
+				..'\n\n'..s:rep(9)..'at index greater than '..limit..'.'
+				end
+			bitfield = bitfield|2^(k-1)
+			end
+		end
+	return bitfield
+	else -- decode
+		for k, truth in ipairs(t) do
+		local bit = 2^(k-1)
+			if bitfield&bit == bit then
+			act_names_menu_t[k] = true
+			end
+		end
+	return t
+	end
+end
+-- USE:
+-- local bitfield = en_de_code_bitfield(t) -- encode
+-- local t = en_de_code_bitfield(t, bitfield) -- decode
 
 
 
@@ -19554,16 +20260,43 @@ end
 
 
 function dec2hex(dec_int)
+-- input arg is a decimal integer
 -- https://www.rapidtables.com/convert/number/decimal-to-hex.html algo
+	
 	if not dec_int then return end
+		
+local dec_int2
+
+	if dec_int > 0xfffffffffffff then  -- 2^52
+	-- math.maxinteger is supported from Lua 5.3
+		if tonumber(_VERSION:match('[%.%d]+')) < 5.3 or math.maxinteger == 0x7fffffff then -- either Lua older than 5.3 or 32 bit system, 0x7fffffff == 2147483647
+		return dec_int -- on a 32 bit system integers above 2^31 Lua encodes as double floating point numbers while in older Lua versions all integers are encoded as double floating point numbers; in all versions of Lua floating point precision limit is 2^53-1 (about 15 - 17 decimal places) after which rounding errors start to occur, so in these two cases no point to convert a number above 2^53-1 (in practical terms above 2^52, because in division and modulo operations employed for conversion into hex this is the limit of accuracy) because it will be fed in with rounding erros from the outset
+		end
+	-- the following assumes that integers up to 2^53-1 are represented natively rather than as floating point numbers, 
+	-- which is good for REAPER since native integer representaion is supported in Lua 5.3+
+	-- run by all REAPER versions with Lua support
+	local diff = math.floor(math.log(dec_int)/math.log(2))-52 -- find by how much the input exponent exceeds the Lua max floating point number precision limit which is 53 bit i.e. ~15-17 decimal places, because numbers whose decimal places exceed this limit lose precision and cause wrong calculation result, this workround is needed because the employed conversion method to hex relies on division and modulo operaions which produce decimal numbers for which precision is important; using value 52 instead of 53 because in division and modulo operations the limit of accuracy is 52 bit; formula to calculate exponend of the value by specific base comes from  https://www.gammon.com.au/scripts/doc.php?lua=math.log
+	dec_int, dec_int2 = dec_int >> diff, dec_int >> 52 -- shift the input value right by the difference to only leave bits whose total doesn't affect precision, then shift the input value right by 52 bits to isolate the remaining upper bits, those which have been discarded in shifting right by the difference // this is the correct splitting method for subsequent string concatenaton because it produces parts with different bit width just as would occur in splitting a string for example '256' into '56' and '2', because maintaining original width i.e. '056' and '200' would not allow accurate concatenation resulting in 200056
+	end
+	
 local hex = ''
 local t  = {[0]=0,1,2,3,4,5,6,7,8,9,'a','b','c','d','e','f'}
 	repeat	
-	local quotient = math.modf(dec_int/16)
-	hex = t[dec_int%16]..hex -- OR t[dec_int-16*quotient]
+	local quotient = math.modf(dec_int/16) -- OR math.floor(dec_int/16)
+	hex = t[dec_int%16]..hex
+-- OR 
+-- hex = t[dec_int-16*quotient] and t[dec_int-16*quotient]..hex or hex
 	dec_int = quotient
 	until quotient == 0
+	
+	local hex2
+	if dec_int2 then -- if the input number exponent exceeds the Lua floating point number max precision limit, convert the remaining upper bits, those which exceed 52 bits and concatenate the results placing the upper bits conversion result at the front as that's where they're placed in the bitfield
+	hex2 = dec2hex(dec_int2)
+	hex = hex2:sub(3)..hex
+	end	
+	
 return '0x'..hex
+
 end
 -- for inverse operation: hex 2 dec
 -- dec = tonumber(hex:match('0x(%x+)'), 16) -- OR hex:sub(3) // hex string sans 0x
@@ -20325,6 +21058,17 @@ r.SetMediaItemInfo_Value(item, 'I_CURTAKE', take_idx)
 
 --===================================================================================
 
+-- Functions to evaluate active take
+
+take == r.GetActiveTake(item)
+
+take_idx == r.GetMediaItemInfo_Value(item, 'I_CURTAKE')
+
+take_idx == r.GetMediaItemTakeInfo_Value(r.GetActiveTake(item), 'IP_TAKENUMBER')
+
+
+--===================================================================================
+
 -- Functions to get take PCM source
 
 reaper.GetMediaItemTake_Source(take)
@@ -20568,6 +21312,9 @@ T A B L E S
 	is_table_already_sorted1
 	is_table_already_sorted2
 	pack
+	build_array_of_multiple_repeating_items
+	deep_copy1
+	deep_copy2
 
 
 M I D I
@@ -20636,7 +21383,8 @@ M I D I
 	Restore_Saved_Selected_Objects
 	Restore_Saved_Selected_Objects
 	Re_Store_Selected_Objects
-	re_store_sel_trks
+	re_store_sel_trks1
+	re_store_sel_trks2
 	ReStoreSelectedItems
 	re_store_obj_selection
 
@@ -20696,6 +21444,7 @@ T R A C K S
 	GetTrackState
 	GetTrackTree
 	Fixed_Lane_Comping_Enabled
+	Track_Controls_Locked
 	
 
 
@@ -20911,7 +21660,7 @@ I T E M S
 	Get_Src_Orig_Length
 	Is_Take_Source_Trimmed
 	Create_Take_Source_Section
-	Get_Take_Phase
+	Get_Take_Polarity
 	MPL_Set_Startoffs_With_Stretch_Mrkrs
 	Re_Store_Apply_Stretch_Markers
 	Find_And_Get_New_Items
@@ -20924,6 +21673,7 @@ I T E M S
 	Item_Has_Top_Icon_Bar
 	Get_Default_Take_Rank_Scale
 	Get_Take_Rank
+	Get_Set_Take_Marker_Length
 
 
 C O L O R
@@ -20980,6 +21730,7 @@ M A R K E R S  &  R E G I O N S
 	Get_Last_Proj_Mrkr_Pos
 	Fix_Overlapping_Regions
 	Get_Mrkrs_Of_Takes_At_Mouse_Or_Edit_Curs
+	Get_Rgn_Mrkr_Mngr_Settings
 
 
 
@@ -21007,9 +21758,9 @@ W I N D O W S
 	Re_Store_Windows_Props_By_Names1
 	Re_Store_Windows_Props_By_Names2
 	Re_Store_Windows_Props_By_Names_And_Handles1
-	Re_Store_Windows_Props_By_Names_And_Handles2
-	GetSet_SWS_Notes_Wnd_Scroll_Pos
-	Window_Is_Visible
+	Re_Store_Windows_Props_By_Names_And_Handles2	
+	Is_Window_Visible1
+	Is_Window_Visible2
 	Exclude_Visible_Windows
 	Move_Window_To_Another_Dock
 	JS_Window_IsVisible
@@ -21020,18 +21771,26 @@ W I N D O W S
 	Get_Child_Windows_SWS
 	Get_All_Parent_Windows
 	Get_Top_Parent_Window
-	Is_Window_Docked
-	Is_Window_Visible
+	Is_Window_Docked	
+	Traverse_List1
+	Traverse_List2
 	GetSet_SWS_Notes_Wnd_Scroll_Pos
 	Scroll_SWS_Notes_Window
-	Insert_String_Into_Field
+	Scroll_Window
 	Scroll_Region_Mngr_JS
+	Insert_String_Into_Field_SWS_SWS	
 	Mouse_Click
 	Is_Floating_FX_Window
 	Is_FX_Chain_Window
 	Is_Window_Fully_Minimized
 	Activate_Context
 	Set_Horiz_Zoom_Level
+	get_gfx_scale 
+	click_pad
+	keep_click_pad_size
+	gfx_mouse_click
+	store_or_update_coordinates_after_quitting1
+	store_or_update_coordinates_after_quitting2
 
 
 F I L E S
@@ -21060,7 +21819,7 @@ F I L E S
 	get_file_timestamp1
 	get_file_timestamp2
 	get_file_timestamp3
-	get_file_timestamp4
+	get_file_timestamp4	
 	open_dir_in_file_browser
 	delete_string_from_file
 	Read_Lines
@@ -21075,7 +21834,9 @@ F I L E S
 	META_Spawn_Scripts
 	GetActionCommandIDByFilename
 	Get_Set_Script_Cont
-	Get_File_Size
+	Get_File_Size1
+	Get_File_Size2
+	Get_File_Size3
 	Script_Is_Installed
 	(loadfile syntax)
 	(require syntax)
@@ -21149,7 +21910,9 @@ U T I L I T Y
 	Show_Menu_Dialogue
 	Reload_Menu_at_Same_Pos1
 	Reload_Menu_at_Same_Pos2
-	Menu_With_Toggle_Options
+	Reload_Menu_at_Same_Pos_gfx
+	Menu_With_Toggle_Options1
+	Menu_With_Toggle_Options2
 	ShowMessageBox_Menu
 	Re_Store_Ext_State
 	EMERGENCY_TOGGLE
@@ -21223,9 +21986,13 @@ U T I L I T Y
 	Ad_Hoc_Setting
 	Get_Lock_Settings1
 	Get_Lock_Settings2
-	Get_Region_Marker_Mngr_Settings
+	Get_Region_Marker_Mngr_Settings1
+	Get_Region_Marker_Mngr_Settings2
+	Get_Media_Explorer_Show_Submenu_Options
+	Get_Media_Explorer_Column_Count
 	trackselonmouse
 	generate_custom_action_ID
+	en_de_code_bitfield
 	CheckDependencies and validate_dependency
 	Break
 	J_Reverb_randomizer
