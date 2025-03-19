@@ -689,6 +689,8 @@ ACT 1 0 "d16766a9126a58419dbec7ec55ec6b99" "Custom: Refresh current theme (usefu
 ACT 1 0 "d14036b9bba02341b94acbd85722d910" "Custom: Refresh current theme (useful when modifying a teme to see changes) -- 2" 40382 40381
 ACT 1 0 "4b1f3be13ecb8348855938d5421b223c" "Custom: Jump to start of tracklist (track selection is not kept) -- map tp Ctrl+Home" 40939 40913 40769
 ACT 1 0 "58e309d0b0eb5541a38b291a07974a78" "Custom: Jump to end of tracklist (track selection is not kept) -- map tp Ctrl+End" 40702 40913 40005
+ACT 1 0 "42060dc4e96a6f468e290aa4f95116c9" "Custom: Jump to end of tracklist EXCLUDING Mixer (track selection is not kept) -- map tp Ctrl+End" 2022 40221 2013 40221 40702 40913 40005 2013 40221
+ACT 1 0 "3bf8e562d5d0e94f84548729b77ef136" "Custom: Jump to start of tracklist EXCLUDING Mixer (track selection is not kept) -- map tp Ctrl+Home" 2022 40221 2013 40221 40939 40913 40769 2013 40221
 ACT 1 0 "e0fefd4067413144927ba68b2a30280b" "Custom: Crop project to loop and open in new tab complete (switching proj tabs needed to activate new tab, no orig project undo)" 40623 40049 40296 40210 41929 40862 40861 42398 40862 40861
 ACT 1 0 "8561c97f5fcc0043ba1873a1e0f67f7e" "Custom: Crop project to loop -- Pt. 1" 40623 40049
 ACT 1 0 "21a3c0859629664f9d4dfdfb9e39bd9c" "Custom: Crop project to loop/region and open in new tab -- Pt. 2 (switching proj tabs needed to activate new tab, undo restores orig project)" 40296 40210 40297 41929 40862 40861 42398 40862 40029 40861 40297
