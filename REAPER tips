@@ -925,6 +925,22 @@ So if there's no active last touched track these actions dosn't select a new tra
 it if it's non-selected. A new track will only be selected and made the last touched on the next run provided the last touched track is still active.
 
 
+--------------------------------------------------
+
+-- Action: Modify MIDI CC/mousewheel: Negative
+
+Reverses mouswheel direction for custom actions from forward/out/up - next/down, backward/in/down - previous/up
+
+The direction is determined by actions
+
+Action: Skip next action if CC parameter <0/mid
+'NEXT/DOWN' action
+Action: Skip next action if CC parameter >0/mid
+'PREVIOUS/UP' action
+
+Placing 'Action: Modify MIDI CC/mousewheel: Negative' at the beginning of the custom action reverses the direction
+
+
 ============================================================================
 
 Action list section IDs
@@ -3042,25 +3058,37 @@ https://forum.cockos.com/showthread.php?t=165974
 https://www.youtube.com/watch?v=ckjl-rpzDPA
 https://www.youtube.com/watch?v=JHGGZiXUnqI
 
-1. Trim/Read - allows previewing and trimming the envelope by moving/affecting the control of the parameter being automated without affecting the actual curve, so effectively changing envelope Base parameter available also in automation item properties.
+1. Trim/Read - allows previewing and trimming the envelope by moving/affecting the control of the parameter being automated 
+without affecting the actual curve, so effectively changing envelope Base parameter available also in automation item properties.
 When activated, the control setting is transfered to the envelope while the control itself is reset, which allows trimming.
 During playback the control of the automated parameter doesn't follow the envelope's existing curve.
 
-2. Read - In playback the control of the automated parameter follows the envelope's existing curve.
+2. Read - In playback the control of the automated parameter follows the envelope's existing curve. Any manual adjustments
+to the parameter are ignored being overriden by the envelope.
 
 3. Touch - allows punching in envelope change by moving/affecting the control of the parameter being automated.
 Only applies change for as long as it's being effected by the user, otherwise simply follows the envelope's existing curve.
+As soon as the user stops changing the parameter the value it was set to before automation recording started is restored.
 
 4. Latch - allows writing envelope curve by moving/affecting the control of the parameter being automated.
 Once effected by the user continues writing envelope even without user interference until transport is stopped.
 If during playback the control of the automated parameter isn't affected by the user, it simply follows the envelope's existing curve.
+So differs from Touch mode in that the parameter value it was set to before automation recording started isn't restored
+and the last registered value continues to be recorded.
 
-5.Latch preview - doesn't write an envelope curve, only allows previwing how changing the setting of the parameter being automated affects the output.
+5.Latch preview - doesn't write an envelope curve, only allows prevewing how changing the setting of the parameter being automated affects the output.
 If during playback the control of the automated parameter isn't affected by the user, it simply follows the envelope's existing curve.
 
-6. Write - allows writing envelope curve by moving/affecting the control of the parameter being automated. Main mode to write automation when there's none.
+6. Write - writes envelope curve immediately without user having to move/affect the control of the parameter being automated. 
+Like in the Latch mode continues writing the last value the parameter was set to. Main mode to write automation when there's none.
 During playback overwrites the envelope using the value the control has been last parked at, therefore isn't suitable for previewing the envelope. 
 To preview use Read, Trim/Read or Touch.
+
+
+-- Showcase of actions 'Automation: Write current values for actively-writing envelopes ...'
+
+
+https://www.youtube.com/watch?v=8szptXeVDCo
 
 
 ==============================================================
@@ -5279,7 +5307,7 @@ http://productionadvice.co.uk/how-loud/
 
 -- Quick routing creation in projects with long track count so that there's no need 
 
--- to pull the cable from the source track to the detination track while scrolling
+-- to drag the mouse cursor from the source track to the detination track across a long track list
 
 
 1. Place all your main destination tracks (busse, FX returns) at the top of the track list
@@ -5316,6 +5344,74 @@ Works with files with embedded BWF chunk. REAPER does write the relevant info in
 This works provided the item source is looped (Loop source option is enabled) and its start matches its source start or its source is not looped
 
 https://reddit.com/r/Reaper/comments/1iueutr/insert_into_project_at_origin/
+
+
+=============================================================
+
+-- Insert envelope segment maintaining envelope curve/shape
+
+
+Inserting one point will always result in curve change because REAPER recalculates it
+when segment length changes, which is the case when a new point is inserted.
+
+The solution is simultaneous inserting of at least two points, so
+
+EITHER 
+
+1. Draw an audomation item at the location where you want the new segment to be created
+2. Right click the automation item and select 'Delete automation item, preserve points'
+
+OR
+
+1. Create time selecton over the envelope where you want the new segment to be created
+2. Select the envelope if not already selected
+3. Execute action 'Envelope: Insert 4 envelope points at time selection'
+4. Optionally delete extra points immediately outside of time selection
+
+
+https://reddit.com/r/Reaper/comments/1j6q2yt/how_to_insert_points_without_affecting_envelope/
+
+
+=============================================================
+
+-- Convert all project media sources into another format individually
+
+File -> Save project As.. 
+
+Checkmark the options: 
+
+Create project directory
+
+Copy all media into project directory -> Convert media -> Format
+
+https://reddit.com/r/Reaper/comments/1j8b9f0/consolidate_without_glueing/mh47v6s/
+
+
+=============================================================
+
+-- Returning to the previewed file directory in the Media Explorer
+
+
+Having gone far away from the directory of the previewed file in the directory tree,
+
+in order to relatively quickly return to the file's directory
+
+1. Right click preview player
+2. Show in explorer/finder OR execute the action 'Media: Show in explorer/finder'
+3. Once the explorer/finder window opens copy its path from its address bar
+4. Paste into the Media Explorer directory address bar
+5. Hit Enter to switch the Media Explorer to that directory
+
+
+=============================================================
+
+-- Prevent accidental deletion of track without items
+
+
+Since tracks cannot be locked, to pevent accidental deletion place a dummy item on a track, 
+
+or add a dummy child track to it, both of which at deletion attempt will generate a warning
+
 
 
 =============================================================
