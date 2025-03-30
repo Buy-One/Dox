@@ -531,6 +531,7 @@ ACT 1 0 "32a9115e1e25fb4f8fef93f0d787a6fd" "Custom: Select all items preceding t
 ACT 1 0 "ac601ba6c3d7ae48be3bdcb7d679e5cc" "Custom: Select all items preceding the one under mouse on all tracks (the pointed item excl from selection) " 40289 40528 41173 40289 40416 40042 40625 41174 40626 40717 40635
 ACT 1 0 "bba16bf6d0dcea4f8281932465d00562" "Custom: Select all items preceding the one under mouse on selected tracks (the pointed item excl from selection)" 40289 40528 41173 40289 40416 40042 40625 41174 40626 40718 40635
 ACT 1 0 "5a89c14e77650d4393aeffd3d3edce94" "Custom: Select all items preceding the one under mouse on selected tracks (the pointed item incl in selection)" 40289 40528 40042 40625 41174 40626 40718 40635
+ACT 1 0 "49fa5854f4dc4541b29a5dbf13c07f24" "Custom: Select all items right of the edit cursor" 40625 40043 40626 40296 40718 40297
 ACT 1 0 "92776a62d1c3b94a933229a56805b2a0" "Custom: Select item under edit cursor on selected track (place edit cursor over or at the start of the item)" 40625 41667 40626 40718 40635
 ACT 1 0 "06eb3ab5583e8e46a6bd60c4984ec8b8" "Custom: Select item under mouse open FX chain" 40528 40638
 ACT 1 0 "89bf07354b17b0448c32de9b76568309" "Custom: Select track under mouse cursor and expand minimizing others" 41110 40723
@@ -694,6 +695,7 @@ ACT 1 0 "d16766a9126a58419dbec7ec55ec6b99" "Custom: Refresh current theme (usefu
 ACT 1 0 "d14036b9bba02341b94acbd85722d910" "Custom: Refresh current theme (useful when modifying a teme to see changes) -- 2" 40382 40381
 ACT 1 0 "ac58ff5e6066904a9ecf382c4e960dda" "Custom: Move edit cursor to next frame SWS (to pverent scrubbing disable it at Pref -> Audio -> Scrub/jog -> ... when moving .. via action)" 2022 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS 2013 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS 2022 41885 2014 41885 40647 2014 41885 2013 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS
 ACT 1 0 "466a8b596136254699c8ebca087175ea" "Custom: Move edit cursor to previous frame SWS (to pverent scrubbing disable it at Pref -> Audio -> Scrub/jog -> ... when moving .. via action)" 2022 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS 2013 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS 2022 41885 2014 41885 40646 2014 41885 2013 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS
+ACT 1 0 "9835c62b17502f4a9b6a61cec732c869" 'Custom: Create a composite item with overlay out of selected item on selected track (set empty item mode to "Stretch image/text")' 40309 40290 41622 40630 41667 41667 40625 40631 41666 41666 40626 40142 40850 40718 40032 2022 1156 2014 1156 2022 40507 2013 40507 41622
 ACT 1 0 "e0fefd4067413144927ba68b2a30280b" "Custom: Crop project to loop and open in new tab complete (switching proj tabs needed to activate new tab, no orig project undo)" 40623 40049 40296 40210 41929 40862 40861 42398 40862 40861
 ACT 1 0 "8561c97f5fcc0043ba1873a1e0f67f7e" "Custom: Crop project to loop -- Pt. 1" 40623 40049
 ACT 1 0 "21a3c0859629664f9d4dfdfb9e39bd9c" "Custom: Crop project to loop/region and open in new tab -- Pt. 2 (switching proj tabs needed to activate new tab, undo restores orig project)" 40296 40210 40297 41929 40862 40861 42398 40862 40029 40861 40297
