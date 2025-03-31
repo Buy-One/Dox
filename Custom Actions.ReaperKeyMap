@@ -531,7 +531,7 @@ ACT 1 0 "32a9115e1e25fb4f8fef93f0d787a6fd" "Custom: Select all items preceding t
 ACT 1 0 "ac601ba6c3d7ae48be3bdcb7d679e5cc" "Custom: Select all items preceding the one under mouse on all tracks (the pointed item excl from selection) " 40289 40528 41173 40289 40416 40042 40625 41174 40626 40717 40635
 ACT 1 0 "bba16bf6d0dcea4f8281932465d00562" "Custom: Select all items preceding the one under mouse on selected tracks (the pointed item excl from selection)" 40289 40528 41173 40289 40416 40042 40625 41174 40626 40718 40635
 ACT 1 0 "5a89c14e77650d4393aeffd3d3edce94" "Custom: Select all items preceding the one under mouse on selected tracks (the pointed item incl in selection)" 40289 40528 40042 40625 41174 40626 40718 40635
-ACT 1 0 "49fa5854f4dc4541b29a5dbf13c07f24" "Custom: Select all items right of the edit cursor" 40625 40043 40626 40296 40718 40297
+ACT 1 0 "49fa5854f4dc4541b29a5dbf13c07f24" "Custom: Select all items right of the edit cursor (items under cursor are also selected)" 40625 40043 40626 40296 40718 40297 40635
 ACT 1 0 "92776a62d1c3b94a933229a56805b2a0" "Custom: Select item under edit cursor on selected track (place edit cursor over or at the start of the item)" 40625 41667 40626 40718 40635
 ACT 1 0 "06eb3ab5583e8e46a6bd60c4984ec8b8" "Custom: Select item under mouse open FX chain" 40528 40638
 ACT 1 0 "89bf07354b17b0448c32de9b76568309" "Custom: Select track under mouse cursor and expand minimizing others" 41110 40723
