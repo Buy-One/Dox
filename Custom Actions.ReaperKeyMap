@@ -801,7 +801,10 @@ ACT 1 32060 "e7cf8d811081b54783c50a30422e8bb4" "Custom: Move cursor to end of no
 ACT 1 32060 "37f5a235e3a83145b3ddcabb81195e6e" "Custom: Move cursor to start of next note (MAY GET STUCK WITH MULTIPLE PITCHES)" 40413 40440 40214
 ACT 1 32060 "50464ff04428c349a7d539681ae45bb0" "Custom: Move cursor to start of note (MAY GET STUCK WITH MULTIPLE PITCHES)" 40425 40414 40440 40214
 ACT 1 32060 "e2b6fa3e79032f4f9cbf20e7707765c1" "Custom: Move cursor to start of previous note" 40414 40414 40440 40214
-ACT 1 32060 "7e25db5defcadb45baa4aa937209725b" "Custom: Move edit cursor left by one grid unit (only when snap to grid is disabled)" 40214 1000 40633 40183 40440 40002
+ACT 1 32060 "7e25db5defcadb45baa4aa937209725b" "Custom: Move edit cursor left by one grid unit (relative) -- 1" 2022 1014 2013 1014 40214 1000 40633 40183 40440 40002 2013 1014
+ACT 1 32060 "33ccd5df7bbfe54e9b43ad76330e8a28" "Custom: Move edit cursor left by one grid unit (relative) -- 2" 2022 1014 2013 1014 40047 2013 1014
+ACT 1 32060 "4003dbb031db764ba9adc3a1343a7afc" "Custom: Move edit cursor right by one grid unit (relative) -- 1" 2022 1014 2013 1014 40214 1000 40633 40184 40440 40002 2013 1014
+ACT 1 32060 "b1f7d1f87bbc584fb7545d523039c833" "Custom: Move edit cursor right by one grid unit (relative) -- 2" 2022 1014 2013 1014 40048 2013 1014
 ACT 1 32060 "9fe50064d93d1049b86bd5590e7f2155" "Custom: Move note(s) to next note(s) creating legato (select last note)" 40414 40413 40440 40414 40793
 ACT 1 32060 "934b6cd3cac9aa42ae1ee38dffaf1321" "Custom: Move note(s) to next note(s) creating legato (select last note) with prompt to repeat" 40414 40413 40440 40414 40793 2002
 ACT 1 32060 "b620135166a08d4fb1de113cd5f4f54f" "Custom: Move note(s) to previous note(s) creating legato (select 1st note)" 40413 40414 40639 40413 40755
