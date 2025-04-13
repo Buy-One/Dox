@@ -119,106 +119,106 @@ V7
 idx   retval                              desc                                        value  defValue  minValue  maxValue
 
 
-0    visSections                        Visualise sections                              0         0         0         1
-1    textBrightness                     Text Brightness                               100       100        50       150
-2    colorTrackLabels                   Custom Color Track Labels                       1         1         0         1
-3    customColorDepthParam              Custom Color Strength                          30        30         0       100
-4    selectStrength                     Selection Overlay Strength                     25        25         0       100
-5    selInvertLabels                    Selection Invert Labels                         1         1         0         1
-6    selDot                             Selection Dot                                   1         1         0         1
-7    sectionMargin                      Section Margins                                 6         6         2        12
-8    xMargin                            X-Axis spacing                                  6         6         2        12
-9    yMargin                            Y-Axis spacing                                  6         6         2        12
-10   tcpfolderIndentSize                TCP Folder Indent                              20        20         0        40
-11   tcpfolderBalanceType               TCP Folder Balance Type                         0         0         0         2
-12   tcpDivOpacity                      TCP Div Opacity                                80        80         0       255
-13   tcpBgColR                          TCP background colour                         129       129         0       255
-14   tcpBgColG                          TCP background colour G                       137       137         0       255
-15   tcpBgColB                          TCP background colour B                       137       137         0       255
-16   emptyTcpSecOpacity                 Empty TCP Section Opacity                     128       128         1       255
-17   tcpFlowLocation1                   TCP flow location 1                             1         1         1        10
-18   tcpFlowLocation2                   TCP flow location 2                             2         2         1        10
-19   tcpFlowLocation3                   TCP flow location 3                             3         3         1        10
-20   tcpFlowLocation4                   TCP flow location 4                             4         4         1        10
-21   tcpFlowLocation5                   TCP flow location 5                             5         5         1        10
-22   tcpFlowLocation6                   TCP flow location 6                             6         6         1        10
-23   tcpFlowLocation7                   TCP flow location 7                             7         7         1        10
-24   tcpFlowLocation8                   TCP flow location 8                             8         8         1        10
-25   tcpFlowLocation9                   TCP flow location 9                             9         9         1        10
-26   tcpFlowLocation10                  TCP flow location 10                           10        10         1        10
-27   tcpFxparmMinWidth                  TCP FX Parameters Minimum Width                60        60        50       200
-28   tcpFxparmMaxWidth                  TCP FX Parameters Maximum Width                88        88        50       200
-29   tcpFxMinWidth                      TCP FX Minimum Width                           30        30        20       200
-30   tcpFxMaxWidth                      TCP FX Maximum Width                           88        88        20       200
-31   tcpSendMinWidth                    TCP Send Minimum Width                         26        26        26       200
-32   tcpSendMaxWidth                    TCP Send Maximum Width                         88        88        30       200
-33   LayoutA-tcpFxparmLocation          Layout A - FX Parameters Section                4         4         0         9
-34   LayoutA-tcpSendLocation            Layout A - Send List Section                    0         0         0         9
-35   LayoutA-tcpFxLocation              Layout A - FX List Section                      7         7         0         9
-36   LayoutA-tcpFxembedLocation         Layout A - Embedded FX Section                  5         5         0         9
-37   LayoutA-tcpFxparmPin               Layout A - FX Parameters Pin                    0         0         0         1
-38   LayoutA-tcpSendPin                 Layout A - Send List Pin                        0         0         0         1
-39   LayoutA-tcpFxPin                   Layout A - FX List Pin                          0         0         0         1
-40   LayoutA-tcpFxembedPin              Layout A - Embedded FX Pin                      0         0         0         1
-41   LayoutA-tcpFxparmVisflag1          Layout A - tcpFxparmVisflag1                   -1        -1        -1         1
-42   LayoutA-tcpFxparmVisflag2          Layout A - tcpFxparmVisflag2                    1         1        -1         1
-43   LayoutA-tcpSectionBottomDiv        Layout A - tcpSectionBottomDiv                  2         2         1         3
-44   LayoutA-sectionLeftW               Layout A - Left Section Width                  75        75        46       400
-45   LayoutA-sectionRightW              Layout A - Right Section Width                 75        75        46       400
-46   LayoutA-tcpLabelLength             Layout A - TCP Label Length                   120       120        40       500
-47   LayoutA-tcpLabelSize               Layout A - TCP Label Font Size                  4         4         1         5
-48   LayoutA-tcpVolumeLength            Layout A - TCP Volume Length                   40        40        40       300
-49   LayoutA-tcpInputFontSize           Layout A - TCP Input Font Size                  1         1         1         5
-50   LayoutA-tcpRecinputLength          Layout A - TCP Input Length                   100       100        40       400
-51   LayoutA-tcpMeterWidth              Layout A - TCP Meter Width                     20        20        10       300
-52   LayoutA-tcpMeterBorder             Layout A - TCP Meter Border                     2         2         0         8
-53   LayoutA-hideTcpLabelBlock          Layout A - Visflag Track Label Block            0         0         0        15
-54   LayoutA-hideTcpRecmon              Layout A - Visflag Track Recmon                 4         4         0        15
-55   LayoutA-hideTcpMSBlock             Layout A - Visflag Track MS Block               0         0         0        15
-56   LayoutA-hideTcpIo                  Layout A - Visflag Track Io                     1         1         0        15
-57   LayoutA-hideTcpFxBlock             Layout A - Visflag Track Fx Block               0         0         0        15
-58   LayoutA-hideTcpPanBlock            Layout A - Visflag Track Pan Block              1         1         0        15
-59   LayoutA-hideTcpRecmode             Layout A - Visflag Track Recmode                4         4         0        15
-60   LayoutA-hideTcpInputBlock          Layout A - Visflag Track Input Block            4         4         0        15
-61   LayoutA-hideTcpEnv                 Layout A - Visflag Track Env                    0         0         0        15
-62   LayoutA-hideTcpPhase               Layout A - Visflag Track Phase                  1         1         0        15
-63   LayoutA-hideTcpLabelsValues        Layout A - Visflag Track Labels and Values      8         8         0        15
-64   LayoutA-hideTcpMeterValues         Layout A - Visflag Track Meter Values           4         4         0        15
-65   LayoutB-tcpFxparmLocation          Layout B - FX Parameters Section                4         4         0         9
-66   LayoutB-tcpSendLocation            Layout B - Send List Section                    0         0         0         9
-67   LayoutB-tcpFxLocation              Layout B - FX List Section                      7         7         0         9
-68   LayoutB-tcpFxembedLocation         Layout B - Embedded FX Section                  5         5         0         9
-69   LayoutB-tcpFxparmPin               Layout B - FX Parameters Pin                    0         0         0         1
-70   LayoutB-tcpSendPin                 Layout B - Send List Pin                        0         0         0         1
-71   LayoutB-tcpFxPin                   Layout B - FX List Pin                          0         0         0         1
-72   LayoutB-tcpFxembedPin              Layout B - Embedded FX Pin                      0         0         0         1
-73   LayoutB-tcpFxparmVisflag1          Layout B - tcpFxparmVisflag1                   -1        -1        -1         1
-74   LayoutB-tcpFxparmVisflag2          Layout B - tcpFxparmVisflag2                    1         1        -1         1
-75   LayoutB-tcpSectionBottomDiv        Layout B - tcpSectionBottomDiv                  2         2         1         3
-76   LayoutB-sectionLeftW               Layout B - Left Section Width                  75        75        46       400
-77   LayoutB-sectionRightW              Layout B - Right Section Width                 75        75        46       400
-78   LayoutB-tcpLabelLength             Layout B - TCP Label Length                   100       100        40       500
-79   LayoutB-tcpLabelSize               Layout B - TCP Label Font Size                  4         4         1         5
-80   LayoutB-tcpVolumeLength            Layout B - TCP Volume Length                   40        40        40       300
-81   LayoutB-tcpInputFontSize           Layout B - TCP Input Font Size                  1         1         1         5
-82   LayoutB-tcpRecinputLength          Layout B - TCP Input Length                   100       100        40       400
-83   LayoutB-tcpMeterWidth              Layout B - TCP Meter Width                     20        20        10       300
-84   LayoutB-tcpMeterBorder             Layout B - TCP Meter Border                     2         2         0         8
-85   LayoutB-hideTcpLabelBlock          Layout B - Visflag Track Label Block            0         0         0        15
-86   LayoutB-hideTcpRecmon              Layout B - Visflag Track Recmon                 0         0         0        15
-87   LayoutB-hideTcpMSBlock             Layout B - Visflag Track MS Block               0         0         0        15
-88   LayoutB-hideTcpIo                  Layout B - Visflag Track Io                     0         0         0        15
-89   LayoutB-hideTcpFxBlock             Layout B - Visflag Track Fx Block               0         0         0        15
-90   LayoutB-hideTcpPanBlock            Layout B - Visflag Track Pan Block              0         0         0        15
-91   LayoutB-hideTcpRecmode             Layout B - Visflag Track Recmode                0         0         0        15
-92   LayoutB-hideTcpInputBlock          Layout B - Visflag Track Input Block            0         0         0        15
-93   LayoutB-hideTcpEnv                 Layout B - Visflag Track Env                    0         0         0        15
-94   LayoutB-hideTcpPhase               Layout B - Visflag Track Phase                  0         0         0        15
-95   LayoutB-hideTcpLabelsValues        Layout B - Visflag Track Labels and Values      0         0         0        15
-96   LayoutB-hideTcpMeterValues         Layout B - Visflag Track Meter Values           4         4         0        15
-97   LayoutC-tcpFxparmLocation          Layout C - FX Parameters Section                4         4         0         9
-98   LayoutC-tcpSendLocation            Layout C - Send List Section                    0         0         0         9
-99   LayoutC-tcpFxLocation              Layout C - FX List Section                      0         0         0         9
+0     visSections                        Visualise sections                              0         0         0         1
+1     textBrightness                     Text Brightness                               100       100        50       150
+2     colorTrackLabels                   Custom Color Track Labels                       1         1         0         1
+3     customColorDepthParam              Custom Color Strength                          30        30         0       100
+4     selectStrength                     Selection Overlay Strength                     25        25         0       100
+5     selInvertLabels                    Selection Invert Labels                         1         1         0         1
+6     selDot                             Selection Dot                                   1         1         0         1
+7     sectionMargin                      Section Margins                                 6         6         2        12
+8     xMargin                            X-Axis spacing                                  6         6         2        12
+9     yMargin                            Y-Axis spacing                                  6         6         2        12
+10    tcpfolderIndentSize                TCP Folder Indent                              20        20         0        40
+11    tcpfolderBalanceType               TCP Folder Balance Type                         0         0         0         2
+12    tcpDivOpacity                      TCP Div Opacity                                80        80         0       255
+13    tcpBgColR                          TCP background colour                         129       129         0       255
+14    tcpBgColG                          TCP background colour G                       137       137         0       255
+15    tcpBgColB                          TCP background colour B                       137       137         0       255
+16    emptyTcpSecOpacity                 Empty TCP Section Opacity                     128       128         1       255
+17    tcpFlowLocation1                   TCP flow location 1                             1         1         1        10
+18    tcpFlowLocation2                   TCP flow location 2                             2         2         1        10
+19    tcpFlowLocation3                   TCP flow location 3                             3         3         1        10
+20    tcpFlowLocation4                   TCP flow location 4                             4         4         1        10
+21    tcpFlowLocation5                   TCP flow location 5                             5         5         1        10
+22    tcpFlowLocation6                   TCP flow location 6                             6         6         1        10
+23    tcpFlowLocation7                   TCP flow location 7                             7         7         1        10
+24    tcpFlowLocation8                   TCP flow location 8                             8         8         1        10
+25    tcpFlowLocation9                   TCP flow location 9                             9         9         1        10
+26    tcpFlowLocation10                  TCP flow location 10                           10        10         1        10
+27    tcpFxparmMinWidth                  TCP FX Parameters Minimum Width                60        60        50       200
+28    tcpFxparmMaxWidth                  TCP FX Parameters Maximum Width                88        88        50       200
+29    tcpFxMinWidth                      TCP FX Minimum Width                           30        30        20       200
+30    tcpFxMaxWidth                      TCP FX Maximum Width                           88        88        20       200
+31    tcpSendMinWidth                    TCP Send Minimum Width                         26        26        26       200
+32    tcpSendMaxWidth                    TCP Send Maximum Width                         88        88        30       200
+33    LayoutA-tcpFxparmLocation          Layout A - FX Parameters Section                4         4         0         9
+34    LayoutA-tcpSendLocation            Layout A - Send List Section                    0         0         0         9
+35    LayoutA-tcpFxLocation              Layout A - FX List Section                      7         7         0         9
+36    LayoutA-tcpFxembedLocation         Layout A - Embedded FX Section                  5         5         0         9
+37    LayoutA-tcpFxparmPin               Layout A - FX Parameters Pin                    0         0         0         1
+38    LayoutA-tcpSendPin                 Layout A - Send List Pin                        0         0         0         1
+39    LayoutA-tcpFxPin                   Layout A - FX List Pin                          0         0         0         1
+40    LayoutA-tcpFxembedPin              Layout A - Embedded FX Pin                      0         0         0         1
+41    LayoutA-tcpFxparmVisflag1          Layout A - tcpFxparmVisflag1                   -1        -1        -1         1
+42    LayoutA-tcpFxparmVisflag2          Layout A - tcpFxparmVisflag2                    1         1        -1         1
+43    LayoutA-tcpSectionBottomDiv        Layout A - tcpSectionBottomDiv                  2         2         1         3
+44    LayoutA-sectionLeftW               Layout A - Left Section Width                  75        75        46       400
+45    LayoutA-sectionRightW              Layout A - Right Section Width                 75        75        46       400
+46    LayoutA-tcpLabelLength             Layout A - TCP Label Length                   120       120        40       500
+47    LayoutA-tcpLabelSize               Layout A - TCP Label Font Size                  4         4         1         5
+48    LayoutA-tcpVolumeLength            Layout A - TCP Volume Length                   40        40        40       300
+49    LayoutA-tcpInputFontSize           Layout A - TCP Input Font Size                  1         1         1         5
+50    LayoutA-tcpRecinputLength          Layout A - TCP Input Length                   100       100        40       400
+51    LayoutA-tcpMeterWidth              Layout A - TCP Meter Width                     20        20        10       300
+52    LayoutA-tcpMeterBorder             Layout A - TCP Meter Border                     2         2         0         8
+53    LayoutA-hideTcpLabelBlock          Layout A - Visflag Track Label Block            0         0         0        15
+54    LayoutA-hideTcpRecmon              Layout A - Visflag Track Recmon                 4         4         0        15
+55    LayoutA-hideTcpMSBlock             Layout A - Visflag Track MS Block               0         0         0        15
+56    LayoutA-hideTcpIo                  Layout A - Visflag Track Io                     1         1         0        15
+57    LayoutA-hideTcpFxBlock             Layout A - Visflag Track Fx Block               0         0         0        15
+58    LayoutA-hideTcpPanBlock            Layout A - Visflag Track Pan Block              1         1         0        15
+59    LayoutA-hideTcpRecmode             Layout A - Visflag Track Recmode                4         4         0        15
+60    LayoutA-hideTcpInputBlock          Layout A - Visflag Track Input Block            4         4         0        15
+61    LayoutA-hideTcpEnv                 Layout A - Visflag Track Env                    0         0         0        15
+62    LayoutA-hideTcpPhase               Layout A - Visflag Track Phase                  1         1         0        15
+63    LayoutA-hideTcpLabelsValues        Layout A - Visflag Track Labels and Values      8         8         0        15
+64    LayoutA-hideTcpMeterValues         Layout A - Visflag Track Meter Values           4         4         0        15
+65    LayoutB-tcpFxparmLocation          Layout B - FX Parameters Section                4         4         0         9
+66    LayoutB-tcpSendLocation            Layout B - Send List Section                    0         0         0         9
+67    LayoutB-tcpFxLocation              Layout B - FX List Section                      7         7         0         9
+68    LayoutB-tcpFxembedLocation         Layout B - Embedded FX Section                  5         5         0         9
+69    LayoutB-tcpFxparmPin               Layout B - FX Parameters Pin                    0         0         0         1
+70    LayoutB-tcpSendPin                 Layout B - Send List Pin                        0         0         0         1
+71    LayoutB-tcpFxPin                   Layout B - FX List Pin                          0         0         0         1
+72    LayoutB-tcpFxembedPin              Layout B - Embedded FX Pin                      0         0         0         1
+73    LayoutB-tcpFxparmVisflag1          Layout B - tcpFxparmVisflag1                   -1        -1        -1         1
+74    LayoutB-tcpFxparmVisflag2          Layout B - tcpFxparmVisflag2                    1         1        -1         1
+75    LayoutB-tcpSectionBottomDiv        Layout B - tcpSectionBottomDiv                  2         2         1         3
+76    LayoutB-sectionLeftW               Layout B - Left Section Width                  75        75        46       400
+77    LayoutB-sectionRightW              Layout B - Right Section Width                 75        75        46       400
+78    LayoutB-tcpLabelLength             Layout B - TCP Label Length                   100       100        40       500
+79    LayoutB-tcpLabelSize               Layout B - TCP Label Font Size                  4         4         1         5
+80    LayoutB-tcpVolumeLength            Layout B - TCP Volume Length                   40        40        40       300
+81    LayoutB-tcpInputFontSize           Layout B - TCP Input Font Size                  1         1         1         5
+82    LayoutB-tcpRecinputLength          Layout B - TCP Input Length                   100       100        40       400
+83    LayoutB-tcpMeterWidth              Layout B - TCP Meter Width                     20        20        10       300
+84    LayoutB-tcpMeterBorder             Layout B - TCP Meter Border                     2         2         0         8
+85    LayoutB-hideTcpLabelBlock          Layout B - Visflag Track Label Block            0         0         0        15
+86    LayoutB-hideTcpRecmon              Layout B - Visflag Track Recmon                 0         0         0        15
+87    LayoutB-hideTcpMSBlock             Layout B - Visflag Track MS Block               0         0         0        15
+88    LayoutB-hideTcpIo                  Layout B - Visflag Track Io                     0         0         0        15
+89    LayoutB-hideTcpFxBlock             Layout B - Visflag Track Fx Block               0         0         0        15
+90    LayoutB-hideTcpPanBlock            Layout B - Visflag Track Pan Block              0         0         0        15
+91    LayoutB-hideTcpRecmode             Layout B - Visflag Track Recmode                0         0         0        15
+92    LayoutB-hideTcpInputBlock          Layout B - Visflag Track Input Block            0         0         0        15
+93    LayoutB-hideTcpEnv                 Layout B - Visflag Track Env                    0         0         0        15
+94    LayoutB-hideTcpPhase               Layout B - Visflag Track Phase                  0         0         0        15
+95    LayoutB-hideTcpLabelsValues        Layout B - Visflag Track Labels and Values      0         0         0        15
+96    LayoutB-hideTcpMeterValues         Layout B - Visflag Track Meter Values           4         4         0        15
+97    LayoutC-tcpFxparmLocation          Layout C - FX Parameters Section                4         4         0         9
+98    LayoutC-tcpSendLocation            Layout C - Send List Section                    0         0         0         9
+99    LayoutC-tcpFxLocation              Layout C - FX List Section                      0         0         0         9
 100   LayoutC-tcpFxembedLocation         Layout C - Embedded FX Section                  5         5         0         9
 101   LayoutC-tcpFxparmPin               Layout C - FX Parameters Pin                    0         0         0         1
 102   LayoutC-tcpSendPin                 Layout C - Send List Pin                        0         0         0         1
@@ -426,7 +426,7 @@ local list = 'idx   retval'..s(#long_ret)..'desc'..s(#long_desc-2)..'value  defV
 
     if retval then
 
-    local pad = i < 10 and 1 or 0
+    local pad = i < 10 and 2 or i < 100 and 1 or 0
     local space0, space1, space2 = 3+pad, #long_ret-#retval+5, #long_desc-#desc+1
     local space2 = space2+(#long_val-#tostring(value)) 
     local space3 = 4+(#long_val-#tostring(defValue))
