@@ -517,6 +517,8 @@ ACT 1 0 "52a738a8b71b034fb54d1a5731ead6b6" "Custom: Ripple record A (uses marker
 ACT 1 0 "de33f29acebdc0419f617254fa862983" "Custom: Ripple record A_amagalma" 40757 _BR_SAVE_CURSOR_POS_SLOT_1 2008 40043 1013
 ACT 1 0 "aee41e52928af14f881586e50063804c" "Custom: Ripple record B (uses marker 10)_KennyGioia" 40667 40699 40160 41748
 ACT 1 0 "70ed56089ebef44a83239ee666c511c4" "Custom: Ripple record B_amagalma" 40667 40699 40310 _BR_RESTORE_CURSOR_POS_SLOT_1 42398 40309
+ACT 1 0 "e00dd35c655c8b4188a64f8b0c8fabc7" "Custom: Nevato Ttuts+ How to edit podcast_Ripple delete & play (split before the target, place edit cursor after it, run)  y-Tu14fG4C8&t=6704s" 2022 41991 2014 41991 40511 40318 40151 40842 40842 2014 41991 1007
+ACT 1 0 "b18161da310f54499d80e58197d6646e" "Custom: Nevato Ttuts+ How to edit podcast_Ripple delete & play (split before the target, place edit cursor after it, run) -- 2" 2022 41991 2014 41991 43178 40318 40842 40842 40006 40151 2014 41991 1007
 ACT 1 0 "de72774a0f6f31458ee5e6b6d60cc027" "Custom: Sample slices preview backward (disable whatever loop is currently enabled, place cursor at end of item)" 1016 40633 40646 40223 40646 40222 40632 1007
 ACT 1 0 "6cb89312ae002648958ef2b4022531a4" "Custom: Sample slices preview backward (place cursor at end of item, allows jumping to edit cursor)" 1016 _BR_SAVE_CURSOR_POS_SLOT_1 40634 _BR_RESTORE_CURSOR_POS_SLOT_1 40646 40222 40647 40223 40632 1007
 ACT 1 0 "c6bc8bc34e7d154caa78f67b9599319f" "Custom: Sample slices preview forward (disable whatever loop is currently enabled, place cursor at start of item)" 1016 40632 40647 40222 40647 40223 40632 1007
