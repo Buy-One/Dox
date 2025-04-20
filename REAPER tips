@@ -941,6 +941,57 @@ Action: Skip next action if CC parameter >0/mid
 Placing 'Action: Modify MIDI CC/mousewheel: Negative' at the beginning of the custom action reverses the direction
 
 
+--------------------------------------------------
+
+-- Track: Insert new track at end of track list vs Track: Insert new track at end of mixer
+
+These behave differently when the option 'Auto-arrange tracks in mixer' is turned off (action Mixer: Toggle autoarrange)
+
+which allows free reordering of tracks in the Mixer while retaining their indices and in which case
+
+'Track: Insert new track at end of mixer' will insert a new track after whatever track which is placed last 
+
+in the Mixer regardless of its index
+
+
+--------------------------------------------------
+
+-- Transport: Play/stop (move edit cursor on stop)
+
+The action is suitable for stopping recording recording as well
+
+
+--------------------------------------------------
+
+-- Navigate: Move edit cursor left/right by grid
+
+
+Moves the edit cursor by grid size relatively if Snapping is turned off
+
+
+--------------------------------------------------
+
+
+-- Select note nearest to the edit cursor
+
+Selects a note event nearest to the edit cursor at the currently active pitch (pitch cursor position)
+
+If there's no note at the current pitch in the neighborhood of the edit cursor,
+a matching note at a pitch closest to the current and higher than it is selected,
+if there's no matching note at a pitch higher than the current one, the first found matching note
+at a pitch lower than it is selected
+
+
+--------------------------------------------------
+
+-- View: Toggle show MIDI editor windows
+
+Only affects last selected MIDI item for opening and currently active MIDI Editor window for closure.
+Always close if a MIDI Editor window is open, even if another MIDI item is selected.
+Must be used to close the window as well, otherwise if you try to apply it to another item 
+having closed the current one manually it must be reset which requires a few idle executions
+
+
 ============================================================================
 
 Action list section IDs
@@ -1538,6 +1589,9 @@ Virtual MIDI keyboard as actions toolbar using LoopBE virtual MIDI cable
 10. While 'Keyboard/OSC/MIDI Input' dialogue is open, click a key on the Virtual MIDI Keyboard to assign it as a shortcut and click OK
 
 https://forum.cockos.com/showthread.php?t=108777
+
+see a much more detailed guide at 
+https://stash.reaper.fm/49960/Trigger%20actions%20with%20MIDI%20items%20from%20within%20REAPER%20without%20MIDI%20control%20surface.pdf
 
 ===========================================================================
 
@@ -3395,6 +3449,11 @@ As a rule MIDI Editor settings are item specific.
 ==============================================================
 
 -- Saving SWS colors so that they're available across all projects
+
+
+By design they must be available to all projects because they're stored under 'custcolors' key inside reaper.ini file,
+
+but in case they aren't ...
 
 In the SWS Color Management dialogue click 'Save colors to file ...' 
 
@@ -5413,9 +5472,141 @@ Since tracks cannot be locked, to pevent accidental deletion place a dummy item 
 or add a dummy child track to it, both of which at deletion attempt will generate a warning
 
 
+=============================================================
+
+-- Plugin preset count limit for presets in REAPER native format
+
+
+Based on Justin's response here https://forum.cockos.com/showthread.php?p=2670622#4 
+
+the limit seems to depend on the preset file size (the .ini file in the /presets folder), 
+
+which in turn depends on the amount of data stored by the plugin per patch. 
+
+But he didn't explicitly say what the file size limit is.
+
+The presets in excess of the limit will still be written into the file but won't show up in the preset list
+
 
 =============================================================
 
+-- Having a big item label for greater visibility
+
+1. Select the media item
+2. Right click the item -> Set time selection to items
+3. Go to 'Insert' menu and click 'Insert empty item'
+4. Now the empty item overlays the original item
+5. Marquee (lasso) select both items
+6. Hit G shortcut to group them
+7. Double click this composite item
+8. Type the label text inside the empty item text box which will pop up
+9. In the empty item drop-down settings menu select 'Stretch image/text'
+10. Click 'Apply' or 'OK'
+
+This will work provided item grouping is enabled, the option 'Offset overlapping media vertically' 
+(old name 'Show overlapping media items in lanes (when room)') is disabled.
+'Selecting one item selects group' may or may not be enabled. If it's not, then the composite item 
+can only be selected by marquee (lasso) selection.
+
+To be able to access the media item properties enable the option 'Offset overlapping media vertically' 
+(old name 'Show overlapping media items in lanes (when room)') so that the items are displayed in lanes 
+separately and the media item is directly clickable.
+
+Alternatively at steps 1 - 3 make sure to leave a strip of the media item not overlayed by the empty item
+(preferable at both edges) so it's directly accessible to mouse click. Dragging the item by grabbing the 
+underlying media item rather than the empty item overlay will also simplify media item snapping, otherwise 
+the focus of snapping will be edges of the empty item.
+
+Item label color is editable via 'Media item label' and 'Media item label (selected)' properties 
+in the Theme development/tweaker dialogue.
+
+
+https://reddit.com/r/Reaper/comments/1jk8ktk/clear_item_labelling/mjwecna/
+
+=============================================================
+
+-- Forcing SWS extension auto-coloring on a track with a custom color and/or a name designed to trigger auto-color
+
+
+When an unnamed track already has a custom color, entering a name which is supposed to trigger auto-coloring won't work
+
+The solution is naming a track with the following custom action, preferably assigned to 'Track control panel - double click' context in Mouse Modifiers
+
+Custom: Reset track color to default and (re)name
+Track: Set to default color
+Track: Rename last touched track
+
+
+Neither will auto-coloring work if a track is already labeled with the name which is supposed to trigger auto-color
+
+The solution is to press the 'Force' button in the Auto-color utility or run the action 'SWS: Apply auto coloring'
+
+which can be assigned to 'Track control panel - double click' context in Mouse Modifiers
+
+
+https://www.reddit.com/r/Reaper/comments/1jnwdlp/trigger_action_by_renaming_a_track/
+
+
+=============================================================
+
+-- Audio file size calculation formulas
+
+Lossless (uncompressed) format
+
+Size in bits = Sample rate * Bit depth * Duration (in sec) * Channel count
+
+Size in bytes = Size in bits / 8
+
+Size in Kilobytes = Size in bytes /  1024
+
+Size in Megabytes = Size in Kilobytes / 1024
+
+Size in Gigabytes = Size in Megabytes / 1024
+
+OR 
+
+Size in Gigabytes = Size in bytes /  ( 1024^3 )
+
+----------------
+
+Bitrate (bits/sec) = Sample rate * Bit depth * Channel count
+
+Bitrate (Kbits/sec) = Bitrate (bits/sec) / 1000
+
+----------------
+
+Lossy format
+
+Size in kilobytes = Duration (in sec) * Bitrate / 8
+
+
+https://medium.com/@Xclusivesocial/sample-rate-bit-depth-bitrate-4ff624cc97db
+
+=============================================================
+
+
+https://www.sample-videos.com/
+
+
+=============================================================
+
+-- Having a maximum of 2 rows of tracks displayed in the Mixer
+
+when the option 'Show multiple rows of tracks (when size permits)' is enabled
+
+because if the window can accommodate more rows the track will line up in as many rows.
+
+
+In the theme's rtconfig.txt file find a line containing mcp_min_height 240
+
+change the value to a greater one, save and re-archive it in the theme's file.
+
+
+https://forum.cockos.com/showthread.php?p=1765552
+
+
+
+=============================================================
 
 
 
