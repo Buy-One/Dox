@@ -2816,6 +2816,18 @@ return sel_note_cnt
 end
 
 
+
+function Deselect_All_Notes(ME, take)
+local ME = not ME and r.MIDIEditor_GetActive() or ME
+local take = not take and r.MIDIEditor_GetTake(ME) or take
+local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take)
+	for i=0,notecnt-1 do
+	r.MIDI_SetNote(take, i, false) -- selectedIn false
+	end
+end
+
+
+
 function count_selected_events(ME, take, evt_type, lane, ch) -- TEXT/SYSEX/NOTATION EVENTS ROUTINE ISN'T DEVELOPED
 -- IF FILTER OR MULTICHANNEL MODE ARE ENABLED THEY WILL HAVE TO BE DISABLED SO THE FUNCTIONS TARGET ALL MIDI CHANNELS AND NOT ONLY THE ACTIVE ONES
 -- evt_type is a string: '' - all, 'n' - notes, 'c' - cc, 't' - text/sysex
@@ -2977,7 +2989,7 @@ end
 local ME = r.MIDIEditor_GetActive()
 local take = r.MIDIEditor_GetTake(ME)
 
-function Cursor_outside_pianoroll(take)
+function Mouse_Cursor_outside_painoroll_1(take) -- see a more efficient version below
 
 r.PreventUIRefresh(1)
 local ACT = r.MIDIEditor_LastFocused_OnCommand
@@ -3003,13 +3015,64 @@ r.PreventUIRefresh(-1)
 
 	if edit_cur_pos >= item_end or edit_cur_pos <= item_start then
 	return true end
+	-- OR
+	-- return edit_cur_pos >= item_end or edit_cur_pos <= item_start
 
 end
 
 
+
+function Mouse_Cursor_outside_painoroll_2(take)
+
+local edit_cur_pos = r.GetCursorPosition()
+local item = r.GetMediaItemTake_Item(take)
+local item_st = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+local item_end = item_st + r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+
+return edit_cur_pos >= item_end or edit_cur_pos <= item_st
+
+end
+
+
+
+function Re_Store_Edit_Cursor_Pos_In_MIDI_Ed(stored_pos)
+-- moves to mouse cursor, then restores
+-- HOWEVER if within the MIDI Editor the edit cursor was initially located
+-- to the left of the start in item which starts exactly at the project start
+-- the cursor position will be registered as 0
+-- and upon restoration the cursor will be moved to the item start
+-- i.e. the project start, because it cannot be moved left past it 
+-- into the negative even if manually it can
+
+r.PreventUIRefresh(1)
+
+	if not stored_pos then -- store
+	
+	local ACT = r.MIDIEditor_LastFocused_OnCommand
+	local stored_pos = r.GetCursorPosition()
+	ACT(40443, false) -- View: Move edit cursor to mouse cursor // islistviewcommand false
+	local edit_cur_pos = r.GetCursorPosition()
+	return stored_pos
+	
+	else -- restore
+
+	r.SetEditCurPos(stored_pos, 0, 0) -- restore edit cursor pos; moveview is 0, seekplay is 0
+	
+	end
+
+r.PreventUIRefresh(-1)
+
+end
+-- USE:
+--local stored_pos = Re_Store_Edit_Cursor_Pos_In_MIDI_Ed()
+-- DO STRUFF
+--Re_Store_Edit_Cursor_Pos_In_MIDI_Ed(stored_pos)
+
+
+
 function Get_Mouse_Coordinates_MIDI(wantSnapped) -- wantsnapped is boolean
 -- inserts a note at mouse cursor, gets its pitch and start position and then deletes it
--- advised to use with Get_Note_Under_Mouse() to avoid other notes, that is only run this function if that function returns nil to be sure that there's no note under mouse and Cursor_outside_pianoroll() to make sure than the mouse cursor if within the piano roll because 'Edit: Insert note at mouse cursor' which is used here inserts notes even if the cursor is outside of the MIDI item bounds, see details in the comment to the action below
+-- advised to use with Get_Note_Under_Mouse() to avoid other notes, that is only run this function if that function returns nil to be sure that there's no note under mouse and Mouse_Cursor_outside_painoroll() to make sure than the mouse cursor if within the piano roll because 'Edit: Insert note at mouse cursor' which is used here inserts notes even if the cursor is outside of the MIDI item bounds, see details in the comment to the action below
 
 local ME = r.MIDIEditor_GetActive()
 local take = r.MIDIEditor_GetTake(ME)
@@ -3075,11 +3138,15 @@ local midi_take = r.MIDIEditor_GetTake(hwnd)
 
 function Get_Note_Under_Mouse(hwnd, midi_take)
 -- returns note index or nil if no note under mouse cursor
--- advised to use with Cursor_outside_pianoroll() because if mouse is outside of the MIDI item
+-- advised to use with Mouse_Cursor_outside_painoroll() because if mouse is outside of the MIDI item
 -- the result will be nil as when there's no note under mouse
 
+local ACT = r.MIDIEditor_OnCommand -- or r.MIDIEditor_LastFocused_OnCommand in which case hwnd arg isn't necessary
+
 r.PreventUIRefresh(1)
-r.Undo_BeginBlock() -- to prevent creation of undo point by 'Edit: Split notes at mouse cursor'
+
+ACT(hwnd, 40659) -- Correct overlapping notes // absolutely necessary because splitting overlapping notes breaks the entire edifice, the split action splits both
+r.Undo_BeginBlock() -- to prevent creation of undo point by 'Edit: Split notes at mouse cursor' // if script creates its own undo point and this function is called inside the undo block undo here will interfere with the script undo block
 local retval, notecntA, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(midi_take)
 local props_t = {}
 	for i = 0, notecntA-1 do -- collect current notes properties
@@ -3087,9 +3154,9 @@ local props_t = {}
 	props_t[#props_t+1] = {startppq, endppq, pitch}
 	end
 local snap = r.GetToggleCommandStateEx(32060, 1014) == 1 -- View: Toggle snap to grid
-local off = snap and r.MIDIEditor_OnCommand(hwnd, 1014) -- disable snap
-r.MIDIEditor_OnCommand(hwnd, 40052)	-- Edit: Split notes at mouse cursor
-local on = snap and r.MIDIEditor_OnCommand(hwnd, 1014) -- re-enable snap
+local off = snap and ACT(hwnd, 1014) -- disable snap
+ACT(hwnd, 40052) -- Edit: Split notes at mouse cursor
+local on = snap and ACT(hwnd, 1014) -- re-enable snap
 local retval, notecntB, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(midi_take) -- re-count after split
 local idx, fin, note
 	if notecntB > notecntA then -- some note was split
@@ -3110,7 +3177,8 @@ local idx, fin, note
 			---]]-----
 		local v = props_t[i+1] -- +1 since table index is 1-based while note count is 0-based; the 1st part of the note will keep the note original index after split and after restoration
 			if v and startppq == v[1] and endppq ~= v[2] and pitch == v[3] then
-			idx, fin, note = i, endppq, pitch end
+			idx, fin, note = i, endppq, pitch 
+			end
 			if idx and startppq == fin and pitch == note then -- locate the 2nd part of the split note
 			r.MIDI_DeleteNote(midi_take, i) -- delete the 2nd part
 			r.MIDI_SetNote(midi_take, idx, x, x, x, endppq, x, x, x, false) -- restore the note original length // selected, muted, startppq, chan, pitch, vel all nil, noSort false because only one note is affected
@@ -4867,7 +4935,9 @@ r.SetTrackSelected(master, false) -- selected is false
 end
 
 
-function Track_Controls_Locked(tr) -- locked is 1, not locked is nil
+function Track_Controls_Locked1(tr) -- locked is 1, not locked is nil
+-- takes advantage of the inability to mute a track
+-- whose controls are locked, even via API
 	if tr == r.GetMasterTrack(0) then return end -- Master track controls cannot be locked
 r.PreventUIRefresh(1)
 local mute_state = r.GetMediaTrackInfo_Value(tr, 'B_MUTE')
@@ -4881,6 +4951,11 @@ r.PreventUIRefresh(-1)
 return locked
 end
 
+
+function Track_Controls_Locked2(tr) -- Track_Controls_Locked1 is preferable because it doesn't rely on the chunk
+local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
+return chunk:match('NAME.-LOCK 1') -- when not locked LOCK attribute is absent in the chunk
+end
 
 
 function Preserve_TCP_Heights_When_Bot_Dock_Open()
@@ -5881,6 +5956,8 @@ end
 
 
 function Fixed_Lane_Comping_Enabled(tr)
+-- not whether fixed item lanes mode is enabled, for which use
+-- r.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2
 --[[
 FIXEDLANES 9 0 0 0 0 -- Big Lanes (lanes maximized)
 FIXEDLANES 9 0 2 0 0 -- lanes collapsed (imploded) down to one visible lane, option 'Fixed item lanes' is disabled
@@ -5890,15 +5967,9 @@ FIXEDLANES 41 0 0 0 0 -- Big Lanes + Hide Lane Buttons
 LANESOLO 8 0 0 0 0 0 0 0 -- absent in track with no lanes, same as r.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') ~= 2
 ]]
 local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
-return chunk:match('LANEREC [%-%d]+ 0 [%-%d]+') -- when disabled the 2nd flag is -1
+return chunk:match('LANEREC [%-%d]+ 0 [%-%d]+') -- in the second string the 2nd flag is -1
 end
 
-
-
-function Track_Controls_Locked(tr)
-local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
-return chunk:match('NAME.-LOCK 1') -- when not locked LOCK attribute is absent in the chunk
-end
 
 
 --================================ T R A C K S  E N D ================================
@@ -8167,6 +8238,7 @@ local tr_cnt = r.CountTracks(0)
 		return end
 	r.SetExtState(sect, slot, data, false) -- persist false
 	]]
+	return t
 	elseif t and next(t) then
 	--[[ -- only relevant for storage as extended state
 	local data = r.GetExtState(sect, slot)
@@ -8195,6 +8267,8 @@ end
 
 
 function Parse_Razor_Edit_Data(data)
+-- data is a string returned by 
+-- r.GetSetMediaTrackInfo_String(tr, 'P_RAZOREDITS', '', false) -- setNewValue false
 local t = {}
 	for st, fin in data:gmatch('([%.%d]+) ([%.%d]+)') do
 	t[#t+1] = {st, fin}
@@ -8204,11 +8278,11 @@ end
 
 
 function Collect_Raz_Edit_Data(razor_edit)
--- razor_edit is a string returned by
+-- razor_edit is a string returned by 
 -- r.GetSetMediaTrackInfo_String(tr, 'P_RAZOREDITS', '', false) -- setNewValue false
 local t = {env = {}, itm = {} }
 	for area in raz_edit:gmatch('[%d%.]+ [%d%.]+ ".-"') do
-		if area:match('{') then t.env[#t.env+1] = area
+		if area:match('{') then t.env[#t.env+1] = area -- envelope GUID is enclosed within quotes
 		else
 		t.itm[#t.itm+1] = area
 		end
@@ -11664,7 +11738,7 @@ local pitch_env_val
 	pitch_env_val = pitch ~= 0 and pitch or 0
 	end
 
--- get origial media source to calculate unit for convertion of item boundaries into region boundaries within RS5k
+-- get original media source to calculate unit for convertion of item boundaries into region boundaries within RS5k
 local src = r.GetMediaItemTake_Source(take)
 local src = r.GetMediaSourceParent(src) or src -- in case the item is a section or a reversed source; if item is a section the next function will return actual item length rather than the source's, hence unsuitable for unit calculation (for which full source length is required) neither suitable for file name retrieval and parent source must be retrieved
 -- convert source length to sample region units used in rs5k (0 - 1)
@@ -11710,7 +11784,7 @@ r.TrackFX_SetParamNormalized(track, rs5k_idx, 13, start*unit) -- 'Sample start o
 -- r.TrackFX_SetParam(track, rs5k_idx, 13, start*unit)
 r.TrackFX_SetParamNormalized(track, rs5k_idx, 14, (start+len)*unit) -- 'Sample end offset'
 --r.TrackFX_SetParam(track, rs5k_idx, 14, (start+len)*unit)
-r.TrackFX_SetParam(track, rs5k_idx, 15, 0.5+pitch_shift+pitch_env_val*1/160) -- 'Pitch offset' aka Pitch adjust
+r.TrackFX_SetParam(track, rs5k_idx, 15, 0.5+pitch_shift+pitch_env_val*1/160) -- 'Pitch offset' aka Pitch adjust // starting with 0.5 because pitch has positive and negative ranges and 0.5 represents pitch 0 (middle) in the parameter range of 0-1
 --r.TrackFX_SetParamNormalized(track, rs5k_idx, 15, 0.5+pitch_shift+pitch_env_val*1/160) -- 'Pitch offset' aka Pitch adjust
 end
 
@@ -11755,6 +11829,9 @@ function rand_active_take_idx(take_cnt, cur_take_idx, ALLOW_REPEATS)
 
 return cur_take_new_idx-1 -- -1 since math.random's range begins with 1 while take count is 0 based
 end
+-- USE:
+-- local cur_take_idx = r.GetMediaItemInfo_Value(item, 'I_CURTAKE')
+-- r.SetMediaItemInfo_Value(item, 'I_CURTAKE', rand_active_take_idx(take_cnt, cur_take_idx, ALLOW_REPEATS))
 
 
 
@@ -14692,7 +14769,11 @@ function Get_Window_And_Children_JS(wnd_title, want_exact_title)
 
 local want_exact_title = want_exact_title or false -- the argument in the function doesn't support nil
 
-local wnd = r.JS_Window_Find(wnd_title, want_exact_title)
+local Find = r.JS_Window_Find
+-- more reliable if want_exact_title is true to ignore string appearances
+-- for example in script/action names in the Action list
+local wnd = not want_exact_title and Find(wnd_title, want_exact_title)
+or want_exact_title and Find(wnd_title, want_exact_title) or (Find(wnd_title..' (docked)', want_exact_title) )
 local child = wnd and r.JS_Window_GetRelated(wnd, 'CHILD')
 local child_t = {}
 	if child then
@@ -14799,12 +14880,15 @@ function Traverse_List1(list_wnd, col_cnt)
 
 local col_cnt = col_cnt or 1 -- only traverse 1st column if arg isn't provided
 local itm_cnt = r.JS_ListView_GetItemCount(list_wnd) -- number of rows
+
+	if itm_cnt == 0 then return end
 	
 local row_idx = 0
 	repeat
 	local col_idx, text = 0
 		repeat
 		text = r.JS_ListView_GetItemText(list_wnd, row_idx, col_idx)
+			if text == item_text then return row_idx end
 		col_idx=col_idx+1
 		until col_idx == col_cnt
 	row_idx=row_idx+1
@@ -14825,12 +14909,15 @@ function Traverse_List2(list_wnd, col_cnt)
 
 local col_cnt = col_cnt or 1 -- only traverse 1st column if arg isn't provided
 local itm_cnt = r.JS_ListView_GetItemCount(list_wnd) -- number of rows
+
+	if itm_cnt == 0 then return end
 	
 local col_idx = 0
 	repeat
 	local row_idx, text = 0
 		repeat
 		text = r.JS_ListView_GetItemText(list_wnd, row_idx, col_idx)
+			if text == item_text then return row_idx end
 		row_idx=row_idx+1
 		until row_idx == itm_cnt or not text
 	col_idx=col_idx+1
@@ -15021,15 +15108,25 @@ end
 function Scroll_Window(wnd, line_idx)
 -- line_idx is 1-based index of the target line
 
+	if not line_idx or line_idx == 0 then return end
+
 	if wnd then
-	local SendMsg = r.BR_Win32_SendMessage
 	--	set scrollbar to top to procede from there on down by lines
-	SendMsg(wnd, 0x0115, 6, 0) -- msg 0x0115 WM_VSCROLL, 6 SB_TOP, 7 SB_BOTTOM, 2 SB_PAGEUP, 3 SB_PAGEDOWN, 1 SB_LINEDOWN, 0 SB_LINEUP https://learn.microsoft.com/en-us/windows/win32/controls/wm-vscroll
+		if r.BR_Win32_SendMessage then
+		r.BR_Win32_SendMessage(wnd, 0x0115, 6, 0) -- msg 0x0115 WM_VSCROLL, wParam 6 SB_TOP, 7 SB_BOTTOM, 2 SB_PAGEUP, 3 SB_PAGEDOWN, 1 SB_LINEDOWN, 0 SB_LINEUP, lParam 0, https://learn.microsoft.com/en-us/windows/win32/controls/wm-vscroll
+		elseif r.JS_WindowMessage_Send then
+		r.JS_WindowMessage_Send(wnd, 'WM_VSCROLL', 6, 0, 0, 0) -- wParamHighWord and lParamHighWord 0
+		end		
 		for i=1, line_idx-1 do -- -1 to stop scrolling at the target line and not scroll past it
-		SendMsg(wnd, 0x0115, 1, 0) -- msg 0x0115 WM_VSCROLL, lParam 0, wParam 1 SB_LINEDOWN scrollbar moves down / 0 SB_LINEUP scrollbar moves up that's how it's supposed to be as per explanation at https://learn.microsoft.com/en-us/windows/win32/controls/wm-vscroll but in fact the message code must be passed here as lParam while wParam must be 0, same as at https://stackoverflow.com/questions/3278439/scrollbar-movement-setscrollpos-and-sendmessage
+			if r.BR_Win32_SendMessage then
+			r.BR_Win32_SendMessage(wnd, 0x0115, 1, 0) -- msg 0x0115 WM_VSCROLL, wParam 1 SB_LINEDOWN scrollbar moves down / 0 SB_LINEUP scrollbar moves up that's how it's supposed to be as per explanation at https://learn.microsoft.com/en-us/windows/win32/controls/wm-vscroll, same as at https://stackoverflow.com/questions/3278439/scrollbar-movement-setscrollpos-and-sendmessage. lParam 0
 		-- WM_VSCROLL is equivalent of EM_SCROLL 0x00B5 https://learn.microsoft.com/en-us/windows/win32/controls/em-scroll
+			elseif r.JS_WindowMessage_Send then
+			r.JS_WindowMessage_Send(wnd, 'WM_VSCROLL', 1, 0, 0, 0) -- wParamHighWord and lParamHighWord 0
+			end
 		end
 	end
+
 end
 
 
@@ -15054,6 +15151,9 @@ local parent_wnd = r.JS_Window_Find('Region/Marker Manager', true) -- exact true
 		for idx=0, list_itm_cnt-1 do
 			if not rgn_name then -- look for highlighted item in the list
 			local highlighted = r.JS_ListView_GetItemState(mngr_list_wnd, idx) == 2 -- items in the Region/Marker Manager aren't selected by a click on a region/marker in Arrange but are highlighted, they're selected when clicked directly, code is 3 which is irrelevant for this script
+		-- OR
+		--	local text, state = r.JS_ListView_GetItem(mngr_list_wnd, idx, 0) -- state is the same value as the one returned by r.JS_ListView_GetItemState(), column index is 0, in most lists item is highlighted across all columns therefore column index is immaterial
+		-- the state codes: 0 - neither heighlighted, selected or was last selected, 1 - last selected while none is currently selected, 2 - highlighted, 3 - selected by a click
 				if highlighted then
 				-- this doesn't need scrolling with JS_Window_SetScrollPos() at all;
 				-- if Region/Marker Manager is closed when the script is executed
@@ -15084,6 +15184,71 @@ local parent_wnd = r.JS_Window_Find('Region/Marker Manager', true) -- exact true
 
 end
 
+
+
+-- child_t = Get_Child_Windows_SWS('Media Explorer')
+-- local displayall = Check_reaper_ini('reaper_explorer', 'displayall')
+-- options = Get_Media_Explorer_Show_Submenu_Options(displayall+0) -- must stay global to be accesible inside Scroll_MX_File_List() function
+-- time_init = r.time_precise()
+-- defer version is required when scrolling must be performed
+-- after changing folder, because the window is slow to update
+-- and target file won't be found immediately
+function Scroll_MX_File_List1() -- defer version
+-- relies on Get_Media_Explorer_Column_Count(), 
+-- Traverse_List2() functions
+
+	if r.time_precise() - time_init >= 0.03 then -- waiting 30 ms before scrolling
+	local list_wnd
+		for k, data in ipairs(child_t) do
+			if data.title == 'List1' then -- MX list view window title is List1
+			list_wnd  = data.child break
+			end
+		end
+		if list_wnd then
+		local file_name = options[3] and stored_path:match('.+[\\/](.+)') or stored_path:match('.+[\\/](.+)%.') -- include extension if enabled in 'Show' settings as 'File extension even if file type displayed'
+		local col_cnt = Get_Media_Explorer_Column_Count()
+		local row_idx = Traverse_List2(list_wnd, col_cnt, file_name) -- isolating file name to the exclusion of its extension because it may be turned off in the 'Show' settings
+			if row_idx then
+			Scroll_Window(list_wnd, row_idx+1) -- +1 because row_idx return value is 0-based
+			end
+		--	r.JS_ListView_EnsureVisible(list_wnd, file_idx, false) -- partialOK false
+		end
+	return
+	end
+r.defer(Scroll_MX_File_List1)
+end
+
+
+function Scroll_MX_File_List2(options, file_name, list_wnd) -- non-defer version
+-- relies on Get_Media_Explorer_Column_Count(), 
+-- Traverse_List2() functions
+-- and those which precede Scroll_MX_File_List1() above
+local file_name = options[3] and file_name or file_name:match('.+[\\/](.+)%.') -- include extension if enabled in 'Show' settings as 'File extension even if file type displayed'
+local col_cnt = Get_Media_Explorer_Column_Count()
+row_idx = Traverse_List2(list_wnd, col_cnt, file_name) -- isolating file name to the exclusion of its extension because it may be turned off in the 'Show' settings
+	if row_idx then
+	Scroll_Window(list_wnd, row_idx+1)
+	end
+--	r.JS_ListView_EnsureVisible(list_wnd, file_idx, false) -- partialOK false
+end
+
+
+
+function Get_Focused_Item_In_List(list_wnd)
+-- may be useful in determining the number of items
+-- which need to be hopped over in order to select or scroll to an item with specific index
+-- provided there's a programmatic way to select or scroll to it
+-- although as far as scrolling is concerned Scroll_Window() function above 
+-- is good enough because it always resets the scroll position 
+-- to 0 before scrolling to the target
+
+local focused_itm_idx = r.JS_ListView_GetFocusedItem(list_wnd) -- returnns last focused item index even if it's not currently selected or highlighted, hence needs to be additionally validated with the following function, because if none is visibly selected or highlighted the initial index for scrolling or selection loop must be 0
+local text, state = r.JS_ListView_GetItem(list_wnd, focused_itm_idx, 0) -- column index is 0, in most lists item is highlighted across all columns therefore column index is immaterial
+-- OR
+-- local state = r.JS_ListView_GetItemState(list_wnd, focused_itm_idx)
+-- the state codes: 0 - neither heighlighted, selected or was last selected, 1 - last selected while none is currently selected, 2 - highlighted, 3 - selected by a click
+return state
+end
 
 
 function Insert_String_Into_Field_SWS(parent_wnd, str)
@@ -15492,7 +15657,7 @@ end
 
 --==================================== T H E M E ====================================
 
-function smandrap_Change_MCP_Width(PIXEL_STEP, PERIST) -- v7.0 default theme only
+function smandrap_Change_MCP_Width(PIXEL_STEP, PERSIST) -- v7.0 default theme only
 -- PIXEL_STEP -- Positive: increase size. Negative: decrease size
 -- https://forum.cockos.com/showpost.php?p=2792656&postcount=120
 -- OR
@@ -16487,7 +16652,7 @@ local func = ''
 		end
 	end
 
-func = func:match('.+(return function.+end)') -- exclude any trailing and preceding content, only the last 'return function' is included in case it occurs elsewhere in the script, should not feature in the nested functions 
+func = func:match('.+(return function.+end)') -- exclude any trailing and preceding content, only the last 'return function' is included in case it occurs elsewhere in the script, it should not feature in the nested functions
 
 	if func then
 	-- https://stackoverflow.com/questions/48629129/what-does-load-do-in-lua
@@ -16497,7 +16662,7 @@ func = func:match('.+(return function.+end)') -- exclude any trailing and preced
 		else
 		-- https://www.gammon.com.au/scripts/doc.php?lua=pcall
 		-- http://lua-users.org/lists/lua-l/2009-11/msg00269.html
-		local ok, t = pcall(func) -- t is a table returned by the function // if the called function has arguments, they all or their substitues must follow as pcall arguments, i.e. pcall(func, arg1, arg2, arg3), in order for evaluation to succeed (this will be the case if the returned function loaded with load() has arguments), if there're multiple return values, the are all returned after ok return value
+		local ok, t = pcall(func) -- t is a table returned by the function func // if the called function has arguments, they all or their substitues must follow as pcall arguments, i.e. pcall(func, arg1, arg2, arg3), in order for evaluation to succeed (this will be the case if the returned function loaded with load() has arguments), if there're multiple return values, the are all returned after ok return value
 			if ok then return t
 			else
 			r.MB('The function is frought with errors', 'ERROR', 0)
@@ -16857,8 +17022,38 @@ local retval, div, swingmode, swingamt = r.GetSetProjectGrid(0, false, 0, 0, 0) 
 --local grid_div_time = 60/r.Master_GetTempo()*div/0.25 -- duration of 1 grid division in sec; 0.25 corresponds to a quarter note as per GetSetProjectGrid()
 --return grid_div_time
 -- OR
-return 60/r.Master_GetTempo()*div/0.25 -- duration of 1 grid division in sec; 0.25 corresponds to a quarter note as per GetSetProjectGrid()
+return r.GetToggleCommandStateEx(0, 41885) == 0 -- Grid: Toggle framerate grid
+and 60/r.Master_GetTempo()*div/0.25 -- duration of 1 grid division in sec; 0.25 corresponds to a quarter note as per GetSetProjectGrid()
+or 1/r.TimeMap_curFrameRate(0) -- frame duration doesn't depend on the tempo, 1 because the rate is per second
 end
+
+
+
+function Get_Visible_Grid_Div_Length(grid_div_len)
+-- grid_div_len stems from Grid_Div_Dur_In_Sec()
+-- returns length of visible grid division in sec
+local retval, min_spacing = r.get_config_var_string('projgridmin') -- minimum visible grid resolution // setting in Snap/Grid Settings dialogue 'Show grid, line spacing: ... minimum: ... pixels'
+	if min_spacing+0 > 0 then
+	local zoom = r.GetHZoomLevel() -- pix/sec
+	local pix_per_grid_div = zoom*grid_div_len
+		if pix_per_grid_div < min_spacing+0 then
+			-- increment until equal or greater than the minimum
+			while pix_per_grid_div < min_spacing+0 do
+			grid_div_len = grid_div_len+grid_div_len
+			pix_per_grid_div = zoom*grid_div_len
+			end
+		return grid_div_len
+		end	
+	end
+return grid_div_len
+end
+
+
+
+function Get_Time_Of_Closest_Grid_Div(time)
+return r.SnapToGrid(0, time)
+end
+
 
 
 function Music_Div_To_Sec(val)
@@ -16972,6 +17167,7 @@ local dimens_t = {r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)} -- wantWorkAre
 -- OR https://forum.cockos.com/showthread.php?p=1608719
 -- spotted in 'Thonex_Adjust selected items vol by greatest peak overage'
 -- https://forums.cockos.com/showthread.php?t=210811
+-- https://forum.cockos.com/showthread.php?t=170003
 local Track_Vol_dB = 20*math.log(val, 10) -- same as 20*math.log10(val) but math.log10 isn't supported in REAPER
 local Track_Vol_val = 10^(dB_val/20)
 
@@ -16995,7 +17191,7 @@ function ValToDb(val)
 	if val < 0.0000000298023223876953125 then
 		return -150
 	else
-		return math.max(-150, math.log(val)* 8.6858896380650365530225783783321)
+		return math.max(-150, math.log(val)*8.6858896380650365530225783783321)
 	end
 end
 
@@ -17441,12 +17637,16 @@ Msg(t.a) Msg(t.b) Msg(t.c)
 
 
 
-function Settings_Management_Menu_And_Help(want_help)
+function Settings_Management_Menu_And_Help(condition, want_help, want_run)
 -- manage script settings from a menu
 -- the function updates the actual script file
 -- used in Transcribing A - Create and manage segments (MAIN).lua
+-- and Transcribing B - Create and manage segments (MAIN).lua
 -- relies on Reload_Menu_at_Same_Pos2() and Esc() functions
 -- want_help is boolean if About text needs to be displayed to the user
+-- want_run is a boolean to create a menu button to execute the script;
+-- any user settings not explicitly listed in user_sett table below 
+-- will be ignored in the menu, i.e. MANAGE_SETTINGS_VIA_MENU setting
 
 --[[ HERE INSERT SOME CONDITION TO OPEN THE SETTINGS MENU IN A REGULAR SCRIPT
 
@@ -17480,7 +17680,7 @@ local sett_t, help_t, about = {}, want_help and {} -- help_t is optional if help
 		end
 	end
 
-local user_sett = {'setting1','setting2'} -- POPULATE WITH ACTUAL SETTING VARIABLES
+local user_sett = {'setting1', 'setting2'} -- POPULATE WITH NAMES OF ACTUAL SETTING VARIABLES // not all settings have to be included, those which aren't listed will not be available in the menu
 local menu_sett = {}
 	for k, v in ipairs(user_sett) do
 		for k, line in ipairs(sett_t) do
@@ -17494,15 +17694,20 @@ local menu_sett = {}
 -- type in actual setting names
 local menu = ('USER SETTINGS'):gsub('.','%0 ')..'||'..menu_sett[1]..'sett1||'
 ..menu_sett[2]..'sett2||'..menu_sett[3]..'sett3||'
-..menu_sett[4]..'sett4|||View Help| '
+..menu_sett[4]..'sett4|||View Help|'..(want_run and ('RUN'):gsub('.','%0 ') or ' ')
 
 local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
 
-	if output < 2 or output > 6 then return 1 end -- THE VALUES DEPEND ON THE NUMBER OF MENU ITEMS // 1 i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited
-
-	if output == 6 then -- THE VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
-	r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'),r.ClearConsole())
-	return 1 end -- 1  i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited // trimming the first line of user settings section because it's captured by the loop
+	if output == 6 and want_help and #help_t > 0 then -- THE output VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
+	r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'),r.ClearConsole()) -- trimming the first line of user settings section because it's captured by the loop
+	end
+	
+	if want_run and output == 7 then -- THE output VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
+	return menu_sett
+	elseif output < 2 or output >= 6 then -- THE VALUES DEPEND ON THE NUMBER OF MENU ITEMS
+	return 1 -- 1 i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited
+	-- OR goto RELOAD -- if clicked on an invalid item, i.e. title or blank
+	end
 
 output = output-1 -- offset the 1st menu item which is a title
 local src = user_sett[output]
@@ -17529,9 +17734,27 @@ goto RELOAD
 
 end
 --[[ USE:
-	if Settings_Management_Menu() then
+	if Settings_Management_Menu_And_Help(condition, want_help) then -- want_run is nil so the script will be aborted in any event
 	return r.defer(no_undo) -- menu was exited or item is invalid
 	end
+
+-- OR
+
+local menu = #MANAGE_SETTINGS_VIA_MENU:gsub(' ','') > 0
+
+local user_sett = menu and Settings_Management_Menu_And_Help(condition, want_help, 1) -- want_run true
+
+	if not user_sett then r.defer(no_undo) end
+	
+-- initialize here if settings menu is enabled, 
+-- otherwise use original variables from USER SETTINGS section
+function validate_sett(sett, menu_sett)
+return #(menu_sett or sett):gsub(' ','') > 0
+end
+sett1 = validate_sett(sett1, user_sett and user_sett[1])
+sett2 = validate_sett(sett2, user_sett and user_sett[2])
+sett3 = validate_sett(sett3, user_sett and user_sett[3])
+
 ]]
 
 
@@ -17551,86 +17774,6 @@ local help_t = {}
 		end
 	end
 end
-
-
-
-function Get_Set_Menu_Toggle_Options(named_ID, opt_st_idx, opt_end_idx, t, output, want_excl)
--- named_ID is the script named ID converted with ReverseNamedCommandLookup()
--- from numeric command ID obtained from get_action_context()
--- opt_st_idx, opt_end_idx are options start and end indices in the menu
--- options are stored as 0s and 1s, e.g. 00101
--- t, output and want_excl are only relevant at the Set stage
--- t is returned at Get stage, output is index returned by the menu
--- want_exl is boolean if options must be mutually exclusive
--- the Get stage comes before menu concatenation
--- the Set stage comes after receiving menu output
-
-local opts = r.GetExtState(named_ID, 'OPTIONS')
-
-	if not t then -- GET
-	local t = {}
-		for i=opt_st_idx, opt_end_idx do
-		t[i] = 0 -- initialize all off
-		end
-	local i = opt_st_idx
-		for opt in opts:gmatch('%d') do
-			if opt then
-			t[i] = opt
-			i=i+1
-			end
-		end
-	return t -- will be used for adding checkmarks to the menu and for activating the SET stage
-	else -- SET
-	local cnt = opt_end_idx-opt_st_idx+1
-	opts = want_excl and ('0'):rep(cnt) or opts
--- OR without cnt
---	opts = want_excl and ('0'):rep(#t) or opts
-		for k, opt in ipairs(t) do
-			if output == k then
-			local new_val = opt == '1' and '0' or '1' -- toggle
-		-- OR
-		--	local new_val = tonumber(opt)~1 -- toggle
-			local i = 0
-			opts = opts:gsub('0', function() i=i+1 if i==k then return new_val end end)
-			break end
-		end
-	--[[ ALSO WORKS
-	local i = 0 -- if options didn't start from index 1, i value would have to be offset
-		for opt in opts:gmatch('%d') do
-			if opt then
-			i=i+1
-				if i == output then
-				local new_val = t[i] == '1' and '0' or '1' -- toggle
-			-- OR
-			-- local new_val = tonumber(t[i])~1 -- toggle
-				local i = 0
-				opts = opts:gsub('0', function() i=i+1 if i==output then return new_val end end)
-				break end
-			end
-		end
-	--]]
-	r.SetExtState(named_ID, 'OPTIONS', opts, false) -- persist false
-	end
-
-end
---[[ USE
-
-::RELOAD::
-local opts_t = Get_Set_Menu_Toggle_Options(named_ID, opt_st_idx, opt_end_idx)
-
-function menu_check(sett)
-return sett == '1' and '!' or ''
-end
-
-local menu = menu_check(opts_t[1])..'opt1||'..menu_check(opts_t[2])..'opt2||' -- AND SO ON
-
-local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
-
-	if output >= opt_st_idx and output <= opt_end_idx then
-	Get_Set_Menu_Toggle_Options(named_ID, opt_st_idx, opt_end_idx, opts_t, output, want_excl)
-	goto RELOAD
-	end
-]]
 
 
 
@@ -17992,6 +18135,87 @@ end
 local output = Reload_Menu_at_Same_Pos_gfx(menu)
 	if output > 0 then
 	-- DO STUFF
+	goto RELOAD
+	end
+]]
+
+
+
+function Get_Set_Menu_Toggle_Options(named_ID, opt_st_idx, opt_end_idx, t, output, want_excl)
+-- named_ID is the script named ID converted with ReverseNamedCommandLookup()
+-- from numeric command ID obtained from get_action_context()
+-- opt_st_idx, opt_end_idx are options start and end indices in the menu
+-- must be contiguous;
+-- options are stored as 0s and 1s, e.g. 00101
+-- t, output and want_excl are only relevant at the Set stage
+-- t is returned at Get stage, output is index returned by the menu
+-- want_exl is boolean if options must be mutually exclusive
+-- the Get stage comes before menu concatenation
+-- the Set stage comes after receiving menu output
+
+local opts = r.GetExtState(named_ID, 'OPTIONS')
+
+	if not t then -- GET
+	local t = {}
+		for i=opt_st_idx, opt_end_idx do
+		t[i] = 0 -- initialize all off
+		end
+	local i = opt_st_idx
+		for opt in opts:gmatch('%d') do
+			if opt then
+			t[i] = opt
+			i=i+1
+			end
+		end
+	return t -- will be used for adding checkmarks to the menu and for activating the SET stage
+	else -- SET
+	local cnt = opt_end_idx-opt_st_idx+1
+	opts = want_excl and ('0'):rep(cnt) or opts
+-- OR without cnt
+--	opts = want_excl and ('0'):rep(#t) or opts
+		for k, opt in ipairs(t) do
+			if output == k then
+			local new_val = opt == '1' and '0' or '1' -- toggle
+		-- OR
+		--	local new_val = tonumber(opt)~1 -- toggle
+			local i = 0
+			opts = opts:gsub('0', function() i=i+1 if i==k then return new_val end end)
+			break end
+		end
+	--[[ ALSO WORKS
+	local i = 0 -- if options didn't start from index 1, i value would have to be offset
+		for opt in opts:gmatch('%d') do
+			if opt then
+			i=i+1
+				if i == output then
+				local new_val = t[i] == '1' and '0' or '1' -- toggle
+			-- OR
+			-- local new_val = tonumber(t[i])~1 -- toggle
+				local i = 0
+				opts = opts:gsub('0', function() i=i+1 if i==output then return new_val end end)
+				break end
+			end
+		end
+	--]]
+	r.SetExtState(named_ID, 'OPTIONS', opts, false) -- persist false
+	end
+
+end
+--[[ USE
+
+::RELOAD::
+local opts_t = Get_Set_Menu_Toggle_Options(named_ID, opt_st_idx, opt_end_idx)
+
+function menu_check(sett)
+return sett == '1' and '!' or ''
+end
+
+local menu = menu_check(opts_t[1])..'opt1||'..menu_check(opts_t[2])..'opt2||' -- AND SO ON
+
+local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
+
+	if output >= opt_st_idx and output <= opt_end_idx then
+	Get_Set_Menu_Toggle_Options(named_ID, opt_st_idx, opt_end_idx, opts_t, output, want_excl)
 	goto RELOAD
 	end
 ]]
@@ -18626,7 +18850,7 @@ function Get_Armed_Action(path, sep)
 
 	local function script_exists(line, name)
 	-- how paths external to \Scripts folder may look on MacOS
--- https://github.com/Samelot/Reaper/blob/master/reaper-kb.ini
+	-- https://github.com/Buy-One/Samelot_Reaper
 	local f_path = line:match(Esc(name)..' "(.+)"$') or line:match(Esc(name)..' (.+)$') -- path either with or without spaces, in the former case it's enclosed within quotation marks
 	local f_path = f_path:match('^%u:') and f_path or path..sep..'Scripts'..sep..f_path -- full (starts with the drive letter and a colon) or relative file path; in reaper-kb.ini full path is stored when the script resides outside of the 'Scripts' folder of the REAPER instance being used // NOT SURE THE FULL PATH SYNTAX IS VALID ON OSs OTHER THAN WIN
 	return r.file_exists(f_path)
@@ -18663,7 +18887,7 @@ local sep = sep or path:match('[\\/]')
 						if line:match('SCR') then -- evaluate if script exists
 						scr_exists = script_exists(line, name)
 						end
-					name = name:gsub('Custom:', 'Script:', 1) -- make script data retrieved from reaper-kb.ini conform to the name returned by CF_GetCommandText() which prefixes the name with 'Script:' following their appearance in the Action list instead of 'Custom:' as they're prefixed in reaper-kb.ini file
+					name = name:gsub('Custom:', 'Script:', 1) -- make script data retrieved from reaper-kb.ini conform to the name returned by CF_GetCommandText() and kbd_getTextFromCmd() which prefix the name with 'Script:' following their appearance in the Action list instead of 'Custom:' as they're prefixed in reaper-kb.ini file
 					break end
 				end
 			elseif cmd > 0 then -- either build 6.71+ or sws extension is installed
@@ -18708,6 +18932,99 @@ local sect_t = {['']=0,['alt']=0,['MIDI Editor']=32060,['MIDI Event List Editor'
 	-- return true
 	end
 end
+
+
+
+function Validate_Command_ID(cmdID, section_ID)
+local cmdID = cmdID:gsub(' ','')
+local named_cmd_ID = cmdID:gsub('_','')
+local err = cmdID == '' and 'the field is empty'
+or (tonumber(cmdID) and 
+(#cmdID > 6 or r.kbd_getTextFromCmd and #r.kbd_getTextFromCmd(num_cmd_ID, section_ID) == 0 -- not native action
+or r.CF_GetCommandText and #r.CF_GetCommandText(section_ID, num_cmd_ID) == 0)
+or not tonumber(cmdID) and 
+(#named_cmd_ID ~= 32 and #named_cmd_ID ~= 42 and #named_cmd_ID ~= 47 -- neither custom action nor script
+or r.NamedCommandLookup(cmdID) == 0))
+and 'invalid action command ID'
+	if err then
+	Error_Tooltip('\n\n '..err..' \n\n', 1, 1, 200) -- caps, spaced true, x2 - 200 to move tooltip away from the mouse cursor so it doesn't block the GetUserInputs() dialogue OK button
+	end
+return true
+end
+
+
+
+function Is_Non_Native_Action(cmdID)
+-- return value nil or false doesn't necessarily mean 
+-- that the cmdID belongs to a valid native action
+-- to ascertain that it is see Get_Action_Name() function below
+	if tonumber(cmdID) then
+	return r.ReverseNamedCommandLookup(cmdID) -- accepts integers in string format as well, if the cmdID belongs to a native action or is 0 or is otherwise invalid returns nil
+	else
+	local num_cmdID = r.NamedCommandLookup(tostring(cmdID)) -- for numeric command IDs outputs the same integer as was put in regardless of their existence in the Action list, for invalid name command IDs outputs 0
+	return num_cmdID > 0 and num_cmdID ~= tonumber(cmdID)
+	end
+end
+
+
+
+function Get_Action_Name(cmdID, section_ID)
+-- can be used to ascertain that the command ID belongs to a valid action
+
+	function Esc(str)
+		if not str then return end -- prevents error
+	-- isolating the 1st return value so that if vars are initialized in a row outside of the function the next var isn't assigned the 2nd return value
+	local str = str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0'):gsub('\\','%0%0')
+	return str
+	end
+	
+	local function script_exists(line, name)
+	-- how paths external to \Scripts folder may look on MacOS
+	-- https://github.com/Buy-One/Samelot_Reaper
+	local f_path = line:match(Esc(name)..' "(.+)"$') or line:match(Esc(name)..' (.+)$') -- path either with or without spaces, in the former case it's enclosed within quotation marks
+	local f_path = f_path:match('^%u:') and f_path or path..sep..'Scripts'..sep..f_path -- full (starts with the drive letter and a colon) or relative file path; in reaper-kb.ini full path is stored when the script resides outside of the 'Scripts' folder of the REAPER instance being used // NOT SURE THE FULL PATH SYNTAX IS VALID ON OSs OTHER THAN WIN	
+	return r.file_exists(f_path)
+	end
+
+	if not cmdID then return end
+
+local path = r.GetResourcePath()
+local sep = path:match('[\\/]')
+local named_cmd = tonumber(cmdID) and r.ReverseNamedCommandLookup(cmdID) -- ReverseNamedCommandLookup() accepts integers in string format as well, if the cmdID belongs to a native action or is 0 ReverseNamedCommandLookup() return value is nil
+local act_name, mess
+
+	if r.kbd_getTextFromCmd or r.CF_GetCommandText then -- accept command both as integer and as a string, covers all types of actions
+		if not section_ID then return end
+	local cmdID = named_cmd and cmdID or r.NamedCommandLookup(cmdID) -- if cmdID is integer use it, otherwise look up numeric command ID
+	local GetCommandText = r.kbd_getTextFromCmd or r.CF_GetCommandText
+	local args = r.kbd_getTextFromCmd and {cmdID, section_ID} or r.CF_GetCommandText and {section_ID, cmdID} -- the order of args in the functions differ
+	act_name = GetCommandText(table.unpack(args))
+		if named_cmd and act_name and act_name:match('Script') then -- named_cmd var makes the condition focus on non-native actions thereby excluding narive actions containing the word 'Script' in their name such as 'ReaScript: Close all running ReaScripts'
+		local scr_name = act_name:gsub('Script:', 'Custom:') -- evaluate if script exists having made a replacement to conform to the reaper-kb.ini syntax
+			for line in io.lines(path..sep..'reaper-kb.ini') do
+				if line:match(Esc(scr_name)) then
+				scr_exists = script_exists(line, '"'..scr_name..'"')
+				break end
+			end
+		mess = not scr_exists and '  the script doesn\'t exist \n\n at the registered location'
+		end
+	elseif named_cmd then -- custom action or a script
+		for line in io.lines(path..sep..'reaper-kb.ini') do -- much quicker than using io.read() which freezes UI
+		act_name = line:match('ACT.-("'..Esc(named_cmd)..'" ".-")') or line:match('SCR.-('..Esc(named_cmd)..' ".-")') -- extract command ID and name
+			if act_name then
+				if line:match('SCR') then -- evaluate if script exists
+				scr_exists = script_exists(line, name)
+				end
+			act_name = act_name:gsub('Custom:', 'Script:', 1) -- make script data retrieved from reaper-kb.ini conform to the name returned by CF_GetCommandText() and kbd_getTextFromCmd() which prefix the name with 'Script:' following their appearance in the Action list instead of 'Custom:' as they're prefixed in reaper-kb.ini file
+			mess = not scr_exists and '  the script doesn\'t exist \n\n at the registered location'
+			break end
+		end
+	end
+	
+return act_name, mess -- mess is optional
+
+end
+
 
 
 
@@ -18890,10 +19207,12 @@ end
 
 
 function Get_Mouse_Time_Pos() -- isn't suitable for use during playback as it stops it (this seems wrong), won't return true mouse cursor position if it's over TCP, Get_TCP_MCP_Under_Mouse() must be used to ascertain that it's outside of it
+r.PreventUIRefresh(1) -- ensures that the edit cursor movements aren't noticeable
 local cur_pos_init = r.GetCursorPosition()
 r.Main_OnCommand(40514, 0) -- View: Move edit cursor to mouse cursor (no snapping)
 local cur_pos = r.GetCursorPosition()
 r.SetEditCurPos(cur_pos_init, false, false) -- moveview, seekplay false // restore orig edit curs pos
+r.PreventUIRefresh(-1)
 return cur_pos
 end
 
@@ -19461,7 +19780,7 @@ end
 
 
 function Get_Cursor_Contexts(allow_locked, sectionID, cmd_ID)
--- uses Cursor_outside_pianoroll(), Get_Mouse_Coordinates_MIDI(),
+-- uses Mouse_Cursor_outside_painoroll(), Get_Mouse_Coordinates_MIDI(),
 -- Get_TCP_MCP_Under_Mouse() and Is_Mouse_Over_Arrange()
 
 local allow_locked = not allow_locked and false or true
@@ -19487,7 +19806,7 @@ local tr, info = table.unpack(build_6_36 and {r.GetThingFromPoint(x, y)} or {r.G
 	local ME = r.MIDIEditor_GetActive()
 	local ctx = r.MIDIEditor_GetSetting_int(ME, 'last_clicked_cc_lane') -- click context, returns -1 if Piano roll/Event list, > -1 if any lane
 		if ctx and ctx > -1 then return 'cc' -- ctx may be false if the Main section script instance is triggered
-		elseif not Cursor_outside_pianoroll(r.MIDIEditor_GetTake(ME))
+		elseif not Mouse_Cursor_outside_painoroll(r.MIDIEditor_GetTake(ME))
 		and Get_Mouse_Coordinates_MIDI() -- wantSnapped false
 		then return 'pianoroll'
 		elseif Is_Mouse_Over_Arrange() then return 'arrange'
@@ -20246,6 +20565,83 @@ math.randomseed(reaper.time_precise()*os.time()/1e3) -- 1e3 = 10^3 = 1000
 local rnd = math.random(11000)/10000
 if rnd > 1 then return rnd = 1 else return rnd = math.random(10000)/10000 end
 end
+
+
+function Audio_Accessor_Noise_Gate()
+-- https://forum.cockos.com/showthread.php?t=299094#17 amagalma
+
+-- Noise Gate Parameters
+local open_threshold_dB = -40
+local close_threshold_diff_dB = -1 -- difference from open_threshold_dB 
+local hold_ms = 20
+local ng_floor_dB = 0
+local preopen_ms = 15 -- open earlier than when the gate opens
+
+-- Convert dB values to linear
+local open_threshold = 10^(open_threshold_dB/20)
+local close_threshold = 10^((open_threshold_dB+close_threshold_diff_dB)/20)
+local hold_time = hold_ms/1000
+local preopen = preopen_ms/1000
+local ng_floor_linear = 10^(ng_floor_dB/20)
+
+local ScalingMode = reaper.GetEnvelopeScalingMode( env )
+ng_floor_linear = reaper.ScaleToEnvelopeMode( ScalingMode, ng_floor_linear )
+  
+-- Create audio accessor
+local audio = reaper.CreateTakeAudioAccessor(take)
+
+	if not audio then return end
+
+local samplerate = reaper.GetMediaSourceSampleRate(PCM_source)
+local aa_start = reaper.GetAudioAccessorStartTime(audio)
+local aa_end = reaper.GetAudioAccessorEndTime(audio)
+local n_channels = reaper.GetMediaSourceNumChannels(PCM_source) -- we will read only channel 1
+
+-- Analysis parameters
+local window_size = 0.010 -- 10ms analysis window
+local samples_per_window = math.floor(samplerate * window_size)
+local buffer = reaper.new_array(samples_per_window)
+
+-- Noise gate state variables
+local gate_open = false
+local last_gate_open_pos = 0
+local last_gate_close_pos = -1
+  
+-- Process audio in windows
+local pos = aa_start
+
+	while pos < aa_end do
+	local ret = reaper.GetAudioAccessorSamples(audio, samplerate, 1, pos, samples_per_window, buffer)
+	 
+		if ret ~= 1 then break end
+
+			-- Noise gate logic
+		if peak_value > open_threshold then			
+			if not gate_open and (pos - last_gate_close_pos) > hold_time then
+			-- Open gate
+			reaper.InsertEnvelopePoint(env, pos-0.01-preopen, ng_floor_linear, 5, 0, false, true)
+			reaper.InsertEnvelopePoint(env, pos-preopen, reaper.ScaleToEnvelopeMode( ScalingMode, 1 ), 0, 0, false, true)
+			gate_open = true
+			last_gate_open_pos = pos
+			end
+		elseif peak_value < close_threshold and gate_open then
+			if (pos - last_gate_open_pos) > hold_time then
+			-- Close gate
+			local release_end = pos + 0.005 -- 5ms release
+			reaper.InsertEnvelopePoint(env, pos, reaper.ScaleToEnvelopeMode( ScalingMode, 1 ), 5, 0, false, true)
+			reaper.InsertEnvelopePoint(env, release_end, ng_floor_linear, 0, 0, false, true)
+			gate_open = false
+			last_gate_close_pos = pos
+			end
+		end
+
+	pos = pos + window_size
+	end
+
+reaper.DestroyAudioAccessor(audio)
+
+end
+
 
 
 --=================================== U T I L I T Y  E N D ======================================
@@ -21338,6 +21734,7 @@ M I D I
 	Evts_Selected
 	All_Sel_CCEvts_Belong_To_Visble_OR_Last_Clicked_Lane
 	count_selected_notes
+	Deselect_All_Notes
 	count_selected_events
 	find_first_next_note
 	Notes_Overlap_Ignored_Chords
@@ -21345,7 +21742,9 @@ M I D I
 	Correct_Overlapping_Notes1
 	Correct_Overlapping_Notes2
 	re_store_sel_MIDI_notes
-	Cursor_outside_pianoroll
+	Mouse_Cursor_outside_painoroll_1
+	Mouse_Cursor_outside_painoroll_2
+	Re_Store_Edit_Cursor_Pos_In_MIDI_Ed
 	Get_Mouse_Coordinates_MIDI
 	Get_Note_Under_Mouse
 	is_dotted
@@ -21413,7 +21812,8 @@ T R A C K S
 	collapse_TCP2
 	Deselect_All_Tracks1
 	Deselect_All_Tracks2
-	Track_Controls_Locked
+	Track_Controls_Locked1
+	Track_Controls_Locked2
 	Preserve_TCP_Heights_When_Bot_Dock_Open
 	Re_Store_Track_Heights_Selection_x_Scroll
 	Temp_Track_For_FX
@@ -21444,7 +21844,6 @@ T R A C K S
 	GetTrackState
 	GetTrackTree
 	Fixed_Lane_Comping_Enabled
-	Track_Controls_Locked
 	
 
 
@@ -21778,7 +22177,10 @@ W I N D O W S
 	Scroll_SWS_Notes_Window
 	Scroll_Window
 	Scroll_Region_Mngr_JS
-	Insert_String_Into_Field_SWS_SWS	
+	Get_Focused_Item_In_List
+	Insert_String_Into_Field_SWS
+	Scroll_MX_File_List1
+	Scroll_MX_File_List2
 	Mouse_Click
 	Is_Floating_FX_Window
 	Is_FX_Chain_Window
@@ -21854,6 +22256,8 @@ M E A S U R E M E N T S / C A L C U L A T I O N S
 	Get_Proj_Len_In_Px
 	Beat_To_Pixels
 	Grid_Div_Dur_In_Sec
+	Get_Visible_Grid_Div_Length
+	Get_Time_Of_Closest_Grid_Div
 	Music_Div_To_Sec
 	Music_Div_To_Pixels
 	Scale_Time_By_Horiz_Zoom_Level
@@ -21894,7 +22298,7 @@ U T I L I T Y
 	validate local variable (not a function)
 	Validate_All_Global_Settings
 	Settings_Management_Menu_And_Help
-	Display_Script_Help_Txt
+	Display_Script_Help_Txt	
 	validate_output1
 	validate_output2
 	Get_Action_ID
@@ -21911,6 +22315,7 @@ U T I L I T Y
 	Reload_Menu_at_Same_Pos1
 	Reload_Menu_at_Same_Pos2
 	Reload_Menu_at_Same_Pos_gfx
+	Get_Set_Menu_Toggle_Options
 	Menu_With_Toggle_Options1
 	Menu_With_Toggle_Options2
 	ShowMessageBox_Menu
@@ -21935,6 +22340,9 @@ U T I L I T Y
 	Get_Type_Of_Action
 	Get_Armed_Action
 	Condition_Action_By_Armed_State
+	Validate_Command_ID
+	Is_Non_Native_Action
+	Get_Action_Name
 	timed_tooltip1
 	timed_tooltip2
 	Error_Tooltip1
