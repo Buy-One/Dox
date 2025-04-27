@@ -8566,7 +8566,7 @@ function Get_Focused_FX_Orig_Name() -- regardless of a user custom name displaye
 		if type == 'JS' then
 		local path = name:match('<Project>') and
 		select(2,r.EnumProjects(-1)):match('(.+[\\/])')..'Effects'..sep..name:match('/(.+)')
-		or path..sep..'Effects'..sep..(name:match('%[(.+)%]') or name:match('.+')) -- 2nd option if a non-local jsfx appearing in the chain isn't available, in which case only relative path is displayed either in the chain or in the chunk, without the fx name
+		or path..sep..'Effects'..sep..(name:match('%[(.+)%]') or name:match('.+')) -- 2nd option if a non-local jsfx appearing in the chain isn't available, in which case only relative path is displayed either in the chain or in the chunk, without the fx name; EnumProjects() returns path even if the project file and possibly folder was deleted while the project is open
 		return r.file_exists(path)
 		else return true -- all other fx types exist by default
 		end
@@ -8638,11 +8638,11 @@ local t = {}
 			local path = r.GetResourcePath()
 			local sep = path:match('[\\/]') -- or package.config:sub(1,1)
 				if name:match('<Project>') then -- JSFX local to the project only if project is saved; for the local JSFX to load presets its file in the /presets folder must be named js-_Project__(JSFX file name).ini
-				local retval, proj_path = r.EnumProjects(-1) -- -1 active project
+				local retval, proj_path = r.EnumProjects(-1) -- -1 active project; EnumProjects() returns path even if the project file and possibly folder was deleted while the project is open
 				local proj_path = proj_path:match('.+[\\/]') -- excluding the file name // OR proj_path:match('.+'..Esc(r.GetProjectName(0, '')))
 				local file_name = name:match('<Project>/(.+)')
-				local path = proj_path..'Effects'..sep..file_name -- proj_path includes the separator
-					if r.file_exists(path) then
+				local path = proj_path and proj_path..'Effects'..sep..file_name -- proj_path includes the separator
+					if path and r.file_exists(path) then
 						for line in io.lines(path) do
 						local name_local = line:match('^desc:') and line:match('desc:%s*(.+)') -- ignoring commented out 'desc:' tags if any // isolate name in this routine so that in case the actual name isn't found in the JSFX file the file name fetched from the chunk will be used
 							if name_local then name = 'JS '..name_local..' ['..path..']' break end
@@ -10967,9 +10967,11 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 	-- Close temp project tab without save prompt; when a freshly opened project closes there's no prompt
 	-- the problem may emerge if the script is bound to a shortcut where Ctrl & Shift are used because this modifier combination is used to generate a prompt to load project with fx offlined, so the script shortcut must not include this combination; in reaper-kb.ini KEY codes Ctrl+Shift code (the first number) seems to be consistently 13, Ctrl+Alt+Shift is 29
 	-- using dummy project doesn't help to overcome Ctrl+Shift issue
-	r.Main_openProject('noprompt:'..projfn)
-	r.Main_OnCommand(40860, 0) -- Close current project tab
-	r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
+		if r.file_exists(projfn) then -- EnumProjects() returns empty string if project doesn't have a file and returns path even if the project file and possibly folder was deleted while the project is open
+		r.Main_openProject('noprompt:'..projfn)
+		r.Main_OnCommand(40860, 0) -- Close current project tab
+		r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
+		end
 		if dock_open then r.Main_OnCommand(40279,0) end -- View: Show docker // re-open docks
 	-- r.PreventUIRefresh(-1)
 	local header_height = bot - tr_height - 23 -- size between program window top edge and Arrange // 18 is horiz scrollbar height (regardless of the theme) and 'bot / window_h' value is greater by 4 px than the actual program window height hence 18+4 = 22 has to be subtracted + 1 more pixel for greater precision in targeting item top/bottom edges
@@ -13327,6 +13329,80 @@ local t = {}
 return t, curs_pos_init
 
 end
+
+
+function Get_Selected_And_Hidden_Markers_And_Regions()
+-- thanks to X-Raym for the hint on where to search for selected marker/region data
+-- https://forums.cockos.com/showthread.php?t=261777
+
+--[[
+-- first field is marker index which is the displayed index, not ordinal number on the time line
+-- but the lines order follows time line order
+-- marker GUIDs were presumably added in 6.02 along with support
+-- of MARKER_GUID:X  for GetSetProjectInfo_String()
+-- field 5 is color
+MARKER 1 3.5 "" 8 0 1 R {98544FCA-A197-43C5-A951-849E05FA9E65} 0 -- 8 marker selected
+MARKER 2 4.5 "" 0 0 1 R {D2E332B1-B975-43E2-BF9D-352A83D87CCA} 0 -- 0 marker not selected // 24 marker hidden, since 7.36
+MARKER 1 5.5 "" 9 0 1 R {A7F21A53-1F31-4AF9-B2CA-5246CB22E13A} 0 -- 9 region selected
+MARKER 1 6.5 "" 9
+MARKER 2 7.5 "" 1 0 1 R {42CDA6EC-9BD1-4B20-A87C-64986B6FD1E8} 0 -- 1 region not selected // 25 region hidden, since 7.36
+MARKER 2 8.5 "" 1
+]]
+
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.53 -- build since which Main_SaveProjectEx() is supported
+	or r.CountProjectMarkers(0) == 0 then
+	return end 
+
+local cur_proj, proj_path = r.EnumProjects(-1) -- returns path even if the project file was deleted while the project is open
+
+-- if, while the tab is open, proj file associated with the open tab was deleted along with the media folder, REAPER will automatically re-create it in the original directory of the project file when any action is performed provided such original directory still exists and a media folder is configured in the project settings or Preferences -> General -> Paths, so if this is gonna be the scenario, prevent that
+
+local proj_path, proj_name = table.unpack(r.file_exists(proj_path) and proj_path:match('(.+[\\/])(.+)%.[RrPp]') or {}) -- extract path and name sans extension, if project without project file the result will be nils
+
+	if not proj_path then -- project tab without project file or deleted proj file
+	-- use script path for temp project file
+	local info = debug.getinfo(1,'S');
+	proj_path = info.source:match('@(.+[\\/])')
+	end
+
+local temp_proj_file = proj_path..(r.time_precise()..''):gsub('%.','')..'.RPP' -- making the name unique to reduce likelihood of clash
+r.Main_SaveProjectEx(0, temp_proj_file, 0) -- works with non-saved projects as well
+
+	if r.file_exists(temp_proj_file) then
+	local t = {sel={},hid={}}
+	local count = -1
+		for line in io.lines(temp_proj_file) do
+			if line:match('^%s*MARKER ') then
+			count = count+1
+			local matching = line:match(' %d+ [%.%d]+ ["\']*.+["\']* ([24589]+)') -- 8/0 marker selected/not selected, 9/1 region selected/not selected; 24/25 marker/region hidden, supported since 7.36; selection and visibility are mutually dxclusive, a hidden marker/region cannot be selected in Arrange, their entry selection in the Region/Marker Manager doesn't affect that; if the name doesn't contain spaces it's not enclosed within quotes unless it contains double quote character in which case the entire name is enclosed within single quotes/apostrohe rather than dounle quotes, i.e. '"TEST"' or 'TEST"'
+			local reg_end = not line:match('%d+ [%.%d]+ ["\']*.+["\']* %d+ (%d+)') -- region end line only has 4 fields
+				if matching and not reg_end then -- excluding region end lines, the complete data will be collected below
+				local t_tmp = #matching == 1 and t.sel or t.hid -- one digit long value refers to selection status, two digit long to visibility
+				t_tmp[#t_tmp+1] = count -- count is equal to time line index, 0-based
+				end
+			elseif count > -1 then break -- marker/region data have been parsed
+			end
+		end
+		
+	os.remove(temp_proj_file)
+	
+		if #t.sel + #t.hid == 0 then return end
+		
+		local function get_data(t)
+			for k, index in ipairs(t) do
+			local retval, isrgn, pos, rgnend, name, indexnumber, color = r.EnumProjectMarkers3(0, index)
+			t[k] = {idx=index, erg=isrgn,pos=pos,reg_end=rgnend,name=name,index=indexnumber,color=color}
+			end
+		return t
+		end
+	
+	t.sel, t.hid = get_data(t.sel), get_data(t.hid)
+	return t
+	
+	end
+
+end
+
 
 
 --========================== M A R K E R S  &  R E G I O N S  E N D =========================
@@ -15708,7 +15784,7 @@ function get_script_path() -- same as ({r.get_action_context()})[2]:match('.+[\\
 local info = debug.getinfo(1,'S');
 local script_path = info.source:match[[^@?(.*[\/])[^\/]-$]]
 -- OR
--- local script_path = info.source:match('@(.+[\\/]')
+-- local script_path = info.source:match('@(.+[\\/])')
 return script_path
 end
 
@@ -15985,8 +16061,8 @@ function Dir_Exists2(path) -- short
 -- path is a directory path, not file
 local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces
 local sep = path:match('[\\/]')
-	if not sep then return end -- likely not a string represening a path
-local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed to return 1 (valid)
+	if not sep then return end -- likely not a string representing a path
+local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed so the path is properly formatted for io.open()
 local _, mess = io.open(path)
 return mess:match('Permission denied') and path..sep -- dir exists // this one is enough
 end
@@ -16265,7 +16341,7 @@ end
 
 function get_proj_path()
 local _, projfn = r.EnumProjects(-1) -- active
-return projfn
+return projfn -- empty string for a project with no file, if the proj file was deleted while the project is open will still return its full path
 -- OR
 --local path = r.GetProjectPath('')
 --return path..path:match('[\\/]')..r.GetProjectName(0,'')
@@ -17638,7 +17714,10 @@ Msg(t.a) Msg(t.b) Msg(t.c)
 
 
 function Settings_Management_Menu_And_Help(condition, want_help, want_run)
--- manage script settings from a menu
+-- manage script settings from a menu,
+-- mainly geared towards boolean settings
+-- (aversion of the function which includes non-boolean settings
+-- is used in Trigger action by audio signal or silence.lua)
 -- the function updates the actual script file
 -- used in Transcribing A - Create and manage segments (MAIN).lua
 -- and Transcribing B - Create and manage segments (MAIN).lua
@@ -17647,9 +17726,10 @@ function Settings_Management_Menu_And_Help(condition, want_help, want_run)
 -- want_run is a boolean to create a menu button to execute the script;
 -- any user settings not explicitly listed in user_sett table below 
 -- will be ignored in the menu, i.e. MANAGE_SETTINGS_VIA_MENU setting
+-- if present
 
---[[ HERE INSERT SOME CONDITION TO OPEN THE SETTINGS MENU IN A REGULAR SCRIPT
-
+--[[ -- HERE INSERT SOME CONDITION TO OPEN THE SETTINGS MENU IN A REGULAR SCRIPT
+	 -- LIKE MOUSE POSITION SO THE MENU IS ONLY DISPLAYED AT CERTAIN MOUSE COORDINATES
 	if not condition then return end -- this will allow the main script routine to run if the condition for menu display isn't met
 ]]
 
@@ -17669,14 +17749,16 @@ local sett_t, help_t, about = {}, want_help and {} -- help_t is optional if help
 		elseif #sett_t > 0 then
 		sett_t[#sett_t+1] = line
 		end
-	-- collect help
-		if want_help and #help_t == 0 and line:match('About:') then
-		help_t[#help_t+1] = line:match('About:%s*(.+)')
-		about = 1
-		elseif line:match('----- USER SETTINGS ------') then
-		about = nil -- reset to stop collecting lines
-		elseif about then
-		help_t[#help_t+1] = line:match('%s*(.-)$')
+		-- collect help
+		if want_help then
+			if #help_t == 0 and line:match('About:') then
+			help_t[#help_t+1] = line:match('About:%s*(.+)')
+			about = 1
+			elseif line:match('----- USER SETTINGS ------') then
+			about = nil -- reset to stop collecting lines
+			elseif about then -- collect lines
+			help_t[#help_t+1] = line:match('%s*(.-)$')
+			end
 		end
 	end
 
@@ -17691,7 +17773,7 @@ local menu_sett = {}
 		end
 	end
 
--- type in actual setting names
+-- type in actual setting names or their versions as menu item labels
 local menu = ('USER SETTINGS'):gsub('.','%0 ')..'||'..menu_sett[1]..'sett1||'
 ..menu_sett[2]..'sett2||'..menu_sett[3]..'sett3||'
 ..menu_sett[4]..'sett4|||View Help|'..(want_run and ('RUN'):gsub('.','%0 ') or ' ')
@@ -17704,6 +17786,7 @@ local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
 	
 	if want_run and output == 7 then -- THE output VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
 	return menu_sett
+	elseif output == 0 then return 1 -- i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited
 	elseif output < 2 or output >= 6 then -- THE VALUES DEPEND ON THE NUMBER OF MENU ITEMS
 	return 1 -- 1 i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited
 	-- OR goto RELOAD -- if clicked on an invalid item, i.e. title or blank
@@ -17738,9 +17821,9 @@ end
 	return r.defer(no_undo) -- menu was exited or item is invalid
 	end
 
--- OR
+-- OR (if MANAGE_SETTINGS_VIA_MENU setting is present or the settings are meant to be managed via the menu always)
 
-local menu = #MANAGE_SETTINGS_VIA_MENU:gsub(' ','') > 0
+local menu = #MANAGE_SETTINGS_VIA_MENU:gsub(' ','') > 0 -- only if such setting is present
 
 local user_sett = menu and Settings_Management_Menu_And_Help(condition, want_help, 1) -- want_run true
 
@@ -18106,7 +18189,7 @@ end
 ::RELOAD::
 local retval = Reload_Menu_at_Same_Pos2(menu)
 	if retval and retval == xyz then -- returned menu item index other than 0
--- 	DO STUFF
+-- DO STUFF
 	goto RELOAD
 	else return r.defer(function() do return end end)
 	end
@@ -18580,27 +18663,26 @@ end
 
 function Temp_Proj_Tab()
 -- relies on Create_Dummy_Project_File() if current tab isn't linked to a saved project
-local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer
+local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer; returns empty string if project doesn't have a file and returns path even if the project file and possibly folder was deleted while the project is open
 r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
 -- DO STUFF
 local dummy_proj = Create_Dummy_Project_File()
-r.Main_openProject('noprompt:'..projfn) -- open dummy proj in the newly open tab without save prompt
-r.Main_OnCommand(40860, 0) -- Close current (temp) project tab // save prompt won't appear either because nothing has changed in the dummy proj
+r.Main_openProject('noprompt:'..dummy_proj) -- open dummy proj in the newly open tab without save prompt
+r.Main_OnCommand(40860, 0) -- Close current (temp) project tab // save prompt won't appear because nothing has changed in the dummy proj
+	if dummy_proj then os.remove(dummy_proj) end
 r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
 end
 
 
 function Close_Tab_Without_Save_Prompt()
 -- Close temp project tab without save prompt; when a freshly opened project closes there's no prompt
-local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer
+local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer; returns empty string if project doesn't have a file and returns path even if the project file and possibly folder was deleted while the project is open
 r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
 -- DO STUFF
 r.Main_openProject('noprompt:'..projfn) -- open the stored project in the temp tab
 r.Main_OnCommand(40860, 0) -- Close current project tab // won't generate a save prompt
 r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
 end
-
-
 
 
 function Is_Win()
@@ -18936,18 +19018,24 @@ end
 
 
 function Validate_Command_ID(cmdID, section_ID)
+-- it's advised to add leading underscrore to cmdID before passing into the function, e.g.
+-- cmdID = (tonumber(cmdID) or cmdID:sub(1,1) == '_') and cmdID or '_'..cmdID -- add leading underscrore if none to named command ID
+
 local cmdID = cmdID:gsub(' ','')
 local named_cmd_ID = cmdID:gsub('_','')
 local err = cmdID == '' and 'the field is empty'
-or (tonumber(cmdID) and 
-(#cmdID > 6 or r.kbd_getTextFromCmd and #r.kbd_getTextFromCmd(num_cmd_ID, section_ID) == 0 -- not native action
-or r.CF_GetCommandText and #r.CF_GetCommandText(section_ID, num_cmd_ID) == 0)
+local invalid = 'invalid action command ID'
+err = err or tonumber(cmdID) and 
+(#cmdID > 6 or r.kbd_getTextFromCmd and #r.kbd_getTextFromCmd(cmdID, section_ID) == 0 -- not native action
+or r.CF_GetCommandText and #r.CF_GetCommandText(section_ID, cmdID) == 0)
+and '  '..invalid..'\n\n or the action doesn\'t belong \n\n\t to the Main section'
 or not tonumber(cmdID) and 
 (#named_cmd_ID ~= 32 and #named_cmd_ID ~= 42 and #named_cmd_ID ~= 47 -- neither custom action nor script
-or r.NamedCommandLookup(cmdID) == 0))
-and 'invalid action command ID'
+or r.NamedCommandLookup(cmdID) == 0)
+and invalid
 	if err then
 	Error_Tooltip('\n\n '..err..' \n\n', 1, 1, 200) -- caps, spaced true, x2 - 200 to move tooltip away from the mouse cursor so it doesn't block the GetUserInputs() dialogue OK button
+	return
 	end
 return true
 end
@@ -19021,7 +19109,12 @@ local act_name, mess
 		end
 	end
 	
-return act_name, mess -- mess is optional
+	if mess then
+	Error_Tooltip('\n\n '..mess..' \n\n', 1, 1, 200) -- caps, spaced true, x2 - 200 to move tooltip away from the mouse cursor or menu so it doesn't block the GetUserInputs() dialogue OK button or covered by the reloaded menu
+	return
+	end
+	
+return act_name, mess -- mess is optional, returned if isn't used as a condition for error display above
 
 end
 
@@ -19072,7 +19165,8 @@ function Error_Tooltip1(text, caps, spaced, x2, y2)
 -- but soon disappears if mouse is in the TCP area but not over the TCP
 -- and immediately disappears if the mouse is over the TCP
 -- caps and spaced are booleans, caps doesn't apply to non-ANSI characters
--- x2, y2 are integers to adjust tooltip position by
+-- x2, y2 are integers to adjust tooltip position by,
+-- both refer to the upper left hand corner of the tooltip,
 local x, y = r.GetMousePosition()
 --[[ IF USING WITH gfx
 local x, y = 0,0 -- set to 0 so that they can be overridden with x2 and y2 arguments which are passed as gfx.clienttoscreen(0,0) so that the tooltip is displayed over the gfx window
@@ -19103,7 +19197,8 @@ function Error_Tooltip2(text, caps, spaced, x2, y2, want_color, want_blink)
 -- but soon disappears if mouse is in the TCP area but not over the TCP
 -- and immediately disappears if the mouse is over the TCP
 -- caps and spaced are booleans, caps doesn't apply to non-ANSI characters
--- x2, y2 are integers to adjust tooltip position by
+-- x2, y2 are integers to adjust tooltip position by,
+-- both refer to the upper left hand corner of the tooltip,
 -- want_color is boolean to enable temporary ruler coloring to emphasize the error
 -- want_blink is boolean to enable ruler color blinking
 local x, y = r.GetMousePosition()
@@ -19480,11 +19575,18 @@ end
 
 
 function how_recently_the_project_was_saved()
-local retval, projfn = r.EnumProjects(-1) -- -1 current project
+local retval, projfn = r.EnumProjects(-1) -- -1 current project; returns empty string if project doesn't have a file and returns path even if the project file and possibly folder was deleted while the project is open
+
+	if not r.file_exists(projfn) then return end -- either tab with no project file or deleted project file in which case it's impossible or pointless to retrieve last save time
+
 local last_save_time
+
 	for line in io.lines(projfn) do
 		if line:match('REAPER_PROJECT') then last_save_time = line:match('.+ (%d+)') break end -- the integer represents Unix time at the moment the project was last saved https://www.askjf.com/index.php?q=6650s
 	end
+	
+	if not proj_file_exists then os.remove(projfn) end -- delete temp proj file
+	
 --os.setlocale ('', 'time') -- set, otherwise timestamp doesn't use current locale https://www.gammon.com.au/scripts/doc.php?lua=os.date // doesn't set custom date format
 local diff = os.time() - last_save_time
 return diff, -- seconds
@@ -19493,6 +19595,7 @@ math.floor(diff/3600+0.5), -- hours, rounded
 math.floor(diff/(3600*24)+0.5), -- days, rounded
 os.date('%x %X',last_save_time), -- last save date & time in current locale format
 os.date('%x %X',os.time()) -- current date & time in current locale format
+	
 end
 -- USE:
 -- local sec, mins, hrs, days, timestamp_save, timestamp_cur = how_recently_the_project_was_saved()
@@ -19988,6 +20091,15 @@ proj = IGNORE_OTHER_PROJECTS and r.EnumProjects(-1) ~= proj and Link_To_New_Proj
 	-- MAIN CODE
 	end
 defer(RUN)
+end
+
+
+
+function monitor_defer_loop_update_rate()
+	if r.time_precise() ~= last_t then
+		if last_t then Msg(r.time_precise()-last_t) end
+	last_t = r.time_precise()
+	end
 end
 
 
@@ -21522,7 +21634,7 @@ in both cases without the last slash
 
 reaper.EnumProjects(idx) -- returns full proj path a 2nd value
 
-reaper.EnumProjects(-1) -- returns full path of the current proj as a 2nd value
+reaper.EnumProjects(-1) -- returns full path of the current proj as a 2nd value; returns empty string if project doesn't have a file and returns path even if the project file and possibly folder was deleted while the project is open
 
 proj_full_path = select(2,r.EnumProjects(-1))
 
@@ -22130,6 +22242,7 @@ M A R K E R S  &  R E G I O N S
 	Fix_Overlapping_Regions
 	Get_Mrkrs_Of_Takes_At_Mouse_Or_Edit_Curs
 	Get_Rgn_Mrkr_Mngr_Settings
+	Get_Selected_And_Hidden_Markers_And_Regions
 
 
 
@@ -22379,6 +22492,7 @@ U T I L I T Y
 	RUN1
 	RUN2
 	Link_To_New_Project
+	monitor_defer_loop_update_rate
 	Note_Format_Check
 	Custom_Horiz_Scroll
 	Mouse_Wheel_Direction
