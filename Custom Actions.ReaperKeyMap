@@ -534,6 +534,8 @@ ACT 1 0 "6cb89312ae002648958ef2b4022531a4" "Custom: Sample slices preview backwa
 ACT 1 0 "c6bc8bc34e7d154caa78f67b9599319f" "Custom: Sample slices preview forward (disable whatever loop is currently enabled, place cursor at start of item)" 1016 40632 40647 40222 40647 40223 40632 1007
 ACT 1 0 "029f228f45a4b748bb3e2499ef671ada" "Custom: Sample slices preview forward (place cursor at end of item, allows jumping to edit cursor)" 1016 _BR_SAVE_CURSOR_POS_SLOT_1 40634 _BR_RESTORE_CURSOR_POS_SLOT_1 40647 40222 40647 40223 40632 1007
 ACT 1 0 "0960214afde0dd44a84548a5aef9fd2d" "Custom: Save selected item as new file and rename" 41999 40131 _XENAKIOS_RENMTAKEANDSOURCE
+ACT 1 0 "083f4641e0ae064f8a1c3c77e46a82ac" "Custom: Scroll to bottom of track list / Go to end of tracklist (track selection isn't preserved)" 40702 40914 40005 40286 40913 40297
+ACT 1 0 "5052c6d88e2d1a46ae2cb531826c15da" "Custom: Scroll to top of track list / Go to start of tracklist (track selection isn't preserved)" 40297 40939 40913 40297
 ACT 1 0 "45f1913bba385348bd9c40f6ecea2f9b" "Custom: Select all items following the 1st selected on all tracks (the 1st item excl from selection) -- only 1 item must be selected" 41174 40289 40417 40043 40626 41173 40625 40717 40635
 ACT 1 0 "46f1e72c54cdd54e9b3fb78b7011a1fa" "Custom: Select all items following the 1st selected on selected tracks (the 1st item excl from selection) -- only 1 item must be selected" 41174 40289 40417 40043 40626 41173 40625 40718 40635
 ACT 1 0 "23aac9bf1e345a4cba1f0abb19c0b1db" "Custom: Select all items following the 1st selected on selected tracks (the 1st item incl in selection) -- only 1 item must be selected " 40043 40626 41173 40625 40718 40635
