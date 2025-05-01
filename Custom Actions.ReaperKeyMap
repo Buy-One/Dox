@@ -579,6 +579,7 @@ ACT 1 0 "83f9bae2e14886429c266018d6aeb195" "Custom: Shift time selection left by
 ACT 1 0 "8892b9eb94e9cd4395658db4b83124c4" "Custom: Shift time selection right by 1 beat (relative to grid)" 40631 40841 40626 40630 40841 40625
 ACT 1 0 "9cd8dde90740054d9bc66d763bc7c9c8" "Custom: Shift time selection right by grid" 40631 40647 40626 40630 40647 40625
 ACT 1 0 "27315a49542d0048b6e05e41a3ec25d0" "Custom: Shift time selection right by time selection length with prompt to repeat" 40038 2002
+ACT 1 0 "ed421960c4d07b49927d50cfe02086fd" "Custom: Shorten selected item and ripple edit (ripple edit all/per track depends on the last active)" _XENAKIOS_SCALEITEMPOS_STATIC 2022 1162 1161 40006 2014 40309
 ACT 1 0 "34b3148aca19bf469eda5d5244e1934f" "Custom: SHOW ALL TRACKS in TCP and MCP ignoring track templates" _SWSTL_SHOWALL 40297 _S&M_CYCLACTION_96 _SWS_SELCHILDREN2 _SWSTL_HIDE
 ACT 1 0 "08b774f9fcd6d540930860a7c92bf2ce" "Custom: Show BASS track(s) hide others" _SWSCONSOLE_CUST3 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
 ACT 1 0 "10533d1afe03df42bcbf82849c58f7a5" "Custom: Show BASS track(s) hide others (snapshot)" _SWSSNAPSHOT_VISMODE _SWSSNAPSHOT_SAVE1 _SWSCONSOLE_CUST3 _SWS_SELCHILDREN2 _SWSTL_SHOWTCPEX _SWSTL_SHOWMCPEX _XENAKIOS_TVPAGEHOME _XENAKIOS_SELFIRSTOFSELTRAX
