@@ -5735,6 +5735,9 @@ end
 
 function Is_TrackList_Hidden()
 -- after double click the the divider between it and the Arrange view
+-- or by actions 'View: Toggle show TCP area' 
+-- and 'View: Toggle to alternate TCP area width (alternate is zero by default)'
+-- supported since 7.16
 	for line in io.lines(r.get_ini_file()) do
 	local leftpane = line:match('leftpanewid=(%d+)')
 		if leftpane then return leftpane == '0' end
@@ -5969,6 +5972,76 @@ LANESOLO 8 0 0 0 0 0 0 0 -- absent in track with no lanes, same as r.GetMediaTra
 local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
 return chunk:match('LANEREC [%-%d]+ 0 [%-%d]+') -- in the second string the 2nd flag is -1
 end
+
+
+
+function Get_Last_Sel_or_Last_Track()
+-- only visible tracks are respected
+
+local sel_tr_cnt = r.CountSelectedTracks2(0, true) -- wantmaster true
+local master_tr = r.GetMasterTrack(0)
+local master_vis = r.GetMasterTrackVisibility()&1 == 1 -- &1 is visibility in TCP
+local last_sel_tr = sel_tr_cnt > 0 and r.GetSelectedTrack2(0, sel_tr_cnt-1, true) -- wantmaster true
+	
+	if last_sel_tr == master_tr and not master_vis -- &1 is visibility in TCP, if last selected is the Master this means it's the only one selected and since it's hidden the loop below won't start
+	or last_sel_tr and r.GetMediaTrackInfo_Value(last_sel_tr, 'B_SHOWINTCP') == 0 then -- get last visible selected track
+	last_sel_tr = nil -- reset to be able to fall back on the last visible track in the tracklist
+		for i=sel_tr_cnt-2,0,-1 do -- -2 to exclude the last selected track which turned out to be hidden
+		local tr = r.GetSelectedTrack2(0, i, true)
+			if tr ~= last_sel_tr and (tr == master_tr and master_vis
+			or tr ~= master_tr and r.GetMediaTrackInfo_Value(tr, 'B_SHOWINTCP') == 1) then
+			last_sel_tr = tr break
+			end
+		end		
+	end
+	
+	if not last_sel_tr then -- if no visible selected track was found, opt for the last visible in the tracklist
+		for i=r.GetNumTracks()-1,0,-1 do
+		local tr = r.GetTrack(0,i)
+			if r.GetMediaTrackInfo_Value(tr, 'B_SHOWINTCP') == 1 then
+			last_sel_tr = tr break
+			end
+		end
+	end
+
+local last_sel_tr_idx = 0
+	if last_sel_tr then -- if no tracks in the project this var will be nil in which case index 0 will be used for the trig track
+	last_sel_tr_idx = r.CSurf_TrackToID(last_sel_tr, false) -- mcpView false // OR r.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER')
+	end
+	
+return last_sel_tr, last_sel_tr_idx -- idx is 1-based and is also index for inserting or moving a track after it to be used as is
+
+end
+
+
+
+function In_Visible_Tracks_Exist1(want_visible, want_sel_tracks)
+-- want_visible is boolean to evaluate existence of visible tracks
+-- otherwise invisible;
+-- want_sel_tracks is boolean to only evaluate selected tracks
+local state = want_visible and 1 or 0
+	for i=0, r.GetNumTracks()-1 do
+	local tr = r.GetTrack(0,i)
+		if not want_sel_tracks or want_sel_tracks and r.IsTrackSelected(tr) then
+			if r.GetMediaTrackInfo_Value(tr, 'B_SHOWINTCP') == state then return true end
+		end
+	end
+end
+
+
+function In_Visible_Tracks_Exist1(want_visible, want_sel_tracks) -- more efficient
+-- want_visible is boolean to evaluate existence of visible tracks
+-- otherwise invisible;
+-- want_sel_tracks is boolean to only evaluate selected tracks
+local state = want_visible and 1 or 0
+local TrackCount, GetTrack = table.unpack(want_sel_tracks and {r.CountSelectedTracks, r.GetSelectedTrack}
+or {r.GetNumTracks, r.GetTrack})
+	for i=0, TrackCount(0)-1 do
+	local tr = GetTrack(0,i)
+		if r.GetMediaTrackInfo_Value(tr, 'B_SHOWINTCP') == state then return true end
+	end
+end
+
 
 
 
@@ -7201,9 +7274,11 @@ end
 function Get_Env_GUID(env, want_vis)
 -- want_vis is boolean to only get GUID if the env is visible
 -- ENVELOPE GUIDs ARE NOT NECESSARILY UNIQUE
--- IN TRACK/TAKE COPIES ENVELOPES KEEP THE THE SAME GUIDs
--- AS IN THE SOURCE TRACK/TAKE
+-- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEEP THE THE SAME GUIDs
+-- AS IN THE SOURCE TRACK/TAKE, IN TAKES THEY ONLY UPDATE IF COPIED BY CTRL + MOUSE DRAG
+-- bug report https://forum.cockos.com/showthread.php?t=300279
 -- IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER MUST BE USED INSTEAD
+-- this is supposed to be fixed in build 7.38
 
 -- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
 -- SUCH VALIDATION WORKS FOR VISIBLE TRACK BUILT-IN ENVELOPES EVEN WITHOUT USER CREATED POINTS
@@ -7248,6 +7323,12 @@ end
 
 
 function Get_Vis_Env_GUID(env)
+-- ENVELOPE GUIDs ARE NOT NECESSARILY UNIQUE
+-- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEEP THE THE SAME GUIDs
+-- AS IN THE SOURCE TRACK/TAKE, IN TAKES THEY ONLY UPDATE IF COPIED BY CTRL + MOUSE DRAG
+-- bug report https://forum.cockos.com/showthread.php?t=300279
+-- IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER MUST BE USED INSTEAD
+-- this is supposed to be fixed in build 7.38
 local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 return chunk:match('\nVIS 1 ') and chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
 end
@@ -7623,6 +7704,45 @@ function Check_env_scaling(src, dst, val)
   end
 
   return val
+end
+
+
+
+function Active_Track_Envelopes_Exist1(want_sel_tracks)
+-- want_sel_tracks is boolean to only evaluate selected tracks
+	for i=0, r.GetNumTracks()-1 do
+	local tr = r.GetTrack(0,i)
+		if not want_sel_tracks or want_sel_tracks and r.IsTrackSelected(tr) then
+			if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.06 then
+				if r.CountTrackEnvelopes(tr) > 0 then return true end
+			else
+			-- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
+				for i=0, r.CountTrackEnvelopes(tr)-1 do
+				local env = r.GetTrackEnvelope(tr,i)
+					if r.CountEnvelopePoints(env) > 0 then return true end
+				end
+			end
+		end
+	end
+end
+
+
+function Active_Track_Envelopes_Exist2(want_sel_tracks) -- more efficient
+-- want_sel_tracks is boolean to only evaluate selected tracks
+local TrackCount, GetTrack = table.unpack(want_sel_tracks and {r.CountSelectedTracks, r.GetSelectedTrack}
+or {r.GetNumTracks, r.GetTrack})
+	for i=0, TrackCount(0)-1 do
+	local tr = GetTrack(0,i)	
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.06 then
+			if r.CountTrackEnvelopes(tr) > 0 then return true end
+		else
+		-- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
+			for i=0, r.CountTrackEnvelopes(tr)-1 do
+			local env = r.GetTrackEnvelope(tr,i)
+				if r.CountEnvelopePoints(env) > 0 then return true end
+			end
+		end
+	end
 end
 
 
@@ -12054,6 +12174,49 @@ end
 end
 
 
+function Media_Items_Exist1(want_sel_tracks)
+-- want_sel_tracks is boolean to only evaluate selected tracks
+
+	for i=0, r.GetNumTracks()-1 do
+	local tr = r.GetTrack(0,i)
+		if (not want_sel_tracks or want_sel_tracks and r.IsTrackSelected(tr))
+		and r.GetTrackNumMediaItems(tr) > 0 then
+		return true
+		end
+	end
+
+end
+
+
+function Media_Items_Exist2(want_sel_tracks) -- more efficient
+-- want_sel_tracks is boolean to only evaluate selected tracks
+	
+	if not want_sel_tracks and r.CountMediaItems(0) > 0 then return true end
+
+	for i=0, r.CountSelectedTracks()-1 do
+	local tr = r.GetSelectedTrack(0,i)
+		if r.GetTrackNumMediaItems(tr) > 0 then 
+		return true
+		end
+	end
+
+end
+
+
+
+function Audio_Take_Exists_In_Selected_Items(want_active_take)
+	for i=0, r.CountSelectedMediaItems(0)-1 do
+	local item = r.GetSelectedMediaItem(0,i)
+		if want_active_take and not r.TakeIsMIDI(r.GetActiveTake(item)) then return true 
+		elseif not want_active_take then
+			for i=0, r.CountTakes(item, i)-1 do
+				if not r.TakeIsMIDI(r.GetTake(item, i)) then return true end
+			end
+		end
+	end
+end
+
+
 
 --================================ I T E M S   E N D ==================================
 
@@ -13349,9 +13512,10 @@ MARKER 2 7.5 "" 1 0 1 R {42CDA6EC-9BD1-4B20-A87C-64986B6FD1E8} 0 -- 1 region not
 MARKER 2 8.5 "" 1
 ]]
 
-	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.53 -- build since which Main_SaveProjectEx() is supported
-	or r.CountProjectMarkers(0) == 0 then
-	return end 
+local err = r.CountProjectMarkers(0) == 0 and 'no markers/regions in the project'
+or tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.53 and 'requires REAPER build 6.53 and lated'-- build since which Main_SaveProjectEx() is supported
+
+	if err then	return err end 
 
 local cur_proj, proj_path = r.EnumProjects(-1) -- returns path even if the project file was deleted while the project is open
 
@@ -15536,12 +15700,42 @@ local dir = r.GetHZoomLevel() > target_val and -1 or r.GetHZoomLevel() < target_
 	if dir then
 	r.PreventUIRefresh(1)
 		repeat
-		r.adjustZoom(0.1*dir, 0, true, -1) -- forceset 1, doupd true, centermode -1 // the amt arg unit seems to be sec where 0.001 is 1 ms but when added/subtracted, the zoom level changes by amount different from the added/subtracted value
+		r.adjustZoom(0.1*dir, 0, true, 0) -- forceset 0, doupd true, centermode 0 // HORIZONTAL ZOOM ONLY // amt > 0 zooms in, < 0 zooms out, the greater the value the greater the zoom, the amt arg unit seems to be sec where 0.001 is 1 ms but when added/subtracted, the zoom level changes by amount different from the added/subtracted value, WITHOUT PreventUIRefresh() with values under 1 THE ZOOM CHANGES VERY SLOWLY, adusting by r.GetHZoomLevel()/1000 changes zoom by 0.3 px/sec; forceset ~= 0 zooms out, if amt value is 1 then zooms out fully, if amt is greater then depends on the amt value but the relationship isn't clear, if bound to mousewheel, amt can be modified by val return value of get_action_context() function to change direction of the zoom, positive IN, negative OUT; doupd (do update) if false, no zoomming; centermode: 0 < or > 1 no center, window horizontally scrolls all the way rightwards (even though as per the API doc -1 for default, presumably as set at Pref -> Appearance -> Zoom/Scroll/Offset -> Horizontal zoom center), 0 or 1 edit cursor is the center, is adjusted so that the edit cursor ends up at the center, to use mouse as the center the action 'View: Move edit cursor to mouse cursor (no snapping)' must be used, then edit cursor pos should be restored
 		local zoom = r.GetHZoomLevel()
 		until dir < 0 and zoom <= target_val or dir > 0 and zoom >= target_val
 	r.PreventUIRefresh(-1)
 	end
 end
+
+
+
+function Re_Store_Zoom(zoom)
+
+	local function round(num, idp) -- idp = number of decimal places, 0 means rounding to integer
+	-- http://lua-users.org/wiki/SimpleRound
+	-- round to N decimal places
+	  local mult = 10^(idp or 0)
+	  return math.floor(num * mult + 0.5) / mult
+	end
+
+local cur_zoom = r.GetHZoomLevel()
+	if not zoom then
+	return cur_zoom
+	else
+	cur_zoom, zoom = round(cur_zoom, 12), round(zoom, 12) -- minute difference in floating point results in inequality between numbers otherwise equal down to the 12th decimal place which are displayed in ReaScript console, so round down to 12 decimal places to prevent that
+	local amt = cur_zoom < zoom and 1 or cur_zoom > zoom and -1
+		if amt then -- not equal to stored zoom
+		r.PreventUIRefresh(1)
+			repeat
+			r.adjustZoom(amt, 0, true, -1) -- amt, forceset, doupd, centermode // HORIZONTAL ZOOM ONLY // amt > 0 zooms in, < 0 zooms out, the greater the value the greater the zoom, the amt arg unit seems to be sec where 0.001 is 1 ms but when added/subtracted, the zoom level changes by amount different from the added/subtracted value, WITHOUT PreventUIRefresh() with values under 1 THE ZOOM CHANGES VERY SLOWLY, adusting by r.GetHZoomLevel()/1000 changes zoom by 0.3 px/sec; forceset ~= 0 zooms out, if amt value is 1 then zooms out fully, if amt is greater then depends on the amt value but the relationship isn't clear, if bound to mousewheel, amt can be modified by val return value of get_action_context() function to change direction of the zoom, positive IN, negative OUT; doupd (do update) if false, no zoomming; centermode: 0 < or > 1 no center, window horizontally scrolls all the way rightwards (even though as per the API doc -1 for default, presumably as set at Pref -> Appearance -> Zoom/Scroll/Offset -> Horizontal zoom center), 0 or 1 edit cursor is the center, horiz scroll is adjusted so that the edit cursor ends up at the center, to use mouse as the center the action 'View: Move edit cursor to mouse cursor (no snapping)' must be used, then edit cursor pos should be restored
+			until amt == 1 and r.GetHZoomLevel() >= zoom or amt == -1 and r.GetHZoomLevel() <= zoom
+		r.PreventUIRefresh(-1)
+		end
+	end
+end
+-- USE:
+-- local zoom = Re_Store_Zoom() -- store
+-- Re_Store_Zoom(zoom) -- restore
 
 
 function get_gfx_scale()
@@ -16433,13 +16627,20 @@ end
 -- BUT ONLY IF key/value aren't subsumed under a separate section
 
 
-function Extract_reaper_ini_val(key) -- the arg must be string
--- same as reaper.get_config_var_string()
+function Extract_reaper_ini_val1(key) -- the arg must be string
+-- same as reaper.get_config_var_string(), see below
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
 return cont:match(key..'=(.-)\n')
 end
+
+
+function Extract_reaper_ini_val2(key) -- the arg must be string
+local ret, val = r.get_config_var_string(key)
+return val
+end
+
 
 
 function Get_File_Cont(f_path)
@@ -16450,7 +16651,13 @@ return cont
 end
 
 
-function Create_Dummy_Project_File()
+function Create_Dummy_Project_File1()
+-- see also Close_Tab_Without_Save_Prompt
+-- since when opened, dummy project reference is added to the 'Recent projects' menu
+-- provided the preference at 
+-- Prefs -> General -> Recent projects list display button -> Add to recent list when loading project is enabled (and it's enabled by default)
+-- it's advised that it be stored in a constant path, because each new path
+-- is a new entry in the menu
 local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
 local dummy_proj = scr_name:match('.+[\\/]')..'BuyOne_dummy project (do not rename).RPP'
 	if not r.file_exists(dummy_proj) then -- create a dummy project file next to the script
@@ -16460,6 +16667,32 @@ local dummy_proj = scr_name:match('.+[\\/]')..'BuyOne_dummy project (do not rena
 	end
 return dummy_proj
 end
+
+
+function Create_Dummy_Project_File2()
+-- see also Close_Tab_Without_Save_Prompt
+-- since when opened, dummy project reference is added to the 'Recent projects' menu
+-- provided the preference at 
+-- Prefs -> General -> Recent projects list display button -> Add to recent list when loading project is enabled (and it's enabled by default)
+-- it's advised that it be stored in a constant path, because each new path
+-- is a new entry in the menu
+local path = os.getenv('TEMP') or os.getenv('TMP') -- path to the system temp folder
+	if #path > 0 then
+	local sep = path:match('[\\/]')
+	-- OR
+	-- sep = package.config:match("([^\n]*)\n?")
+	-- OR
+	-- sep = r.GetResourcePath():match('[\\/]')
+	local dummy_proj = path..sep..'dummy project.RPP'
+		if not r.file_exists(dummy_proj) then
+		local f = io.open(dummy_proj,'w')
+		f:write('<REAPER_PROJECT\n>')
+		f:close()
+		end
+	return dummy_proj
+	end
+end
+
 
 
 function META_Spawn_Scripts(fullpath, scr_name, names_t)
@@ -16840,29 +17073,44 @@ end
 function sanitize_file_name1(name)
 -- the name must exclude extension
 -- https://stackoverflow.com/questions/1976007/what-characters-are-forbidden-in-windows-and-linux-directory-names
+-- relies on Error_Tooltip() function
+
+local orig_len = #name
 local OS = r.GetAppVersion()
 local lin, mac = OS:match('lin'), OS:match('OS')
 local win = not lin and not mac
 local t = win and {'<','>',':','"','/','\\','|','?','*'}
 or lin and {'/'} or mac and {'/',':'}
+
 	for k, char in ipairs(t) do
 	name = name:gsub(char, '')
 	end
+	
+	if #name:gsub(' ','') == 0 then 
+	Error_Tooltip('\n\n the file name does not \n\n include valid characters. \n\n', 1, 1) -- caps, spaced true
+	return end
+	
 local win_illegal = 'CON,PRN,AUX,NUL,COM1,COM2,COM3,COM4,COM5,COM6,COM7,COM8,COM9,LPT1,LPT2,LPT3,LPT4,LPT5,LPT6,LPT7,LPT8,LPT9'
 	if win then
 		for ill_name in win_illegal:gmatch('[^,]+') do
-			if name:match('%s*'..ill_name..'%s*') then name = '' break end -- illegal names padded with spaces aren't allowed either
+			if name:match('^%s*'..ill_name..'%s*$') then name = '' break end -- illegal names padded with spaces aren't allowed either
 		end
 	end
+	
 	if #name > 0 then -- if after the sanitation there're characters left
-	return name
+	local shorter = #name < orig_len 
+		if shorter then
+		Error_Tooltip('\n\n the file name has been \n\n stipped of illegal characters. \n\n\t please review it \n\n', 1, 1) -- caps, spaced true
+		end
+	return name, shorter
 	end
+	
 end
 
 
-function sanitize_filename2(filename)
+function sanitize_file_name2(filename)
 -- https://github.com/ReaTeam/ReaScripts/blob/04c8142b91a09ba84f0dcd766fdbacc744a3d7c8/Tracks/Tylereddington_Smart_Track_Manager_Package.lua
-return filename:gsub("[\\/:*?\"<>|]", "_")
+return filename:gsub('[\\/:*?\"<>|]', '_') -- colon may be supported on MacOS
 end
 
 
@@ -16897,13 +17145,19 @@ end
 
 local path, name, ext = f_path:match('(.+[\\/])(.+)(%.%w+)')
 local diff = 256 - (path:len()+ext:len())
-local mess = ''
+-- local mess = ''
+local mess
 
 	if diff <= 0 then
-	Error_Tooltip('\n\n the file path length \n\n   exceeds the limit. \n\n', 1, 1) -- caps, spaced true
-	return
-	elseif 256-(path:len()+ext:len()) < name:len() then -- truncate file name
-	name = name:sub(1,256-(path:len()+ext:len())) -- allow only as many characters as the difference between 256 and the path+extension
+	local excess = diff < 0 and '\n\n   by '..math.abs(diff)..' characters.' or ''
+	Error_Tooltip('\n\n the file path length \n\n   exceeds the limit '..excess..' \n\n', 1, 1) -- caps, spaced true
+	mess = name
+	elseif diff < name:len() then -- truncate file name
+	name = name:sub(1, diff)
+	--[[ OR in a more convoluted way
+	local diff = diff-name:len() -- subtracting smaller from greater to obtain negative value
+	name = name:sub(1, diff-1) -- additional -1 because the end argument includes the last character, i.e. 1 greater than the actual difference
+	--]]
 	-- after truncation the file name may happen to match an existing file
 	-- if so reverse the name, not 100% failproof but the odds that the reversed file name will still clash are fairly low
 	local reversed = ''
@@ -16911,15 +17165,50 @@ local mess = ''
 		name = name:reverse()
 		reversed = '\n\n\tand reversed to prevent \n\n     clash with an existing file'
 		end
-	Error_Tooltip('\n\n the file name has been truncated '..reversed..'\n\n', 1, 1) -- caps, spaced true
+	Error_Tooltip('\n\n the file name has been truncated \n\n    due to excessive path length. '..reversed..'\n\n', 1, 1) -- caps, spaced true
+--	Error_Tooltip('\n\n the file name has been truncated \n\n    due to excessive path length. '..reversed..'\n\n\t\tplease review it. \n\n', 1, 1) -- caps, spaced true
 	-- mess = 'The file name has been truncated '..reversed
+	mess = name
 	end
 
-return path..name..ext, (path..name..ext):len() < f_path:len(), name:len() -- 2nd value to indicate whether the name was truncated, 3d value the length of the new name
+return path..name..ext, mess, (path..name..ext):len() < f_path:len(), name:len() -- mess return value is supposed to trigger reload of a dialogue/menu, 3d value to indicate whether the name was truncated, 4th value the length of the new name
 -- return path..name..ext, mess
 
 end
 
+
+function Get_Last_Accessed_Dir()
+-- last directory accessed by REAPER in various contexts
+
+-- the following are not supported:
+-- lastdir= under sections [reasamplomatic], [reaper_explorer], [reaverb]
+-- recent01= under [Recent] section, recently opened project files, format recent00
+-- notenamedir=, notenamerecent_1= , at least 6 of notenamerecent_X under [midiedit] section
+-- should be retrieved with Check_reaper_ini()
+
+local t = {'vstpath64', 'lv2path_win64', 'clap_path_win64', 'altpeakspath', 'convertaddpath', 'lastrenderpath2', 'bounce_path', 'importpath', 'reascale_fn', 'lastbankdir', 'lastcwd', -- cwd = current working directory
+'lastthemefn5', 'lastprojuiref', 'lastscript', 'lastmenusetdir', 'convertfolder', 'autosavedir', 'autosavedir_unsaved'}
+	for idx, key in ipairs(t) do
+	local retval, path = r.get_config_var_string(key)
+	t[idx] = path
+	end
+return t
+end
+
+
+
+function file_status(path)
+-- based on https://www.tutorialspoint.com/lua/index.htm
+-- returned status: readable, writable
+-- if readable but not writable then readonly
+-- if neither then either the file doesn't exist or the path is invalid
+local t = {true}
+	for k, v in ipairs({'r','w'}) do
+	t[k] = t[1] and io.open(path, v) -- initial true t[1] conditions opening in read mode, then opening in write mode depends on the result of the read mode stored in t[1], because if file doesn't exist, attempt to open it in write mode will create it, which is not what we need
+		if t[k] then t[k]:close() end
+	end
+return t
+end
 
 
 --=================================== F I L E S   E N D =========================================
@@ -17470,7 +17759,7 @@ function Msg(...)
 -- arguments are passed, i.e. always end with a caption
 	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
 	local t = {...}
-	local str = #t > 1 and '' or tostring(t[1])..'\n'
+	local str = #t == 1 and tostring(t[1])..'\n' or not t[1] and 'nil\n' or ''
 		if #t > 1 then -- OR if #str == 0
 			for i=1,#t,2 do
 				if i > #t then break end
@@ -18667,22 +18956,67 @@ local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer; return
 r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
 -- DO STUFF
 local dummy_proj = Create_Dummy_Project_File()
-r.Main_openProject('noprompt:'..dummy_proj) -- open dummy proj in the newly open tab without save prompt
+r.Main_openProject('noprompt:'..dummy_proj) -- open dummy proj in the newly open tab without save prompt // THIS CHANGES LAST WORKING DIRECTORY, SO NEXT TIME THE DIALOGUE WILL POINT TO THE DUMMY PROJ FILE DIRECTORY
 r.Main_OnCommand(40860, 0) -- Close current (temp) project tab // save prompt won't appear because nothing has changed in the dummy proj
 	if dummy_proj then os.remove(dummy_proj) end
 r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
 end
 
 
-function Close_Tab_Without_Save_Prompt()
+function Close_Tab_Without_Save_Prompt1() -- see version 2 below which uses temporary dummy project file which is faster to load than a full fledged one
 -- Close temp project tab without save prompt; when a freshly opened project closes there's no prompt
 local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer; returns empty string if project doesn't have a file and returns path even if the project file and possibly folder was deleted while the project is open
 r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
 -- DO STUFF
-r.Main_openProject('noprompt:'..projfn) -- open the stored project in the temp tab
+r.Main_openProject('noprompt:'..projfn) -- open the stored project in the temp tab // 
 r.Main_OnCommand(40860, 0) -- Close current project tab // won't generate a save prompt
 r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
 end
+
+
+function Close_Tab_Without_Save_Prompt2(path)
+-- creates temp project file, uses it, then deletes it
+-- THE TEMP FILE IS ADDED TO RECENT PROJECTS MENU
+-- provided the preference at 
+-- Prefs -> General -> Recent projects list display button -> Add to recent list when loading project is enabled (and it's enabled by default)
+-- SO WITH FREQUENT USE THE MENU WILL BE INUNDATED WITH TEMP FILES
+-- BECAUSE THEY ALL WILL BE UNIQUE, SO MUCH CLEANER IS TO USE
+-- THE SAME SPECIFIC DUMMY FILE IN EACH FUNCTION CALL
+-- for consistency's sake path is the path of the last loaded/saved template 
+-- stemming from the extended state
+-- if not stored yet, use REAPER own last/current working directory
+local path = path or select(2, r.get_config_var_string('lastcwd'))
+local sep = path:match('[\\/]')
+	if #path > 0 then
+	path = path..(path:sub(1,-2) == sep and '' or sep)..tostring(r.time_precise())..'.RPP' -- using time precise since the odds of it being a unique name are pretty high
+	local f = io.open(path,'w')
+	f:write('<REAPER_PROJECT\n>')
+	f:close()
+		if r.file_exists(path) then
+		r.Main_openProject('noprompt:'..path) -- open suppressing prompt to save currently unsaved project // THIS CHANGES LAST WORKING DIRECTORY, SO NEXT TIME THE DIALOGUE WILL POINT TO THE TEMP PROJ FILE DIRECTORY
+		r.Main_OnCommand(40860, 0) -- Close current project tab
+		os.remove(path)
+		end
+	end
+end
+
+
+function Validate_Proj_Tab(target_proj)
+-- same as r.ValidatePtr(target_proj, 'ReaProject*')
+	if not target_proj then
+	return r.EnumProjects(-1)
+	else
+	local i = 0
+		repeat
+		local proj = r.EnumProjects(-1)
+			if proj == target_proj then return true end
+		until not proj
+	end
+end
+-- USE:
+-- local proj = Validate_Proj_Tab()
+-- local vald = Validate_Proj_Tab(proj)
+
 
 
 function Is_Win()
@@ -18821,52 +19155,103 @@ end
 
 
 function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator, comment_field, comment)
--- title string, field_cnt integer, field_names string comma delimited
--- OR separator delimited IF commas must be used in field names, because 'separator=' setting
--- applies to field name separation as well,
--- the length of field names list should obviously match field_cnt arg
--- it's more reliable to contruct a table of names and pass the two vars field_cnt and field_names as #t, t
--- field_cont is empty string unless they must be initially filled
--- to fill out only specific fields precede them with as many separator characters
--- as the number of fields which must stay empty
--- in which case it's a separator delimited list e.g.
--- ,,field 3,,field 5
--- separator is a string, character which delimits the fields
--- MULTIPLE CHARACTERS CANNOT BE USED AS FIELD SEPARATOR, FIELD NAMES LIST OR ITS FORMATTING BREAKS
--- comment_field is boolean, comment is string to be displayed in the comment field
--- extrawidth parameter is inside the function;
+-- title string, field_cnt integer which can be smaller or greater 
+-- than the number of fields in field_names arg, in which case fields will
+-- be subtracted, or added but without names, if 0 <= field_cnt 
+-- then field_cnt will be derived from field_names arg 
+-- and if field_names is empty but comment_field is enabled
+-- field_cnt will default to 1 to add one field besides the comment field(s),
+-- otherwise the dialogue won't load because field count 0 disables it in the native function
+-- while negative value generates a blank window with buttons, which is prevented here,
+-- field_cnt doesn't account for the comment field,
+-- if final field count exceeds the total limit of 16, 
+-- it gets clamped to 16 and disables the comment if enabled;
+-- field_names is table or string comma delimited
+-- OR separator delimited IF commas must be used in field names, 
+-- because 'separator=' setting applies to field name separation as well, 
+-- OR empty string,
 -- it's safer to use \n or \r or \t or any other control char as a separator
 -- to ensure that the separator has no chance of clashing with the user content
 -- because literal control characters input by the user won't be recognized as such,
 -- in this case however such characters must be excluded from the user content
 -- to prevent them from being recognized as control chars when the content
 -- is processed internally;
--- SEE ALSO resolve_all_or_restore_apostrophe() above
+-- unbalanced quotes, apostrophes and parenthesis break field separation
+-- SEE ALSO resolve_all_or_restore_apostrophe() above;
+-- the length of field names list should obviously match field_cnt arg
+-- it's more reliable to contruct a table of names and pass the two vars field_cnt and field_names as #t, t
+-- field_cont is empty string unless they must be initially filled
+-- to fill out only specific fields precede them with as many separator characters
+-- as the number of fields which must stay empty
+-- in which case it's a separator delimited list e.g.
+-- ,,field 3,,field 5,
+-- if some/all fields must initially be filled out field_cont may be a table;
+-- separator is a string, character which delimits the fields,
+-- if invalid / empty string, defaults to comma;
+-- MULTIPLE CHARACTERS CANNOT BE USED AS FIELD SEPARATOR, FIELD NAMES LIST OR ITS FORMATTING BREAKS
+-- comment_field is boolean, comment is string to be displayed in the comment field(s),
+-- multiple comments must be delimited by the character used as the separator arg
+-- or by comma if separator is the comma,
+-- if comment text contains commas separator arg must be set specifically 
+-- to be anything but comma, if final field count with comment fields
+-- hits or exceeds the limit of 16, comment fields number is reduced, 
+-- text of any extra comment fields is merged into the last visible comment field
+-- if any remains, if comment_field is true but comment arg is an empty string
+-- comment field(s) aren't displayed;
+-- extrawidth parameter is inside the function;
 
-	if field_cnt == 0 then return end
+	if (not field_cnt or field_cnt <= 0) then -- if field_cnt arg is invalid, derive count from field_names arg
+		if #field_names:gsub(' ','') == 0 and not comment_field then return end
+	field_cnt = select(2, field_names:gsub(',',''))+1 -- +1 because last field name isn't followed by a comma and one comma less was captured
+	--	if field_cnt-1 == 0 and not comment_field then return end -- SAME AS THE ABOVE CONDITION
+	end
+	
+	if field_cnt >= 16 then
+	field_cnt = 16 -- clamp to the limit supported by the native function
+	comment_field = nil -- disable comment if field count hit the limit, just in case 
+	end
 
-	local function add_separators(field_cnt, field_cont, sep)
+
+	local function add_separators(field_cnt, arg, sep)
+	-- for field_names and field_cont as arg
 	-- add delimiting separators when they're fewer than field_cnt
 	-- due to lacking field names or field content
-	local _, sep_cnt = field_cont:gsub(sep,'')
-	return sep_cnt == field_cnt-1 and field_cont -- -1 because the last field isn't followed by a separator
-	or sep_cnt < field_cnt-1 and field_cont..(sep):rep(field_cnt-1-sep_cnt)
+	-- which means they will delimit trailing empty fields
+	local _, sep_cnt = arg:gsub(sep,'')
+	return sep_cnt == field_cnt-1 and arg -- -1 because the last field isn't followed by a separator
+	or sep_cnt < field_cnt-1 and arg..(sep):rep(field_cnt-1-sep_cnt) -- add trailing separators
+	or arg:match(('.-'..sep):rep(field_cnt)):sub(1,-2) -- truncate arg when field_cnt value is smaller than the number of fields, excluding the last separator captured with the pattern inside string.match because the last field isn't followed by a separator
+	end
+
+	local function format_fields(arg, sep, field_cnt)
+	-- for field_names and field_cont as arg
+	local arg = type(arg) == 'table' and table.concat(arg, sep) or arg
+	return add_separators(field_cnt, arg, sep):gsub(sep..' ', sep) -- if there's space after separator, remove because with multiple fields the field names/content will not line up vertically
 	end
 
 -- for field names sep must be a comma because that's what field names list is delimited by
 -- regardless of internal 'separator=' argument
-local field_names = type(field_names) == 'table' and table.concat(field_names,',') or field_names
-field_names = add_separators(field_cnt, field_names, ',')
-field_names = field_names:gsub(', ', ',') -- if there's space after comma, remove because with multiple fields the names will not line up vertically
-local sep = separator or ','
-local field_cont = add_separators(field_cnt, field_cont, sep)
+-- but if comma must be used in field names, they must be delimited
+-- by the main separator
+local field_names = format_fields(field_names, ',', field_cnt) -- if commas need to be used in field names and the main separator is not a comma (because if it is comma cannot delimit field names), pass here the separator arg from the function
+local sep = separator and #separator > 0 and separator or ','
+local field_cont = format_fields(field_cont, sep, field_cnt)
 local comment = comment_field and type(comment) == 'string' and #comment > 0 and comment or ''
-local field_cnt = comment_field and #comment > 0 and field_cnt+1 or field_cnt
-field_names = comment_field and #comment > 0 and field_names..',Comment:' or field_names
+local comment_field_cnt = select(2, comment:gsub(sep,''))+1 -- +1 because last comment field isn't followed by the separator so one less will be captured
+local field_cnt = comment_field and #comment > 0 and field_cnt+comment_field_cnt or field_cnt
+
+	if field_cnt >= 16 then 
+	-- disable some or all comment fields if field count hit the limit after comment fields have been added	
+	comment_field_cnt = field_cnt - 16
+	field_cnt = 16
+	end
+
+field_names = comment_field and #comment > 0 and field_names..(',Comment:'):rep(comment_field_cnt) or field_names -- if commas need to be used in field names, these must be delimited by the main separator which also should be used here
 field_cont = comment_field and #comment > 0 and field_cont..sep..comment or field_cont
-local separator = separator and ',separator='..separator or ''
-local ret, output = r.GetUserInputs(title, field_cnt, field_names..',extrawidth=150'..separator, field_cont)
-output = #comment > 0 and output:match('(.+'..sep..')') or output -- exclude comment field keeping separator to simplify captures in the loop below
+local separator = sep ~= ',' and ',separator='..sep or '' -- if commas need to be used in field names, these must be delimited by the main separator which also should be used here
+local ret, output = r.GetUserInputs(title, field_cnt, field_names..',extrawidth=150'..separator, field_cont) -- same as above regarding delimiter
+local comment_pattern = ('.-'..sep):rep(comment_field_cnt-1) -- -1 because the last comment field isn't followed by a separator
+output = #comment > 0 and output:match('(.+'..sep..')'..comment_pattern) or output
 field_cnt = #comment > 0 and field_cnt-1 or field_cnt -- adjust for the next statement
 	if not ret or (field_cnt > 1 and output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)
 	or #output:gsub('[%s%c]','') == 0) then return end
@@ -20250,16 +20635,12 @@ end
 
 local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context()-- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // the function must be outside as it cannot work properly inside more than 1 user function, in which case val will be 0
 function Mousewheel_Or_Shortcut(val)
-return val == math.abs(15), val == 63 -- mousewheel, shortcut
+return val == math.abs(15) or mode == 1, val == 63 or mode == 0 -- mousewheel, shortcut
 end
 
 
-function Is_Mousewheel1(mode)
-return mode == 1 -- mousewheel, when sctipt is run with a shortcut mode is 0
-end
-
-function Is_Mousewheel2(mode)
-return val == math.abs(15) -- mousewheel, when sctipt is run with a shortcut val is 63
+function Is_Mousewheel(mode)
+return val == math.abs(15) or mode == 1 -- mousewheel, when sctipt is run with a shortcut val is 63, mode is 1
 end
 
 
@@ -20562,6 +20943,66 @@ return total_col_cnt, total_col_cnt - hidden_col_count -- total and visible
 end
 
 
+
+function MediaExplorer_OnCommand1(action_cmdID, close_when_done)
+-- https://forum.cockos.com/showthread.php?p=2863268
+-- if the MX is initially closed the triggered action 
+-- is likely to not take effect after MX window opens
+-- because it's slow to become active compared to the speed
+-- of the script execution, therefore defer loop will
+-- have to be employed to wait until it's fully active
+-- see defer loop version below MediaExplorer_OnCommand2()
+
+local action_cmdID = r.NamedCommandLookup(action_cmdID) -- works with numeric command IDs of native action as well
+local MX = r.OpenMediaExplorer('', false) -- play false
+
+	if MX then
+		if r.BR_Win32_SendMessage then
+		r.BR_Win32_SendMessage(MX, 0x0111, action_cmdID, 0) -- 0x0111 is 'WM_COMMAND'
+		elseif r.JS_WindowMessage_Send then
+		r.JS_WindowMessage_Send(MX, 'WM_COMMAND', action_cmdID, 0, 0, 0)
+		end
+		if close_when_done then -- Close
+		r.Main_OnCommand(50124,0) -- 'Media explorer: Show/hide media explorer'
+		end
+	end
+
+end
+
+
+
+-- these must either be global variables to be recognized inside the defer loop
+-- or passed as arguments if the function is run via Wrapper function 
+-- (see in this U T I L I T Y section)
+action_cmdID = ''
+close_when_done = true
+function MediaExplorer_OnCommand2()
+-- https://forum.cockos.com/showthread.php?p=2863268
+
+	if not time_init and r.GetToggleCommandState(50124) == 0 then -- Media explorer: Show/hide media explorer // Open
+	r.Main_OnCommand(50124,0) -- 'Media explorer: Show/hide media explorer'
+	time_init = r.time_precise()	
+	elseif time_init and r.time_precise()-time_init >= 0.1 then
+	local MX = r.OpenMediaExplorer('', false) -- play false
+	local action_cmdID = r.NamedCommandLookup(action_cmdID) -- works with numeric command IDs of native actions as well
+		if r.BR_Win32_SendMessage then
+		r.BR_Win32_SendMessage(MX, 0x0111, action_cmdID, 0) -- 0x0111 is 'WM_COMMAND'
+		elseif r.JS_WindowMessage_Send then
+		r.JS_WindowMessage_Send(MX, 'WM_COMMAND', action_cmdID, 0, 0, 0)			
+		end
+		if close_when_done then -- Close
+		r.Main_OnCommand(50124,0) -- 'Media explorer: Show/hide media explorer'
+		end
+	return
+	end
+	
+r.defer(MediaExplorer_OnCommand2)
+
+end
+
+
+
+
 function trackselonmouse()
 -- 'trackselonmouse' key of the preference at
 -- Prefs -> Editing behavior -> Mouse -> Mouse click/edit in arrange view: Selects track... Sets target track for insert/paste...
@@ -20625,6 +21066,11 @@ end
 -- USE:
 -- local bitfield = en_de_code_bitfield(t) -- encode
 -- local t = en_de_code_bitfield(t, bitfield) -- decode
+
+
+-- SYSTEM ENVIRONMENT VARIABLES
+-- https://en.wikipedia.org/wiki/Environment_variable
+os.getenv(string) -- TMP/TEMP; USERNAME; PATH; HOMEDRIVE; HOMEPATH; USERPROFILE; APPDATA; LOCALAPPDATA; PROGRAMDATA = ALLUSERSPROFILE; OS; COMSPEC; PUBLIC; ProgramFiles = ProgramW6432; ProgramFiles(x86); SystemDrive; SystemRoot = windir; USERDOMAIN; 
 
 
 
@@ -21956,6 +22402,9 @@ T R A C K S
 	GetTrackState
 	GetTrackTree
 	Fixed_Lane_Comping_Enabled
+	Get_Last_Sel_or_Last_Track
+	In_Visible_Tracks_Exist1
+	In_Visible_Tracks_Exist2
 	
 
 
@@ -22034,6 +22483,8 @@ E N V E L O P E S
 	Get_Env_Segment_At_Cursor
 	Get_Env_Custom_Colors
 	Check_env_scaling
+	Active_Track_Envelopes_Exist1
+	Active_Track_Envelopes_Exist2
 
 
 A U T O M A T I O N  I T E M S
@@ -22185,6 +22636,9 @@ I T E M S
 	Get_Default_Take_Rank_Scale
 	Get_Take_Rank
 	Get_Set_Take_Marker_Length
+	Media_Items_Exist1
+	Media_Items_Exist2
+	Audio_Take_Exists_In_Selected_Items
 
 
 C O L O R
@@ -22300,6 +22754,7 @@ W I N D O W S
 	Is_Window_Fully_Minimized
 	Activate_Context
 	Set_Horiz_Zoom_Level
+	Re_Store_Zoom
 	get_gfx_scale 
 	click_pad
 	keep_click_pad_size
@@ -22343,9 +22798,11 @@ F I L E S
 	get_proj_title
 	get_ini_cont
 	Check_reaper_ini
-	Extract_reaper_ini_val
+	Extract_reaper_ini_val1
+	Extract_reaper_ini_val2
 	Get_File_Cont
-	Create_Dummy_Project_File
+	Create_Dummy_Project_File1
+	Create_Dummy_Project_File2
 	META_Spawn_Scripts
 	GetActionCommandIDByFilename
 	Get_Set_Script_Cont
@@ -22359,6 +22816,11 @@ F I L E S
 	Parse_ReaBank_File
 	Get_CommID_By_Script_Name
 	GetUserFileNameForRead_Alt
+	sanitize_file_name1
+	sanitize_file_name2
+	sanitize_file_path
+	Get_Last_Accessed_Dir
+	file_status
 
 
 M E A S U R E M E N T S / C A L C U L A T I O N S
@@ -22441,7 +22903,9 @@ U T I L I T Y
 	defer_store
 	Count_Proj_Tabs
 	Temp_Proj_Tab
-	Close_Tab_Without_Save_Prompt
+	Close_Tab_Without_Save_Prompt1
+	Close_Tab_Without_Save_Prompt2
+	Validate_Proj_Tab
 	Is_Win
 	Get_OS
 	All_Proj_Change_Cnt
@@ -22499,9 +22963,8 @@ U T I L I T Y
 	Process_Mouse_Wheel_Direction1
 	Process_Mouse_Wheel_Direction2
 	Process_Mousewheel_Sensitivity
-	Mousewheel_Or_Shortcut
-	Is_Mousewheel1
-	Is_Mousewheel2
+	Mousewheel_Or_Shortcut	
+	Is_Mousewheel
 	Is_Not_Relative_Mode
 	format_time_given_in_sec
 	Time_in_Sec_to_List
@@ -22512,9 +22975,12 @@ U T I L I T Y
 	Get_Region_Marker_Mngr_Settings2
 	Get_Media_Explorer_Show_Submenu_Options
 	Get_Media_Explorer_Column_Count
+	MediaExplorer_OnCommand1
+	MediaExplorer_OnCommand2
 	trackselonmouse
 	generate_custom_action_ID
 	en_de_code_bitfield
+	os.getenv()
 	CheckDependencies and validate_dependency
 	Break
 	J_Reverb_randomizer
