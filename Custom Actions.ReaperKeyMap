@@ -469,7 +469,7 @@ ACT 1 0 "412aedf8dc03324399918bc077863ee3" "Custom: Preview: Move cursor to the 
 ACT 1 0 "a338cb93e29d544c9adc6c4e90df8428" "Custom: Preview: Move cursor to the next adjacent item on the track and retreat 1 beat (select track, place cursor over the 1st item) -- next click after playhead crossed item joint point" 40434 40319 40842
 ACT 1 0 "1945ec1a94a65046b19b42ec39569f85" "Custom: Preview: Move cursor to the next adjacent item on the track, retreat 1 beat and play (select track) - 1st click is idle" 41173 40417 40842 1016 1007
 ACT 1 0 "df8e01b38fecf447afcad0d6d103b62a" "Custom: Preview selected items from mouse cursor (step 1 - place mouse cursor at the start position, run with shortcut or mouse modifier, step 2 - stop)" 2022 1007 2014 40514 2014 41558 2014 1007 2013 1016 2013 41560
-ACT 1 0 "df09cc0f5592e649a8fc6629d62d8cb9" "Custom: Preview selected items from edit cursor (step 1 - place edit cursor at the start positon, run, step 2 - stop)" 2022 1007 2014 41558 2014 1007 2013 1016 2013 41560
+ACT 1 0 "df09cc0f5592e649a8fc6629d62d8cb9" "Custom: Preview selected items from edit cursor (step 1 - place edit cursor at the start position, run, step 2 - stop)" 2022 1007 2014 41558 2014 1007 2013 1016 2013 41560
 ACT 1 0 "3481f6486c626d4eb851ac66ef6ad8e8" "Custom: protoolstoreaper.com_Back to Last Transient" 40625 40626 40421 40434 40376 40289
 ACT 1 0 "e3e021254e772a4b930db21032b56274" "Custom: protoolstoreaper.com_Consolidate Clip" 41588 41173 40289 40635
 ACT 1 0 "86b2069db7f21f4a8675292a699041a1" "Custom: protoolstoreaper.com_Ctrl X - Cut selected" 41173 40059
