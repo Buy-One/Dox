@@ -811,6 +811,8 @@ ACT 1 32060 "5999714eccb4c246ba98c7b2ff20bc0e" "Custom: Make selected notes lega
 ACT 1 32060 "6068bf37bfe0e24995719c69907e2334" "Custom: Min/Major 7th Chord" 40164 40167 40171 40175
 ACT 1 32060 "3ebf38b29649ea4496a863c515c34cc1" "Custom: Minor 7th Chord" 40164 40167 40171 40174
 ACT 1 32060 "c97b1afe17a7a14a912c7d862842a905" "Custom: Minor Chord" 40164 40167 40171 40176
+ACT 1 32060 "88c91946b2e73d458baea11f44079558" "Custom: Go to next note start (selection isn't preserved)" 40214 40413 40440 40214
+ACT 1 32060 "4ddeff23cebef643b00813c60aed685e" "Custom: Go to next note end (selection isn't preserved)" 40214 40413 40639 40214
 ACT 1 32060 "f1c722eb692869479c361d65b87da2cf" "Custom: Move cursor to end of next note (for legato notes)" 40425 40413 40639 40214
 ACT 1 32060 "55be6ea9fa83514eb598646baa89cbe0" "Custom: Move cursor to end of next note (not for legato notes)" 40413 40639 40214
 ACT 1 32060 "44da2d0f9528fb45810fd065a23e276b" "Custom: Move cursor to end of note (MAY GET STUCK WITH MULTIPLE PITCHES)" 40425 40639 40214
