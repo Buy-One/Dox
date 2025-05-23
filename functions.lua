@@ -1050,6 +1050,31 @@ end
 
 
 
+function split_lines_by_length(max_len, lines_t)
+	for i = #list_t, 1, -1 do -- can be done in direct loop as well, in which case the index for new entries would be calculates as follows 'idx = not idx and i or idx+1'
+	local line = list_t[i]
+		if #line:gsub('[\128-\191]','') > max_len then -- accounting for non-ANSI characters
+		local collected, idx
+			for char in line:gmatch('.') do
+				if collected and #collected:gsub('[\128-\191]','') == max_len then
+				idx = not idx and i+1 or idx+1 -- insert each next line chunk at next table index, i.e. downstream of the original line index
+				table.insert(list_t, idx, collected)
+				collected = nil -- reset, to be able to start collecting next line chunk
+				end
+			collected = collected and collected..char or char
+			end
+			if collected then -- if after splitting there's outstanding chunk shorter than max_len, add it to the table
+			table.insert(list_t, idx+1, collected)
+			end
+		table.remove(list_t, i) -- remove the old non-split entry
+		end		
+	end
+return lines_t
+end
+
+
+
+
 function Are_Multiple_Captures(chunk, str) -- relies on Esc() function
 local cnt = 0
 	for w in chunk:gmatch(Esc(str)) do
@@ -1909,6 +1934,18 @@ function bytes2string(input)
 return input -- if not literal byte sequence, return as is
 
 end
+
+
+
+function add_zero_padding(max_num)
+-- only supports integers
+	for i=0, max_num do
+	local pad = ('0'):rep(#(max_num..'')-#(i..'')) -- difference in integer length
+	-- CONCATENATE pad VARIABLE HERE
+	end
+-- RETURN THE RESULT
+end
+
 
 
 --=========================== S T R I N G S  E N D ==============================
@@ -3348,6 +3385,17 @@ end
 
 function Ch_Filter_Enabled2(obj) -- via chunk, no need to open the MIDI Ed
 -- filter enabled status is true when either a single channel is active, multichannel mode is active or 'Show only events that pass the filter' option is checked in Event filter dialogue and can be true when 'All channels' option is active in the menu as well
+
+	local function get_enabled_channels(channel_bitfield)
+	local t = {}
+		for i = 0, 15 do
+		local bit = 2^i
+		local set = channel_bitfield+0&bit == bit
+			if set then t[i] = set end -- i is 0-based channel number
+		end
+	return t
+	end
+
 local item = r.ValidatePtr(obj, 'MediaItem*')
 local take = r.ValidatePtr(obj, 'MediaItem_Take*')
 local item = item and obj or take and r.GetMediaItemTake_Item(obj)
@@ -3356,14 +3404,16 @@ local take = take and obj or r.GetActiveTake(item)
 local retval, takeGUID = r.GetSetMediaItemTakeInfo_String(take, 'GUID', '', false) -- setNewValue false
 local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo
 local takeGUID = takeGUID:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0') -- escape
-local take_found
+local take_found, channel_bitfield
 	for line in chunk:gmatch('[^\n\r]+') do
 		if line:match(takeGUID) then take_found = 1 end
 		if take_found and line:match('EVTFILTER') then
 		local cnt = 0
 			for val in line:gmatch('[%-%d]+') do
 			cnt = val and cnt+1 or cnt
-				if cnt == 7 then return val == '1' end -- filter boolean is 7th field
+			channel_bitfield = channel_bitfield or cnt == 1 and val
+				if cnt == 7 then -- filter boolean is 7th field
+				return val == '1', get_enabled_channels(channel_bitfield) end 
 			end
 		end
 	end
@@ -3387,7 +3437,7 @@ local take_found
 		local val = line:match('EVTFILTER (%d+)')
 			if val then
 				for i = 0, 15 do
-					if val+0 == 2^i then return i+1 end -- channel numbers are 0-based logarithm of the value from the chunk with base 2
+					if val+0 == 2^i then return i+1 end -- channel numbers are 0-based logarithm of the value from the chunk with base 2 // THIS ONLY RETURNS CORRECT VALUE IF ONE CHANNEL ENABLED ONLY, SEE PROPER WAY IN Ch_Filter_Enabled2() above
 				end
 			--[[ OR without the loop
 			-- https://www.gammon.com.au/scripts/doc.php?lua=math.log
@@ -3983,14 +4033,24 @@ if #evts_t > 0 and events then Store_Insert_Notes_OR_Evts(ME, take, evts_t, even
 function Get_MIDI_Ed_Grid(take)
 
 local grid_QN, swing_val, note_len = r.MIDI_GetGrid(take) -- in QN, quarter note is 1, 1/8th is 0.5 and so on. Swing is between -1 and 1 (the API doc is inaccurate in saying 0 and 1), when swing is negative the grid is shifted leftwards. Note length is 0 if it follows the grid size.; triplet is 1.5 of the straight division, 1/4T = 1/4 / 1.5 = 1 / 1.5; dotted is 1.5 times straight, 1/4D = 1/4 * 1.5 = 1 * 1.5; swing doesn't affect grid_QN value because it's returned as swing_val
-local t = {['Grid'] = 0, ['1'] = 4, -- Grid is used in note_len evaluation
-['1/2'] = 2, ['1/2T'] = 2/1.5, ['1/2D'] = 2*1.5,
-['1/4'] = 1, ['1/4T'] = 1/1.5, ['1/4D'] = 1.5,
-['1/8'] = 1/2, ['1/8T'] = 1/2/1.5, ['1/8D'] = 1/2*1.5,
-['1/16'] = 1/4, ['1/16T'] = 1/4/1.5, ['1/16D'] = 1/4*1.5,
-['1/32'] = 1/8, ['1/32T'] = 1/8/1.5, ['1/32D'] = 1/8*1.5,
-['1/64'] = 1/16, ['1/64T'] = 1/16/1.5, ['1/64D'] = 1/16*1.5,
-['1/128'] = 1/32, ['1/128T'] = 1/32/1.5, ['1/128D'] = 1/32*1.5}
+
+-- exact grid divisions up to 1 measure can be calculated by the expression 4000/grid_QN
+-- triplet notes in this case produce integer greater by 1/3 than the straight note value,
+-- dotted notes are fractional and trickier to recognize, their fractionl part
+-- alternates between 0.333333333333 and 0.666666666667
+
+local mult = 1.5 -- to calculate triplets and dotted notes
+local t = {['Grid'] = 0, -- Grid value is used in note_len evaluation
+['4'] = 16, ['4T'] = 16/mult, ['4D'] = 16*mult,
+['2'] = 8, ['2T'] = 8/mult, ['2D'] = 8*mult,
+['1'] = 4, ['1T'] = 4/mult, ['1D'] = 4*mult,
+['1/2'] = 2, ['1/2T'] = 2/mult, ['1/2D'] = 2*mult,
+['1/4'] = 1, ['1/4T'] = 1/mult, ['1/4D'] = 1.5,
+['1/8'] = 1/2, ['1/8T'] = 1/2/mult, ['1/8D'] = 1/2*1.5,
+['1/16'] = 1/4, ['1/16T'] = 1/4/mult, ['1/16D'] = 1/4*mult,
+['1/32'] = 1/8, ['1/32T'] = 1/8/mult, ['1/32D'] = 1/8*mult,
+['1/64'] = 1/16, ['1/64T'] = 1/16/mult, ['1/64D'] = 1/16*mult,
+['1/128'] = 1/32, ['1/128T'] = 1/32/mult, ['1/128D'] = 1/32*mult}
 
 local grid, swing, note
 
@@ -4002,22 +4062,101 @@ local grid, swing, note
 		if note_len == val then note = div break end
 	end
 
-return 	grid, swing, note
+local grid_div_len_sec = 60/r.Master_GetTempo()*grid_QN
+local grid_div_len_px = grid_div_len*r.GetHZoomLevel()
+
+return grid, swing, note, grid_div_len_sec, grid_div_len_px
 
 end
+
+
+
+function Get_MIDI_Ed_Visible_Grid(vis_grid_div_len)
+-- the function is only compatible with builds 7.37+
+-- where grid minimum line spacing setting
+-- applies to the MIDI Editor grid as well
+-- vis_grid_div_len is value in sec which stems from Get_Visible_Grid_Div_Length();
+
+-- exact grid divisions up to 1 measure can be calculated by the expression 4000/grid_QN
+-- triplet notes in this case produce integer greater by 1/3 than the straight note value,
+-- dotted notes are fractional and trickier to recognize, their fractionl part
+-- alternates between 0.333333333333 and 0.666666666667
+
+local vis_QN = vis_grid_div_len/(60/r.Master_GetTempo()) -- visible grid division in quarter notes
+local mult = 1.5 -- to calculate triplets and dotted notes
+local t = {
+['4'] = 16, ['4T'] = 16/mult, ['4D'] = 16*mult,
+['2'] = 8, ['2T'] = 8/mult, ['2D'] = 8*mult,
+['1'] = 4, ['1T'] = 4/mult, ['1D'] = 4*mult,
+['1/2'] = 2, ['1/2T'] = 2/mult, ['1/2D'] = 2*mult,
+['1/4'] = 1, ['1/4T'] = 1/mult, ['1/4D'] = 1.5,
+['1/8'] = 1/2, ['1/8T'] = 1/2/mult, ['1/8D'] = 1/2*1.5,
+['1/16'] = 1/4, ['1/16T'] = 1/4/mult, ['1/16D'] = 1/4*mult,
+['1/32'] = 1/8, ['1/32T'] = 1/8/mult, ['1/32D'] = 1/8*mult,
+['1/64'] = 1/16, ['1/64T'] = 1/16/mult, ['1/64D'] = 1/16*mult,
+['1/128'] = 1/32, ['1/128T'] = 1/32/mult, ['1/128D'] = 1/32*mult}
+
+	for div, val in pairs(t) do
+		if val == vis_QN then return div end
+	end
+
+end
+
+
+
+
+function Re_Store_Note_Setting(note_div, note_mode)
+-- note division and mode settings at the bottom of the MIDI Editor
+
+	if not (note_div or note_mode) then
+	local note_div_sett_t = {
+	41081, -- Set length for next inserted note: 1
+	41079, -- Set length for next inserted note: 1/2
+	41076, -- Set length for next inserted note: 1/4
+	41073, -- Set length for next inserted note: 1/8
+	41070, -- Set length for next inserted note: 1/16
+	41067, -- Set length for next inserted note: 1/32
+	41064, -- Set length for next inserted note: 1/64
+	41062, -- Set length for next inserted note: 1/128
+	41295 -- Set length for next inserted note: grid // when set to grid, note mode (straight, triplet, dotted) isn't preserved when custom note division is re-enabled 
+	}
+	local note_mode_sett_t = {
+	41712, -- Set length for next inserted note: dotted preserving division length
+	41711, -- Set length for next inserted note: straight preserving division length
+	41713 -- Set length for next inserted note: triplet preserving division length
+	}
+	local note_div, note_mode
+		for k, act_ID in ipairs(note_div_sett_t) do
+			if r.GetToggleCommandStateEx(32060, act_ID) == 1 
+			then note_div = act_ID
+			end
+		end
+		for k, act_ID in ipairs(note_mode_sett_t) do
+			if r.GetToggleCommandStateEx(32060, act_ID) == 1 
+			then note_mode = act_ID
+			end
+		end
+	return note_div, note_mode -- returns action command IDs
+	else
+	local note_div = note_div and r.MIDIEditor_LastFocused_OnCommand(note_div, false) -- islistviewcommand
+	local note_mode = note_mode and r.MIDIEditor_LastFocused_OnCommand(note_mode, false) -- islistviewcommand
+	end
+
+end
+
 
 
 function Get_Track_MIDI_Note_Names(tr)
 local note_names = '<MIDINOTENAMES'
 	for note_idx = 0, 127 do -- note range
 		for chan_idx = -1, 15 do -- MIDI channel range, -1 is omni
-		local name = r.GetTrackMIDINoteNameEx(0, tr, note_idx, chan_idx)
+		local name = r.GetTrackMIDINoteNameEx(0, tr, note_idx, chan_idx) -- name is nil if no custom name
 			if name then
 			-- enclose inside quotes if contains spaces as per REAPER format
 			name = name:match(' ') and '"'..name..'"' or name
 			-- concatenate <MIDINOTENAMES block line
 			note_names = note_names..'\n'..chan_idx..' '..note_idx..' '..name..' 0 '..note_idx
-			-- if name is found under onmi MIDI channel it will also be returned for all 16 channel
+			-- if name is found under onmi MIDI channel it will also be returned for all 16 channels
 			-- so no point in continuing because this is not how the code looks in the track chunk
 				if chan_idx == -1 then break end
 			end
@@ -4025,6 +4164,16 @@ local note_names = '<MIDINOTENAMES'
 	end
 return note_names ~= '<MIDINOTENAMES' and note_names..'\n>'
 end
+
+
+
+function Get_Note_Name_At_Current_Pitch(ME)
+local ME = ME or r.MIDIEditor_GetActive()
+local pitch = r.MIDIEditor_GetSetting_int(ME, 'active_note_row')
+local note_t = {'C','C#','D','D#','E','F','F#','G','G#','A','A#','B'}
+return pitch/12 < 0 and note_t[pitch+1] or note_t[pitch%12+1]..tostring(math.floor(pitch/12-1)) -- +1 in pitch+1 and pitch%12+1 because range starts at 0 and at each C note modulo is 0 while notes table is indexed from 1; -1 in pitch/12-1 because MIDI Editor keyboard starts from octave -1, so 0 in the 0-127 range of the pitch var refers to C-1 rather than C0 and everything must be shifted downwards by 1 to match the keyboard labels and note readouts; math.floor to truncate trailing decimal 0 before conversion into string
+end
+
 
 
 function Get_Default_MIDI_Chan(take, sectID)
@@ -4049,7 +4198,7 @@ function Re_Store_MIDI_Editor_Mode(mode_init)
 -- are used changing the mode in the temp MIDI item won't affect the mode active elsewhere
 -- if the project is empty on startup Notation mode which was last used
 -- cannot be restored when temp track and temp MIDI items are used
--- because its toggle state is not stored, instead the mode last active before Notaton
+-- because its toggle state is not stored, instead the mode last active before Notation
 -- is returned with GetToggleCommandStateEx() even though all modes are mutually exclusive
 	local function get()
 	local get_togg_state = r.GetToggleCommandStateEx
@@ -4074,9 +4223,9 @@ end
 --============================= M I D I  E N D =============================
 
 
---============================= (R E) S T O R E   O B J E C T S =============================
+--============================= (R E) S T O R E ============================
 
-function StoreSelectedObjects() -- CAN BE COMBINED INTO A SINGLE FUNCTION WITH THE RESTORE ONE BELOW
+function StoreSelectedObjects() -- CAN BE COMBINED INTO A SINGLE FUNCTION WITH THE RESTORE ONE BELOW, see Re_Store_Selected_Objects()
 
 -- Store selected items
 -- REAPER devs don't recommend using CountSelectedMediaItems()
@@ -4337,6 +4486,37 @@ r.UpdateArrange()
 end
 
 
+
+function Re_Store_Selected_Items(t, keep_last_selected)
+-- at the restoration stage when evaluating whether any items 
+-- were saved into the table, use 'if next(t) then' statement 
+-- because the table isn't indexed and 'if #t > 0 then' wont work
+
+	if not t then
+	local t = {}
+		for i=0, r.CountMediaItems(0)-1 do
+		local item = r.GetMediaItem(0,i) 
+			if r.IsMediaItemSelected(item) then
+			t[item] = '' -- dummy entry
+			end
+		end
+	r.SelectAllMediaItems(0, false) -- selected false // deselect all
+	return t
+	else
+		if not keep_last_selected then
+		r.SelectAllMediaItems(0, false) -- selected false // deselect all
+		end
+		for item in pairs(t) do
+		r.SetMediaItemSelected(item, true) -- selected true
+		end
+	end
+
+r.UpdateArrange()
+
+end
+
+
+
 function re_store_obj_selection(t1, t2)
 	if not t1 and not t2 then
 	local t1, t2 = {}, {}
@@ -4369,7 +4549,7 @@ function re_store_obj_selection(t1, t2)
 end
 
 
---========================= (R E) S T O R E   O B J E C T S   E N D ============================
+--========================= (R E) S T O R E   E N D ============================
 
 --========================= O B J E C T S ============================
 
@@ -5063,8 +5243,8 @@ r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINMIXER', 0) -- hide in Mixer
 	if not want_midi_editor then
 	-- Must not be hidden in Arrange if a temp item on the temp track must be opened
 	-- in the MIDI Editor, otherwise it may end up not being deleted after opening the MIDI Editor,
-	-- it doesn't if the function is run on REAPER starup, may need testing in other scenarios
-	r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINTCP', 0) -- hide in Arrange
+	-- it doesn't if the function is run on REAPER startup, may need testing in other scenarios
+	r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINTCP', 0) -- hide in Arrange // IF TRACK IS HIDDEN IN ARRANGE ITEM CANNOT BE GLUED
 	else -- insert temp MIDI item
 	local ACT = reaper.Main_OnCommand
 	ACT(40914, 0) -- Track: Set first selected track as last touched track (to make it the target for temp MIDI item insertion)
@@ -8503,6 +8683,7 @@ function GetMonFXProps() -- get mon fx accounting for floating window, reaper.Ge
 	return mon_fx_idx, is_mon_fx_float -- expected >= 0, true
 end
 
+
 local retval, track_num, item_num, fx_num = r.GetFocusedFX()
 local mon_fx_idx = retval == 1 and track_num == 0 and fx_num >= 16777216
 or retval == 0 and GetMonFXProps() >= 0 -- for builds older that 6.20 where GetFocusedFX() doesn't detect Monitor FX
@@ -8600,8 +8781,8 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 	-- supported since v7.0
 	local retval, tr_num, itm_num, take_num, fx_num, parm_num = reaper.GetTouchedOrFocusedFX(1) -- 1 last touched mode // parm_num only relevant for querying last touched (mode 0) // supports Monitoring FX and FX inside containers, container itself can also be focused
 	local tr = tr_num > -1 and r.GetTrack(0, tr_num) or retval and r.GetMasterTrack(0) -- Master track is valid when retval is true, tr_num in this case is -1
-	local item = r.GetMediaItem(0, itm_num)
-	local take = item and r.GetTake(0, take_num)
+	local item = tr and r.GetTrackMediaItem(tr, itm_num)
+	local take = item and r.GetTake(item, take_num)
 	local fx_alias, fx_GUID, is_cont
 
 		if take then
@@ -8615,24 +8796,24 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 		end
 
 	local obj = take or tr
-	local GetNamedConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
-	local fx_name = GetNamedConfigParm(obj, fx_num, 'fx_name')
-	fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
-	or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name -- if Video processor or Container
+		if obj then
+		local GetNamedConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
+		local ret, fx_name = GetNamedConfigParm(obj, fx_num, 'fx_name')
+		fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
+		or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name -- if Video processor or Container
 
-	local input_fx, cont_fx = tr and r.TrackFX_GetRecChainVisible(tr) ~= -1, fx_num >= 33554432 -- or fx_num >= 0x2000000 // fx_num >= 0x1000000 or fx_num >= 16777216 for input_fx gives false positives if fx is inside a container in main fx chain hence chain visibility evaluatiion
-	local mon_fx = retval and tr_num == -1 and input_fx
+		local input_fx, cont_fx = tr and r.TrackFX_GetRecChainVisible(tr) ~= -1, fx_num >= 33554432 -- or fx_num >= 0x2000000 // fx_num >= 0x1000000 or fx_num >= 16777216 for input_fx gives false positives if fx is inside a container in main fx chain hence chain visibility evaluatiion
+		local mon_fx = retval and tr_num == -1 and input_fx
 
-	return retval, tr_num, tr, itm_num, item, take_num, take, fx_num, mon_fx, fx_alias, fx_name, fx_GUID, input_fx, cont_fx, is_cont -- tr_num = -1 means Master
-
+		return retval, tr_num, tr, itm_num, item, take_num, take, fx_num, mon_fx, fx_alias, fx_name, fx_GUID, input_fx, cont_fx, is_cont -- tr_num = -1 means Master
+		end
 	end
 
 end
 -- USE:
 -- local retval, tr_num, tr, itm_num, item, take_num, take, fx_num, mon_fx, fx_alias, fx_name, fx_GUID, is_input_fx, is_cont_fx, is_cont = GetFocusedFX2()
--- if retval == 0 and not mon_fx then return end -- no focused FX -- in versions older than 7.0
--- not fx_name means no focused
-
+-- if retval == 0 and not mon_fx then return end -- no focused FX -- in versions older than 7.0;
+-- not retval or not fx_name means no focused
 
 
 
@@ -10078,6 +10259,32 @@ end
 
 
 
+function Get_FX_Parm_By_Name_Or_Ident(obj, fx_idx, parm_name, parm_ident, want_input_fx)
+-- search by name/identifier in case index changes
+-- yet a situation when index remains the same while name/identifier change
+-- is just as likely;
+-- param name can be aliased by user while identifier can't and so more reliable;
+-- obj is track or take
+-- want_input_fx is boolean to target input fx chain / Mointoring FX chain of the Master track
+-- only valid if obj arg is track
+local take, tr = r.ValidatePtr(obj,'MediaItem_Take*'), r.ValidatePtr(obj,'MediaTrack*')
+local FX_CountParm, FX_GetParamName, FX_GetParamIdent = table.unpack(take and {r.TakeFX_GetNumParams, r.TakeFX_GetParamName, r.TakeFX_GetParamIdent} or tr and {want_input_fx and r.TrackFX_GetRecCount or r.TrackFX_GetNumParams, r.TrackFX_GetParamName, r.TrackFX_GetParamIdent})
+	if take or tr then
+	local _6_37 = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.37 -- support FX_GetParamIdent function
+	local fx_idx = tr and want_input_fx and fx_idx < 0x100000 and fx_idx+0x1000000 or fx_idx
+		for i=0, FX_CountParm(obj, fx_idx) do
+		local retval, name = FX_GetParamName(obj, fx_idx, i)
+		local retval, ident = table.unpack(_6_37 and {FX_GetParamIdent(obj, fx_idx, i)} or {})
+			if parm_name and name == parm_name 
+			or parm_ident and ident:match(parm_ident) -- without escaping because they're unlikely to include special characters, but worth being watchful
+			then return i end
+		end
+	end
+end
+
+
+
+
 function Is_Same_Plugin(src_obj, src_fx_idx, dest_obj, dest_fx_idx)
 -- src_obj and dest_obj are either track or take
 -- input/Monitoring FX index must be fed in the API format, i.e. 0x1000000+idx or 16777216+idx
@@ -10135,13 +10342,16 @@ end
 
 
 
-function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, TAG)
+function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, parm_ident_t, TAG)
 -- the function is based on Get_FX_Parm_Orig_Name() above
 -- in case it's been aliased by the user
 -- obj is track or take
 -- fx_name is the original name of the plugin being validated
 -- parm_t is a table indexed by param indices whose fields hold corresponding original param names
 -- e.g. {[4] = 'parm name 4', [12] = 'parm name 12', [23] = 'parm name 23'}
+-- parm_ident_t is a table indexed by param indices whose fields hold 
+-- corresponding param string identifiers, supported since build 6.37+
+-- parm_t and parm_ident_t must be of the same length and have the same order of parameters
 -- TAG is a user TAG added to FX name in the FX chain
 -- to mark it as a target for script, optional
 -- works with builds 6.37+
@@ -10180,44 +10390,70 @@ r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new 
 local temp_track = r.GetTrack(0,r.CountTracks(0)-1)
 r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0) -- hide in Mixer
 r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
--- search for the name of fx parameter at the same index as the one being evaluated, in the copy of the fx
--- on the temp track
-CopyFX(obj, fx_idx, temp_track, 0, false) -- is_move false
+-- search for the name of fx parameter at the same index as the one being evaluated 
+-- in a fresh instance of the fx on the temp track or its copy if fresh instance could not
+-- be added due to name change by the user in the FX browser,
+-- in builds older than 6.37 the evaluation isn't reliable 
+-- by 100% because some parameter names in the source fx may be aliased
+-- and won't match the expected names
+-- parameter identifiers supported since build 6.37 however are likely to be immutable
+r.TrackFX_AddByName(temp_track, fx_name, false, 1) -- recFX false, instantiate 1 (or -1000) to insert
+	if r.TrackFX_GetCount(temp_track) == 0 then -- copy source fx if insertion of a fresh one failed
+	CopyFX(obj, fx_idx, temp_track, 0, false) -- is_move false
+	end
 local parm_t = parm_t and type(parm_t) == 'table' and #parm_t > 0 and parm_t
+local parm_ident_t = parm_ident_t and type(parm_ident_t) == 'table' and #parm_ident_t > 0 and parm_ident_t
 local name_match = true
 
-	if parm_t then
+	if parm_t or parm_ident_t then	
 		for idx, name in pairs(parm_t) do
+		local ident
 		local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, idx, '') -- fx_idx 0
-			if and parm_t[i] ~= parm_name then
+			if build_6_37 then
+			retval, ident = r.TrackFX_GetParamIdent(temp_track, 0, idx)
+			end
+			if partm_t and name ~= parm_name
+			or parm_ident_t and not ident:match(Esc(parm_ident_t[idx])) -- using string.match because returned identifiers incluse param index, i.e. 1:_identifier, while the table fed as argument doesn't
+			then
 			-- break rather than return to allow deletion of the temp track
 			-- before returning the value
 			name_match = false break
 			end
 		end
-	else -- compare names of up to 6 random parameters
+	else -- compare names and identifiers of up to 6 random parameters
 	local src_parm_cnt = GetParmCount(obj, fx_idx)
-	local tmp_parm_cnt = r.TrackFX_GetNumParams(temp_track, 0)
+	local tmp_parm_cnt = r.TrackFX_GetNumParams(temp_track, 0) -- 0 temp fx index
 		if src_parm_cnt == tmp_parm_cnt then
-		parm_t = {}
+		parm_t, parm_ident_t = {}, {}
 		math.randomseed(math.floor(r.time_precise()*1000))
 		local count = src_parm_cnt > 5 and 6 or src_parm_cnt -- look for 6 param names as long as the param count allows that, 6 is more reliable than 3 or 4 because random number may repeat which will reduce the number of options
 			for i=1, count do
+			-- collect parameter data from the source fx
+			local ident
 			local rnd = math.random(1, src_parm_cnt)-1 -- math.random range must start from 1
 			local ret, parm_name = GetParamName(obj, fx_idx, rnd, '')
+				if build_6_37 then
+				ret, ident = r.TrackFX_GetParamIdent(obj, fx_idx, rnd)
+				end
 			local stock = parm_name == 'Bypass' or parm_name == 'Wet' or build_6_37 and parm_name == 'Delta' -- excluding 3 stock parameters because they're not unique to a plugin
-				if parm_t[rnd] or stock then -- prevent storing the same param several times if math.random generates the same number and storing stock params
+				if parm_t[rnd] or parm_ident_t[rnd] or stock then -- prevent storing the same param several times if math.random generates the same number, and storing stock params
 					repeat
 					rnd = math.random(1, src_parm_cnt)-1
 					ret, parm_name = GetParamName(obj, fx_idx, rnd, '')
-					until not parm_t[rnd] and parm_name ~= 'Bypass' and parm_name ~= 'Wet'
+					until not parm_t[rnd] and not parm_ident_t[rnd] 
+					and parm_name ~= 'Bypass' and parm_name ~= 'Wet'
 					and (not build_6_37 or parm_name ~= 'Delta')
 				end
-			parm_t[rnd] = parm_name
+			parm_t[rnd], parm_ident_t[rnd] = parm_name, ident -- store
 			end
+			-- compare collected parameter data with temp fx parameters
 			for parm_idx, name in pairs(parm_t) do
+			local ident
 			local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, parm_idx, '') -- fx_idx 0
-				if name ~= parm_name then
+				if build_6_37 then
+				retval, ident = r.TrackFX_GetParamIdent(temp_track, 0, parm_idx)
+				end
+				if name ~= parm_name or parm_ident_t[parm_idx] and parm_ident_t[parm_idx] ~= ident then
 				-- break rather than return to allow deletion of the temp track
 				-- before returning the value
 				name_match = false break
@@ -10951,6 +11187,131 @@ r.SetEditCurPos(cur_pos, false, false) -- moveview, seekplay false; restore posi
 end
 
 
+
+function Insert_Image()
+-- change path, image file name and undo point title in the code
+
+local chunk = [[
+<ITEM
+POSITION 0
+SNAPOFFS 0
+LENGTH 8
+LOOP 1
+ALLTAKES 0
+FADEIN 1 0 0 1 0 0 0
+FADEOUT 1 0 0 1 0 0 0
+MUTE 0 0
+SEL 1
+IGUID {3E42B32C-B52E-4644-A494-DFDBCFB163B9}
+IID 1
+RESOURCEFN "F:\Program Files\REAPER (x64)\Scripts\MY\my_Transcribing\Transcribing toolbar layout.png"
+IMGRESOURCEFLAGS 5
+NOTESWND 197 95 1198 659
+>
+]]
+
+r.Undo_BeginBlock()
+-- the function will faulter here if it's already used outside of the function
+-- in which case scr_name will have to be passed as an argument
+local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context()
+local img_name = 'Transcribing 2 toolbar layout.png'
+local path = scr_name:match('.+[\\/]')..img_name
+	if r.file_exists(path) then
+	local GetSet = r.GetSetMediaTrackInfo_String
+	local img_tr
+	-- search for an empty file with the image inserted earler to prevent duplication on successive script runs
+	-- when the toolbar file gets overwritten this function doesn't run
+		for i=r.GetNumTracks()-1, 0, -1 do
+		local tr = r.GetTrack(0,i)
+		local ret, ext = GetSet(tr, 'P_EXT:'..img_name, '', false) -- setNewValue false
+			if ret then
+				for i=0,r.CountTrackMediaItems(tr)-1 do
+				local item = r.GetTrackMediaItem(tr,i)
+					if r.CountTakes(item) == 0 then -- OR not r.GetActiveTake(item) // empty items don't have takes
+					local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
+						if chunk:match('RESOURCEFN "'..Esc(path)..'"') then return end -- already exists
+					end
+				end
+			img_tr = tr
+			break end
+		end
+	--Msg(path)
+		if not img_tr then
+		r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefault false
+		img_tr = r.GetTrack(0,r.GetNumTracks()-1)
+		end
+	local item = r.AddMediaItemToTrack(img_tr)
+	GetSet(img_tr, 'P_NAME', 'Transcribing 2 toolbar layout', true) -- setNewValue true
+	GetSet(img_tr, 'P_EXT:'..img_name, '1', true) -- setNewValue true
+	chunk = chunk:gsub('RESOURCEFN.-\n', 'RESOURCEFN "'..path..'"\n')
+	--Msg(chunk)
+	r.SetItemStateChunk(item, chunk, false) -- isundo false
+	local st_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0) -- isSet false
+	r.SetMediaItemInfo_Value(item, 'D_LENGTH', end_time)
+--	r.UpdateArrange()
+		if r.GetCursorPosition() < end_time then -- prevent edit cursor crossing the image
+		r.SetEditCurPos(0,true,false) -- moveview true, seekplay false
+		end
+	-- The image may end up being a bit cut off on the left if zoom level is not high enough
+	-- but couldn't figure out a way to ensure the sweet spot of the zoom level, Set_Horiz_Zoom_Level() didn't help
+	r.CSurf_OnScroll(-400,0) -- scroll horizontally left, 1 scroll unit is 16 px so scroll 6400 px which should be enough to reach the project start
+--	Set_Horiz_Zoom_Level(10)
+--	r.CSurf_OnScroll(2,0)
+	GetSet_Track_Zoom_100_Perc(img_tr)
+--	r.UpdateArrange()
+	end
+r.Undo_EndBlock('Insert Transcribing toolbar layout image', -1)
+
+end
+
+
+
+function Insert_Temp_Item(temp_tr, file_path, item_props_t, take_props_t)
+-- for adding temp_tr see Insert_Temp_Track()
+-- item_props_t, take_props_t are associative arrays of item and take attribute names and value to be set
+
+local temp_itm = r.AddMediaItemToTrack(temp_tr)
+local take = r.AddTakeToMediaItem(temp_itm)
+local pcm_src = r.PCM_Source_CreateFromFile(file_path)
+r.SetMediaItemTake_Source(take, pcm_src)
+r.GetSetMediaItemTakeInfo_String(take, 'P_NAME', file_path:match('[^\\/]+$'), true) -- setNewValue true, name after source file
+local Set_Item, Set_Take = r.SetMediaItemInfo_Value, r.SetMediaItemTakeInfo_Value
+	
+	for attr, val in pairs(item_props_t) do
+	Set_Item(temp_itm, attr, val)
+	end
+	
+	for attr, val in pairs(take_props_t) do
+	Set_Take(take, attr, val)
+	end
+	
+-- DO STUFF AND STORE VALUES
+
+r.DeleteTrackMediaItem(temp_tr, temp_itm) -- or the entire track can be deleted if not needed any longer
+-- r.DeleteTrack((temp_tr)
+r.PCM_Source_Destroy(pcm_src)
+
+-- RETURN STUFF
+
+end
+
+
+
+function Insert_Item_On_Temp_Track(tr_name)
+
+r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
+local temp_tr = r.GetTrack(0,r.CountTracks(0)-1)
+local name = tr_name and r.GetSetMediaTrackInfo_String(temp_tr, 'P_NAME', tr_name, true) -- setNewValue true
+r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINMIXER', 0) -- hide in Mixer
+r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINTCP', 0) -- hide in Arrange // hiding in Arrange will prevent Gluing track item, the Glue action won't work
+local temp_itm = r.AddMediaItemToTrack(temp_tr)
+local take = r.AddTakeToMediaItem(temp_itm)
+
+return temp_tr, temp_itm, take
+
+end
+
+
 function Get_Item_Edge_At_Mouse() -- Combined with Get_Item_Track_Segment_At_Mouse() can be used to get 4 item corners at the mouse cursor
 local cur_pos = r.GetCursorPosition()
 local x, y = r.GetMousePosition()
@@ -11574,15 +11935,16 @@ local fade_in, fade_out, xfade_in, xfade_out, xfade_in_nonuniform, xfade_out_non
 function Get_Take_Src_Props(take)
 	if take then
 	local src = r.GetMediaItemTake_Source(take)
-	local sect, startoffs, len, rev = r.PCM_Source_GetSectionInfo(src) -- if sect is false src_startoffs and src_len are 0
+	local sect, startoffs, length, rev = r.PCM_Source_GetSectionInfo(src) -- if sect is false startoffs is 0
 	local src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or reversed
 	local filename = r.GetMediaSourceFileName(src, '') -- source pointer in takes with the same source is different therefore for comparison file name must be retrieved
-	return sect, startoffs, len, rev, filename
+	return sect, startoffs, length, rev, filename
 	end
 end
 
 
 function Select_Items_With_Same_Src_Media(src_take) -- select only items where active take has the same media source as the source take, don't select the source take parent item if it's unselected
+-- relies on Get_Take_Src_Props()
 local src_take_file = ({Get_Take_Src_Props(src_take)})[5]
 r.PreventUIRefresh(1)
 r.SelectAllMediaItems(0, false) -- selected false // deselect all
@@ -11684,8 +12046,8 @@ local src = r.GetMediaItemTake_Source(src_take)
 local sect, startoffs, len, rev = r.PCM_Source_GetSectionInfo(src_src) -- sect_src is true if 'Section' checkbox is checkmarked in 'Item Properties' (can be checkmarked with action 'Item properties: Loop section of audio item source')
 local src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or reversed
 	if sect then r.Main_OnCommand(40547,0) end -- Item properties: Loop section of audio item source // uncheck if checked
-Set_Take(take, 'D_STARTOFFS', trim_left)
-Set_Item(item, 'D_LENGTH', trim_right) -- set to the desired section length
+r.SetMediaItemTakeInfo_Value(take, 'D_STARTOFFS', trim_left)
+r.SetMediaItemInfo_Value(item, 'D_LENGTH', trim_right) -- set to the desired section length
 r.Main_OnCommand(40547,0) -- Item properties: Loop section of audio item source // check to enable section in the dest take // ADDS 10 ms OF SECTION FADE, can only be modified via item chunk as OVERLAP parameter in <SOURCE SECTION section
 end
 
@@ -11954,84 +12316,6 @@ end
 -- USE:
 -- local cur_take_idx = r.GetMediaItemInfo_Value(item, 'I_CURTAKE')
 -- r.SetMediaItemInfo_Value(item, 'I_CURTAKE', rand_active_take_idx(take_cnt, cur_take_idx, ALLOW_REPEATS))
-
-
-
-function Insert_Image()
--- change path, image file name and undo point title in the code
-
-local chunk = [[
-<ITEM
-POSITION 0
-SNAPOFFS 0
-LENGTH 8
-LOOP 1
-ALLTAKES 0
-FADEIN 1 0 0 1 0 0 0
-FADEOUT 1 0 0 1 0 0 0
-MUTE 0 0
-SEL 1
-IGUID {3E42B32C-B52E-4644-A494-DFDBCFB163B9}
-IID 1
-RESOURCEFN "F:\Program Files\REAPER (x64)\Scripts\MY\my_Transcribing\Transcribing toolbar layout.png"
-IMGRESOURCEFLAGS 5
-NOTESWND 197 95 1198 659
->
-]]
-
-r.Undo_BeginBlock()
--- the function will faulter here if it's already used outside of the function
--- in which case scr_name will have to be passed as an argument
-local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context()
-local img_name = 'Transcribing 2 toolbar layout.png'
-local path = scr_name:match('.+[\\/]')..img_name
-	if r.file_exists(path) then
-	local GetSet = r.GetSetMediaTrackInfo_String
-	local img_tr
-	-- search for an empty file with the image inserted earler to prevent duplication on successive script runs
-	-- when the toolbar file gets overwritten this function doesn't run
-		for i=r.GetNumTracks()-1, 0, -1 do
-		local tr = r.GetTrack(0,i)
-		local ret, ext = GetSet(tr, 'P_EXT:'..img_name, '', false) -- setNewValue false
-			if ret then
-				for i=0,r.CountTrackMediaItems(tr)-1 do
-				local item = r.GetTrackMediaItem(tr,i)
-					if r.CountTakes(item) == 0 then -- OR not r.GetActiveTake(item) // empty items don't have takes
-					local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
-						if chunk:match('RESOURCEFN "'..Esc(path)..'"') then return end -- already exists
-					end
-				end
-			img_tr = tr
-			break end
-		end
-	--Msg(path)
-		if not img_tr then
-		r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefault false
-		img_tr = r.GetTrack(0,r.GetNumTracks()-1)
-		end
-	local item = r.AddMediaItemToTrack(img_tr)
-	GetSet(img_tr, 'P_NAME', 'Transcribing 2 toolbar layout', true) -- setNewValue true
-	GetSet(img_tr, 'P_EXT:'..img_name, '1', true) -- setNewValue true
-	chunk = chunk:gsub('RESOURCEFN.-\n', 'RESOURCEFN "'..path..'"\n')
-	--Msg(chunk)
-	r.SetItemStateChunk(item, chunk, false) -- isundo false
-	local st_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0) -- isSet false
-	r.SetMediaItemInfo_Value(item, 'D_LENGTH', end_time)
---	r.UpdateArrange()
-		if r.GetCursorPosition() < end_time then -- prevent edit cursor crossing the image
-		r.SetEditCurPos(0,true,false) -- moveview true, seekplay false
-		end
-	-- The image may end up being a bit cut off on the left if zoom level is not high enough
-	-- but couldn't figure out a way to ensure the sweet spot of the zoom level, Set_Horiz_Zoom_Level() didn't help
-	r.CSurf_OnScroll(-400,0) -- scroll horizontally left, 1 scroll unit is 16 px so scroll 6400 px which should be enough to reach the project start
---	Set_Horiz_Zoom_Level(10)
---	r.CSurf_OnScroll(2,0)
-	GetSet_Track_Zoom_100_Perc(img_tr)
---	r.UpdateArrange()
-	end
-r.Undo_EndBlock('Insert Transcribing toolbar layout image', -1)
-
-end
 
 
 function Split_Item_Into_Takes_And_Reconstruct(item)
@@ -15696,6 +15980,9 @@ local pages = { -- prefpage_lastpage
 
 
 function Set_Horiz_Zoom_Level(target_val)
+-- target_val is px/sec,
+-- example: if grid division length in sec * r.GetHZoomLevel() < X in px
+-- target_value (i.e. px/sec) arg is X / grid division length in sec
 local dir = r.GetHZoomLevel() > target_val and -1 or r.GetHZoomLevel() < target_val and 1
 	if dir then
 	r.PreventUIRefresh(1)
@@ -16277,6 +16564,31 @@ end
 
 
 
+function file_exists_alt(path) -- a fix for the buggy ReaScript API function
+-- file_exists() returns true if passed a file name only and a file with the same name
+-- is found in the current working directory, which is a bug https://forum.cockos.com/showthread.php?t=300386
+-- so must be additionaly validated
+	if not path:match('[\\/]') -- excluding file names without a path, i.e. without separators, due to the bug mentioned above
+	or not r.file_exists(path) then
+	return
+	end
+end
+
+
+function file_status(path)
+-- based on https://www.tutorialspoint.com/lua/index.htm
+-- returned status: readable, writable
+-- if readable but not writable then readonly
+-- if neither then either the file doesn't exist or the path is invalid
+local t = {true}
+	for k, v in ipairs({'r','w'}) do
+	t[k] = t[1] and io.open(path, v) -- initial true t[1] conditions opening in read mode, then opening in write mode depends on the result of the read mode stored in t[1], because if file doesn't exist, attempt to open it in write mode first will create it, which is not what we need
+		if t[k] then t[k]:close() end
+	end
+return t
+end
+
+
 -- Validate path supplied in the user settings
 function Validate_Folder_Path(path) -- returns empty string if path is empty and nil if it's not a string
 	if type(path) == 'string' then
@@ -16651,31 +16963,41 @@ return cont
 end
 
 
-function Create_Dummy_Project_File1()
--- see also Close_Tab_Without_Save_Prompt
+function Get_Or_Create_Dummy_Project_File1()
+-- see also Open_Close_Temp_Proj_Tab_Without_Save_Prompt()
 -- since when opened, dummy project reference is added to the 'Recent projects' menu
 -- provided the preference at 
 -- Prefs -> General -> Recent projects list display button -> Add to recent list when loading project is enabled (and it's enabled by default)
 -- it's advised that it be stored in a constant path, because each new path
 -- is a new entry in the menu
-local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
-local dummy_proj = scr_name:match('.+[\\/]')..'BuyOne_dummy project (do not rename).RPP'
+-- project templates path may be used instead but the dummy file will be listed
+-- in the project template menu
+local _, script_path, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
+-- OR
+-- local script_path = debug.getinfo(1,'S').source:match('@(.+[\\/])') -- without the name
+local section, key = ('DUMMY PROJECT FILE'):reverse(), ('PATH'):reverse()
+local dummy_proj = r.GetExtState(section, key)
+dummy_proj = r.file_exists(dummy_proj) and dummy_proj
+or script_path:match('.+[\\/]')..'BuyOne_dummy project (do not rename).RPP'
 	if not r.file_exists(dummy_proj) then -- create a dummy project file next to the script
+	r.SetExtState(section, key, dummy_proj, true) -- persist true
 	local f = io.open(dummy_proj,'w')
-	f:write('<REAPER_PROJECT\n>')
+	f:write('<REAPER_PROJECT\nTITLE "THIS FILE IS USED BY SOME SCRIPTS"\n>')
 	f:close()
 	end
 return dummy_proj
 end
 
 
-function Create_Dummy_Project_File2()
--- see also Close_Tab_Without_Save_Prompt
+function Get_Or_Create_Dummy_Project_File2()
+-- see also Open_Close_Temp_Proj_Tab_Without_Save_Prompt()
 -- since when opened, dummy project reference is added to the 'Recent projects' menu
 -- provided the preference at 
 -- Prefs -> General -> Recent projects list display button -> Add to recent list when loading project is enabled (and it's enabled by default)
 -- it's advised that it be stored in a constant path, because each new path
 -- is a new entry in the menu
+-- project templates path may be used instead but the dummy file will be listed
+-- in the project template menu
 local path = os.getenv('TEMP') or os.getenv('TMP') -- path to the system temp folder
 	if #path > 0 then
 	local sep = path:match('[\\/]')
@@ -16683,10 +17005,13 @@ local path = os.getenv('TEMP') or os.getenv('TMP') -- path to the system temp fo
 	-- sep = package.config:match("([^\n]*)\n?")
 	-- OR
 	-- sep = r.GetResourcePath():match('[\\/]')
-	local dummy_proj = path..sep..'dummy project.RPP'
+	local section, key = ('DUMMY PROJECT FILE'):reverse(), ('PATH'):reverse()
+	local dummy_proj = r.GetExtState(section, key)
+	dummy_proj = r.file_exists(dummy_proj) and dummy_proj or path..sep..'dummy REAPER project.RPP'
 		if not r.file_exists(dummy_proj) then
+		r.SetExtState(section, key, dummy_proj, true) -- persist true
 		local f = io.open(dummy_proj,'w')
-		f:write('<REAPER_PROJECT\n>')
+		f:write('<REAPER_PROJECT\nTITLE "THIS FILE IS USED BY SOME SCRIPTS"\n>')
 		f:close()
 		end
 	return dummy_proj
@@ -17080,7 +17405,7 @@ local OS = r.GetAppVersion()
 local lin, mac = OS:match('lin'), OS:match('OS')
 local win = not lin and not mac
 local t = win and {'<','>',':','"','/','\\','|','?','*'}
-or lin and {'/'} or mac and {'/',':'}
+or lin and {'/','\0'} or mac and {'/',':'}
 
 	for k, char in ipairs(t) do
 	name = name:gsub(char, '')
@@ -17093,14 +17418,16 @@ or lin and {'/'} or mac and {'/',':'}
 local win_illegal = 'CON,PRN,AUX,NUL,COM1,COM2,COM3,COM4,COM5,COM6,COM7,COM8,COM9,LPT1,LPT2,LPT3,LPT4,LPT5,LPT6,LPT7,LPT8,LPT9'
 	if win then
 		for ill_name in win_illegal:gmatch('[^,]+') do
-			if name:match('^%s*'..ill_name..'%s*$') then name = '' break end -- illegal names padded with spaces aren't allowed either
+			if name:match('^%s*'..ill_name..'%s*$') or name:match('^%s*'..ill_name:lower()..'%s*$')
+			then name = '' break end -- illegal names padded with spaces aren't allowed either
 		end
 	end
 	
 	if #name > 0 then -- if after the sanitation there're characters left
 	local shorter = #name < orig_len 
 		if shorter then
-		Error_Tooltip('\n\n the file name has been \n\n stipped of illegal characters. \n\n\t please review it \n\n', 1, 1) -- caps, spaced true
+		Error_Tooltip('\n\n\t the file name has been \n\n stripped of illegal characters. '
+		..'\n\n\t      please review it \n\n', 1, 1, -100, -280) -- caps, spaced
 		end
 	return name, shorter
 	end
@@ -17133,7 +17460,7 @@ function string.len(self)
 return #self:gsub('[\128-\191]','') -- discard the continuation bytes, if any
 end
 
--- make the stock function reverse non-ASCII strings as well
+-- make the stock function reverse non-ANSI strings as well
 -- the change applies to the entire environment scope
 function string.reverse(self)
 local str_reversed = ''
@@ -17144,6 +17471,21 @@ return str_reversed
 end
 
 local path, name, ext = f_path:match('(.+[\\/])(.+)(%.%w+)')
+
+local OS = r.GetAppVersion()
+local lin, mac = OS:match('lin'), OS:match('OS')
+local win = not lin and not mac
+local t = win and {'<','>',':','"','/','|','%?','%*'} -- escaping magic characters
+or lin and {'\0'} or mac and {':', '/.'} -- OSX doesn't recognize file/folder names starting with a dot
+-- https://care.acronis.com/s/article/Illegal-Characters-on-Various-Operating-Systems?language=en_US
+-- https://superuser.com/questions/1499950/what-are-invalid-names-for-a-directory-under-linux
+
+	for k, char in ipairs(t) do
+		if path:match('^%s*%u:.-'..char) then
+		Error_Tooltip('\n\n the file path contains \n\n    illegal characters \n\n', 1, 1, -65, -275)
+		return nil, f_path end -- f_path is parallel to mess return value below
+	end
+
 local diff = 256 - (path:len()+ext:len())
 -- local mess = ''
 local mess
@@ -17177,6 +17519,25 @@ return path..name..ext, mess, (path..name..ext):len() < f_path:len(), name:len()
 end
 
 
+
+function Copy_Or_Move_File(cur_file_path, new_file_path, want_move)
+-- cur_file_path includes file name
+-- new_file_path excludes file name
+local f = io.open(cur_file_path,'rb')
+local cont = f:read('*a')
+	if want_move then -- remove from old location
+	os.remove(cur_file_path)
+	end
+local sep = new_file_path:match('[\\/]')
+local path = new_file_path..(new_file_path:sub(-1) == sep and '' or sep)..cur_file_path:match('[^\\/]+') -- concatenate full path of the file at the new location
+f = io.open(path,'wb')
+f:write(cont)
+f:close()
+return r.file_exists(path) and path
+end
+
+
+
 function Get_Last_Accessed_Dir()
 -- last directory accessed by REAPER in various contexts
 
@@ -17195,20 +17556,6 @@ local t = {'vstpath64', 'lv2path_win64', 'clap_path_win64', 'altpeakspath', 'con
 return t
 end
 
-
-
-function file_status(path)
--- based on https://www.tutorialspoint.com/lua/index.htm
--- returned status: readable, writable
--- if readable but not writable then readonly
--- if neither then either the file doesn't exist or the path is invalid
-local t = {true}
-	for k, v in ipairs({'r','w'}) do
-	t[k] = t[1] and io.open(path, v) -- initial true t[1] conditions opening in read mode, then opening in write mode depends on the result of the read mode stored in t[1], because if file doesn't exist, attempt to open it in write mode will create it, which is not what we need
-		if t[k] then t[k]:close() end
-	end
-return t
-end
 
 
 --=================================== F I L E S   E N D =========================================
@@ -17395,7 +17742,8 @@ end
 
 
 function Get_Visible_Grid_Div_Length(grid_div_len)
--- grid_div_len stems from Grid_Div_Dur_In_Sec()
+-- grid_div_len is value in sec, 
+-- stems from Grid_Div_Dur_In_Sec() or Get_MIDI_Ed_Grid()
 -- returns length of visible grid division in sec
 local retval, min_spacing = r.get_config_var_string('projgridmin') -- minimum visible grid resolution // setting in Snap/Grid Settings dialogue 'Show grid, line spacing: ... minimum: ... pixels'
 	if min_spacing+0 > 0 then
@@ -18732,7 +19080,7 @@ function ShowMessageBox_Menu(message_lines, buttons_t, title)
 		for k, line in ipairs(t) do
 		local line_len = #line:gsub('[\128-\191]','')
 	--	local diff = (max_len-line_len)/4
-	--	diff = math.floor(diff*3+0.5) -- figured out empirically, 3/4 or 4/5 of the difference give the best result with English though not ideal, for Russian 5/6 // ideally pixels must be counted rathen than characters
+	--	diff = math.floor(diff*3+0.5) -- figured out empirically, 3/4 or 4/5 of the difference give the best result with English though not ideal, for Russian 5/6 // ideally pixels must be counted rather than characters
 	-- OR simply
 		local diff = math.floor((max_len-line_len) * 4/5 + 0.5)
 		t[k] = (' '):rep(diff)..line -- add leading spaces to center the line // may not be accurate if lines text is in different register
@@ -18770,8 +19118,10 @@ local message_t, max_len = {}, 0
 -- Center the message
 message_t = center_text(message_t, max_len)
 buttons_t = center_text(buttons_t, max_len)
-	
-local title = title or 'PROMPT'
+
+local title = title or ('PROMPT'):gsub('.','%0    ')
+-- title = (' '):rep(math.floor((max_len-#title)/2+#title/2+0.5))..title 
+-- OR better yet ('  '):rep(math.floor((max_len-#title)/2+0.5))..title -- center the title, works for spaced out 'PROMPT', same can be done with the button captions
 local menu = title..'||'..table.concat(message_t)..'||'..table.concat(buttons_t,'|')
 
 ::RELOAD::
@@ -18780,9 +19130,7 @@ local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open is true
 	if output == 0 then return
 	elseif output > #message_t+1 then -- a button was pressed, +1 to account for the title
 	return output-#message_t-1 -- return button index, -1 to account for the title
-	end
-
-	if output <= #message_t+1 then -- if message menu item was clicked, +1 to account for the title
+	elseif output <= #message_t+1 then -- if message menu item was clicked, +1 to account for the title
 	goto RELOAD
 	end
 
@@ -18950,31 +19298,60 @@ return i
 end
 
 
-function Temp_Proj_Tab()
--- relies on Create_Dummy_Project_File() if current tab isn't linked to a saved project
+function Open_Close_Temp_Proj_Tab_Without_Save_Prompt1()
+-- relies on Get_Or_Create_Dummy_Project_File() if current tab isn't linked to a saved project
 local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer; returns empty string if project doesn't have a file and returns path even if the project file and possibly folder was deleted while the project is open
 r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
 -- DO STUFF
-local dummy_proj = Create_Dummy_Project_File()
-r.Main_openProject('noprompt:'..dummy_proj) -- open dummy proj in the newly open tab without save prompt // THIS CHANGES LAST WORKING DIRECTORY, SO NEXT TIME THE DIALOGUE WILL POINT TO THE DUMMY PROJ FILE DIRECTORY
+local dummy_proj = Get_Or_Create_Dummy_Project_File()
+r.Main_openProject('noprompt:'..dummy_proj) -- open dummy proj in the newly open tab without save prompt // THIS CHANGES CURRENT WORKING DIRECTORY, SO NEXT TIME THE OPEN PROJECT DIALOGUE WILL POINT TO THE DUMMY PROJ FILE DIRECTORY
 r.Main_OnCommand(40860, 0) -- Close current (temp) project tab // save prompt won't appear because nothing has changed in the dummy proj
-	if dummy_proj then os.remove(dummy_proj) end
+--	if dummy_proj then os.remove(dummy_proj) end -- NOT ADVISED IF THE DUMMY PROJECT FILE IS TO BE REUSED TO ENSURE THAN THE RECENT PROJECTS LIST ISN'T OVERFLOWN WITH NEW PATHS
 r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
 end
 
 
-function Close_Tab_Without_Save_Prompt1() -- see version 2 below which uses temporary dummy project file which is faster to load than a full fledged one
+function Open_Close_Temp_Proj_Tab_Without_Save_Prompt2()
+-- relies on Get_Or_Create_Dummy_Project_File() if no valid project file to load was found
 -- Close temp project tab without save prompt; when a freshly opened project closes there's no prompt
 local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer; returns empty string if project doesn't have a file and returns path even if the project file and possibly folder was deleted while the project is open
+	if #projfn == 0 then -- current tab isn't linked to saved project file, look elsewhere
+	local i = 0
+		repeat
+		cur_proj, fn = r.EnumProjects(i)
+			if #fn > 0 then projfn = fn end -- get path associated with the most recently opened proj tab, normally the righmost, so loop runs until the end because the count is from left to right
+		i=i+1
+		until not cur_proj
+		if #projfn == 0 then -- if still not found in the open tabs, look for recently opened
+		local recent
+			for line in io.lines(r.get_ini_file()) do
+				if line:match('%[Recent%]') then recent = 1 -- section start
+				elseif recent then
+				-- file_exists() returns true if passed a file name only and a file with the same name
+				-- is found in the current working directory, which is a bug https://forum.cockos.com/showthread.php?t=300386
+				-- so must be additionaly validated
+					if not line:match('^recent%d+=') then break -- section end
+					elseif line:match('^recent%d+=(.+)'):match('[\\/]') -- validate proper path due to the bug mentioned above to ensure it's not just a bare file name without a path which can happen if r.Main_SaveProjectEx() was ever used with file name only and flag 8
+					and r.file_exists(line:match('^recent%d+=(.+)'))
+					then
+					projfn = line:match('^recent%d+=(.+)') break
+					end
+				end
+			end		
+		end
+		if #projfn == 0 then -- still not found in recently opened, use dummy
+		projfn = Get_Or_Create_Dummy_Project_File()
+		end
+	end
 r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
 -- DO STUFF
-r.Main_openProject('noprompt:'..projfn) -- open the stored project in the temp tab // 
+r.Main_openProject('noprompt:'..projfn) -- open the stored project in the temp tab // this updates the current working directory so next time the open project dialogue will point to the directory of last loaded file be it another project or dummy project
 r.Main_OnCommand(40860, 0) -- Close current project tab // won't generate a save prompt
 r.SelectProjectInstance(cur_proj) -- re-open orig proj tab
 end
 
 
-function Close_Tab_Without_Save_Prompt2(path)
+function Open_Close_Temp_Proj_Tab_Without_Save_Prompt3(path)
 -- creates temp project file, uses it, then deletes it
 -- THE TEMP FILE IS ADDED TO RECENT PROJECTS MENU
 -- provided the preference at 
@@ -18993,7 +19370,7 @@ local sep = path:match('[\\/]')
 	f:write('<REAPER_PROJECT\n>')
 	f:close()
 		if r.file_exists(path) then
-		r.Main_openProject('noprompt:'..path) -- open suppressing prompt to save currently unsaved project // THIS CHANGES LAST WORKING DIRECTORY, SO NEXT TIME THE DIALOGUE WILL POINT TO THE TEMP PROJ FILE DIRECTORY
+		r.Main_openProject('noprompt:'..path) -- open suppressing prompt to save currently unsaved project // THIS CHANGES CURRENT WORKING DIRECTORY UNLESS IT'S USED FOR THE TEMP PROJ FILE CREATION, SO NEXT TIME THE DIALOGUE WILL POINT TO THE TEMP PROJ FILE DIRECTORY
 		r.Main_OnCommand(40860, 0) -- Close current project tab
 		os.remove(path)
 		end
@@ -22171,6 +22548,7 @@ M A T H
 	get_integer_length
 	un_pack_integers
 	calculate_median_value
+	split_combine_64bit_integer
 
 
 S T R I N G S
@@ -22190,6 +22568,7 @@ S T R I N G S
 	split_into_lines
 	split_into_multiple_lines
 	split_line_by_capture_count
+	split_lines_by_length
 	Are_Multiple_Captures
 	count_captures
 	insert_string_at_specific_position1
@@ -22231,6 +22610,7 @@ S T R I N G S
 	construct_table_from_2_lists
 	embellish_string
 	bytes2string
+	add_zero_padding
 
 
 T A B L E S
@@ -22329,7 +22709,10 @@ M I D I
 	CC_Evts_Exist
 	Store_Insert_Notes_OR_Evts
 	Get_MIDI_Ed_Grid
+	Get_MIDI_Ed_Visible_Grid
+	Re_Store_Note_Setting
 	Get_Track_MIDI_Note_Names
+	Get_Note_Name_At_Current_Pitch
 	Get_Default_MIDI_Chan
 	Re_Store_MIDI_Editor_Mode
 
@@ -22343,6 +22726,7 @@ M I D I
 	re_store_sel_trks1
 	re_store_sel_trks2
 	ReStoreSelectedItems
+	Re_Store_Selected_Items
 	re_store_obj_selection
 
 
@@ -22568,6 +22952,7 @@ F X
 	Collect_All_Container_FX_Indices
 	Loop_Over_FX_Container_Table
 	Get_FX_Parm_Orig_Name
+	Get_FX_Parm_By_Name_Or_Ident
 	Is_Same_Plugin
 	Validate_FX_Identity
 
@@ -22603,6 +22988,9 @@ I T E M S
 	Get_Item_Greatest_And_1st_Availab_Group_IDs2
 	Insert_Empty_Item_To_Display_Text1
 	Insert_Empty_Item_To_Display_Text2
+	Insert_Image
+	Insert_Temp_Item
+	Insert_Item_On_Temp_Track
 	Get_Item_Edge_At_Mouse
 	Get_Sel_Items_St_And_End
 	Is_Same_Items_Track
@@ -22629,8 +23017,7 @@ I T E M S
 	Is_Item_Looped_In_Arrange
 	Import_Item_To_RS5k
 	Is_Item_Under_Mouse
-	Is_Item_Under_Mouse_Locked
-	Insert_Image
+	Is_Item_Under_Mouse_Locked	
 	Split_Item_Into_Takes_And_Reconstruct
 	Item_Has_Top_Icon_Bar
 	Get_Default_Take_Rank_Scale
@@ -22697,7 +23084,6 @@ M A R K E R S  &  R E G I O N S
 	Get_Mrkrs_Of_Takes_At_Mouse_Or_Edit_Curs
 	Get_Rgn_Mrkr_Mngr_Settings
 	Get_Selected_And_Hidden_Markers_And_Regions
-
 
 
 G F X
@@ -22779,6 +23165,8 @@ F I L E S
 	Dir_Exists2
 	File_Exists1
 	File_Exists2
+	file_exists_alt
+	file_status
 	Validate_Folder_Path
 	print_or_write_to_file
 	ScanPath1
@@ -22801,8 +23189,8 @@ F I L E S
 	Extract_reaper_ini_val1
 	Extract_reaper_ini_val2
 	Get_File_Cont
-	Create_Dummy_Project_File1
-	Create_Dummy_Project_File2
+	Get_Or_Create_Dummy_Project_File1
+	Get_Or_Create_Dummy_Project_File2
 	META_Spawn_Scripts
 	GetActionCommandIDByFilename
 	Get_Set_Script_Cont
@@ -22819,8 +23207,8 @@ F I L E S
 	sanitize_file_name1
 	sanitize_file_name2
 	sanitize_file_path
+	Copy_Or_Move_File
 	Get_Last_Accessed_Dir
-	file_status
 
 
 M E A S U R E M E N T S / C A L C U L A T I O N S
@@ -22902,9 +23290,9 @@ U T I L I T Y
 	Re_Set_Toggle_State
 	defer_store
 	Count_Proj_Tabs
-	Temp_Proj_Tab
-	Close_Tab_Without_Save_Prompt1
-	Close_Tab_Without_Save_Prompt2
+	Open_Close_Temp_Proj_Tab_Without_Save_Prompt1
+	Open_Close_Temp_Proj_Tab_Without_Save_Prompt1
+	Open_Close_Temp_Proj_Tab_Without_Save_Prompt2
 	Validate_Proj_Tab
 	Is_Win
 	Get_OS
