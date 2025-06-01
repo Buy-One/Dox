@@ -945,6 +945,7 @@ Placing 'Action: Modify MIDI CC/mousewheel: Negative' at the beginning of the cu
 
 -- Track: Insert new track at end of track list vs Track: Insert new track at end of mixer
 
+
 These behave differently when the option 'Auto-arrange tracks in mixer' is turned off (action Mixer: Toggle autoarrange)
 
 which allows free reordering of tracks in the Mixer while retaining their indices and in which case
@@ -958,7 +959,7 @@ in the Mixer regardless of its index
 
 -- Transport: Play/stop (move edit cursor on stop)
 
-The action is suitable for stopping recording recording as well
+The action is suitable for stopping recording as well
 
 
 --------------------------------------------------
@@ -990,6 +991,29 @@ Only affects last selected MIDI item for opening and currently active MIDI Edito
 Always close if a MIDI Editor window is open, even if another MIDI item is selected.
 Must be used to close the window as well, otherwise if you try to apply it to another item 
 having closed the current one manually it must be reset which requires a few idle executions
+
+
+--------------------------------------------------
+
+
+-- Take: Implode selected fixed lane tracks to takes using best efforts (overlapping items may be shortened)
+VS
+-- Take: implode items on the same track
+
+The first action also disables FIL (fixed item lanes) mode
+
+
+--------------------------------------------------
+
+-- File: Save new version of project (automatically increment project name)
+
+Updates name of the open project
+
+
+-- File: Save copy of project (automatically increment project name)
+
+Keeps the project name the same, display a message about the path of the created file copy
+
 
 
 ============================================================================
@@ -3726,7 +3750,7 @@ https://forum.cockos.com/showthread.php?p=2008003
 
 ==============================================================
 
--- IF and IF NOT statements for regular custom actions
+-- IF and IF NOT statements for regular custom actions (conditional custom actions)
 
 Actions to be used are named 'Action: Skip next action ...'
 
@@ -3845,13 +3869,16 @@ Some locking toggle actions
 Item properties: Toggle item play all takes
 
 
-- Or a dummy Lua script with the following code can be used to toggle the state:
+-- Or a dummy Lua script with the following code can be used to toggle the state:
 
 /////////////////////////////////////////////////////////
 
 local is_new_value, fullpath, sectionID, cmdID, mode, resolution, val = reaper.get_action_context()
 local state = reaper.GetToggleCommandStateEx(sectionID, cmdID) < 1
 reaper.SetToggleCommandState(sectionID, cmdID, state and 1 or 0)
+-- OR
+local state = reaper.GetToggleCommandStateEx(sectionID, cmdID)
+reaper.SetToggleCommandState(sectionID, cmdID, state~1) -- flip the bit
 
 ////////////////////////////////////////////////////////
 
@@ -3860,6 +3887,7 @@ reaper.SetToggleCommandState(sectionID, cmdID, state and 1 or 0)
 -- MIND THAT NOT ALL ACTIONS LABELED 'TOGGLE' ACTUALLY REPORT THE TOGGLE STATE, SUCH AS THOSE WHICH AFFECT SELECTED OBJECTS
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 Custom: Temporary toggle to OFF
   Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
   Options: Toggle snapping
@@ -3871,10 +3899,12 @@ Custom: Temporary toggle to OFF
   Action: Skip next action if CC parameter <0/mid --------------------- if 'Toggle snapping' action toggle state had initially been OFF, CC was set to -1, 											therefore next action will be skipped and won't run to restore the initial toggle state, 										otherwise it won't be skipped and will run to restore the initial toggle 
 									state, that is ON after being set to OFF above
   Options: Toggle snapping
+
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
 Custom: Temporary toggle to ON
   Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
   Options: Toggle snapping
@@ -3887,6 +3917,7 @@ Custom: Temporary toggle to ON
 									state, otherwise it will be skipped and won't run to restore the initial toggle state, 
 									that is OFF after being set to ON above
   Options: Toggle snapping
+
 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
 
@@ -3910,7 +3941,7 @@ Bypass can also be conditioned by another toggle action, e.g.
 
 Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
 -- TOGGLE ACTION
-Action: Skip next action if CC parameter >0/mid OR  <0/mid ---------- depeding on which toggle state is required as a condition
+Action: Skip next action if CC parameter >0/mid  OR  <0/mid ---------- depeding on which toggle state is required as a condition
 -- YOUR ACTION TO BYPASS
 
 
@@ -5607,6 +5638,104 @@ https://forum.cockos.com/showthread.php?p=1765552
 
 
 =============================================================
+
+-- Ensure that you don't have any invisible or tiny items at the end of the project
+
+because it will affect project bounds in rendering
+
+
+Run the action 'View: Zoom out project'
+
+and if there're any stray items the zoom will include the timeline beyond your last visible item
+
+
+https://youtu.be/y-Tu14fG4C8?t=7560
+
+=============================================================
+
+-- Configuruing ReaGate in podcast editing
+
+
+An audio gate is an effect that will help you to reduce unwanted noise below a certain threshold. Sometimes this is called a noise gate, and it's job is really simple. It opens and it closes. When the signal is above a certain threshold, it allows the audio to pass through completely unaffected.
+And when the signal falls below that threshold, it closes and completely cuts the audio.
+In other words, it mutes it so you can't hear anything. And this can be a very useful tool to cut down on background noise.
+A gate's job is to open when the audio is above a certain threshold and close when it's below a certain threshold.
+So a really quick way to set up a gate is to play the audio that you know that you want to cut out.
+There are a few ways that we can tweak the gate to make it do its job a lot better. The first thing is adjusting this control down here called hysteresis.
+Because right the gate is opening and closing at the same point, say negative 24.
+But adjusting this hysteresis will separate the opening portion of the gate from the closed portion of the gate.
+In other words we can get the gate to open at negative 24, but we can get it to close lower than that.
+Setting the hysteresis to -6 decibels means that the gate will open at -24 and close at -30 so that the part of the signal which is lower in level than the threshold but which needs to be preserved is gonna come through the gate.
+Additionally we can add a little bit of hold time maybe 75 milliseconds which will force the gate to stay open once the audio falls below the threshold, it gives you a bit more wiggle room at the end of phrases. And that can also increase the release time maybe up to 150 milliseconds. What that will do is increase the time it takes from the gate to go from the open
+state to the closed state which is kind of a fade out time, if you will. Now 150 milliseconds is pretty fast because
+a thousand milliseconds is one second. So this is happening pretty fast, but making the release a little bit longer
+will smooth out the closing of the gate and it'll make it sound less chattery.
+Unfortunately, there's no way to get this audio gate to work perfectly a 100% of the time.
+There are other settings that you can tweak, like the low pass and the high pass and the RMS size, which may completely crush out the signal which needs to be muted.
+However, those settings will also make it less reliable for the ends of phrases, which may be about at the same level.
+There's not a great way to make it do both, but that's okay because on the whole this will make a really positive effect.
+And when you hear it in context, you won't hear this kind of chattery sound.
+There're a few more settings that would be good to tweak. One of those is pre-open. What this will do is it will move the open window, if you will, ahead of the cursor or the playhead. So that it will get the gate to open before the audio actually
+rises up above the threshold. This will help to ensure that the beginning of every word is being caught.
+So if we add like seven milliseconds of pre open, that's going to move the open forward in time by seven milliseconds.
+So instead of opening right here, it's actually gonna open like right here which is going to catch the very beginning
+of the word which is going to sound a little bit better. 
+Now I also like to increase the attack time, which is kind of the fade-in time if you will, to maybe something like 5 milliseconds. And that will make the beginning of all of the words when the gate opens sound a little bit smoother. If you find that these particular settings still sound too chattery, what you can do is increase the pre-open time a little bit more, and maybe increase the attack time a little bit more.
+And that will hopefully smooth out the opening phase of the gate so that it's not sounding so chattery, which can sometimes happen.
+If some stray sounds are still popping through, to try and get it to not do that, you can adjust the RMS size setting.
+By increasing this just a little bit, what you're doing is telling the gate that the audio needs to remain above the threshold for three milliseconds on average in order to trigger the gate to open. Which will reduce some of little clicky sounds a little bit. But be careful with the RMS size because increasing it just a little bit can affect how it opens up on certain sounds, and it may not work all the time. If you're trying to crush those out, that's the setting, that you want to adjust and very small values should work. So maybe even two or one milliseconds might get that to be out. You wanna set this as low as possible.
+Now all of that said, I do not like to run a gate completely open and completely closed. Because I think that even though it is doing a great job, it still sounds maybe a little bit too harsh, it can still sound a little bit chattery.
+So one thing that can help a little bit is to reduce the dry wet blend. This Wet circular knob controls how much of the affected sound versus how much of the unaffected sound goes through this effect. In other words, by default, all of the effects are set to 100% wet, meaning you are listening to the effect 100%. But by setting it to something like 90%, it's going to introduce 10% of the unaffected sound into the mix. And this can help reduce some of that chattering. 
+
+https://youtu.be/y-Tu14fG4C8?t=3377
+
+=============================================================
+
+-- Project media (recording) path setting priority
+
+For unsaved projects:
+
+If no path is configured in any of the preferences, REAPER default path '%USER%\Documents\REAPER Media'
+
+Path configured in default Project settings -> Media -> Path to save media files (...), ONLY IF ABSOLUTE
+
+Path configured at Preferences -> General -> Paths -> Default recording path, ... (defrecpath= key in reaper.ini)
+
+
+For saved projects:
+
+Path configured in Project settings -> Media -> Path to save media files (...), relative to project directory or absolute
+
+Project directory if no path is configured in the Project Settings
+
+
+=============================================================
+
+-- Look up current theme after its properties have been changed in 'Theme develoment / tweaker' dialogue
+
+
+When a theme is selected from the list at Options -> Themes a checkmark is placed next to its file name.
+
+Once the theme properties have been edited in the 'Theme development / tweaker' dialogue the checkmark 
+is cleared and when the theme tweaker is closed nothing indicates which theme is currently open.
+
+To look up the current theme name open the Screenset/Layouts window, go to the Layouts tab. 
+The current theme is listed in the Theme row
+
+https://forum.cockos.com/showthread.php?t=289528#3
+
+
+=============================================================
+
+
+
+
+
+
+
+
+
+
 
 
 
