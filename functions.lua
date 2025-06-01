@@ -72,7 +72,7 @@ do return r.defer(function() end) end
 do r.defer(function() if not bla then return end end) end -- to avoid defer being stuck and display ReaScrpt task control dialogue on successive runs
 --OR
 do r.defer(function() do return end end) end
--- neither works work if a shortcut is held continuously
+-- neither works if a shortcut is held continuously
 
 
 function no_undo()
@@ -492,18 +492,41 @@ function Get_Closest_Prev_Whole_Multiple(dividend, int_divisor)
 end
 
 
-function Get_Closest_Multiple_Of_Divisor(number, divisor) -- number is some number, decimal arguments are supported; the closest meaning the closest to the number
+function Get_Closest_Multiple_Of_Divisor1(number, divisor) 
+-- number is some number, decimal arguments and arguments < 1 are supported;
+-- the closest meaning the closest to the number, on either side;
+-- math.floor for negative numbers rounds closer to 0, i.e. -4.5 is rounded to 4
+-- rather than to -5
 	local function round(num) -- if decimal part is greater than or equal to 0.5 round up else round down; rounds to the closest integer
 		if math.floor(num) == num then return num end -- if number isn't decimal
 	return math.ceil(num) - num <= num - math.floor(num) and math.ceil(num) or math.floor(num)
+-- OR
+-- return math.floor(num+0.5) -- only numbers > 1 are supported
 	end
-return round(number/divisor)*divisor
+local dec_places = math.abs(number) < 1 and 10^#tostring(number):match('%.(%d+)')
+number = number*(dec_places or 1)	
+return round(number/divisor)*divisor/(dec_places and dec_places or 1)
 end
 
 
-local function nmb(...)
+
+function Get_Closest_Multiple_Of_Divisor2(number, divisor, want_next)
+-- number is some number, decimal arguments and arguments < 1 are supported;
+-- if want_next is false/nil returns closest previous multiple, otherwise closest next
+-- math.floor for negative numbers rounds closer to 0, i.e. -4.5 is rounded to 4
+-- rather than to -5
+local dec_places = math.abs(number) < 1 and 10^#tostring(number):match('%.(%d+)')
+number = number*(dec_places or 1)
+return (math.floor(number/divisor)*divisor+(want_next and divisor or 0))/(dec_places and dec_places or 1)
+end
+
+
+
+local function nmb(...) -- abbreviation
 return tonumber(...)
 end
+-- OR simply
+-- nmb = tonumber
 
 
 function split_integer_to_1s_and_10s(integer)
@@ -818,6 +841,25 @@ function split_combine_64bit_integer(hi, lo)
 end
 
 
+function floats_are_equal(numA, numB)
+-- due to floating point rounding errors and long fractional parts
+-- it's impossible to reliably evaluate equality by direct comparison between 
+-- two floating point numbers because numbers functionally the same 
+-- will differ in minute fraction, 
+-- this is always an ussue with notes length, which seems to be related 
+-- to their measurement in quarter note units, and value in quarter notes
+-- ends up being slightly larger than the value it's supposed to be equal to
+-- so a way to compare them is by converting them into strings, tostring()
+-- function automatically rounds long floating point numbers of up to about
+-- 15 decimal places which seems enough for reliable comparison because the
+-- difference is much smaller
+return tostring(numA/numB) == '1.0' -- the fractional part of the quotient of the division is so small that after being rounded by conversion into string all which remains of it is decimal zeros
+-- OR
+-- local numA, numB = numA..'', numB..''
+-- numA == numB or numA == numB:gsub('%.0','') or numA:gsub('%.0','') == numB -- simple comparison works BUT craps out at whole numbers if there's a trailing decimal zero in one of them, hence the gsub
+end
+
+
 
 --================================ M A T H  E N D ===================================
 
@@ -1095,6 +1137,21 @@ return cntr[2] -- 2nd return value of gsub is the number of replaced captures
 end
 -- OR
 -- select(2, str:gsub(capt,''))
+
+
+
+function collect_captures(source_str, pattern, capture_idx)
+-- same as string.gmatch
+-- if capture at specific index is required specify capture_idx,
+-- if specified, the gsub loop will only run up to such index
+-- and the table will only include captures up to and including
+-- the target capture
+local t = {}
+local i = 0
+local source_str = source_str:gsub(pattern, 
+function(c) i=i+1; t[i] = c end, capture_idx or #source_str)
+return t, t[#t] -- or t[i], the 2nd return value is the caprure at index
+end
 
 
 
@@ -2917,6 +2974,26 @@ end
 
 
 
+function notes_at_current_pitch_exist(ME, take, time_st, time_end, loop_st, loop_end)
+-- if time_st or loop_st are valid, evaluation is only performed
+-- within time selection or loop
+local cur_pitch = r.MIDIEditor_GetSetting_int(ME, 'active_note_row') -- store
+local i = 0
+	repeat
+	local retval, sel, mute, startpos, endpos, chan, pitch, vel = r.MIDI_GetNote(take, i) -- only targets notes in the current MIDI channel if Channel filter is enabled, if looking for genuine false or 0 values must be validated with retval which is only true for notes from current channel // if looking for all notes use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
+	local pos = r.MIDI_GetProjTimeFromPPQPos(take, startpos)
+		if pitch == cur_pitch and not time_st and not loop_st
+		or (time_st and time_end and pos >= time_st and pos < time_end
+		or loop_st and loop_end and pos >= loop_st and pos < loop_end)
+		then return true
+		end
+	i=i+1
+	until not retval
+end
+
+
+
+
 function find_first_next_note(take, start_pos) -- the first which starts later than the given one (start_pos) which allows ignoring chord notes in case they start simultaneously
 local retval, notecnt, _, _ = r.MIDI_CountEvts(take)
 local i = 0
@@ -2995,7 +3072,9 @@ end
 local ME = r.MIDIEditor_GetActive()
 local take = r.MIDIEditor_GetTake(ME)
 
-function re_store_sel_MIDI_notes(take,t) -- store and restore (in the current MIDI channel if Channel filter is enabled)
+function re_store_sel_MIDI_notes(take, deselect_all, t) 
+-- store and restore (in the current MIDI channel if Channel filter is enabled)
+-- deselect_all is boolean, only relevant at the storage stage
 
 local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take)
 
@@ -3012,13 +3091,20 @@ local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take)
 				if note > -1 then sel_note_t[#sel_note_t+1] = i end
 			i = i+1
 			until note == -1
-	]]
+	]]	
+		if deselect_all then
+			for k, note_idx in ipairs(sel_note_t) do
+			r.MIDI_SetNote(take, note_idx, false) -- selectedIn false, the rest is ignored
+			end
+		end
 	return sel_note_t
 	elseif #t > 0 then
 		for _, v in ipairs(t) do
 		r.MIDI_SetNote(take, v, true, false, -1, -1, 0, -1, -1, true) -- noteidx - v, selectedIn - true, mutedIn - false, startppqposIn and endppqposIn both -1, chanIn - 0, velIn -1, noSortIn - true since only one note params are set
 		end
 	end
+	
+r.MIDI_Sort(take)
 
 end
 
@@ -4071,18 +4157,117 @@ end
 
 
 
-function Get_MIDI_Ed_Visible_Grid(vis_grid_div_len)
+function Get_MIDI_Ed_Visible_Grid(ME, take)
 -- the function is only compatible with builds 7.37+
--- where grid minimum line spacing setting
--- applies to the MIDI Editor grid as well
--- vis_grid_div_len is value in sec which stems from Get_Visible_Grid_Div_Length();
+-- where insert note actions respect visible grid
+-- when the option 'Snap to visible grid' (first introduced in build 7.36)
+-- is enabled and minimum line spacing setting applies to the MIDI Editor grid
+-- so when the line spacing produced by the original grid type is smaller 
+-- than the minimum line spacing value, actual (visible) grid resolution 
+-- can be learned by inserting a note and measuring its length;
+-- IN MIDI EDITOR, FOLDED VISIBLE GRID OF TRIPLET, DOTTED AND SWUNG
+-- DIVISIONS PRODUCES LINE SPACING OF MAINLY STRAIGHT NOTES;
+-- relies on re_store_sel_MIDI_notes();
+-- !!! IMPORTANT: 
+-- 1) THE FUNCTION MUST BE INCLUDED WITHIN THE UNDO BLOCK
+-- BECAUSE THE ACTION 'Edit: Insert note at edit cursor' CREATES
+-- AN UNDO POINT AND IF PLACED OUTSIDE OF THE UNDO BLOCK, MIDI EVENT 
+-- IT TEMPORARILY INSERTS GETS RESTORED WHEN CHANGE PRODUCED 
+-- BY THE SCRIPT IS UNDONE
+-- 2) IT MUST BE PRECEDED BY:
+--[[ 
+local note_div, note_mode = Re_Store_Note_Setting(take) -- store settings
+	if note_mode ~= 'Grid' then
+	r.MIDIEditor_LastFocused_OnCommand(41295, false) -- islistviewcommand false // Set length for next inserted note: grid // ENABLE SO THAT 'Edit: Insert note at edit cursor' ACTION INSERTS NOTE BY GRID, ORIGINAL OR VISIBLE (in bilds 7.37+)
+	end
+]]
+-- AND FOLLOWED BY:
+--[[ 
+	if note_mode ~= 'Grid' then
+	Re_Store_Note_Setting(take, note_div, note_mode) -- restore settings
+	end
+]]
+-- 3) BE MINDFUL OF THE USE OF PreventUIRefresh() BEFORE THE FUNCTION
+-- BECAUSE IT MAY PREVENT EDIT CURSOR POSITION CHANGE EFFECTED
+-- WITH 'View: Go to start of file' BELOW FROM BEING ACCESSIBLE
+-- TO 'Edit: Insert note at edit cursor', THIS HASN'T BEEN TESTED
+
+
+-- the function is an alternative to Get_Visible_Grid_Div_Length()
+-- which works reliably for Arrange grid but is not relable in the MIDI Editor
+-- becasue MIDI Editor grid when folded doesn't respect mimimum line spacing value 
+-- set in the grid settings (never respected before build 7.37 and only partially 
+-- respects since) and instead creates greater line spacing which is impossible 
+-- to calculate with the said function because the function looks for time value in sec 
+-- corresponding to mimimum line spacing value in pixels and cannot guess 
+-- by how much actual line spacing of the visible MIDI Editor grid is greater 
+-- than the minimum value,
+-- that said Get_Visible_Grid_Div_Length() function is still able to give an indication 
+-- when the MIDI Editor visible grid doesn't match the grid setting in builds 7.37+
+
+-- SINCE THE FUNCTION IS INTRUSIVE IT MUST BE CONDITIONED
+-- BY DIFFERENCE BETWEEN LINE SPACING IN THE ORIGINAL GRID AND THE VISIBLE GRID
+-- SO IT DOESN'T RUN UNNECESSARY
+local grid_QN, swing_val, note_len = r.MIDI_GetGrid(take) -- grid_QN is effective grid setting in quarter notes
+local grid_div_len = 60/r.Master_GetTempo()*grid_QN -- grid division length in sec
+local retval, min_spacing = r.get_config_var_string('projgridmin') -- minimum visible grid resolution // setting in Snap/Grid Settings dialogue 'Show grid, line spacing: ... minimum: ... pixels'
+local _7_37 = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.37
+
+	if _7_37 and min_spacing+0 > 0 and grid_div_len*r.GetHZoomLevel() >= min_spacing+0 then return end -- build 7.37+, original grid line spacing in px is NOT smaller than the setting, i.e. visible grid resolution is NOT active, so no need to determine its line spacing
+
+-- The routine runs when build is 7.37+, original grid line spacing in px is smaller 
+-- than min_spacing setting, i.e. visible grid is active
+-- or when min_spacing setting is 0 so there's no clear rule determining when the grid 
+-- folds to fit the zoom level, so whether there's difference between original 
+-- and visible grids will have to be determined using this function return value 
+-- and based on this decision will have to be made which one to opt for.
+-- OR when build is older than 7.37 allowing to get grid line spacing regardles if whether
+-- it matches the original or the visible grid
+	
+local sel_notes = re_store_sel_MIDI_notes(take, 1) -- deselect_all true because note insert action doesn't make the note exclusively selected
+local cur_pitch = r.MIDIEditor_GetSetting_int(ME, 'active_note_row') -- store
+local edit_cur_pos = r.GetCursorPosition() -- store
+local snap_to_vis_grid = r.GetToggleCommandStateEx(32060, 42473) == 1 -- Options: Snap to visible grid
+
+local ACT = r.MIDIEditor_LastFocused_OnCommand
+
+r.PreventUIRefresh(1)
+
+	if not snap_to_vis_grid then -- toggle to ON, must be enaled for the insert note action to respect visible grid
+	ACT(42473, false) -- islistviewcommand // Options: Snap to visible grid
+	end
+	
+r.MIDIEditor_SetSetting_int(ME, 'active_note_row', 0)
+ACT(40036, false) -- islistviewcommand // View: Go to start of file
+ACT(40051, false) -- islistviewcommand // Edit: Insert note at edit cursor // inserts notes at grid resolution even if global Snap is disabled as long as note length setting is Grid
+local note_st, note_end, note_idx
+
+-- get first selected note because when note is inserted by action above
+-- it ends up being the only one selected because the rest were preemptively deselected above
+local i = 0
+	repeat
+	local retval, sel, muted, startppqpos, endppqpos, chan, pitch, vel = r.MIDI_GetNote(take, i)
+		if sel then note_st, note_end, note_idx = startppqpos, endppqpos, i break end		
+	i=i+1
+	until not retval
+	
+-- Restore everything
+	if not snap_to_vis_grid then -- toggle to OFF if was intially OFF
+	ACT(42473, false) -- islistviewcommand // Options: Snap to visible grid
+	end
+
+	if note_idx then r.MIDI_DeleteNote(take, note_idx) end
+
+re_store_sel_MIDI_notes(take, nil, sel_notes) -- deselect_all nil, irrelevant at the restoration stage
+r.MIDIEditor_SetSetting_int(ME, 'active_note_row', cur_pitch) -- restore
+r.SetEditCurPos(edit_cur_pos, false, false) -- moveview, seekplay false // restore
+
+r.PreventUIRefresh(-1)
 
 -- exact grid divisions up to 1 measure can be calculated by the expression 4000/grid_QN
 -- triplet notes in this case produce integer greater by 1/3 than the straight note value,
 -- dotted notes are fractional and trickier to recognize, their fractionl part
 -- alternates between 0.333333333333 and 0.666666666667
-
-local vis_QN = vis_grid_div_len/(60/r.Master_GetTempo()) -- visible grid division in quarter notes
 local mult = 1.5 -- to calculate triplets and dotted notes
 local t = {
 ['4'] = 16, ['4T'] = 16/mult, ['4D'] = 16*mult,
@@ -4096,8 +4281,33 @@ local t = {
 ['1/64'] = 1/16, ['1/64T'] = 1/16/mult, ['1/64D'] = 1/16*mult,
 ['1/128'] = 1/32, ['1/128T'] = 1/32/mult, ['1/128D'] = 1/32*mult}
 
-	for div, val in pairs(t) do
-		if val == vis_QN then return div end
+	if note_idx then
+	local sec = r.MIDI_GetProjTimeFromPPQPos(take, note_end)-r.MIDI_GetProjTimeFromPPQPos(take, note_st) -- length in sec
+	local QN = r.MIDI_GetProjQNFromPPQPos(take, note_end)-r.MIDI_GetProjQNFromPPQPos(take, note_st) -- length in QN
+	local vis_QN = QN or sec/(60/r.Master_GetTempo()) -- visible grid division in quarter notes
+		for div, val in pairs(t) do
+		-- due to floating point rounding errors and long fractional parts
+		-- it's impossible to reliably evaluate equality by direct comparison 
+		-- between two floating point numbers
+		-- because numbers functionally the same will differ in minute fraction,
+		-- this is always an ussue with notes length, which seems to be related 
+		-- to their measurement in ppq per quarter note, and value in quarter notes
+		-- ends up being slightly larger than the value it's supposed to be equal to,
+		-- mainly with triplets whose floating point precision is 18 decimal places		
+		-- i.e. 1/64T: val = 0.041666666666666664 VS vis_QN = 0.041666666666666741, 
+		-- so a way to compare them is by converting them into strings, tostring()
+		-- function automatically rounds off long floating point numbers of up to about
+		-- 15 decimal places which seems enough for reliable comparison because the
+		-- difference is smaller;
+		-- employing this solution for completeness because folded grid only matches 
+		-- whole notes except when extremely folded in which case it matches 1/2D
+			if tostring(val/vis_QN) == '1.0' -- the fractional part of the quotient of the division is so small that after being rounded by conversion into string all which remains of it is decimal zeros
+	--[[ OR
+		if val..'' == vis_QN..'' or val..'' == (vis_QN..''):gsub('%.0','') -- this works BUT craps out at whole numbers because when vis_QN is converted into string there's a trailing decimal zero while in the table whole numbers lack such zero which causes the evaluation to fail, hence the gsub
+		]]
+			then
+			return div, sec, QN end
+		end
 	end
 
 end
@@ -4105,22 +4315,54 @@ end
 
 
 
-function Re_Store_Note_Setting(note_div, note_mode)
+function Re_Store_Note_Setting(take, note_div, note_mode)
 -- note division and mode settings at the bottom of the MIDI Editor
-
-	if not (note_div or note_mode) then
+-- take must be valid is chunk is going to be used
+-- TO BE ABLE TO RESTORE SETTINGS VIA CHUNK
+-- AT THE RESTORATION STAGE THE FUNCTION MUST BE PRECEDED WITH:
+-- r.MIDIEditor_LastFocused_OnCommand(2, false) -- File: Close window
+-- AND FOLLOWED BY:
+-- r.SelectAllMediaItems(0, false) -- deselect all
+-- r.SetMediaItemSelected(r.GetMediaItemTake_Item(take), true)
+-- r.Main_OnCommand(40153,0) -- Item: Open in built-in MIDI editor (set default behavior in preferences)
+-- see pros and cons of each method in annotations below
+	
+	-- store
+	if not note_div and not note_mode -- IF USING ACTIONS, in this case note_mode will certainly be valid at the restoration stage and assigned command ID 41711 (straight note mode) even if note_div is nil
+	-- if not note_div -- IF USING CHUNK, note_mode can come in as nil if the data was collected from chunk, but note_div will always be valid
+	then
 	local note_div_sett_t = {
-	41081, -- Set length for next inserted note: 1
-	41079, -- Set length for next inserted note: 1/2
-	41076, -- Set length for next inserted note: 1/4
-	41073, -- Set length for next inserted note: 1/8
-	41070, -- Set length for next inserted note: 1/16
-	41067, -- Set length for next inserted note: 1/32
-	41064, -- Set length for next inserted note: 1/64
-	41062, -- Set length for next inserted note: 1/128
-	41295 -- Set length for next inserted note: grid // when set to grid, note mode (straight, triplet, dotted) isn't preserved when custom note division is re-enabled 
+	-- these actions always keep their toggle state as long as note division
+	-- is active regardles of the way it was activated
+	-- while actions without 'preserving division type' verbiage change
+	-- their toggle state and therefore unreliable;
+	-- there're no actions to enable 2 and 4 measures in the note menu
+	-- so these cannot be stored and restored
+	41710, -- Set length for next inserted note: 1 preserving division type
+	41709, -- Set length for next inserted note: 1/2 preserving division type
+	41708, -- Set length for next inserted note: 1/4 preserving division type
+	41707, -- Set length for next inserted note: 1/8 preserving division type
+	41706, -- Set length for next inserted note: 1/16 preserving division type
+	41705, -- Set length for next inserted note: 1/32 preserving division type
+	41704, -- Set length for next inserted note: 1/64 preserving division type
+	41703, -- Set length for next inserted note: 1/128 preserving division type
+	41295 -- Set length for next inserted note: grid
 	}
 	local note_mode_sett_t = {
+	-- with whole notes, dotted 1 whole note is supported, however
+	-- when 1 measure dotted is set via action it ends up displayed as 1/1 instead of 1
+	-- and if the pull-up note list is opened, 1/128 becomes automatically selected;
+	-- there's no single action to enable 1 measure dotted unlike with smaller note divisions;
+	-- when triplet 1 whole note and all non-straight types of 2 and 4 measure note
+	-- are manually enabled in the note menu the toggle state of the triplet 
+	-- and dotted actions listed below is set to OFF while the toggle state of the 
+	-- straight action is set to ON,
+	-- when triplet and dotted modes are enabled for 2 and 4 measure notes via action, 
+	-- the mode remains straight, but note notation is shown as a fraction, i.e. 4/3, 
+	-- or a decimal fraction, repeated execution of the triplet or dotted action keeps 
+	-- calculating the new fractional note value, while for 1 measure note this is
+	-- only the case with triplet mode set via action, however if set, dotted mode
+	-- action starts to affect it as well;
 	41712, -- Set length for next inserted note: dotted preserving division length
 	41711, -- Set length for next inserted note: straight preserving division length
 	41713 -- Set length for next inserted note: triplet preserving division length
@@ -4136,10 +4378,65 @@ function Re_Store_Note_Setting(note_div, note_mode)
 			then note_mode = act_ID
 			end
 		end
+
+	--[[ ALTERNATIVE 2
+		if note_div == 41710 or not note_div then -- 1 measure or 2 and 4 measures, resort to chunk for reasons described above, because there's no other way to reliably restore them
+		local ret, chunk = r.GetItemStateChunk(r.GetMediaItemTake_Item(take), '', false) -- insundo false
+		local CFGEDIT = chunk:match('CFGEDIT (.-)\n')
+		local i = 0
+		CFGEDIT = CFGEDIT:gsub('[%.%d]+', function(c) i=i+1 if i==21 then note_div = c return end end) -- note setting field is 21st
+		note_mode = nil -- reset
+		end
+	--]]
+
 	return note_div, note_mode -- returns action command IDs
-	else
-	local note_div = note_div and r.MIDIEditor_LastFocused_OnCommand(note_div, false) -- islistviewcommand
+	
+	-- restore
+	else 	
+	
+	--[=-[ ALTERNATIVE 1
+	local note_div = note_div or 41710 -- if note_div came in as nil because note was set to 2 or 4 measures, set to 1 because there're no actions for 2 and 4 measure notes
+	local set = note_div and r.MIDIEditor_LastFocused_OnCommand(note_div, false) -- islistviewcommand
+--	local note_mode = not (note_div or note_mode) and 41711 or note_mode -- if note_div came in as nil because note was set to 2 or 4 measures for which note mode (triplet, dotted) isn't supported, or if note_mode came in false because 1 measure note mode was set to triplet which isn't supported, set the mode to 1 measure straight -- OLD
+	-- THE PROBLEM IS THAT WHEN 1 measure dotted IS RESTORED IT MAY END UP DISPLAYED AS 1/1 INSTEAD OF 1	
+	-- and if the drop-down note list is opened 1/128 becomes automatically selected;
+	-- there's no single action to enable 1 measure dotted unlike with smaller note divisions
+	local note_mode = note_div and note_div ~= 41710 and note_mode -- only set mode when note_div var is valid, which excluses 2 and 4 measure note because they cannot be set via actions, OR when note_div is NOT 1 measure because setting dotted mode for 1 measure note results in the note value not being properly displayed in the menu, see above, while for 1 measure, straight explicit mode setting isn't necessary anyway; so for 1,2,4 measure notes only restore 1 straight
 	local note_mode = note_mode and r.MIDIEditor_LastFocused_OnCommand(note_mode, false) -- islistviewcommand
+	--]=]
+	--[=[ ALTERNATIVE 2, using chunk, actually isn't worth the effort
+		if note_mode then -- note settings which can be restored with actions
+		r.MIDIEditor_LastFocused_OnCommand(note_div, false) -- islistviewcommand
+		r.MIDIEditor_LastFocused_OnCommand(note_mode, false) -- islistviewcommand
+		elseif note_div then -- 1,2 and 4 measure settings, use chunk
+		-- TO SET CHUNK TO AN OPEN MIDI ITEM IT MUST BE CLOSED AND RE-OPENED WITH
+		-- r.MIDIEditor_LastFocused_OnCommand(2, false) -- File: Close window BEFORE THE FUNCTION
+		-- AND 
+		-- r.SelectAllMediaItems(0, false)
+		-- r.SetMediaItemSelected(r.GetMediaItemTake_Item(take), true)
+		-- r.Main_OnCommand(40153,0) -- Item: Open in built-in MIDI editor (set default behavior in preferences)
+		-- AFTER IT, BUT NON-STRAIGHT MEASURES ARE RESTORED IN DIFFERENT VALUES WITH MODE BEING straight
+		-- i.e. 1 triplet as 2/3 straight; 4 dotted as 6 straight, AND SO ARE CONFUSING AND INCONSISTENT
+		local item = r.GetMediaItemTake_Item(take)
+		local ret, chunk = r.GetItemStateChunk(item, '', false) -- insundo false
+		local CFGEDIT = chunk:match('CFGEDIT .-\n')
+	--[[ 1. an unsuccessful attempt to set straight note via chunk and enable triple/dotted via action, because the displayed result is the same as if setting via chunk alone
+		local note_div = note_div+0
+		local triplet_src, dotted_src = math.floor(note_div*1.5+0.5), math.floor(note_div/1.5+0.5)
+		note_div = triplet_src%4 == 0 and triplet_src or dotted_src%4 == 0 and dotted_src or note_div
+		--]]
+		local i = 0
+		CFGEDIT_new = CFGEDIT:gsub('[%.%d]+', function(c) i=i+1 if i==21 then return note_div end end) -- note setting field is 21st
+		chunk = chunk:gsub(CFGEDIT, CFGEDIT_new)
+		r.SetItemStateChunk(item, chunk, false) -- insundo false
+	--[[ 2. an unsuccessful attempt to set straight note via chunk and enable triple/dotted via action
+		local note_mode = triplet_src%4 == 0 == 0 and 41713 or dotted_src%4 == 0 and 41712
+			if cmdID then
+			r.MIDIEditor_LastFocused_OnCommand(note_mode, false) -- islistviewcommand
+			end
+		--]]
+		end
+	--]=]
 	end
 
 end
@@ -8502,6 +8799,50 @@ function Replace_GUIDs_in_Chunk(chunk)
 end
 -- OR
 local fx_chunk = fx_chunk:gsub('{[%-%w]+}', function() return r.genGuid('') end) -- replace GUIDs making them unique
+
+
+
+function Remove_Track_Chunk_By_Criteria(code, pattern)
+-- from project file or track template content where ther're multiple track chunks
+-- code is string contaning project file or track template content
+-- pattern is string for string.match() function
+-- to evaluate the chunk content, i.e.
+-- '^%s*SHOWINMIX %d [%.%d]+ [%.%d]+ 0' -- for hidden track
+-- '^%s*SEL 0' -- for selected track
+
+local reassembled, chunk, criteria, item
+local removed
+	for line in code:gmatch('[^\n\r]+') do
+		if line:match('^%s*<ITEM') then item = 1 end -- item is used to disambiguate track attributes from item atrributes which are likely to produce false positives otherwise, one such attribute is SEL
+		if line:match(pattern) and not item then criteria = 1; removed = 1
+		elseif criteria and line:match('^%s*<TRACK') then -- next track chunk has come along
+		chunk = nil -- reset latest track chunk because it belongs to a non-selected track
+		criteria = nil -- reset because new chunk has come along
+		item = nil
+		end
+		if chunk and line:match('^%s*<TRACK') then -- next track chunk has come along
+		reassembled = reassembled and reassembled..'\n'..chunk or chunk -- add to the rest of the chunks
+		chunk = line -- restart chunk collection
+		item = nil -- reset
+		else
+		chunk = chunk and chunk..'\n'..line or line
+		end		
+	end
+
+-- if last track matches the criteria its chunk won't be reset within the loop
+-- because line:match('^%s*<TRACK') condition for reset won't be met, so criteria 
+-- var remains true in which case return reassembled right away;
+-- if last track doesn't match the criteria its chunk won't be added to reassembled
+-- within the loop likewise because line:match('^%s*<TRACK') condition won't be met
+-- so add it inline;
+-- if only one track is being saved the loop won't reach reassembled concatenation stage
+-- hence fall back on chunk var whether valid or not, so may be nil if track matched
+-- the criteria
+return criteria and reassembled or reassembled and reassembled..'\n'..chunk or chunk, removed
+
+end
+
+
 
 
 -- see also Get_FX_Chain_Chunk and Get_FX_Chunk in F X
@@ -15981,13 +16322,13 @@ local pages = { -- prefpage_lastpage
 
 function Set_Horiz_Zoom_Level(target_val)
 -- target_val is px/sec,
--- example: if grid division length in sec * r.GetHZoomLevel() < X in px
+-- example: if grid division length in sec * r.GetHZoomLevel() < X px
 -- target_value (i.e. px/sec) arg is X / grid division length in sec
 local dir = r.GetHZoomLevel() > target_val and -1 or r.GetHZoomLevel() < target_val and 1
 	if dir then
 	r.PreventUIRefresh(1)
 		repeat
-		r.adjustZoom(0.1*dir, 0, true, 0) -- forceset 0, doupd true, centermode 0 // HORIZONTAL ZOOM ONLY // amt > 0 zooms in, < 0 zooms out, the greater the value the greater the zoom, the amt arg unit seems to be sec where 0.001 is 1 ms but when added/subtracted, the zoom level changes by amount different from the added/subtracted value, WITHOUT PreventUIRefresh() with values under 1 THE ZOOM CHANGES VERY SLOWLY, adusting by r.GetHZoomLevel()/1000 changes zoom by 0.3 px/sec; forceset ~= 0 zooms out, if amt value is 1 then zooms out fully, if amt is greater then depends on the amt value but the relationship isn't clear, if bound to mousewheel, amt can be modified by val return value of get_action_context() function to change direction of the zoom, positive IN, negative OUT; doupd (do update) if false, no zoomming; centermode: 0 < or > 1 no center, window horizontally scrolls all the way rightwards (even though as per the API doc -1 for default, presumably as set at Pref -> Appearance -> Zoom/Scroll/Offset -> Horizontal zoom center), 0 or 1 edit cursor is the center, is adjusted so that the edit cursor ends up at the center, to use mouse as the center the action 'View: Move edit cursor to mouse cursor (no snapping)' must be used, then edit cursor pos should be restored
+		r.adjustZoom(0.1*dir, 0, true, 0) -- forceset 0, doupd true, centermode 0 // HORIZONTAL ZOOM ONLY // amt > 0 zooms in, < 0 zooms out, the greater the value the greater the zoom, amt value smaller than 1 is supported, however the zoom amount produced by the amt value seems to depend on the initial zoom level and as zoom level increases/decreases the delta between previous and next zoom levels gradually increases/decreases in comparison with the delta produced by the initial change, so it's hard to calculate in advance the amt value required for a particular zoom level to be able to set it in one go without the loop even though it's known that the zoom amount changes by a factor 10 time greater than the amt value i.e. 0.001 produces change by 0.0X px/sec, WITHOUT PreventUIRefresh() with values under 1 THE ZOOM CHANGES VERY SLOWLY, adusting by r.GetHZoomLevel()/1000 changes zoom by 0.3 px/sec; forceset ~= 0 zooms out, if amt value is 1 then zooms out fully, if amt is greater then depends on the amt value but the relationship isn't clear, if bound to mousewheel, amt can be modified by val return value of get_action_context() function to change direction of the zoom, positive IN, negative OUT; doupd (do update) if false, no zoomming; centermode: 0 < or > 1 no center, window horizontally scrolls all the way rightwards (even though as per the API doc -1 for default, presumably as set at Pref -> Appearance -> Zoom/Scroll/Offset -> Horizontal zoom center), 0 or 1 edit cursor is the center, is adjusted so that the edit cursor ends up at the center, to use mouse as the center the action 'View: Move edit cursor to mouse cursor (no snapping)' must be used, then edit cursor pos should be restored
 		local zoom = r.GetHZoomLevel()
 		until dir < 0 and zoom <= target_val or dir > 0 and zoom >= target_val
 	r.PreventUIRefresh(-1)
@@ -16531,7 +16872,7 @@ local path = path..(not path:match('.+[\\/]$') and path:match('[\\/]') or '') --
 
 local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- if there's separator remove it // not always necessary
 local _, mess = io.open(path:sub(1,-2)) -- last separator is removed to return 1 (valid)
-local result = mess:match('Permission denied') and 1 -- or 'and path..sep' // dir exists // this one is enough
+local result = #path:gsub('[%c%.]', '') > 0 and mess:match('Permission denied') and 1 -- or 'and path..sep' // dir exists // this one is enough HOWEVER THIS IS ALSO THE RESULT IF THE path var ONLY INCLUDES DOTS, therefore gsub ensures that besides dots there're other characters
 or mess:match('No such file or directory') and 2
 or mess:match('Invalid argument') and 3 -- leading and/or trailing spaces in the path or empty string
 return result
@@ -16545,7 +16886,7 @@ local sep = path:match('[\\/]')
 	if not sep then return end -- likely not a string representing a path
 local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed so the path is properly formatted for io.open()
 local _, mess = io.open(path)
-return mess:match('Permission denied') and path..sep -- dir exists // this one is enough
+return #path:gsub('[%c%.]', '') > 0 and mess:match('Permission denied') and path..sep -- dir exists // this one is enough HOWEVER THIS IS ALSO THE RESULT IF THE path var ONLY INCLUDES DOTS, therefore gsub ensures that besides dots there're other characters
 end
 
 
@@ -17481,7 +17822,7 @@ or lin and {'\0'} or mac and {':', '/.'} -- OSX doesn't recognize file/folder na
 -- https://superuser.com/questions/1499950/what-are-invalid-names-for-a-directory-under-linux
 
 	for k, char in ipairs(t) do
-		if path:match('^%s*%u:.-'..char) then
+		if path:match('^%s*%u:.-'..char) then -- this message is only possible if path was insered manually
 		Error_Tooltip('\n\n the file path contains \n\n    illegal characters \n\n', 1, 1, -65, -275)
 		return nil, f_path end -- f_path is parallel to mess return value below
 	end
@@ -17743,8 +18084,21 @@ end
 
 function Get_Visible_Grid_Div_Length(grid_div_len)
 -- grid_div_len is value in sec, 
--- stems from Grid_Div_Dur_In_Sec() or Get_MIDI_Ed_Grid()
+-- stems from Grid_Div_Dur_In_Sec()
 -- returns length of visible grid division in sec
+
+-- THE FUNCTION IS INCOMPATIBLE WITH MIDI EDITOR VISIBLE GRID 
+-- PRODUCING INACCURATE RESULT BECASUE MIDI EDITOR GRID WHEN FOLDED 
+-- DOESN'T RESPECT MIMIMUM LINE SPACING VALUE SET IN THE GRID SETTINGS 
+-- (never respected before build 7.37 and only partially respects since) 
+-- AND INSTEAD CREATES GREATER LINE SPACING WHICH IS IMPOSSIBLE TO CALCULATE 
+-- WITH THE FUNCTION BECAUSE THE FUNCTION LOOKS FOR TIME VALUE IN SEC 
+-- CORRESPONDING TO MIMIMUM LINE SPACING VALUE IN PIXELS AND CANNOT GUESS 
+-- BY HOW MUCH ACTUAL LINE SPACING OF THE VISIBLE MIDI EDITOR GRID IS GREATER 
+-- THAN THE MINIMUM VALUE
+-- THAT SAID IT IS ABLE TO GIVE AN INDICATION WHEN THE MIDI EDITOR VISIBLE GRID
+-- DOESN'T MATCH THE GRID SETTING IN BUILDS 7.37+
+
 local retval, min_spacing = r.get_config_var_string('projgridmin') -- minimum visible grid resolution // setting in Snap/Grid Settings dialogue 'Show grid, line spacing: ... minimum: ... pixels'
 	if min_spacing+0 > 0 then
 	local zoom = r.GetHZoomLevel() -- pix/sec
@@ -18030,6 +18384,14 @@ return dest_val
 end
 
 
+function get_time_sel_or_loop_len(want_loop)
+local want_loop = want_loop or false
+local st, fin = r.GetSet_LoopTimeRange(false, want_loop, 0, 0, false) -- isSet, allowautoseek false
+return fin-st
+end
+
+
+
 --========== M E A S U R E M E N T S / C A L C U L A T I O N S   E N D ===============
 
 
@@ -18097,6 +18459,7 @@ function Msg(...) -- caption first (must be string otherwise ignored) or none, a
 end
 
 
+
 local Debug = ""
 function Msg(...) 
 -- accepts either a single arg, or multiple pairs of value and caption
@@ -18118,6 +18481,38 @@ function Msg(...)
 	reaper.ShowConsoleMsg(str)
 	end
 end
+
+
+
+function Msg2(f, ...)
+-- same as Msg(...) above but with argument f which is integer
+-- to modify floating point numbers precision;
+-- accepts either a single arg, or multiple pairs of value and caption
+-- caption must follow value because if value is nil
+-- and the vararg ends with it, it will be ignored
+-- because nil isn't a valid table value, and won't be displayed
+-- so vararg must not be allowed to end with nil when multiple
+-- arguments are passed, i.e. always end with a caption
+
+-- https://stackoverflow.com/questions/1133639/how-can-i-print-a-huge-number-in-lua-without-using-scientific-notation
+local function form(f, s)
+return string.format(tonumber(s) and f and '%.'..f..'f' or '%s', s)
+end
+
+	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	local t = {...}
+	local str = #t == 1 and form(f, t[1])..'\n' or not t[1] and 'nil\n' or ''
+		if #t > 1 then -- OR if #str == 0
+			for i=1,#t,2 do
+				if i > #t then break end
+			local val, cap = t[i], t[i+1]		
+			str = str..form(f, cap)..' = '..form(f, val)..'\n'
+			end
+		end
+	reaper.ShowConsoleMsg(str)
+	end
+end
+
 
 
 local function printf(...) -- cfillion's from cfillion_Step sequencing (replace mode).lua
@@ -19542,7 +19937,12 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 -- while negative value generates a blank window with buttons, which is prevented here,
 -- field_cnt doesn't account for the comment field,
 -- if final field count exceeds the total limit of 16, 
--- it gets clamped to 16 and disables the comment if enabled;
+-- it gets clamped to 16 and disables the comment if enabled,
+-- if fields count isn't constant because their appearance is conditional
+-- it may prove more relialbe to calculate the field_cnt value in the code 
+-- outside of the function because extra separators which separate fields
+-- whose appearance condition isn't met will affect the internal
+-- calculation;
 -- field_names is table or string comma delimited
 -- OR separator delimited IF commas must be used in field names, 
 -- because 'separator=' setting applies to field name separation as well, 
@@ -19557,7 +19957,7 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 -- SEE ALSO resolve_all_or_restore_apostrophe() above;
 -- the length of field names list should obviously match field_cnt arg
 -- it's more reliable to contruct a table of names and pass the two vars field_cnt and field_names as #t, t
--- field_cont is empty string unless they must be initially filled
+-- field_cont is empty string or nil unless they must be initially filled,
 -- to fill out only specific fields precede them with as many separator characters
 -- as the number of fields which must stay empty
 -- in which case it's a separator delimited list e.g.
@@ -19612,7 +20012,8 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 -- by the main separator
 local field_names = format_fields(field_names, ',', field_cnt) -- if commas need to be used in field names and the main separator is not a comma (because if it is comma cannot delimit field names), pass here the separator arg from the function
 local sep = separator and #separator > 0 and separator or ','
-local field_cont = format_fields(field_cont, sep, field_cnt)
+local field_cont = field_cont or ''
+field_cont = format_fields(field_cont, sep, field_cnt)
 local comment = comment_field and type(comment) == 'string' and #comment > 0 and comment or ''
 local comment_field_cnt = select(2, comment:gsub(sep,''))+1 -- +1 because last comment field isn't followed by the separator so one less will be captured
 local field_cnt = comment_field and #comment > 0 and field_cnt+comment_field_cnt or field_cnt
@@ -19630,8 +20031,12 @@ local ret, output = r.GetUserInputs(title, field_cnt, field_names..',extrawidth=
 local comment_pattern = ('.-'..sep):rep(comment_field_cnt-1) -- -1 because the last comment field isn't followed by a separator
 output = #comment > 0 and output:match('(.+'..sep..')'..comment_pattern) or output
 field_cnt = #comment > 0 and field_cnt-1 or field_cnt -- adjust for the next statement
-	if not ret or (field_cnt > 1 and output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)
-	or #output:gsub('[%s%c]','') == 0) then return end
+	if not ret
+	-- these two conditions will need commenting out if empty dialogue
+	-- sumbission is allowed by script design, mainly if there're multiple fields in the dialogue
+	or (field_cnt > 1 and output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)
+	or #output:gsub('[%s%c]','') == 0) 
+	then return end
 	--[[ OR
 	-- to condition action by the type of the button pressed
 	if not ret then return 'cancel'
@@ -19641,17 +20046,22 @@ field_cnt = #comment > 0 and field_cnt-1 or field_cnt -- adjust for the next sta
 -- construct table out of input fields
 local t = {}
 	for s in output:gmatch('(.-)'..sep) do
+--	for s in output:gmatch('[^'..sep..']*') do -- allow capturing empty fields and the last field which doesn't end with a separator // alternative to 'if #comment == 0 then' block below
 		if s then t[#t+1] = s end
 	end
 	if #comment == 0 then
 	-- if the last field isn't comment,
 	-- add it to the table because due to lack of separator at its end
 	-- it wasn't caught in the above loop
-	t[#t+1] = output:match('.+'..sep..'(.*)')
+	t[#t+1] = output:match('.*'..sep..'(.*)') -- * operator to account for empty 1st field if there're only two of them
 	end
 -- return fields content in a table and as a string to refill the dialogue on reload
-return t, #comment > 0 and output:match('(.+)'..sep) or output -- remove hanging separator if there was a comment field, to simplify re-filling the dialogue in case of reload, when there's a comment the separator will be added with it, comment isn't included in the returned output
+return t, #comment > 0 and output:match('(.+)'..sep) or output -- remove hanging separator from output return value if there was a comment field, to simplify re-filling the dialogue in case of reload, when there's a comment the separator will be added with it, comment isn't included in the returned output
 end
+-- USE:
+-- local output_t, output = GetUserInputs_Alt(...)
+--	if not output_t then return r.defer(no_undo) end -- aborted by the user or submitted empty
+
 --[[ EXAMPLE OF USE WITH resolve_all_or_restore_apostrophe()
 
 ::CONTINUE::
@@ -20123,6 +20533,13 @@ local target
 r.SetEditCurPos(curs_pos, false, false) -- moveview, seekplay false // restore orig. edit curs pos
 r.PreventUIRefresh(-1)
 return target
+end
+
+
+
+function isMouseInArrangeView()
+-- https://github.com/LAxemann/LAxemann_ReaperScripts/blob/main/Various/LAx_SlipView/LAx_SlipView%20-%20Main.lua
+return r.BR_GetMouseCursorContext() == "arrange"
 end
 
 
@@ -22525,7 +22942,8 @@ M A T H
 	trim_trail_zero
 	math.randomseed
 	Get_Closest_Prev_Whole_Multiple
-	Get_Closest_Multiple_Of_Divisor
+	Get_Closest_Multiple_Of_Divisor1
+	Get_Closest_Multiple_Of_Divisor2
 	nmb
 	split_integer_to_1s_and_10s
 	range_to_sequence
@@ -22549,6 +22967,7 @@ M A T H
 	un_pack_integers
 	calculate_median_value
 	split_combine_64bit_integer
+	floats_are_equal
 
 
 S T R I N G S
@@ -22571,6 +22990,7 @@ S T R I N G S
 	split_lines_by_length
 	Are_Multiple_Captures
 	count_captures
+	collect_captures
 	insert_string_at_specific_position1
 	insert_string_at_specific_position2
 	count_specific_chars
@@ -22674,6 +23094,7 @@ M I D I
 	count_selected_notes
 	Deselect_All_Notes
 	count_selected_events
+	notes_at_current_pitch_exist
 	find_first_next_note
 	Notes_Overlap_Ignored_Chords
 	Notes_Overlap_Respected_Chords
@@ -22899,6 +23320,7 @@ C H U N K
 	SetObjChunk1
 	SetObjChunk2
 	Replace_GUIDs_in_Chunk
+	Remove_Track_Chunk_By_Criteria
 
 
 R A Z O R  E D I T
@@ -23241,11 +23663,13 @@ M E A S U R E M E N T S / C A L C U L A T I O N S
 	Measure_Note_In_Ms
 	Offset_Shift_Value_To_Land_On_Natural_Keys1
 	Offset_Shift_Value_To_Land_On_Natural_Keys2
+	get_time_sel_or_loop_len
 
 
 U T I L I T Y
 
 	Msg
+	Msg2
 	printf
 	DebugMsg
 	Is_Project_Start
@@ -23318,6 +23742,7 @@ U T I L I T Y
 	Get_Mouse_Time_Pos
 	Get_Mouse_Or_Edit_Curs_Pos
 	Get_Mouse_TimeLine_Pos
+	isMouseInArrangeView
 	Get_Tooltip_Settings
 	Keep_ExtState_For_X_Mins1
 	Keep_ExtState_For_X_Mins2
