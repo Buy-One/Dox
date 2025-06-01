@@ -5711,7 +5711,7 @@ Project directory if no path is configured in the Project Settings
 
 =============================================================
 
--- Look up current theme after its properties have been changed in 'Theme develoment / tweaker' dialogue
+-- Look up current theme after its properties have been changed in 'Theme development / tweaker' dialogue
 
 
 When a theme is selected from the list at Options -> Themes a checkmark is placed next to its file name.
