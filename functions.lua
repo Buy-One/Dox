@@ -2005,6 +2005,43 @@ end
 
 
 
+function wrap_text(text, max_len)
+-- https://old.reddit.com/r/Reaper/comments/1l08ctv/new_lua_script_for_reaper_subtitle_prompter_with/
+
+local words = {}
+	for word in text:gmatch("%S+") do
+	table.insert(words, word)
+	end
+
+local lines = {}
+local current_line = ""
+
+	for i, word in ipairs(words) do
+		if #current_line == 0 then
+		current_line = word
+		else
+			if #current_line + 1 + #word <= max_len then
+			current_line = current_line .. " " .. word
+			else
+			table.insert(lines, current_line)
+			current_line = word
+			end
+		end
+	end
+	
+	if #current_line > 0 then
+	table.insert(lines, current_line)
+	end
+
+return table.concat(lines, "\n")
+
+end
+
+
+
+
+
+
 --=========================== S T R I N G S  E N D ==============================
 
 
@@ -2268,7 +2305,7 @@ end
 
 
 function shuffle_array(t, places, backward)
--- places integer, backward boolean
+-- places is integer, backward is boolean
 -- number of places backward = #t - places forward and vice versa,
 -- the results will be identical
 
@@ -2277,9 +2314,9 @@ local i = 0
 	if not backward then
 	local last = t[#t] -- store to assign to the 1st field
 		repeat
-		for i = #t,1,-1 do
-			if i < #t then t[i+1] = t[i] end
-		end
+			for i = #t,1,-1 do
+				if i < #t then t[i+1] = t[i] end
+			end
 		t[1] = last
 		last = t[#t]
 		i = i+1
@@ -2287,9 +2324,9 @@ local i = 0
 	else
 	local first = t[1] -- store to assign to the last field
 		repeat
-		for i = 1, #t do
-			if i > 1 then t[i-1] = t[i]	end
-		end
+			for i = 1, #t do
+				if i > 1 then t[i-1] = t[i] end
+			end
 		t[#t] = first
 		first = t[1]
 		i = i+1
@@ -2308,7 +2345,7 @@ end
 
 
 -- local t = {'Bb1','E3','D2','B4','F#5','G#1','Db2','C4','A5','B3','Eb3','G1'}
--- in note names created by REAPER explode actions sharps are applied to F and G, flats are applied to D, E and B
+-- in note names created by REAPER 'explode' actions sharps are applied to F and G, flats are applied to D, E and B
 function sort_notes_by_name(t, wantReverse) -- t is an array containing note names, wantReverse is boolean
 -- the notes must use # and b for sharps and flats
 -- the notes must be capitalized to distinguish between B and flat sign b
@@ -2385,7 +2422,7 @@ local table_len = #t -- to be used in removing all nested tables, there're fewer
 		--]]
 	end
 
---return t -- unnecessary because the table is the same
+return t
 
 end
 
@@ -2512,7 +2549,113 @@ end
 
 
 
+function sort_table1(t, start_idx, end_idx, field, descending) -- see version 2 below with recursion
+-- t is an INDEXED table;
+-- start_idx, end_idx limit table range within which
+-- values must be sorted, to the best of my knowledge the stock table.sort
+-- doesn't allow sorting within range and is unstable, i.e. when sorting by a criterion
+-- which only varies in certain table fields, the entire table ends up being
+-- sorted including some fields with values which by dent of being identical 
+-- should not be sorted, so before sorting within range with this function
+-- prepare the table by placing all target fields within that range, e.g.
+--[[
+local end_idx = 0
+	for i=1, #t do -- not using ipairs to avoid affecting loop sequence when fields are moved within the table
+	local v = t[i]
+		if v == MATCH then -- OR v[field] // MATCH is a variable to campare against in search for a relevant field
+		-- in this order, to remove from original index i
+		-- before inserting at index 1
+		table.remove(t,i)
+		table.insert(t,1,task)
+		end_idx = end_idx+1
+		end
+	end
+]]
+-- field is a string, name of a field in a nested associative array,
+-- or integer of a field index in an indexed nested table, if the table t 
+-- consists of nested arrays,
+-- if field arg is invalid, indexed values in the table t will be sorted, if any;
+-- descending is boolean to sort in descending order;
+-- the algo is probably terribly inefficient, but for relatively short tables is fine
+local compare = descending and math.max or math.min
+local start_idx = start_idx and start_idx > 0 and start_idx ~= #t and start_idx or 1
+local end_idx = end_idx and end_idx <= #t and end_idx ~= 1 and end_idx or #t
+	for i=start_idx, end_idx do -- advance by 1 and evaluate values from index i onwards
+	local result = math.huge*(descending and -1 or 1)
+		for ii=i,end_idx do -- not using ipairs to avoid affecting loop sequence when fields are moved within the table
+		local v = t[ii]
+		local value = field and type(v) == 'table' and v[field] or not field and v
+			if value then
+			result = compare(value, result)
+				if result == value then
+				v = field and type(v) == 'table' and v or value -- if nested table move the entire table
+				-- in this order, to remove from original index ii
+				-- before inserting at index i
+				table.remove(t,ii)
+				table.insert(t,i,v) -- move to the index, value at which is currently being evaluated
+				end
+			end
+		end
+	end
+return t
+end
+
+
+
+function sort_table2(t, start_idx, end_idx, field, descending)
+-- t is an INDEXED table;
+-- start_idx, end_idx limit table range within which
+-- values must be sorted, to the best of my knowledge the stock table.sort
+-- doesn't allow sorting within range and is unstable, i.e. when sorting by a criterion
+-- which only varies in certain table fields, the entire table ends up being
+-- sorted including some fields with values which by dent of being identical 
+-- should not be sorted, so before sorting within range with this function
+-- prepare the table by placing all target fields within that range, e.g.
+--[[
+local end_idx = 0
+  for i=1, #t do -- not using ipairs to avoid affecting loop sequence when fields are moved within the table
+  local v = t[i]
+    if v == MATCH then -- OR v[field] // MATCH is a variable to campare against in search for a relevant field
+    -- in this order, to remove from original index i
+    -- before inserting at index 1
+    table.remove(t,i)
+    table.insert(t,1,task)
+    end_idx = end_idx+1
+    end
+  end
+]]
+-- field is a string, name of a field in a nested associative array,
+-- or integer of a field index in an indexed nested table, if the table t 
+-- consists of nested arrays,
+-- if field arg is invalid, indexed values in the table t will be sorted, if any;
+-- descending is boolean to sort in descending order;
+-- the algo is probably terribly inefficient, but for relatively short tables is fine
+local compare = descending and math.max or math.min
+local start_idx = start_idx and start_idx > 0 and start_idx ~= #t and start_idx or 1
+local end_idx = end_idx and end_idx <= #t and end_idx ~= 1 and end_idx or #t
+local result = math.huge*(descending and -1 or 1)
+    for i=start_idx,end_idx do -- not using ipairs to avoid affecting loop sequence when fields are moved within the table
+    local v = t[i]
+    local value = field and type(v) == 'table' and v[field] or not field and v
+      if value then
+      result = compare(value, result)
+        if result == value then
+        v = field and type(v) == 'table' and v or value -- if nested table move the entire table
+        -- in this order, to remove from original index ii
+        -- before inserting at index i
+        table.remove(t,i)
+        table.insert(t,start_idx,v) -- move to the index, value at which is currently being evaluated
+        end
+      end
+    end
+return start_idx+1 < end_idx and sort_table(t, start_idx+1, end_idx, field, descending) or t
+end
+
+
+
+
 function is_table_already_sorted1(t, dir)
+-- t is an indexed table
 -- dir is integer, sorting direction to be evaluated
 -- 1 - ascending, 2 descending
 local asc, desc = dir == 1, dir == 2
@@ -2523,15 +2666,20 @@ return table.concat(t2,',') == table.concat(t,',')	-- compary concatenated
 end
 
 
-local function is_table_already_sorted2(t, dir)
+local function is_table_already_sorted2(t, field, dir)
 -- version for complex tables
+-- t is an INDEXED table with nested tables
+-- field is a string or integer, name of a field in the associative array
+-- or field index in an indexed array
 -- dir is integer, sorting direction to be evaluated
 -- 1 - ascending, 2 descending
 ---------------------------------
 -- collect values from the orig table into temp table t2
 local t2 = {}
 	for k, tab in ipairs(t) do -- here original t contains nested tables in all of which the required value is stored in the field 'value'
-	t2[k] = tab.value
+		if tab[field] then
+		t2[k] = tab[field]
+		end
 	end
 local t2_concat = table.concat(t2,',') -- convert into string before sorting
 local asc, desc = dir == 1, dir == 2
@@ -4176,7 +4324,7 @@ function Get_MIDI_Ed_Visible_Grid(ME, take)
 -- BY THE SCRIPT IS UNDONE
 -- 2) IT MUST BE PRECEDED BY:
 --[[ 
-local note_div, note_mode = Re_Store_Note_Setting(take) -- store settings
+local note_div, note_mode = Re_Store_Note_Length_Setting(take) -- store settings
 	if note_mode ~= 'Grid' then
 	r.MIDIEditor_LastFocused_OnCommand(41295, false) -- islistviewcommand false // Set length for next inserted note: grid // ENABLE SO THAT 'Edit: Insert note at edit cursor' ACTION INSERTS NOTE BY GRID, ORIGINAL OR VISIBLE (in bilds 7.37+)
 	end
@@ -4184,7 +4332,7 @@ local note_div, note_mode = Re_Store_Note_Setting(take) -- store settings
 -- AND FOLLOWED BY:
 --[[ 
 	if note_mode ~= 'Grid' then
-	Re_Store_Note_Setting(take, note_div, note_mode) -- restore settings
+	Re_Store_Note_Length_Setting(take, note_div, note_mode) -- restore settings
 	end
 ]]
 -- 3) BE MINDFUL OF THE USE OF PreventUIRefresh() BEFORE THE FUNCTION
@@ -4315,7 +4463,7 @@ end
 
 
 
-function Re_Store_Note_Setting(take, note_div, note_mode)
+function Re_Store_Note_Length_Setting(take, note_div, note_mode)
 -- note division and mode settings at the bottom of the MIDI Editor
 -- take must be valid is chunk is going to be used
 -- TO BE ABLE TO RESTORE SETTINGS VIA CHUNK
@@ -8843,6 +8991,62 @@ return criteria and reassembled or reassembled and reassembled..'\n'..chunk or c
 end
 
 
+
+function Remove_Chunks(file_path, chunk, want_items, want_envs)
+-- removes item and envelope chunks
+-- can be modified to include criteria by which these will be removed;
+-- file_path and chunk args are mutually exclusive
+-- while file_path has priority if both are valid;
+
+	if not file_path and not chunk then return end
+
+local t, chunk_start = {}
+
+	-- collect the code to the exclusion of extended data
+	for line in (file_path and io.lines(file_path) or chunk and chunk:gmatch('[^\r\n]*')) do -- or gmatch('(.-)\n') to capture empty lines
+		if line:match('<EXTENSIONS') or line:match('<EXTSTATE') then break -- these, if any, come at the bottom of the .RPP file so ignore them
+		elseif line:match('^%s*<TRACK') or chunk_start then -- track chunk start, in project file TRACK token is followed by GUID unlike in the track template, but that's immaterial
+		chunk_start = 1
+		t[#t+1] = line
+		end
+	end
+	
+	if want_items then -- weed out item chunks
+	local item
+		for k, line in ipairs(t) do
+			if line:match('^%s*<TRACK') or k == #t then item = nil -- reset, k==#t ensures preservation of the last track block closure which is the last field in the table
+			elseif (line:match('^%s*<ITEM') or item) -- in some track template files the <ITEM block start may not include the GUID as it doesn't in the project file
+			and t[k+1] and not t[k+1]:match('^%s*<TRACK') then -- preventing deletion of the current track block closure if the next track block starts on the next line
+			item = 1
+			t[k] = ''
+			items_removed = 1
+			end
+		end
+	end
+	
+	if want_envs then -- weed out envelope chunks
+	local env
+		for k, line in ipairs(t) do
+			if line:match('^%s*<.-ENV[%w]*%s*') or #line > 0 and env then -- ignoring empty fields from items loop, if any
+			env = 1
+			t[k] = ''
+			env_removed = 1
+			env = not line:match('^%s*>') -- if closure, reset, there're no nested blocks within envelope blocks so weeding them out is simple // ternary expression of 'env = line:match('^%s*>') and nil/false or env' to reset won't work because true env will always end up being selected and this will keep being true
+			-- OR
+			--	if line:match('^%s*>') then env = nil end
+			end
+		end
+	end
+
+-- remove empty lines, although works with them as long as blocks integrity is preserved
+local length = #t -- store the original table length because it will get shorter during the loop
+	for i = length, 1, -1 do
+		if t[i] == '' then table.remove(t,i) end
+	end
+
+return table.concat(t,'\n') -- reconstruct
+
+end
 
 
 -- see also Get_FX_Chain_Chunk and Get_FX_Chunk in F X
@@ -14341,7 +14545,7 @@ function Get_Store_GFX_Wnd_Coordinates(bool) -- run to get without the arg, then
 	local wnd_coord = (not ret or #wnd_coord == 0) and r.GetExtState('PROPAGATE PARAMETERS', 'wnd_coordinates') or wnd_coord
 	return wnd_coord:match('(.+), (.+)') -- x & y to be used in gfx.init()
 	else
-	local x, y = gfx.clienttoscreen(0,0) -- will only work while tyhe gfx window is open
+	local x, y = gfx.clienttoscreen(0,0) -- will only work while the gfx window is open
 	r.SetExtState('PROPAGATE PARAMETERS', 'wnd_coordinates', x..', '..y, false) -- !!!!! persist false, in the final version MUST BE true to store in reaper-extstate.ini
 	r.SetProjExtState(0, 'PROPAGATE PARAMETERS', 'wnd_coordinates', x..', '..y)
 	end
@@ -14396,6 +14600,13 @@ gfx.x, gfx.y = 0, 0 -- reset for mouse capture
 --local left, bott = gfx.x + gfx.w, gfx.y + gfx.h
 return gfx.mouse_cap&1 == 1 and gfx.mouse_x > gfx.x and gfx.mouse_x < gfx.w
 and gfx.mouse_y > gfx.y and gfx.mouse_y < gfx.h
+end
+
+
+function restore_gfx_wnd_focus()
+local wnd_x, wnd_y = gfx.clienttoscreen(0,0)
+gfx.quit()
+gfx.init("", gfx.w, gfx.h, 0, wnd_x-4, wnd_y-23) -- 4 and 23 px are width of gfx window right/left/bottom frame and the top bar which aren't accounted for in gfx window coordinates
 end
 
 
@@ -22896,6 +23107,17 @@ reaper.PreventUIRefresh(-1)
 
 --===================================================================================
 
+-- Get project media path
+
+local proj_media_path = r.GetProjectPath('') -- for unsaved projects returns default recording path, i.e. '%USER%\Documents\REAPER Media', a dedicated ABSOLUTE path if configured in default Project Settings, or global path configured at Prefs -> General -> Paths -> Default recording path; for saved projects returns the project folder path unless a project dedicated media path is specified in the project settings
+-- to find out whether the project is saved
+-- local proj, proj_path = r.EnumProjects(-1)
+-- #proj_path > 0
+-- OR 
+-- local proj_name = r.GetProjectName(0, '')
+
+--===================================================================================
+
 -- As yet undocumented track parameter P_BUFSTATS
 
 reaper.GetSetMediaTrackInfo_String(tr,"P_BUFSTATS","",false)
@@ -23031,6 +23253,7 @@ S T R I N G S
 	embellish_string
 	bytes2string
 	add_zero_padding
+	wrap_text
 
 
 T A B L E S
@@ -23063,6 +23286,8 @@ T A B L E S
 	construct_char_array
 	reuse_short_array_over_long
 	reuse_short_array_over_long_reversed
+	sort_table1
+	sort_table2
 	is_table_already_sorted1
 	is_table_already_sorted2
 	pack
@@ -23131,7 +23356,7 @@ M I D I
 	Store_Insert_Notes_OR_Evts
 	Get_MIDI_Ed_Grid
 	Get_MIDI_Ed_Visible_Grid
-	Re_Store_Note_Setting
+	Re_Store_Note_Length_Setting
 	Get_Track_MIDI_Note_Names
 	Get_Note_Name_At_Current_Pitch
 	Get_Default_MIDI_Chan
@@ -23321,6 +23546,7 @@ C H U N K
 	SetObjChunk2
 	Replace_GUIDs_in_Chunk
 	Remove_Track_Chunk_By_Criteria
+	Remove_Chunks
 
 
 R A Z O R  E D I T
@@ -23468,6 +23694,9 @@ C O L O R
 	RGB_To_Normalized
 	Split_Integer_To_RGB_And_Combine
 	Extract_Object_Color
+	close_gfx_wnd_and_store_coordinates
+	mouse_click_within_gfx_wnd
+	restore_gfx_wnd_focus
 	RandomizeBackgroundColor
 
 
