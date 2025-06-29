@@ -271,8 +271,10 @@ ACT 1 0 "124695682de47245a0f6cea19e7164c6" "Custom: Move cursor right to nearest
 ACT 1 0 "4bb6fa1c8351e74fa7ec00531b67ce03" "Custom: Move cursor right to nearest item LEFT edge on selected track" _SWS_SAVESELITEMS1 40417 _SWS_RESTSELITEMS1
 ACT 1 0 "e0ac76bc21336249ba33f5465f3ead09" "Custom: Move edit cursor to mouse and trim left edge of seleсted item (creates many undo points)" 40514 41305
 ACT 1 0 "ef329b5fbddc10449610523a7b301e2e" "Custom: Move edit cursor to mouse and trim right edge of seleсted item (creates many undo points)" 40514 41311
-ACT 1 0 "1da5cbfa8d6dbb4a8eebc6bca725550f" "Custom: Move edit cursor right by grid size (relative movement) [time selection & loop points not preserved]" 2022 40621 2013 40621 40625 40105 40626 40646 40222 40647 40223 40630 43210 40623 40631 2013 40621 40020
-ACT 1 0 "5ac4c2df3d186e459b5c81840ad11a18" "Custom: Move edit cursor left by grid size (relative movement) [time selection & loop points not preserved]" 2022 40621 2013 40621 40625 40105 40626 40646 40222 40647 40223 40630 43211 40623 40630 2013 40621 40020
+ACT 1 0 "1da5cbfa8d6dbb4a8eebc6bca725550f" "Custom: Move edit cursor right by grid size (relative movement) [time selection & loop points not preserved] -- builds < 7.41 where there's no native action" 2022 40621 2013 40621 40625 40105 40626 40646 40222 40647 40223 40630 43210 40623 40631 2013 40621 40020
+ACT 1 0 "5ac4c2df3d186e459b5c81840ad11a18" "Custom: Move edit cursor left by grid size (relative movement) [time selection & loop points not preserved] -- builds < 7.41 where there's no native action" 2022 40621 2013 40621 40625 40105 40626 40646 40222 40647 40223 40630 43211 40623 40630 2013 40621 40020
+ACT 1 0 "123b07dc0076294ea8acd32dc9c19a26" "Custom: Move edit cursor left by grid size -- builds 7.41+" 2022 1157 2013 1157 43614 2013 1157
+ACT 1 0 "e7c5436e0618e74e8b2d37e9ae9476da" "Custom: Move edit cursor right by grid size -- builds 7.41+" 2022 1157 2013 1157 43615 2013 1157
 ACT 1 0 "84804cb3e50987478c68722f4e1e2114" "Custom: Move items/envelope poins down one track/a bit (Ripple mode)-2" 40290 41148 40118 40285 41148 _BR_COPY_ENV_TS_SEL_TR_ENVS_VIS_CUR 40889
 ACT 1 0 "06b1a67bea98d34ba20c866e669ca32e" "Custom: Move items/envelope points down one track/a bit (in Ripple mode all tracks)" 40309 40118 41991
 ACT 1 0 "c93f820ffe51b743818d4e50e6ed90df" "Custom: Move items/envelope points down one track/a bit (in Ripple mode per track)" 40309 40118 40310
