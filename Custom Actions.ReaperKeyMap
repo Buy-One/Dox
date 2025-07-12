@@ -269,6 +269,7 @@ ACT 1 0 "7da645a86bfb264dab7dffa4be6b6d49" "Custom: Move cursor left to nearest 
 ACT 1 0 "97b84fe0aab5c0458d7924e30063004f" "Custom: Move cursor left to nearest item RIGHT edge on selected track (may overshoot)" _SWS_SAVESELITEMS1 40105 40416 40416 40319 _SWS_RESTSELITEMS1
 ACT 1 0 "124695682de47245a0f6cea19e7164c6" "Custom: Move cursor right to nearest item edge on selected track (with hiding)" _SWSTL_HIDEUNSEL 41168 _SWSTL_SHOWALL
 ACT 1 0 "4bb6fa1c8351e74fa7ec00531b67ce03" "Custom: Move cursor right to nearest item LEFT edge on selected track" _SWS_SAVESELITEMS1 40417 _SWS_RESTSELITEMS1
+ACT 1 0 "e031503a9be2464e9cde83aff4167527" "Custom: Move cursor to start of time selection when set by region double click - link to Ruler double-click MM context" 2022 40621 2014 40513 2014 40172 2014 40625 2014 40173 2014 40626 2014 40630
 ACT 1 0 "e0ac76bc21336249ba33f5465f3ead09" "Custom: Move edit cursor to mouse and trim left edge of seleсted item (creates many undo points)" 40514 41305
 ACT 1 0 "ef329b5fbddc10449610523a7b301e2e" "Custom: Move edit cursor to mouse and trim right edge of seleсted item (creates many undo points)" 40514 41311
 ACT 1 0 "1da5cbfa8d6dbb4a8eebc6bca725550f" "Custom: Move edit cursor right by grid size (relative movement) [time selection & loop points not preserved] -- builds < 7.41 where there's no native action" 2022 40621 2013 40621 40625 40105 40626 40646 40222 40647 40223 40630 43210 40623 40631 2013 40621 40020
