@@ -521,6 +521,13 @@ return (math.floor(number/divisor)*divisor+(want_next and divisor or 0))/(dec_pl
 end
 
 
+function Get_Closest_Multiple_Of_Divisor3(int, int_divisor, want_next)
+-- only integers are supported
+local modulo = int%int_divisor
+local prev_mult = int - modulo
+return prev_mult and (want_next and prev_mult + int_divisor or 0)
+end
+
 
 local function nmb(...) -- abbreviation
 return tonumber(...)
@@ -857,6 +864,53 @@ return tostring(numA/numB) == '1.0' -- the fractional part of the quotient of th
 -- OR
 -- local numA, numB = numA..'', numB..''
 -- numA == numB or numA == numB:gsub('%.0','') or numA:gsub('%.0','') == numB -- simple comparison works BUT craps out at whole numbers if there's a trailing decimal zero in one of them, hence the gsub
+end
+
+
+
+function get_greatest_smallest_value1(want_smallest, field, ...)
+-- if vararg is a list of tables, nested tables aren't supported;
+-- field is either integer representing index in an indexed table
+-- or string represending field in an associative array;
+-- to evaluate values in nested tables inside several indexed tables
+-- this function must be first applied to nested tables, 
+-- then to the resulting values of all tables;
+-- also useful for determining the longest indexed table as well out of several,
+-- to make the function return table pointer along with the value
+-- embed the table length in its field, see embed_table_length functions
+local t = {...}
+Msg(t,'t')
+	local function select_source(s,field)
+	return field and type(s) == 'table' and s[field] or s
+	end
+table.sort(t, function(a,b) local a, b = select_source(a,field), select_source(b,field)
+return want_smallest and a < b or not want_smallest and a > b end)
+local tbl = type(t[1]) == 'table'
+return field and tbl and t[1][field] or t[1], field and tbl and t[1] -- return value and the table it belongs to if table values were sorted
+end
+
+function get_greatest_smallest_value2(want_smallest, field, ...)
+-- if vararg is a list of tables, nested tables aren't supported;
+-- field is either integer representing index in an indexed table
+-- or string represending field in an associative array;
+-- to evaluate values in nested tables inside several indexed tables
+-- this function must be first applied to nested tables, 
+-- then to the resulting values of all tables;
+-- also useful for determining the longest indexed table as well out of several,
+-- to make the function return table pointer along with the value
+-- embed the table length in its field, see embed_table_length functions
+local t = {...}
+local compare = want_smallest and math.min or math.max
+local value = want_smallest and math.huge or math.huge*-1
+local index
+	for k, v in ipairs(t) do
+	local v = field and v[field] or v
+	value = (want_smallest and v < value or not want_smallest and v > value) and v or value
+-- OR
+--	value = compare(v, value)
+	index = value == v and k or index
+	end
+return value, type(t[index]) == 'table' and t[index] -- return value and the table it belongs to if table values were sorted
 end
 
 
@@ -2767,6 +2821,21 @@ local copy
 	end
 return copy
 end
+
+
+function embed_table_length1(t)
+-- as field 'n'
+return table.pack(table.unpack(t))
+end
+
+
+function embed_table_length2(t)
+-- as field 'n' or any other arbitrary field
+return t.n = #t
+end
+
+
+-- see also get_greatest_smallest_value
 
 
 
@@ -13225,11 +13294,9 @@ function RGB_To_Normalized(R,G,B)
 local unit = 1/255
 return R and unit*R or 255, G and unit*G or 255, B and unit*B or 255
 end
---[[EXAMPLE
-
+--[[EXAMPLE:
 local R,G,B = table.unpack((not R and not G and not B) and {255,255,255} or {R,G,B}) -- defaults to white if none is supplied
 gfx.r, gfx.g, gfx.b = RGB_To_Normalized(R, G, B)
-
 ]]
 
 
@@ -14520,14 +14587,14 @@ end
 
 
 
-function Get_Store_GFX_Wnd_Dock_State(bool) -- run to get without the arg, then pass any valid value directly as the arg to store
+function Re_Store_GFX_Wnd_Dock_State(bool) -- run to get without the arg, then pass any valid value directly as the arg to store
 	if not bool then
 	local ret, dock_state = r.GetProjExtState(0, 'PROPAGATE PARAMETERS', 'dock')
 	local dock_state = (not ret or #dock_state == 0) and r.GetExtState('PROPAGATE PARAMETERS', 'dock') or dock_state
 	gfx.dock(dock_state,wx,wy,ww,wh)
 	else
 	local dock_state = gfx.dock(-1,wx,wy,ww,wh) -- query with -1
-	r.SetExtState('PROPAGATE PARAMETERS', 'dock', dock_state, false) -- !!!!! persist false, in the final version MUST BE true to store in reaper-extstate.ini
+	r.SetExtState('PROPAGATE PARAMETERS', 'dock', dock_state, false) -- !!!!! persist false, in the final version may true to store in reaper-extstate.ini
 	r.SetProjExtState(0, 'PROPAGATE PARAMETERS', 'dock', dock_state)
 	end
 end
@@ -14539,14 +14606,14 @@ end
 -- terminate the script
 
 
-function Get_Store_GFX_Wnd_Coordinates(bool) -- run to get without the arg, then pass any valid value directly as the arg to store
+function Re_Store_GFX_Wnd_Coordinates(bool) -- run to get without the arg, then pass any valid value directly as the arg to store
 	if not bool then
 	local ret, wnd_coord = r.GetProjExtState(0, 'PROPAGATE PARAMETERS', 'wnd_coordinates')
 	local wnd_coord = (not ret or #wnd_coord == 0) and r.GetExtState('PROPAGATE PARAMETERS', 'wnd_coordinates') or wnd_coord
 	return wnd_coord:match('(.+), (.+)') -- x & y to be used in gfx.init()
 	else
 	local x, y = gfx.clienttoscreen(0,0) -- will only work while the gfx window is open
-	r.SetExtState('PROPAGATE PARAMETERS', 'wnd_coordinates', x..', '..y, false) -- !!!!! persist false, in the final version MUST BE true to store in reaper-extstate.ini
+	r.SetExtState('PROPAGATE PARAMETERS', 'wnd_coordinates', x..', '..y, false) -- !!!!! persist false, in the final version may true to store in reaper-extstate.ini
 	r.SetProjExtState(0, 'PROPAGATE PARAMETERS', 'wnd_coordinates', x..', '..y)
 	end
 end
@@ -14556,12 +14623,12 @@ end
 function close_gfx_wnd_and_store_coordinates(scr_cmdID)
 -- when gfx window has been closed by mouse click or with a key press
 -- gfx.clienttoscreen(0,0) will only return zeros because there's no window any longer
--- however if coordinates are fetched relative to the mouse cursor
--- which allows calculating their more or less exact original location on the screen;
+-- however fetching coordinatess relative to the mouse cursor
+-- allows calculating their more or less exact original location on the screen;
 -- when closing with the click on the close button located in the upper right hand corner:
 -- x = mouse_x-gfx.w+5 (or 10), accounting for gfx window width because the close button
--- is located opposite to the X axis start but short of the window's right edge
--- y = mouse_y-10, accounting for mouse location which is below the gfx window top edge
+-- is located opposite to the window X coordinate but short of the window's right edge
+-- y = mouse_y-10, accounting for mouse location which is below the gfx window y coordinate
 -- by about 10 px;
 -- otherwise the coordinates need to be updated constantly while the script runs
 -- this however isn't suitable for closing with key press because mouse cursor can be anywhere
@@ -14590,9 +14657,30 @@ local click, escape = gfx.getchar() == -1, gfx.getchar() == 27
 end
 --[[ USE:
 	if gfx.getchar() == 27 or gfx.getchar() == -1 then -- close either with close button click or with Escape key
-	fx_wnd_and_store_coordinates(scr_cmdID)
+	close_gfx_wnd_and_store_coordinates(scr_cmdID)
 	return end
 --]]
+
+
+function monitor_window_properties()
+-- must be run inside the deferred function
+-- to store in extended state with atexit()
+-- https://forum.cockos.com/showpost.php?p=2652656&postcount=121
+local wnd_open = gfx.getchar() > -1
+wnd_x, wnd_y = table.unpack(wnd_open and {gfx.clienttoscreen(0,0)} or {wnd_x, wnd_y})
+wnd_w, wnd_h, dock = table.unpack(wnd_open and {gfx.w, gfx.h, gfx.dock(-1)} or {wnd_w, wnd_h, dock})
+proj = wnd_open and reaper.EnumProjects(-1) or proj
+end
+--[[ USE:
+local wnd_x, wnd_y, wnd_w, wnd_h, dock, proj -- declare outside of the defered function
+function run()
+monitor_window_properties()
+r.defer(run)
+end
+run()
+r.atexit(function() r.SaveExtenedProjState(proj, 'SECTION NAME', 'KEY NAME', wnd_x..';'..wnd_y..';'..wnd_w..';'..wnd_h..';'..dock) end)
+]]
+
 
 
 function mouse_click_within_gfx_wnd()
@@ -14603,10 +14691,13 @@ and gfx.mouse_y > gfx.y and gfx.mouse_y < gfx.h
 end
 
 
-function restore_gfx_wnd_focus()
+function restore_gfx_wnd_focus() -- NEW
 local wnd_x, wnd_y = gfx.clienttoscreen(0,0)
-gfx.quit()
-gfx.init("", gfx.w, gfx.h, 0, wnd_x-4, wnd_y-23) -- 4 and 23 px are width of gfx window right/left/bottom frame and the top bar which aren't accounted for in gfx window coordinates
+local w, h, dock = gfx.w, gfx.h, gfx.dock(-1)
+	if dock&1 ~= 1 then -- only when undocked, when docked focus loss isn't a problem
+	gfx.quit()
+	gfx.init("", w, h, 0, wnd_x-4, wnd_y-23) -- 4 and 23 px are width of gfx window right/left/bottom frame and the top bar which aren't accounted for in gfx window coordinates // https://www.askjf.com/?q=5895s https://forum.cockos.com/showpost.php?p=2493416&postcount=40
+	end
 end
 
 
@@ -14622,9 +14713,14 @@ gfx.rect(0, 0, gfx.w, gfx.h, 1) -- Draw the colored rectangle
 end
 
 
+-- see also RGB_To_Normalized in the "C O L O R" section
+
+
 --[[ MANAGING DOCKING cfillion
 
 https://forums.cockos.com/showthread.php?p=2778359#121
+OR
+-- https://forum.cockos.com/showpost.php?p=2652656&postcount=121
 
 -- Scripts can use gfx.dock or gfx.init to dock their gfx window. The first bit enables docking and the second byte has the docker index (0..15).
 -- The position of each of the 16 available dockers is user customizable. There's a DockGetPosition function to read the current position of a given docker.
@@ -15932,6 +16028,25 @@ end
 
 
 
+function Is_Parent_Window(hwnd, parent_hwnd) -- this one wasn't properly tested
+--retval, text = reaper.BR_Win32_GetWindowText(hwnd)
+--r.ShowConsoleMsg(tostring(text)..'\n')
+local hwnd = hwnd
+local last
+	repeat
+	hwnd = r.BR_Win32_GetParent(hwnd)
+--retval, text = reaper.BR_Win32_GetWindowText(hwnd)
+--r.ShowConsoleMsg(tostring(text)..'\n')
+		if hwnd == parent_hwnd then return parent_hwnd 
+		else
+		last = last ~= hwnd and hwnd or last
+		end
+	until not hwnd or hwnd == last
+end
+
+
+
+
 function Is_Window_Docked(wnd)
 -- includes floating docker as well
 local wnd = wnd
@@ -16558,15 +16673,15 @@ function Re_Store_Zoom(zoom)
 	end
 
 local cur_zoom = r.GetHZoomLevel()
-	if not zoom then
+	if not zoom then -- store
 	return cur_zoom
-	else
-	cur_zoom, zoom = round(cur_zoom, 12), round(zoom, 12) -- minute difference in floating point results in inequality between numbers otherwise equal down to the 12th decimal place which are displayed in ReaScript console, so round down to 12 decimal places to prevent that
+	else -- restore
+	local cur_zoom, zoom = round(cur_zoom, 12), round(zoom, 12) -- minute difference in floating point results in inequality between numbers otherwise equal down to the 12th decimal place which are displayed in ReaScript console, so round down to 12 decimal places to prevent that // another method of dealing with these see in floats_are_equal()
 	local amt = cur_zoom < zoom and 1 or cur_zoom > zoom and -1
 		if amt then -- not equal to stored zoom
 		r.PreventUIRefresh(1)
 			repeat
-			r.adjustZoom(amt, 0, true, -1) -- amt, forceset, doupd, centermode // HORIZONTAL ZOOM ONLY // amt > 0 zooms in, < 0 zooms out, the greater the value the greater the zoom, the amt arg unit seems to be sec where 0.001 is 1 ms but when added/subtracted, the zoom level changes by amount different from the added/subtracted value, WITHOUT PreventUIRefresh() with values under 1 THE ZOOM CHANGES VERY SLOWLY, adusting by r.GetHZoomLevel()/1000 changes zoom by 0.3 px/sec; forceset ~= 0 zooms out, if amt value is 1 then zooms out fully, if amt is greater then depends on the amt value but the relationship isn't clear, if bound to mousewheel, amt can be modified by val return value of get_action_context() function to change direction of the zoom, positive IN, negative OUT; doupd (do update) if false, no zoomming; centermode: 0 < or > 1 no center, window horizontally scrolls all the way rightwards (even though as per the API doc -1 for default, presumably as set at Pref -> Appearance -> Zoom/Scroll/Offset -> Horizontal zoom center), 0 or 1 edit cursor is the center, horiz scroll is adjusted so that the edit cursor ends up at the center, to use mouse as the center the action 'View: Move edit cursor to mouse cursor (no snapping)' must be used, then edit cursor pos should be restored
+			r.adjustZoom(amt, 0, true, -1) -- forceset 0, doupd true, centermode 0 // HORIZONTAL ZOOM ONLY // amt > 0 zooms in, < 0 zooms out, the greater the value the greater the zoom, amt value smaller than 1 is supported, however the zoom amount produced by the amt value seems to depend on the initial zoom level and as zoom level increases/decreases the delta between previous and next zoom levels gradually increases/decreases in comparison with the delta produced by the initial change, so it's hard to calculate in advance the amt value required for a particular zoom level to be able to set it in one go without the loop even though it's known that the zoom amount changes by a factor 10 time greater than the amt value i.e. 0.001 produces change by 0.0X px/sec, WITHOUT PreventUIRefresh() with values under 1 THE ZOOM CHANGES VERY SLOWLY, adusting by r.GetHZoomLevel()/1000 changes zoom by 0.3 px/sec; forceset ~= 0 zooms out, if amt value is 1 then zooms out fully, if amt is greater then depends on the amt value but the relationship isn't clear, if bound to mousewheel, amt can be modified by val return value of get_action_context() function to change direction of the zoom, positive IN, negative OUT; doupd (do update) if false, no zoomming; centermode: 0 < or > 1 no center, window horizontally scrolls all the way rightwards (even though as per the API doc -1 for default, presumably as set at Pref -> Appearance -> Zoom/Scroll/Offset -> Horizontal zoom center), 0 or 1 edit cursor is the center, is adjusted so that the edit cursor ends up at the center, to use mouse as the center the action 'View: Move edit cursor to mouse cursor (no snapping)' must be used, then edit cursor pos should be restored
 			until amt == 1 and r.GetHZoomLevel() >= zoom or amt == -1 and r.GetHZoomLevel() <= zoom
 		r.PreventUIRefresh(-1)
 		end
@@ -18106,6 +18221,20 @@ local t = {'vstpath64', 'lv2path_win64', 'clap_path_win64', 'altpeakspath', 'con
 	t[idx] = path
 	end
 return t
+end
+
+
+function get_cwd() -- current working directory
+-- https://stackoverflow.com/a/73139370/8883033
+return io.popen("cd"):read()
+end
+
+
+
+function Get_Desktop_Path()
+local Win = reaper.GetAppVersion():match('Win')
+local path = os.getenv(Win and 'USERPROFILE' or 'HOME')
+return path..path:match('[\\/]')..'Desktop'
 end
 
 
@@ -19791,6 +19920,11 @@ end
 ---------------------------------------------
 
 local function Wrapper1(func,...) -- see Wrapper_multi_function() below
+-- r.atexit() CAN BE USED WITHOUT THE WRAPPER FUNCTION AS FOLLOWS
+-- r.atexit(function() my_function(arg1, arg2, arg3) end) 
+-- ARGUMENTS DON'T HAVE TO BE GLOBAL 
+-- AND UPVALUE NAMES DON'T HAVE TO MATCH THE ARGUMENTS
+
 -- wrapper for a 3d function with arguments
 -- to be used with defer() and atexit()
 -- thanks to Lokasenna, https://forums.cockos.com/showthread.php?t=218805 -- defer with args
@@ -19819,6 +19953,11 @@ r.atexit(Wrapper(My_Function, arg1, arg2, arg3)
 
 
 local function Wrapper2(...) -- more wordy, see Wrapper_multi_function() below
+-- r.atexit() CAN BE USED WITHOUT THE WRAPPER FUNCTION AS FOLLOWS
+-- r.atexit(function() my_function(arg1, arg2, arg3) end) 
+-- ARGUMENTS DON'T HAVE TO BE GLOBAL 
+-- AND UPVALUE NAMES DON'T HAVE TO MATCH THE ARGUMENTS
+
 -- to be used with defer() and atexit()
 -- https://forums.cockos.com/showthread.php?t=218805 Lokasenna
 local t = {...}
@@ -19830,6 +19969,11 @@ end
 
 
 function Wrapper_multi_function(...)
+-- r.atexit() CAN BE USED WITHOUT THE WRAPPER FUNCTION AS FOLLOWS
+-- r.atexit(function() my_function1(arg1, arg2, arg3) my_function2(arg1, arg2, arg3) end) 
+-- ARGUMENTS DON'T HAVE TO BE GLOBAL 
+-- AND UPVALUE NAMES DON'T HAVE TO MATCH THE ARGUMENTS
+
 -- the vararg syntax is as follows:
 -- {func1, arg1, arg2, arg3}, {func2, arg1, arg2, arg3} etc.
 local macro = {}
@@ -22075,8 +22219,7 @@ end
 
 -- SYSTEM ENVIRONMENT VARIABLES
 -- https://en.wikipedia.org/wiki/Environment_variable
-os.getenv(string) -- TMP/TEMP; USERNAME; PATH; HOMEDRIVE; HOMEPATH; USERPROFILE; APPDATA; LOCALAPPDATA; PROGRAMDATA = ALLUSERSPROFILE; OS; COMSPEC; PUBLIC; ProgramFiles = ProgramW6432; ProgramFiles(x86); SystemDrive; SystemRoot = windir; USERDOMAIN; 
-
+os.getenv(string) -- TMP/TEMP; USERNAME; PATH; HOMEDRIVE; HOMEPATH; USERPROFILE; APPDATA; LOCALAPPDATA; PROGRAMDATA = ALLUSERSPROFILE; OS; COMSPEC; PUBLIC; ProgramFiles = ProgramW6432; ProgramFiles(x86); SystemDrive; SystemRoot = windir; USERDOMAIN;
 
 
 -- https://github.com/ReaTeam/ReaScripts/pull/1466#issuecomment-2500963241
@@ -23126,6 +23269,15 @@ reaper.GetSetMediaTrackInfo_String(tr,"P_BUFSTATS","",false)
 
 --===================================================================================
 
+-- PreventUIRefresh correct syntax
+
+-- Schwa: You should always call PreventUIRefresh(1) to initiate and PreventUIRefresh(-1) to end
+
+-- https://forum.cockos.com/showthread.
+
+--===================================================================================
+
+
 -- Detect undo
 
 --=============================== F U N C T I O N   L I S T =========================
@@ -23166,6 +23318,7 @@ M A T H
 	Get_Closest_Prev_Whole_Multiple
 	Get_Closest_Multiple_Of_Divisor1
 	Get_Closest_Multiple_Of_Divisor2
+	Get_Closest_Multiple_Of_Divisor3
 	nmb
 	split_integer_to_1s_and_10s
 	range_to_sequence
@@ -23190,6 +23343,8 @@ M A T H
 	calculate_median_value
 	split_combine_64bit_integer
 	floats_are_equal
+	get_greatest_smallest_value1
+	get_greatest_smallest_value2
 
 
 S T R I N G S
@@ -23294,6 +23449,8 @@ T A B L E S
 	build_array_of_multiple_repeating_items
 	deep_copy1
 	deep_copy2
+	embed_table_length1
+	embed_table_length2
 
 
 M I D I
@@ -23743,8 +23900,12 @@ G F X
 	Prevent_Floating_Window_Resize1
 	Prevent_Floating_Window_Resize2
 	gfx_drawstring
-	Get_Store_GFX_Wnd_Dock_State
-	Get_Store_GFX_Wnd_Coordinates
+	Re_Store_GFX_Wnd_Dock_State
+	Re_Store_GFX_Wnd_Coordinates
+	close_gfx_wnd_and_store_coordinates
+	monitor_window_properties
+	mouse_click_within_gfx_wnd
+	restore_gfx_wnd_focus
 	RandomizeBackgroundColor
 
 
@@ -23774,6 +23935,7 @@ W I N D O W S
 	Get_Child_Windows_SWS
 	Get_All_Parent_Windows
 	Get_Top_Parent_Window
+	Is_Parent_Window
 	Is_Window_Docked	
 	Traverse_List1
 	Traverse_List2
@@ -23860,6 +24022,8 @@ F I L E S
 	sanitize_file_path
 	Copy_Or_Move_File
 	Get_Last_Accessed_Dir
+	get_cwd()
+	Get_Desktop_Path
 
 
 M E A S U R E M E N T S / C A L C U L A T I O N S
@@ -24022,7 +24186,7 @@ U T I L I T Y
 	trackselonmouse
 	generate_custom_action_ID
 	en_de_code_bitfield
-	os.getenv()
+	os.getenv()	
 	CheckDependencies and validate_dependency
 	Break
 	J_Reverb_randomizer
