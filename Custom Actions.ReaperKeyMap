@@ -327,6 +327,7 @@ ACT 0 0 "aa18960d3f08f34da123a0fd73517766" "Custom: Pinknoise_Bypass FX select p
 ACT 1 0 "d49925f17ab36b4b94a3e10d1147c934" "Custom: Play and move play cursor to edit cursor at play time" 40044 1007
 ACT 1 0 "f6ed9f6598bc054ea282edf6e6f21419" "Custom: Play and Stop playback at the end of selected item OFF" _SWS_SETREPEAT 40750 _SWS_RESTTIME1 41834
 ACT 1 0 "f486dfb342199a47b27f697f461a1163" "Custom: Play and Stop playback at the end of selected item ON" _SWS_SAVETIME1 40290 40749 _SWS_UNSETREPEAT 41834 40630 41173 1007
+ACT 1 0 "4022a51ba8adb74da75fbf691d529da7" "Custom: Play from loop start / Pause" 2022 1007 2013 1008 2014 40632 2014 1007
 ACT 1 0 "3773b0be3a923e4bbf6f53552b08bdd3" "Custom: Pod_Peek_Autocopy selected area to next track and mute original (select item and make time sel)" 40061 40060 40285 40630 40058 40289 40286 40718 40719 40289 40635
 ACT 1 0 "5e1403995e009f4b9428921387a05580" "Custom: Pod_Peek_Remove gaps between items and move all to project start (select track, repos. values: End, 0)" 40421 _XENAKIOS_REPOSITION_ITEMS 40042 41205 40289
 ACT 1 0 "faf795a3fe6d3742862dedeb9783d7b6" "Custom: PooFox aka foxAsteria !!!Panic!!!" 41175
@@ -900,3 +901,4 @@ ACT 1 32063 "286813b3c4177c4ea2e1b13dd4b51313" "Custom: Select previous sample a
 ACT 1 32063 "7097dbda25b3ca4895eba5800ac1e985" "Custom: Play next file (only useful if Auto-play is disabled)" 40030 1008
 ACT 1 32063 "8e2f72ec78351b4cb97a86a07974f858" "Custom: Play previous file (only useful if Auto-play is disabled)" 40029 1008
 ACT 1 32063 "69286e347f28954582244027cf74736f" "Custom: Select first file in the directory" 40041 40030 40029
+
