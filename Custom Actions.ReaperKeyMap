@@ -507,6 +507,8 @@ ACT 1 0 "9415697365508f45bdbb99b38f6a6588" "Custom: REAPERMania_Seek by clicking
 ACT 1 0 "ec502bd8c060a046a665e2a37355db48" "Custom: reapertips_Ripple delete selected items on the same track" 41990 40312 40309
 ACT 1 0 "7cf1e3ebc71819428f73e0e2d83d0978" "Custom: Recording: Pre-recording pause (set edit cursor to the start point) -- AFFECTS SELECTED TRACK" 40498 40625 41667 40626 40630 1013 1008 40718 40006 40630 40635 40496
 ACT 1 0 "9d43fca7afdada4ebb6aa9b2eca507ea" "Custom: Refresh theme" 40382 40381
+ACT 1 0 "d16766a9126a58419dbec7ec55ec6b99" "Custom: Refresh current theme (useful when modifying a teme to see changes) -- 1" 40381 40382
+ACT 1 0 "d14036b9bba02341b94acbd85722d910" "Custom: Refresh current theme (useful when modifying a teme to see changes) -- 2" 40382 40381
 ACT 1 0 "4835144595a97a4c9e994cd20837499f" "Custom: Region from loop" 40623 40174 40635
 ACT 1 0 "99e816cfb02e4c4e906b25684f5766aa" "Custom: Remove all envelopes for all tracks" _SWS_SAVESEL 40296 _S&M_REMOVE_ALLENVS _SWS_RESTORESEL
 ACT 1 0 "f6ec66fb4a12bc41b8fd3dd50b8e77ed" "Custom: Remove FX from selected tracks" _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX _S&M_REMOVE_FX 40297
@@ -716,8 +718,6 @@ ACT 1 0 "275791efcffbdc48b87edade95b6ff09" "Custom: Move contents of selected it
 ACT 1 0 "536e22334197734e87ac6db1469b08d7" "Custom: Change selected item stereo channel view to mono (play both channels)" 2022 40435 2013 40435 40698 40603 45000 40179 45001 40180 2022 40437 2013 40437
 ACT 1 0 "e07d92ce00488249860ce4ce43e9f5fc" "Custom: Create segment in active envelope in time selection preserving curve" 42082 42088
 ACT 1 0 "40ec462a2fb10043949d5fe59397c819" "Custom: Create segment in active envelope in time selection preserving curve -- SWS" 40726 40331 40630 _BR_ENV_SEL_PREV_POINT 40631 _BR_ENV_SEL_NEXT_POINT 40333
-ACT 1 0 "d16766a9126a58419dbec7ec55ec6b99" "Custom: Refresh current theme (useful when modifying a teme to see changes) -- 1" 40381 40382
-ACT 1 0 "d14036b9bba02341b94acbd85722d910" "Custom: Refresh current theme (useful when modifying a teme to see changes) -- 2" 40382 40381
 ACT 1 0 "ac58ff5e6066904a9ecf382c4e960dda" "Custom: Move edit cursor to next frame SWS (to pverent scrubbing disable it at Pref -> Audio -> Scrub/jog -> ... when moving .. via action)" 2022 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS 2013 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS 2022 41885 2014 41885 40647 2014 41885 2013 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS
 ACT 1 0 "466a8b596136254699c8ebca087175ea" "Custom: Move edit cursor to previous frame SWS (to pverent scrubbing disable it at Pref -> Audio -> Scrub/jog -> ... when moving .. via action)" 2022 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS 2013 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS 2022 41885 2014 41885 40646 2014 41885 2013 _BR_OPTIONS_SNAP_FOLLOW_GRID_VIS
 ACT 1 0 "9835c62b17502f4a9b6a61cec732c869" 'Custom: Create a composite item with overlay out of selected item on selected track (set empty item mode to "Stretch image/text")' 40309 40290 41622 40630 41667 41667 40625 40631 41666 41666 40626 40142 40850 40718 40032 2022 1156 2014 1156 2022 40507 2013 40507 41622
@@ -901,4 +901,5 @@ ACT 1 32063 "286813b3c4177c4ea2e1b13dd4b51313" "Custom: Select previous sample a
 ACT 1 32063 "7097dbda25b3ca4895eba5800ac1e985" "Custom: Play next file (only useful if Auto-play is disabled)" 40030 1008
 ACT 1 32063 "8e2f72ec78351b4cb97a86a07974f858" "Custom: Play previous file (only useful if Auto-play is disabled)" 40029 1008
 ACT 1 32063 "69286e347f28954582244027cf74736f" "Custom: Select first file in the directory" 40041 40030 40029
+
 
