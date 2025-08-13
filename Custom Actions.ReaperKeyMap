@@ -702,6 +702,7 @@ ACT 1 0 "096ab3e08206c84d88b6269921e83dcb" "Custom: Zoom in to 2 measurs (REAPER
 ACT 1 0 "4f1cfc699f76b940b54759ca989df0e5" "Custom: Zoom in to 4 measurs (REAPER 7.07+)" 42964 41040 40625 40839 40839 40839 40839 40626 40031 40635
 ACT 1 0 "4fe52205abad7d46a000cc07e6391ff0" "Custom: Zoom in horizontal fully at edit cursor" 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 1012 40151
 ACT 1 0 "8c3cddcde704bd43a4969ab0abd979c4" "Custom: Zoom out project (a little more precise than View: Zoom out project)" 40042 40625 40043 40626 40031 40635
+ACT 1 0 "48d67ae973aa624a9d5ac3eb7adb5791" "Custom: Zoom to loop points - time selection isn't preserved" 40623 2022 40621 2014 40621 40031 2014 40621 2014 40635
 ACT 1 0 "8349326e5c10c545a0e099baaefe6087" "Custom: Toko_MG_Adjust item envelope segment with mousewheel (have envelope selected)" 40528 40290 40726 40330 40635 2013 41180 2014 41181
 ACT 1 0 "0e44ddbc5ab34693b8dd00aedaa768b1" "Custom: KennyGioia_Zoom Out Project Vertical + Horizontal" _SWS_SAVESEL 40296 _SWS_VZOOMFITMIN _SWS_RESTORESEL 40295
 ACT 1 0 "194439f2a42ca044a881955d8ccbdb45" "Custom: Select item under mouse and set fixed lane playing (run with shortcut or bind to Media item - left click mouse modifier)" 40528 42478
@@ -902,6 +903,7 @@ ACT 1 32063 "286813b3c4177c4ea2e1b13dd4b51313" "Custom: Select previous sample a
 ACT 1 32063 "7097dbda25b3ca4895eba5800ac1e985" "Custom: Play next file (only useful if Auto-play is disabled)" 40030 1008
 ACT 1 32063 "8e2f72ec78351b4cb97a86a07974f858" "Custom: Play previous file (only useful if Auto-play is disabled)" 40029 1008
 ACT 1 32063 "69286e347f28954582244027cf74736f" "Custom: Select first file in the directory" 40041 40030 40029
+
 
 
 
