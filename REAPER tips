@@ -1071,6 +1071,8 @@ May be irrelevant for the latest versions of REAPER
 
 --------------------------------------------------------
 
+-- Rearoute loopback
+
 Justin:
 
 You can set rearoute_loopback=1 in your reaper.ini (right under [REAPER]), and then you will have loopback inputs and outputs which you can use to send between projects. (if you are on Windows, this will mean you lose ReaRoute capability, though, but you probably don't need it).
@@ -3686,14 +3688,48 @@ https://forum.cockos.com/showthread.php?t=29640&page=78#3119
 
 ==============================================================
 
-When debugging undo related things, set "debug=1" in reaper.ini, 
+-- reaper.ini special keys/flags
+
+
+1. You can set rearoute_loopback=1 in your reaper.ini (right under [REAPER]), 
+and then you will have loopback inputs and outputs which you can use to send between projects. 
+(if you are on Windows, this will mean you lose ReaRoute capability, though, but you probably don't need it).
+
+https://forum.cockos.com/showthread.php?p=1796913#post1796913
+
+Since build 6.69 supports up to 512 channel
+
+https://www.youtube.com/watch?v=GKa3uGbz854&t=97s
+
+and since version 7 there's a built-in option in Preferences -> Audio -> Virtual loopback audio hardware
+which can be used alongside the parameter in reaper.ini but if both are enabled each option is allocated
+half of the maximum number of channels, i.e. 256
+
+https://www.youtube.com/watch?v=FAKiHozcE8o?t=1203s
+
+
+2. When debugging undo related things, set "debug=1" in reaper.ini, 
 
 restart REAPER, and you'll see an added column in the undo history 
 
 which lets you see a summary of what changed.
 
-
 https://forum.cockos.com/showthread.php?t=272617#2
+
+
+3. midi_hw_debug=1 ini file option to enable win32 debug messages on MIDI output errors 
+
+(since build 7.39 but may not be supported in official builds)
+
+https://forum.cockos.com/showthread.php?t=300389
+
+
+4. add experimental option (reaper.ini areasel=2) to not merge adjacent selection regions (Razor Edits)
+
+since build 7.40
+
+https://forum.cockos.com/showthread.php?t=301174
+
 
 ==============================================================
 
@@ -5727,15 +5763,65 @@ https://forum.cockos.com/showthread.php?t=289528#3
 
 =============================================================
 
+-- Move parent track automation along with child track automation
 
 
+1. Enable Options -> Envelope points -> Move envelope points with media items and razor edits
+
+2. Insert an empty or a dummy MIDI item on the parent track encompassing the envelope points which need moving
+
+3. Select this empty or dummy file and items which need moving on the child tracks
+
+4. Drag with the mouse
 
 
+Alternatively create Razor edit areas over everything which needs moving, then drag with the mouse
 
 
+https://reddit.com/r/Reaper/comments/1lm09ly/is_there_any_way_to_move_parent_track_automation/
 
 
+=============================================================
 
+-- Associate plugin after reinstallation with its instances inside the project
+
+
+As a result of swithing OS and plugin re-installation, association between the plugin 
+and its instances inside a project saved on another system may be lost due to difference
+in REAPER specific plugin ID, stored inside reaper-vstplugins64.ini or reaper-vstplugins.ini
+file.
+
+To fix this do one of the following:
+A. Replace the plugin entry in the ini file on the new system with the entry which was present in this file on the old system
+B. Change the ID in the FX chain code inside the .RPP file, e.g.
+	<VST "VSTi: Surge" Surge.dll 0 "" 1515016268<5653545A4D504C7A616D706C65720000> 
+where ID is 1515016268 which corresponds to the ID in the ini file listed at 2nd place after =, e.g.
+	Surge.dll=00B2BF788836D701,1515016268,Surge (Surge Synth Team)
+
+
+=============================================================
+
+-- Multi-line captions in the Video processor
+
+When inserted in take FX chain with the preset 'Overlay: Text/Timecode'
+the video processor retrieves and displays take name. The preset does support 
+multi-line text however it requires embedding the invisible line break character \n 
+within the take name which is only possible with ReaScript API.
+
+The workaround is using mutli-take items.
+
+1. Create a multi-take MIDI item
+2. As take name write text which you wish to be displayed on different line in the video
+3. Insert video processor instance in the FX chain of each take
+4. In the item properties enable the option 'Play all takes' -------- THIS IS CRUCIAL PART
+5. Apply 'Overlay: Text/Timecode'preset to the Video processor instance in each take
+6. Adjust the preset 'Y position' parameter so that take names appear at different height
+thus creating a multi-line caption.
+
+DO NOT USE FOR THIS PURPOSE DEDICATED VIDEO PROCESSOR ITEM CREATED WITH THE ACTION 'Insert dedicated video processor item'
+BECAUSE IT SEEMS TO IGNORE ALL TAKES BAR THE VERY FIRST
+
+=============================================================
 
 
 
