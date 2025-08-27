@@ -893,6 +893,8 @@ ACT 1 32060 "dec3b60756c88b4f9f57e455ba6b6dce" "Custom: Scale: Scribian" 40214 4
 ACT 1 32060 "87f7bac361617641b6c38d961b0b37c9" "Custom: Scale: WholeTone" 40214 40164 40048 40166 40048 40168 40048 40170 40048 40172 40048 40174 40048 40176 40048 40164 40048
 ACT 1 32060 "cd6293b530d7e740beab3fbec775851e" "Custom: Set CC lane to Bank/Program Select and insert event" 40369 40950
 ACT 1 32060 "e757d67a11e98e47ba31e90fc1ce1a92" "Custom: Set CC lane to Text events and insert event" 40370 40458
+ACT 1 32060 "9decbd9dd3e5d54c9bfaeef790c01fc4" "Custom: Set ends of selected notes to mouse cursor - edit cursor position is not kept" 40443 40791
+ACT 1 32060 "658d3537e381114e8e686b923274bb68" "Custom: Set start of selected notes to mouse cursor - edit cursor position is not kept" 40443 40790
 ACT 0 32060 "2cce7e141ec5ab4994b67d33149b3482" "Custom: Solo notes" 40058 40501 40057 40501
 ACT 1 32060 "2c145e8607ed874094fb7fa24ee42115" "Custom: Spread extracted drum break MIDI sequence chromatically up (1st set pitch cursor to pitch of the sequence)" 41746 40659 40214 40036 2001 40413 40440 40667 40049 40693 40440 2002 40003 40405 40214 40037 40414 40791 40214 40036
 ACT 0 32060 "58fd6f31f7f43b49b7c30433b7747103" "Custom: Unsolo notes" 40803 40058 40501
@@ -903,6 +905,7 @@ ACT 1 32063 "286813b3c4177c4ea2e1b13dd4b51313" "Custom: Select previous sample a
 ACT 1 32063 "7097dbda25b3ca4895eba5800ac1e985" "Custom: Play next file (only useful if Auto-play is disabled)" 40030 1008
 ACT 1 32063 "8e2f72ec78351b4cb97a86a07974f858" "Custom: Play previous file (only useful if Auto-play is disabled)" 40029 1008
 ACT 1 32063 "69286e347f28954582244027cf74736f" "Custom: Select first file in the directory" 40041 40030 40029
+
 
 
 
