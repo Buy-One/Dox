@@ -20319,18 +20319,23 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 -- ,,field 3,,field 5,
 -- if some/all fields must initially be filled out field_cont may be a table;
 -- separator is a string, character which delimits the fields,
--- if invalid / empty string, defaults to comma;
--- MULTIPLE CHARACTERS CANNOT BE USED AS FIELD SEPARATOR, FIELD NAMES LIST OR ITS FORMATTING BREAKS
+-- if invalid / empty string, defaults to comma
+-- the function relies on Esc() function is separator character needs escaping,
+-- MULTIPLE CHARACTERS CANNOT BE USED AS FIELD SEPARATOR 
+-- BECAUSE FIELD NAMES LIST OR ITS FORMATTING BREAKS;
 -- comment_field is boolean, comment is string to be displayed in the comment field(s),
+-- if comment_field is true but comment arg is an empty string 
+-- or only contains separators, comment_field arg is ignored 
+-- and no comment field(s) is displayed, UNLESS the apropriate code is uncommented
+-- within the function,
 -- multiple comments must be delimited by the character used as the separator arg
 -- or by comma if separator is the comma,
--- if comment text contains commas separator arg must be set specifically 
--- to be anything but comma, if final field count with comment fields
--- hits or exceeds the limit of 16, comment fields number is reduced, 
--- text of any extra comment fields is merged into the last visible comment field
--- if any remains, if comment_field is true but comment arg is an empty string
--- comment field(s) aren't displayed;
--- extrawidth parameter is inside the function;
+-- if comment text contains commas, separator arg must be set specifically 
+-- to be anything but comma, 
+-- if final field count with comment fields hits or exceeds the limit of 16, 
+-- comment fields number is reduced, text of any extra comment fields is merged 
+-- into the last visible comment field if any remains;
+-- extrawidth parameter is to be set diectly inside the function code;
 
 	if (not field_cnt or field_cnt <= 0) then -- if field_cnt arg is invalid, derive count from field_names arg
 		if #field_names:gsub(' ','') == 0 and not comment_field then return end
@@ -20349,16 +20354,18 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 	-- add delimiting separators when they're fewer than field_cnt
 	-- due to lacking field names or field content
 	-- which means they will delimit trailing empty fields
-	local _, sep_cnt = arg:gsub(sep,'')
+	local sep_esc = Esc(sep)
+	local _, sep_cnt = arg:gsub(sep_esc,'')
 	return sep_cnt == field_cnt-1 and arg -- -1 because the last field isn't followed by a separator
 	or sep_cnt < field_cnt-1 and arg..(sep):rep(field_cnt-1-sep_cnt) -- add trailing separators
-	or arg:match(('.-'..sep):rep(field_cnt)):sub(1,-2) -- truncate arg when field_cnt value is smaller than the number of fields, excluding the last separator captured with the pattern inside string.match because the last field isn't followed by a separator
+	or arg:match(('.-'..sep_esc):rep(field_cnt)):sub(1,-2) -- truncate arg when field_cnt value is smaller than the number of fields, excluding the last separator captured with the pattern inside string.match because the last field isn't followed by a separator
 	end
 
 	local function format_fields(arg, sep, field_cnt)
 	-- for field_names and field_cont as arg
+	local sep_esc = Esc(sep)
 	local arg = type(arg) == 'table' and table.concat(arg, sep) or arg
-	return add_separators(field_cnt, arg, sep):gsub(sep..' ', sep) -- if there's space after separator, remove because with multiple fields the field names/content will not line up vertically
+	return add_separators(field_cnt, arg, sep):gsub(sep_esc..' ', sep) -- if there's space after separator, remove because with multiple fields the field names/content will not line up vertically
 	end
 
 -- for field names sep must be a comma because that's what field names list is delimited by
@@ -20367,11 +20374,26 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 -- by the main separator
 local field_names = format_fields(field_names, ',', field_cnt) -- if commas need to be used in field names and the main separator is not a comma (because if it is comma cannot delimit field names), pass here the separator arg from the function
 local sep = separator and #separator > 0 and separator or ','
+local sep_esc = Esc(sep)
 local field_cont = field_cont or ''
 field_cont = format_fields(field_cont, sep, field_cnt)
-local comment = comment_field and type(comment) == 'string' and #comment > 0 and comment or ''
-local comment_field_cnt = select(2, comment:gsub(sep,''))+1 -- +1 because last comment field isn't followed by the separator so one less will be captured
+
+--[-[ DOESN'T SUPPORT ALL EMPTY COMMENT FIELDS
+local sep_cnt = select(2,comment:gsub(sep_esc,''))
+local comment = comment_field and type(comment) == 'string' and #comment ~= sep_cnt and comment or ''
+--]]
+--[[ SUPPORTS ALL EMPTY COMMENT FIELDS
+local comment = comment_field and type(comment) == 'string' and comment or ''
+--]]
+
+local comment_field_cnt = select(2, comment:gsub(sep_esc,''))+1 -- +1 because last comment field isn't followed by the separator so one less will be captured
+
+--[-[ DOESN'T SUPPORT ALL EMPTY COMMENT FIELDS
 local field_cnt = comment_field and #comment > 0 and field_cnt+comment_field_cnt or field_cnt
+--]]
+--[[ SUPPORTS ALL EMPTY COMMENT FIELDS
+local field_cnt = comment_field and field_cnt+comment_field_cnt or field_cnt
+--]]
 
 	if field_cnt >= 16 then 
 	-- disable some or all comment fields if field count hit the limit after comment fields have been added	
@@ -20379,39 +20401,69 @@ local field_cnt = comment_field and #comment > 0 and field_cnt+comment_field_cnt
 	field_cnt = 16
 	end
 
+--[-[ DOESN'T SUPPORT ALL EMPTY COMMENT FIELDS
 field_names = comment_field and #comment > 0 and field_names..(',Comment:'):rep(comment_field_cnt) or field_names -- if commas need to be used in field names, these must be delimited by the main separator which also should be used here
 field_cont = comment_field and #comment > 0 and field_cont..sep..comment or field_cont
+--]]
+--[[ SUPPORTS ALL EMPTY COMMENT FIELDS
+field_names = comment_field and field_names..(',Scratch field:'):rep(comment_field_cnt) or field_names
+field_cont = comment_field and field_cont..sep..comment or field_cont
+--]]
+
 local separator = sep ~= ',' and ',separator='..sep or '' -- if commas need to be used in field names, these must be delimited by the main separator which also should be used here
 local ret, output = r.GetUserInputs(title, field_cnt, field_names..',extrawidth=150'..separator, field_cont) -- same as above regarding delimiter
 local comment_pattern = ('.-'..sep):rep(comment_field_cnt-1) -- -1 because the last comment field isn't followed by a separator
-output = #comment > 0 and output:match('(.+'..sep..')'..comment_pattern) or output
-field_cnt = #comment > 0 and field_cnt-1 or field_cnt -- adjust for the next statement
+
+--[-[ DOESN'T SUPPORT ALL EMPTY COMMENT FIELDS
+output = #comment > 0 and output:match('(.+'..sep_esc..')'..comment_pattern) or output -- strip comment fields content
+field_cnt = #comment > 0 and field_cnt-comment_field_cnt or field_cnt -- adjust for the next statement
+--]]
+--[[ SUPPORTS ALL EMPTY COMMENT FIELDS
+output = comment_field and output:match('(.+'..sep_esc..')'..comment_pattern) or output -- strip comment fields content
+field_cnt = comment_field and field_cnt-comment_field_cnt or field_cnt -- adjust for the next statement
+--]]
+
 	if not ret
-	-- these two conditions will need commenting out if empty dialogue
+	-- the following two conditions will need commenting out if empty dialogue
 	-- sumbission is allowed by script design, mainly if there're multiple fields in the dialogue
-	or (field_cnt > 1 and output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)
-	or #output:gsub('[%s%c]','') == 0) 
+	--[-[ DOESN'T SUPPORT ALL EMPTY COMMENT FIELDS
+	or (#comment == 0 and output or output:match('(.+)'..sep_esc)):gsub('[%s%c]','') == (field_cnt > 1 and (sep):rep(field_cnt-1) or '') -- if there're comment fields, exclude trailing separator left behind after stripping comment fields content above
+	--]]
+	--[[ SUPPORTS ALL EMPTY COMMENT FIELDS
+	or (not comment_field and output or output:match('(.*)'..sep_esc)):gsub('[%s%c]','') == (field_cnt > 1 and (sep):rep(field_cnt-1) or '') -- if there're comment fields, exclude trailing separator left behind after stripping comment fields content above
+	--]]
 	then return end
 	--[[ OR
 	-- to condition action by the type of the button pressed
 	if not ret then return 'cancel'
-	elseif field_cnt > 1 and output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)
-	or #output:gsub('[%s%c]','') == 0 then return 'empty' end
+	elseif 
+	-- DOESN'T SUPPORT ALL EMPTY COMMENT FIELDS
+	(#comment == 0 and output or output:match('(.+)'..sep_esc)):gsub('[%s%c]','') == (field_cnt > 1 and (sep):rep(field_cnt-1) or '') 
+	-- SUPPORTS ALL EMPTY COMMENT FIELDS
+	(not comment_field and output or output:match('(.*)'..sep_esc)):gsub('[%s%c]','') == (field_cnt > 1 and (sep):rep(field_cnt-1) or '')
+	then return 'empty' end
 	]]
--- construct table out of input fields
+-- construct table out of input fields, empty fields and fields only filled with spaces are permitted
+-- must be validated after values return
 local t = {}
-	for s in output:gmatch('(.-)'..sep) do
---	for s in output:gmatch('[^'..sep..']*') do -- allow capturing empty fields and the last field which doesn't end with a separator // alternative to 'if #comment == 0 then' block below
+	for s in output:gmatch('(.-)'..sep_esc) do
+--	for s in output:gmatch('[^'..sep_esc..']*') do -- allow capturing empty fields and the last field which doesn't end with a separator // alternative to 'if #comment == 0 then' block below, only relevant when there's no comment, otherwise comment fields will be uncluded in the table
 		if s then t[#t+1] = s end
 	end
-	if #comment == 0 then
+	if not comment_field then
 	-- if the last field isn't comment,
 	-- add it to the table because due to lack of separator at its end
 	-- it wasn't caught in the above loop
-	t[#t+1] = output:match('.*'..sep..'(.*)') -- * operator to account for empty 1st field if there're only two of them
+	t[#t+1] = output:match('.*'..sep_esc..'(.*)') -- * operator to account for empty 1st field if there're only two of them
 	end
+
 -- return fields content in a table and as a string to refill the dialogue on reload
-return t, #comment > 0 and output:match('(.+)'..sep) or output -- remove hanging separator from output return value if there was a comment field, to simplify re-filling the dialogue in case of reload, when there's a comment the separator will be added with it, comment isn't included in the returned output
+--[-[ DOESN'T SUPPORT ALL EMPTY COMMENT FIELDS
+return t, #comment > 0 and output:match('(.+)'..sep_esc) or output -- remove hanging separator from output return value if there was a comment field, to simplify re-filling the dialogue in case of reload, when there's a comment the separator will be added with it, comment isn't included in the returned output
+--]]
+--[[ SUPPORTS ALL EMPTY COMMENT FIELDS AND RETURN OF ALL OTHER FIELDS EMPTY
+return t, comment_field and output:match('(.*)'..sep_esc) or output -- remove hanging separator from output return value if there're comment fields, to simplify re-filling the dialogue in case of reload, when there's a comment field the separator will be added with it, comment isn't included in the returned output
+--]]
 end
 -- USE:
 -- local output_t, output = GetUserInputs_Alt(...)
