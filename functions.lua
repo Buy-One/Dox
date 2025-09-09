@@ -13465,7 +13465,7 @@ local fin, idx
 	end
 
 Activate(act_take) -- restore active take active status
-
+r.UpdateItemInProject(item) -- to make re-activated take immediately visible
 --r.Undo_EndBlock('TEST', -1)
 
 end
