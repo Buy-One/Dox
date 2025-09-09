@@ -77,6 +77,7 @@ ACT 1 0 "4ed207d768f5ea409c320be74f7b99b3" "Custom: Convert project markers to p
 ACT 1 0 "5d272d9bd6497c4eae4cfd5a495cfd6e" "Custom: Convert project regions to project markers with naming and delete regions (place edit cursor inside 1st region) - v7.10+" 40172 40616 40171 43144 40615 2001 40632 40616 40171 43144 40615 2002
 ACT 1 0 "59f478afaa3e474b914bbfaeb086e0a0" "Custom: Convert project regions to project markers with naming and delete regions (place edit cursor left of the 1st region) - v7.10+" 40625 40105 40626 40174 40635 40104 43144 40615 2001 40632 40616 40171 43144 40615 2002
 ACT 1 0 "ce47e056509dd24b9759d005e0fea0dc" "Custom: Convert take markers in selected items to proj markers" 41173 2001 42394 40157 2002
+ACT 1 0 "db9b709b4a5600479637283aacd69a75" "Custom: Copy active take (have only one item selected) -- latest take active status isn't restored" 40131 40698 40029
 ACT 1 0 "259686de94597248bd34660dfadedb39" "Custom: Copy selected area to a separate track assigned to Group 01" _SWS_SAVEALLSELITEMS1 _BR_SAVE_CURSOR_POS_SLOT_1 40060 40804 40914 40042 40421 41174 40058 _BR_RESTORE_CURSOR_POS_SLOT_1 _SWS_RESTALLSELITEMS1
 ACT 1 0 "1b3c4aa0a7b870428a1f7ea4f07b3c10" "Custom: Copy selected items down 1 track" 40528 41173 40698 40058 40118
 ACT 1 0 "73256c9ffb330c4fa12805b777340369" "Custom: Copy selected items up 1 track" 40528 41173 40698 40058 40117
@@ -905,6 +906,7 @@ ACT 1 32063 "286813b3c4177c4ea2e1b13dd4b51313" "Custom: Select previous sample a
 ACT 1 32063 "7097dbda25b3ca4895eba5800ac1e985" "Custom: Play next file (only useful if Auto-play is disabled)" 40030 1008
 ACT 1 32063 "8e2f72ec78351b4cb97a86a07974f858" "Custom: Play previous file (only useful if Auto-play is disabled)" 40029 1008
 ACT 1 32063 "69286e347f28954582244027cf74736f" "Custom: Select first file in the directory" 40041 40030 40029
+
 
 
 
