@@ -5053,8 +5053,8 @@ end
 
 function Re_Store_Selected_Items(t, keep_last_selected)
 -- at the restoration stage when evaluating whether any items 
--- were saved into the table, use 'if next(t) then' statement 
--- because the table isn't indexed and 'if #t > 0 then' wont work
+-- were saved into the table, 'if next(t) then' statement is used
+-- because the table isn't indexed and 'if #t > 0 then' won't work
 
 	if not t then
 	local t = {}
@@ -5066,7 +5066,7 @@ function Re_Store_Selected_Items(t, keep_last_selected)
 		end
 	r.SelectAllMediaItems(0, false) -- selected false // deselect all
 	return t
-	else
+	elseif t and next(t) then
 		if not keep_last_selected then
 		r.SelectAllMediaItems(0, false) -- selected false // deselect all
 		end
@@ -6825,6 +6825,79 @@ or {r.GetNumTracks, r.GetTrack})
 	end
 end
 
+
+
+function Get_Last_Touched_Fixed_Item_Lane()
+-- the function takes advantage of the fact
+-- that with the paste action items are pasted
+-- to the last touched lane;
+-- last touched lane doesn't change if lane enable
+-- button is clicked
+
+	local function re_store_selected_items(t, keep_last_selected)
+	-- at the restoration stage when evaluating whether any items 
+	-- were saved into the table, 'if next(t) then' statement is used
+	-- because the table isn't indexed and 'if #t > 0 then' won't work
+		if not t then
+		local t = {}
+			for i=0, r.CountMediaItems(0)-1 do
+			local item = r.GetMediaItem(0,i) 
+				if r.IsMediaItemSelected(item) then
+				t[item] = '' -- dummy entry
+				end
+			end
+		r.SelectAllMediaItems(0, false) -- selected false // deselect all
+		return t
+		elseif t and next(t) then
+			if not keep_last_selected then
+			r.SelectAllMediaItems(0, false) -- selected false // deselect all
+			end
+			for item in pairs(t) do
+			r.SetMediaItemSelected(item, true) -- selected true
+			end
+		end
+	r.UpdateArrange()
+	end
+
+	local function act(ID)
+	r.Main_OnCommand(ID, 0) -- Options: Trim content behind media items when editing
+	end
+
+local trim = r.GetToggleCommandStateEx(0, 41117) == 1 -- Options: Trim content behind media items when editing
+	if trim then act(41117) end -- set to off to prevent overwriting items inder the pasted temporary item
+	
+-- store current item pointers
+local t = {}
+	for i=0, r.CountMediaItems(0)-1 do
+	t[r.GetMediaItem(0,i)] = ''
+	end
+-- store selected items and clear selection to restore later
+-- the selection is cleared so that only the temporary items
+-- end up being selected, copied and pasted
+local sel_itms = re_store_selected_items()
+local tr = r.GetLastTouchedTrack()
+-- insert temporary item on the last touched track,
+-- by the function the item is always inserted in the last lane
+-- so by itself the item is useless
+local item = r.AddMediaItemToTrack(tr)
+r.SetMediaItemSelected(item, true) -- selected true
+act(40698) -- Edit: Copy items
+r.DeleteTrackMediaItem(tr, item) -- delete temporary item
+act(42398) -- Item: Paste items/tracks // paste copied item to the last touched track
+local item = r.GetSelectedMediaItem(0,0) -- the pasted item is exclusively selected
+local lane = r.GetMediaItemInfo_Value(item, 'I_FIXEDLANE')
+r.DeleteTrackMediaItem(tr, item) -- delete pasted item
+re_store_selected_items(sel_itms) -- restore original item selection
+	if trim then act(41117) end -- restore On toggle state
+return tr, lane
+end
+
+
+
+function Get_Index_of_Fixed_Item_Lane_Under_Mouse()
+local tr, info = r.GetTrackFromPoint(r.GetMousePosition())
+return info>>8
+end
 
 
 
@@ -9204,6 +9277,69 @@ local length = #t -- store the original table length because it will get shorter
 
 return table.concat(t,'\n') -- reconstruct
 
+end
+
+
+
+function Get_Take_Chunk(take, item)
+-- item is optional
+-- relies on Esc() function
+local ret, GUID = r.GetSetMediaItemTakeInfo_String(take, 'GUID', '', false) -- isset false
+local item = item or r.GetMediaItemTake_Item(take)
+local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
+local GUID = Esc(GUID)
+local take_chunk, take = {}
+	for line in chunk:gmatch('[^\n\r]+') do
+		if take and line:match('^TAKE') then break -- new take has come along, if no next take the loop will continue until chunk and and the table will include item chunk closure which will be discarded below
+		elseif not take and line and line:match('^NAME') or take then
+		take = 1
+		take_chunk[#take_chunk+1] = line
+		elseif take and line:match('GUID') and not line:match(GUID) then 
+		-- reset, wrong take
+		take_chunk = {}
+		take = nil
+		end
+	end
+	if #take_chunk > 0 then
+	local len = #take_chunk
+		if take_chunk[len] == take_chunk[len-1] then -- the lines will be equal if both include block closure >, in which case the last closure will belong to item chunk so must be discared
+		table.remove(take_chunk, len)
+		end
+	end
+return #take_chunk > 0 and table.concat(take_chunk,'\n')
+end
+
+
+function Replace_Take_Chunks(item, take_chunk)
+-- in this function empty take is replaced by a MIDI take chunk
+-- can be repurposed
+
+	local function update_guid(chunk)
+	local chunk = chunk:gsub('E*GUID {.-}','GUID '..r.genGuid('')) -- update GUID, uncluding envelopes, so it's unique
+	chunk = chunk:gsub('POOLEDEVTS {.-}','POOLEDEVTS '..r.genGuid('')) -- update pool GUID so it's unique, otherwise take copies will end up becoming pooled
+	chunk = chunk:gsub('FXID {.-}','FXID '..r.genGuid(''))
+	return chunk
+	end
+
+local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
+local take_chunk = take_chunk:gsub('%%','%%%%') -- escape percent signs if any
+chunk = chunk:gsub('TAKE NULL', function() return 'TAKE\n'..update_guid(take_chunk) end) -- unique GUIDs at each replacement cycle are only generated if replacement argument is a function
+r.SetItemStateChunk(item, chunk)
+
+end
+
+
+function Collect_Take_Chunks(item)
+local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
+local take_cnt = r.CountTakes(item)
+local chunk_t = {chunk:match('(NAME[%W].-)'..string.rep('(TAKE[%W].-)', take_cnt-2)..'(TAKE[%W].+)>')} -- repeat as many times as take count -2 since first and last take chunks are different; [%W] makes sure that only 'TAKE' tag is captured disregarding words which contain it, of which there're a few, i.e. must be followed by anything but alphanumeric characters
+	if #chunk_t == take_cnt then
+	local last_take = chunk_t[#chunk_t]
+		if last_take:match('.+>\n>') then -- if last take chunk includes item chunk closure, which it likely will, removed it
+		chunk_t[#chunk_t] = last_take:sub(1,-3)
+		end		
+	return chunk_t
+	end
 end
 
 
@@ -13282,70 +13418,6 @@ local YPOS = chunk:match('(YPOS.-)\n')
 local Y, ratio = YPOS:match('([%.%d]+) ([%.%d]+)') -- Y is lane relative Y coordinate within track height which is 1, i.e. the height of all preceding lanes, ratio is ratio between track height and single lane height, track height is divided uniformely between lanes
 return Y+ratio / ratio -- Y+ratio is the analysed and preceding lanes combined height within track height
 end 
-
-
-
-function Get_Take_Chunk(take, item)
--- item is optional
--- relies on Esc() function
-local ret, GUID = r.GetSetMediaItemTakeInfo_String(take, 'GUID', '', false) -- isset false
-local item = item or r.GetMediaItemTake_Item(take)
-local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
-local GUID = Esc(GUID)
-local take_chunk, take = {}
-	for line in chunk:gmatch('[^\n\r]+') do
-		if take and line:match('^TAKE') then break -- new take has come along, if no next take the loop will continue until chunk and and the table will include item chunk closure which will be discarded below
-		elseif not take and line and line:match('^NAME') or take then
-		take = 1
-		take_chunk[#take_chunk+1] = line
-		elseif take and line:match('GUID') and not line:match(GUID) then 
-		-- reset, wrong take
-		take_chunk = {}
-		take = nil
-		end
-	end
-	if #take_chunk > 0 then
-	local len = #take_chunk
-		if take_chunk[len] == take_chunk[len-1] then -- the lines will be equal if both include block closure >, in which case the last closure will belong to item chunk so must be discared
-		table.remove(take_chunk, len)
-		end
-	end
-return #take_chunk > 0 and table.concat(take_chunk,'\n')
-end
-
-
-function Replace_Take_Chunks(item, take_chunk)
--- in this function empty take is replaced by a MIDI take chunk
--- can be repurposed
-
-	local function update_guid(chunk)
-	local chunk = chunk:gsub('E*GUID {.-}','GUID '..r.genGuid('')) -- update GUID, uncluding envelopes, so it's unique
-	chunk = chunk:gsub('POOLEDEVTS {.-}','POOLEDEVTS '..r.genGuid('')) -- update pool GUID so it's unique, otherwise take copies will end up becoming pooled
-	chunk = chunk:gsub('FXID {.-}','FXID '..r.genGuid(''))
-	return chunk
-	end
-
-local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
-local take_chunk = take_chunk:gsub('%%','%%%%') -- escape percent signs if any
-chunk = chunk:gsub('TAKE NULL', function() return 'TAKE\n'..update_guid(take_chunk) end) -- unique GUIDs at each replacement cycle are only generated if replacement argument is a function
-r.SetItemStateChunk(item, chunk)
-
-end
-
-
-function Collect_Take_Chunks(item)
-local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
-local take_cnt = r.CountTakes(item)
-local chunk_t = {chunk:match('(NAME[%W].-)'..string.rep('(TAKE[%W].-)', take_cnt-2)..'(TAKE[%W].+)>')} -- repeat as many times as take count -2 since first and last take chunks are different; [%W] makes sure that only 'TAKE' tag is captured disregarding words which contain it, of which there're a few, i.e. must be followed by anything but alphanumeric characters
-	if #chunk_t == take_cnt then
-	local last_take = chunk_t[#chunk_t]
-		if last_take:match('.+>\n>') then -- if last take chunk includes item chunk closure, which it likely will, removed it
-		chunk_t[#chunk_t] = last_take:sub(1,-3)
-		end		
-	return chunk_t
-	end
-end
-
 
 
 function Duplicate_Active_Take_Contiguously(sel_item, want_above)
@@ -20732,7 +20804,8 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 -- unbalanced quotes, apostrophes and parenthesis break field separation
 -- SEE ALSO resolve_all_or_restore_apostrophe() above;
 -- the length of field names list should obviously match field_cnt arg
--- it's more reliable to contruct a table of names and pass the two vars field_cnt and field_names as #t, t
+-- it's more reliable to contruct a table of names 
+-- and pass the two vars field_cnt and field_names as #t, t
 -- field_cont is empty string or nil unless they must be initially filled,
 -- to fill out only specific fields precede them with as many separator characters
 -- as the number of fields which must stay empty
@@ -20741,9 +20814,13 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 -- if some/all fields must initially be filled out field_cont may be a table;
 -- separator is a string, character which delimits the fields,
 -- if invalid / empty string, defaults to comma
--- the function relies on Esc() function is separator character needs escaping,
+-- the function relies on Esc() function if separator character needs escaping,
 -- MULTIPLE CHARACTERS CANNOT BE USED AS FIELD SEPARATOR 
--- BECAUSE FIELD NAMES LIST OR ITS FORMATTING BREAKS;
+-- BECAUSE FIELD NAMES LIST OR ITS FORMATTING BREAKS,
+-- Lua string library magic characters are NOT recommended as separators
+-- because if these characters also present in the text fields
+-- captures won't work accurately, \n, \r and \t are the safest because 
+-- they're not confused with their literal look-alikes;
 -- comment_field is boolean, comment is string to be displayed in the comment field(s),
 -- if comment_field is true but comment arg is an empty string 
 -- or only contains separators, comment_field arg is ignored 
@@ -20769,7 +20846,6 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 	field_cnt = 16 -- clamp to the limit supported by the native function
 	comment_field = nil -- disable comment if field count hit the limit, just in case 
 	end
-
 
 	local function add_separators(field_cnt, arg, sep)
 	-- for field_names and field_cont as arg
@@ -20814,43 +20890,37 @@ local field_cnt = comment_field and field_cnt+comment_field_cnt or field_cnt
 field_names = comment_field and field_names..(',Scratch field:'):rep(comment_field_cnt) or field_names
 field_cont = comment_field and field_cont..sep..comment or field_cont
 local separator = sep ~= ',' and ',separator='..sep or '' -- if commas need to be used in field names, these must be delimited by the main separator which also should be used here
-local ret, output = r.GetUserInputs(title, field_cnt, field_names..',extrawidth=150'..separator, field_cont) -- same as above regarding delimiter
-local comment_pattern = ('.-'..sep):rep(comment_field_cnt-1) -- -1 because the last comment field isn't followed by a separator
-output = comment_field and output:match('(.*)'..comment_pattern) or output -- strip comment fields content // * operator accommodates single empty field
+local ret, output = r.GetUserInputs(title, field_cnt, field_names..',extrawidth=300'..separator, field_cont) -- same as above regarding delimiter
+local comment_pattern = (sep_esc..'.*'):rep(comment_field_cnt)
+comment = comment_field and output:match('.*('..comment_pattern..')') -- captured with leading separator which separates comment(s) from the main fields
+output = comment_field and output:match('(.*)'..comment_pattern) or output -- strip comment fields content // * operator accommodates single empty field // output capture doesn't include trailing separator
 field_cnt = comment_field and field_cnt-comment_field_cnt or field_cnt -- adjust for the next statement
-
-	if not ret
-	--[-[ 
+	
+	if not ret	
+	--[[
 	-- this condition will need commenting out if empty dialogue
 	-- sumbission is allowed by script design, mainly if there're multiple fields in the dialogue	
-	or (not comment_field and output or output:match('(.*)'..sep_esc)):gsub('[%s%c]','') == 
-	(field_cnt > 1 and (sep):rep(field_cnt-1) or '') -- if there're comment fields, exclude trailing separator left behind after stripping comment fields content above // * operator accommodates single empty field
-  --]]
+	or (not comment_field and output or output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)) -- if there're comment fields, exclude trailing separator left behind after stripping comment fields content above // * operator accommodates single empty field // -1 because the last field doesn't end with a separator	
+	--]]
 	then return end
 	--[[ OR
 	-- to condition action by the type of the button pressed
+	-- which will be assigned to the first return value that's supposed to be output_t
 	if not ret then return 'cancel'
-	elseif (not comment_field and output or output:match('(.*)'..sep_esc)):gsub('[%s%c]','') == 
-	(field_cnt > 1 and (sep):rep(field_cnt-1) or '') -- if there're comment fields, exclude trailing separator left behind after stripping comment fields content above // * operator accommodates single empty field
+	elseif not comment_field and output or output:gsub('[%s%c]','') == (sep):rep(field_cnt-1) -- if there're comment fields, exclude trailing separator left behind after stripping comment fields content above // * operator accommodates single empty field // -1 because the last field doesn't end with a separator
 	then return 'empty' end
-	]]
+	--]]
 
 -- construct table out of input fields, empty fields and fields only filled with spaces are permitted
 -- must be validated after values return
 local t = {}
+output = output..sep -- add trailing separator to be able to capture last field in the dialogue or last before comment field(s) because it doesn't end with a separator
 	for s in output:gmatch('(.-)'..sep_esc) do
---	for s in output:gmatch('[^'..sep_esc..']*') do -- allow capturing empty fields and the last field which doesn't end with a separator // alternative to 'if #comment == 0 then' block below
 		if s then t[#t+1] = s end
 	end
-	if not comment_field then
-	-- if the last field isn't comment,
-	-- add it to the table because due to lack of separator at its end
-	-- it wasn't caught in the above loop
-	t[#t+1] = output:match('.*'..sep_esc..'(.*)') -- * operator to account for empty 1st field if there're only two of them
-	end
-	
+
 -- return fields content in a table and as a string to refill the dialogue on reload
-return t, comment_field and output:match('(.*)'..sep_esc) or output -- remove hanging separator from output return value if there're comment fields, to simplify re-filling the dialogue in case of reload, when there's a comment field the separator will be added with it, comment isn't included in the returned output // * operator accommodates single empty field
+return t, output:match('(.*)'..sep_esc), comment and comment:match(sep_esc..'(.*)') -- remove hanging separator from output return value to simplify re-filling the dialogue in case of reload, when there's a comment field the separator will be added with it, comment isn't included in the returned output // * operator accommodates single empty field // comment is returned without leading separator to be collected and fed back into the dialogue if it's generated dynamically and needs preserving when the dialogue is reloaded
 
 end
 -- USE:
@@ -24129,6 +24199,8 @@ T R A C K S
 	Get_Last_Sel_or_Last_Track
 	In_Visible_Tracks_Exist1
 	In_Visible_Tracks_Exist2
+	Get_Last_Touched_Fixed_Item_Lane
+	Get_Index_of_Fixed_Item_Lane_Under_Mouse
 	
 
 
@@ -24241,6 +24313,9 @@ C H U N K
 	Replace_GUIDs_in_Chunk
 	Remove_Track_Chunk_By_Criteria
 	Remove_Chunks
+	Get_Take_Chunk
+	Replace_Take_Chunks
+	Collect_Take_Chunks
 
 
 R A Z O R  E D I T
@@ -24371,10 +24446,8 @@ I T E M S
 	Media_Items_Exist2
 	Audio_Take_Exists_In_Selected_Items
 	Get_Item_Lane_Index
-	Get_Take_Chunk
-	Replace_Take_Chunks
-	Collect_Take_Chunks
 	Duplicate_Active_Take_Contiguously
+	Move_Active_Take_Within_Item
 
 
 C O L O R
