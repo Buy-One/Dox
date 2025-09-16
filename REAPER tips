@@ -3965,7 +3965,7 @@ unless such sequence is converted into another custom action and used as such
 
 
 Action: Skip next action, set CC parameter to relative +1 if action armed, 0 otherwise
--- YOUR ACTION TO BYPASS
+-- YOUR ACTION TO BYPASS (here only used for state evaluation)
 Action: Skip next action if CC parameter ==0/mid
 -- YOUR ACTION TO BYPASS
 
@@ -3976,9 +3976,45 @@ sequence for each action that needs bypassing because only one action can be ski
 Bypass can also be conditioned by another toggle action, e.g.
 
 Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
--- TOGGLE ACTION
+-- TOGGLE ACTION (here only used for state evaluation)
 Action: Skip next action if CC parameter >0/mid  OR  <0/mid ---------- depeding on which toggle state is required as a condition
 -- YOUR ACTION TO BYPASS
+
+
+
+-- Toggle two toggle actions in sync which is achieved by simulating AND logic operator
+
+If one action is ON AND another is OFF, toggle the second to ON as well, and vice versa,
+if one is OFF AND another is ON, toggle the second to OFF as well,
+this requires using nested custom actions for the second action
+
+-- MAIN ACTION:
+
+Custom: Toggle continuous scrolling during playback
+  View: Continuous scrolling during playback --------------- toggle, then evaluate toggle state and based on it toggle the second action
+  Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+  View: Continuous scrolling during playback
+  Action: Skip next action if CC parameter <0/mid
+  Custom: Toggle continuous scrolling during playback - Toggle auto-view-scroll ON (component)
+  Action: Skip next action if CC parameter >0/mid
+  Custom: Toggle continuous scrolling during playback - Toggle auto-view-scroll OFF (component)
+
+-- NESTED CUSTOM ACTIONS:
+
+Custom: Toggle continuous scrolling during playback - Toggle auto-view-scroll OFF (component)
+  Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+  View: Toggle auto-view-scroll during playback
+  Action: Skip next action if CC parameter <0/mid
+  View: Toggle auto-view-scroll during playback
+
+
+Custom: Toggle continuous scrolling during playback - Toggle auto-view-scroll ON (component)
+  Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+  View: Toggle auto-view-scroll during playback
+  Action: Skip next action if CC parameter >0/mid
+  View: Toggle auto-view-scroll during playback
+
+
 
 
 
@@ -5823,10 +5859,12 @@ BECAUSE IT SEEMS TO IGNORE ALL TAKES BAR THE VERY FIRST
 
 =============================================================
 
+-- Track/take name length limit
+
+Track name 447 bytes, take name 512 bytes
 
 
-
-
+=============================================================
 
 
 
