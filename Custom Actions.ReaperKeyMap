@@ -646,6 +646,9 @@ ACT 1 0 "e4771bc1e573954f90ff7f0440474a3f" "Custom: Tap tempo with proj. timebas
 ACT 1 0 "f2eddab3f3b3af459ec2b167ff34afc0" "Custom: Togggle zoom to sel. item + MIDI Inline Editor" 41622 40847
 ACT 1 0 "232617df6a36e045af178289604be280" "Custom: Toggle alternate M shortcut (proof of concept) -- activate 'Toggle show track icons in mixer' from toolbar button" 2022 40903 2014 40157 2013 6
 ACT 1 0 "00fabafea6f75f498afd096c3fa6f28d" "Custom: Toggle alternate M shortcut MOMENTARY (proof of concept) -- activate 'Toggle show track icons in mixer' from toolbar button" 2022 40903 2014 40157
+ACT 1 0 "7c7e13f26fae334686d85030bb7940c9" "Custom: Toggle continuous scrolling during playback - Toggle auto-view-scroll OFF (component)" 2022 40036 2013 40036
+ACT 1 0 "142f3d684b07e64288384387141a782a" "Custom: Toggle continuous scrolling during playback - Toggle auto-view-scroll ON (component)" 2022 40036 2014 40036
+ACT 1 0 "88ef4a6a53f29b469efcb12832427002" "Custom: Toggle continuous scrolling during playback (both featured actions must be enabled and are toggled in sync)" 41817 2022 41817 2013 _142f3d684b07e64288384387141a782a 2014 _7c7e13f26fae334686d85030bb7940c9
 ACT 1 0 "8fd0191c2ab98b4db286a10c80568c5c" "Custom: Toggle mute all grouped items" _SWS_SAVEALLSELITEMS1 40289 _SWS_RESTALLSELITEMS1 40034 40175
 ACT 1 0 "85398330b4dff34bb456e6a8e90c1d85" "Custom: Toggle Record/Stop (bind to MIDI CC in relative mode) yW5r8H7PUcg&t=333s" 2013 40667 2014 1013
 ACT 1 0 "a58412c4de1e0345848902e939b91f16" "Custom: Toggle send track for Voxengo SPAN selective monitoring (create folder, select child track whose output to monitor)" _SWS_SAVESEL _SWS_SELPARENTS _SWS_SELCHILDREN2 _SWS_DISMPSEND _SWS_TOGSAVESEL _SWS_ENMPSEND
@@ -907,6 +910,7 @@ ACT 1 32063 "286813b3c4177c4ea2e1b13dd4b51313" "Custom: Select previous sample a
 ACT 1 32063 "7097dbda25b3ca4895eba5800ac1e985" "Custom: Play next file (only useful if Auto-play is disabled)" 40030 1008
 ACT 1 32063 "8e2f72ec78351b4cb97a86a07974f858" "Custom: Play previous file (only useful if Auto-play is disabled)" 40029 1008
 ACT 1 32063 "69286e347f28954582244027cf74736f" "Custom: Select first file in the directory" 40041 40030 40029
+
 
 
 
