@@ -199,7 +199,7 @@ ACT 1 0 "a8948c5d77ab6549933cbabeb0d1d9d5" "Custom: IadAslan_Bounce In Place - I
 ACT 1 0 "237e0143ea49674a8d0ac8573ec5cfb9" "Custom: IadAslan_Bounce In Place - Time Selection (showthread.php?t=221654) (create time sel. and select items) see preparation in Tips.txt" _SWS_SAVEALLSELITEMS1 41559 _SWS_SAVEMSTFXEN _SWS_DISMASTERFX 42230 _SWS_RESTALLSELITEMS1 41560 40719 _SWS_RESTMSTFXEN 40635
 ACT 1 0 "9540480f3baf834b834bdae8ff54d2b0" "Custom: IDDQD Sound_Insert 3 env. points (at mouse curs. and time sel.) YT - rDXb2ymumCs" _BR_INSERT_2_ENV_POINT_TIME_SEL _BR_ENV_POINT_MOUSE_CURSOR 2008 40635 40331
 ACT 1 0 "bdb67664a4baa54e89305de2e84b9734" "Custom: Implode selected items into one item (disable trim content behind media) - useful for MIDI with different parts" 40644 42432
-ACT 1 0 "37ad157b3209e840b99e9571aee2640a" "Custom: In/Decrease selected envelope points value a tiny bit with mouse scrollwheel" 2013 42381 2014 42382
+ACT 1 0 "37ad157b3209e840b99e9571aee2640a" "Custom: In/Decrease selected envelope points value a tiny bit with mousewheel" 2013 42381 2014 42382
 ACT 1 0 "e26f1bcc4a26bc41b2302ccc0dea7809" "Custom: Insert a dedicated region ruler (select all items in the region or the longest one on both sides)" 40290 40939 40210 40001 40142 42312 40635 40286 40005 40286 42398
 ACT 1 0 "609c7f181219d14aa74d12e837de6c3f" "Custom: Insert a new track inheriting color from previous track, add ReaEQ (relies on cycle action to insert ReaEQ)" 40001 _SWS_COLTRACKPREV _S&M_CYCLACTION_44 _S&M_CYCLACTION_45
 ACT 1 0 "c143979df9862446bb550350b18a2983" "Custom: Insert AI on selected envelope at item under edit cursor on selected track (select track & envelope, place edit cursor over item)" 40625 41667 40626 40718 40290 42082 40635
@@ -907,6 +907,7 @@ ACT 1 32063 "286813b3c4177c4ea2e1b13dd4b51313" "Custom: Select previous sample a
 ACT 1 32063 "7097dbda25b3ca4895eba5800ac1e985" "Custom: Play next file (only useful if Auto-play is disabled)" 40030 1008
 ACT 1 32063 "8e2f72ec78351b4cb97a86a07974f858" "Custom: Play previous file (only useful if Auto-play is disabled)" 40029 1008
 ACT 1 32063 "69286e347f28954582244027cf74736f" "Custom: Select first file in the directory" 40041 40030 40029
+
 
 
 
