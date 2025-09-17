@@ -4007,13 +4007,31 @@ Custom: Toggle continuous scrolling during playback - Toggle auto-view-scroll OF
   Action: Skip next action if CC parameter <0/mid
   View: Toggle auto-view-scroll during playback
 
-
 Custom: Toggle continuous scrolling during playback - Toggle auto-view-scroll ON (component)
   Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
   View: Toggle auto-view-scroll during playback
   Action: Skip next action if CC parameter >0/mid
   View: Toggle auto-view-scroll during playback
 
+
+-- Another example of AND operator simulation
+-- Delete action conditional on enabled 'Ripple edit all tracks' AND disabled 'Selecting one grouped item selects group' options
+
+-- MAIN ACTION:
+
+Custom: Conditional item delete
+  Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+  Toggle ripple editing all tracks
+  Action: Skip next action if CC parameter <0/mid --------------- the nested custom action will be executed if 'Ripple edit all tracks' is ON
+  Custom: Conditional item delete (component)
+
+-- NESTED ACTION:
+
+Custom: Conditional item delete (component)
+  Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+  Options: Selecting one grouped item selects group
+  Action: Skip next action if CC parameter >0/mid --------------- Delete will be executed if 'Selecting one grouped item selects group' is OFF
+  Item: Remove items
 
 
 
