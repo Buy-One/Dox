@@ -184,6 +184,7 @@ ACT 1 0 "e01a242a1dde874aba848c46df503cbe" "Custom: Fade vertically aligned item
 ACT 1 0 "157fc3ed8e52ab429b880d48cd5e115f" "Custom: Fade vertically aligned item(s) out from cursor on selected track(s)" 40718 _XENAKIOS_SELITEMSUNDEDCURSELTX 40528 40630 40510
 ACT 1 0 "167b860c7d9da542891e0e68e6626a34" "Custom: Fade vertically aligned item(s) out from mouse cursor on selected track(s)" 40513 _XENAKIOS_SELITEMSUNDEDCURSELTX 40528 40510
 ACT 1 0 "553af33493b3ef4fb18760f9da91ec7f" "Custom: Frank B_Extract sample slices by time selection without splits and paste on a next track (select item)" 40630 _SWS_SAVEALLSELITEMS1 40060 40285 40058 _SWS_RESTALLSELITEMS1
+ACT 1 0 "ecadba5792366047851c4a9e34514b0d" "Custom: Freeze selected tracks to stereo keeping FX (FX button MUST BE ACTIVE)" 8 40689 41223 8
 ACT 1 0 "9fac5d43d8238c4dbe9280e5df948884" "Custom: gestrument.com_Render VSTi multisample: Core (create midi item with one note, select item and track, configure Render) -- modifiable (SWS)" _SWSMARKERLIST10 _FNG_MIDI_UP_SEMI _FNG_MIDI_UP_SEMI _FNG_MIDI_UP_SEMI _FNG_MIDI_NAME _BR_ITEMS_TO_REGIONS_NOTES 42230
 ACT 1 0 "228d49eb35d5764182e493498ec18967" "Custom: gestrument.com_Render VSTi multisample: Render -- modifiable" _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884
 ACT 1 0 "ae51735217612e4e949c55796326d74e" "Custom: Gianluca Apollaro_Snap multitrack to project BPM (stretch/shrink) - (1. put manually stretch marker at top of one of the items, 2. set grid to 1 bar or other appropriate division, 3. group all items needing adjustment)" 41842 40842 40625 40841 40841 40626 41847 40630 40841 40635
@@ -910,6 +911,7 @@ ACT 1 32063 "286813b3c4177c4ea2e1b13dd4b51313" "Custom: Select previous sample a
 ACT 1 32063 "7097dbda25b3ca4895eba5800ac1e985" "Custom: Play next file (only useful if Auto-play is disabled)" 40030 1008
 ACT 1 32063 "8e2f72ec78351b4cb97a86a07974f858" "Custom: Play previous file (only useful if Auto-play is disabled)" 40029 1008
 ACT 1 32063 "69286e347f28954582244027cf74736f" "Custom: Select first file in the directory" 40041 40030 40029
+
 
 
 
