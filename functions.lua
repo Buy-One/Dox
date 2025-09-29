@@ -1085,7 +1085,7 @@ function split_into_lines(input, want_empty_lines)
 local input = input:sub(-1):match('\n') and input..'\n' or input -- OR input:sub(-1) ~= '\n'
 local t = {}
 	for line in input:gmatch('(.-)\n') do -- respects empty lines; '[^\n]+' to skip empty lines
-		if want_empty_lines and #line:gsub(' ','') == 0
+		if want_empty_lines and #line:gsub(' ','') == 0 -- OR not line:gsub['[^%s]+'] / not line:gsub['%S']
 		or not want_empty_lines then
 		t[#t+1] = line
 		end
@@ -5968,12 +5968,27 @@ function Scroll_Track_To_Top1(tr, env) -- see more versatile v3 below
 -- env arg is optional, only if the first envelope
 -- displayed in its own lane needs to be scrolled to
 
+-- calculate height of the pinned tracks (supported since 7.46)
+-- only if pinned tracks are displayed in the pinned area
+-- i.e. Track: Override/unpin all pinned tracks in TCP option is Off
+local top_Y = 0
+	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+		for i=0, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i)
+			if r.IsTrackVisible(tr, false) -- mixer false
+			and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 then
+			top_Y = top_Y + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
+			end
+		end
+	top_Y = top_Y > 0 and top_Y+10 or top_Y -- 10 px is pinned track area separator width
+	end
+
 local GetValue = r.GetMediaTrackInfo_Value
 local tr_y = GetValue(tr, 'I_TCPY')
 --local tr_h = GetValue(tr, 'I_TCPH')
 local env_y = env and r.GetEnvelopeInfo_Value(env, 'I_TCPY') or 0 -- the result is the same as with tr_h
 
-local dir = tr_y < 0 and -1 or tr_y > 0 and 1 or 0 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
+local dir = tr_y < top_Y and -1 or tr_y > top_Y and 1 or 0 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
 r.PreventUIRefresh(1)
 local cntr, Y_init = 0 -- to store track Y coordinate between loop cycles and monitor when the stored one equals to the one obtained after scrolling within the loop which will mean the scrolling can't continue due to reaching scroll limit when the track is close to the track list end or is the very last, otherwise the loop will become endless because there'll be no condition for it to stop
     repeat
@@ -5982,14 +5997,14 @@ local cntr, Y_init = 0 -- to store track Y coordinate between loop cycles and mo
 		if Y ~= Y_init then Y_init = Y -- store
 		else cntr = cntr+1
 		end
-	until not Y or dir > 0 and Y+env_y <= 0 or dir < 0 and Y+env_y >= 0 or cntr == 1 -- not Y if tr is invalid
+	until not Y or dir > 0 and Y+env_y <= top_Y or dir < 0 and Y+env_y >= top_Y or cntr == 1 -- not Y if tr is invalid
 --[[OR
 	repeat
     r.CSurf_OnScroll(0, dir) -- unit is 8 px
     local Y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
 		if Y ~= Y_init then Y_init = Y -- store
 		else break end -- if scroll has reached the end before track has reached the destination to prevent loop becoming endless
-	until dir > 0 and Y <= 0 or dir < 0 and Y >= 0
+	until dir > 0 and Y <= top_Y or dir < 0 and Y >= top_Y
 --]]
 
 r.PreventUIRefresh(-1)
@@ -6001,12 +6016,27 @@ function Scroll_Track_To_Top2(tr, env) -- see more versatile v3 below
 -- env arg is optional, only if the first envelope
 -- displayed in its own lane needs to be scrolled to
 
+-- calculate height of the pinned tracks (supported since 7.46)
+-- only if pinned tracks are displayed in the pinned area
+-- i.e. Track: Override/unpin all pinned tracks in TCP option is Off
+local top_Y = 0
+	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+		for i=0, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i)
+			if r.IsTrackVisible(tr, false) -- mixer false
+			and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 then
+			top_Y = top_Y + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
+			end
+		end
+	top_Y = top_Y > 0 and top_Y+10 or top_Y -- 10 px is pinned track area separator width
+	end
+
 local GetValue = r.GetMediaTrackInfo_Value
 local tr_y = GetValue(tr, 'I_TCPY')
 --local tr_h = GetValue(tr, 'I_TCPH')
 local env_y = env and r.GetEnvelopeInfo_Value(env, 'I_TCPY') or 0 -- the result is the same as with tr_h
 
-local dir = tr_y < 0 and -1 or tr_y > 0 and 1 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
+local dir = tr_y < top_Y and -1 or tr_y > top_Y and 1 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
 r.PreventUIRefresh(1)
 local Y_init -- to store track Y coordinate between loop cycles and monitor when the stored one equals to the one obtained after scrolling within the loop which will mean the scrolling can't continue due to reaching scroll limit when the track is close to the track list end or is the very last, otherwise the loop will become endless because there'll be no condition for it to stop
 	if dir then
@@ -6015,7 +6045,7 @@ local Y_init -- to store track Y coordinate between loop cycles and monitor when
 		local Y = GetValue(tr, 'I_TCPY')
 			if Y ~= Y_init then Y_init = Y -- store
 			else break end -- if scroll has reached the end before track has reached the destination to prevent loop becoming endless
-		until dir > 0 and Y+env_y <= 0 or dir < 0 and Y+env_y >= 0
+		until dir > 0 and Y+env_y <= top_Y or dir < 0 and Y+env_y >= top_Y
 	end
 r.PreventUIRefresh(-1)
 end
@@ -6026,12 +6056,27 @@ function Scroll_Track_To_Top3(tr, item_Y)
 -- scroll track to any Y coordinate within track, not necessarily to its own Y coordinate
 -- tr is item parent track or track within which the item_Y coordinate is located
 -- item_Y is item I_LASTY attribute or calculated item/take top edge
--- to scroll to track own Y coordinate item_Y must be 0;
+-- to scroll to track own Y coordinate item_Y must be 0, in which case 
+-- pinned tracks height must be taken into account;
 -- IN CERTAIN CASES OF SCROLLING DOWN (dir var is -1) TO THE COORDINATE WITHIN THE TRACK
 -- THE FUNCTIOM MAY NEED TO BE PRECEDED WITH ANOTHER INSTANCE WHERE item_Y arg is 0
 -- so that in the 2nd instance the scrolling starts from track Y coordinate being 0 
 -- rather than negative because otherwise the condition 'dir > 0 and Y <= item_Y' 
 -- will prevent scrolling since it becomes true at the very beginning of the loop
+
+local item_Y = item_Y
+	if item_Y == 0 and r.GetToggleCommandState(43573) == 0 -- Track: Override/unpin all pinned tracks in TCP
+	then
+		-- calculate height of the pinned tracks (supported since 7.46)
+		for i=0, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i)
+			if r.IsTrackVisible(tr, false) -- mixer false
+			and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 then
+			item_Y = item_Y + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
+			end
+		end
+	item_Y = item_Y > 0 and item_Y+10 or item_Y -- 10 px is pinned track area separator width
+	end
 
 local item_Y = item_Y*-1 -- converting to negative to reliably compare with track Y coordinate in determining the scroll direction, as a result item_Y coordinate will always be smaller than positive track Y coordinate to condition direction +1 (upwards, scrollbar moves down), and will always be greater than negative track Y coordinate to condition scroll direction -1 (downwards, scrollbar moves up)
 local GetValue = r.GetMediaTrackInfo_Value
@@ -6055,19 +6100,35 @@ end
 
 function Scroll_Closest_Track_To_Top(last_idx)
 -- relies on Scroll_Track_To_Top2()
--- first find track which is likely visible, i.e. its TCP Y coordinate is >= 0
--- or Y < 0 and Y+height > 0, to prevent changing the scroll state drastically,
--- if within view nothing is found, first matching track
+-- first find first track which is likely visible, i.e. its TCP Y coordinate is >= top_Y
+-- or Y < top_Y and Y+height > top_Y, to prevent changing the scroll state drastically,
+-- where top_Y is either 0 or pinned tracks combined height (since build 7.46);
+-- if within view nothing is found, first matching track (in this case a track with a visible envelope) 
 -- out of sight at the bottom will be brought into view,
--- if such track wasn't be found, search is performed again from
+-- if such track couldn't be found, search is performed again from
 -- the first visible track up in reverse,
 -- that is among tracks out of sight at the top,
--- so that always the track closest to the visible tracklist start
--- is scrolled into view at the top
+-- so that the track closest to the visible tracklist start
+-- is always scrolled into view at the top
 
 local tr_cnt = r.GetNumTracks()
 local last_idx = last_idx
 local st, fin, dir = table.unpack(not last_idx and {0,tr_cnt-1,1} or {last_idx-1,0,-1})
+
+-- calculate height of the pinned tracks (supported since 7.46)
+-- only if pinned tracks are displayed in the pinned area
+-- i.e. Track: Override/unpin all pinned tracks in TCP option is Off
+local top_Y = 0
+	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+		for i=0, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i)
+			if r.IsTrackVisible(tr, false) -- mixer false
+			and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 then
+			top_Y = top_Y + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
+			end
+		end
+	top_Y = top_Y > 0 and top_Y+10 or top_Y -- 10 px is pinned track area separator width
+	end
 
 	for i=st, fin, dir do
 	local tr = r.GetTrack(0,i)
@@ -6076,7 +6137,7 @@ local st, fin, dir = table.unpack(not last_idx and {0,tr_cnt-1,1} or {last_idx-1
 		local Y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
 	--	local H = r.GetMediaTrackInfo_Value(tr, 'I_TCPH') -- excluding envelopes
 		local H = r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl envelopes
-			if not last_idx and (Y >= 0 or Y < 0 and Y+H > 0) or last_idx then
+			if not last_idx and (Y >= top_Y or Y < top_Y and Y+H > top_Y) or last_idx then
 			last_idx = i
 			------------- Script specific condition -----------------
 			----- that determines which track needs scrolling, ------
@@ -6086,7 +6147,7 @@ local st, fin, dir = table.unpack(not last_idx and {0,tr_cnt-1,1} or {last_idx-1
 					if Is_Env_Visible(env) then
 			----------------------------------------------------------
 					r.PreventUIRefresh(1)
-					Scroll_Track_To_Top2(r.GetTrack(0,0)) -- first scroll the very 1st track to top resetting tracklist scroll position to ensure that the ECP scroll position doesn't drift with each script run which happens because after each scroll the Y coordinate it stops at slightly changes
+					Scroll_Track_To_Top2(r.GetTrack(0,0)) -- first scroll the very 1st track to top resetting tracklist scroll position to ensure that the ECP scroll position doesn't drift with each script run which happens because after each scroll, the Y coordinate it stops at slightly changes
 					Scroll_Track_To_Top2(tr,env) -- scroll to the target track ECP
 					r.PreventUIRefresh(-1)
 					return true
@@ -6096,7 +6157,7 @@ local st, fin, dir = table.unpack(not last_idx and {0,tr_cnt-1,1} or {last_idx-1
 		end
 	end
 	
-return Scroll_Closest_Track_To_Top(last_idx) -- if not found after the first visible track run the loop again from the first visible at last_idx backwards to the tracklist start
+return Scroll_Closest_Track_To_Top(last_idx) -- if not found after the first visible track, run the loop again from the first visible at last_idx backwards to the tracklist start
 
 end
 
@@ -6120,6 +6181,7 @@ local cntr, Y_init = 0 -- to store track Y coordinate between loop cycles and mo
 	until not Y or dir > 0 and Y <= arrange_h or dir < 0 and Y >= arrange_h or cntr == 1 -- not Y if tr is invalid
 r.PreventUIRefresh(-1)
 end
+
 
 
 function Scroll_Track_Into_View(tr, take, parent_tr_y)
@@ -10708,7 +10770,7 @@ end
 
 
 
-function Get_FX_Selected_In_FX_Chain(obj, input_fx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensible version
+function Get_FX_Selected_In_FX_Chain(obj, input_fx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensive version
 -- input_fx is boolean for use in builds 7.06+ to target input/Monitoring FX chain
 -- doesn't support containers
 
@@ -10720,6 +10782,10 @@ local input_fx = tr and input_fx -- validate so it's only valid if object is tra
 	local ret, sel_idx = FX_GetNamedConfigParm(obj, input_fx and 0x1000000 or 0, 'chain_sel')
 	return sel_idx
 	else
+	-- as an alternative to chunk, selected fx can be determined by opening FX chain with actions
+	-- with storage of selected objects and making the target object exclusively selected/last touched
+	-- then using FX_GetOpen and closing FX chain if it was initially closed which is evaluated with FX_GetChainVisible
+	-- but you're running the risk of removing the focus from any currently focused windows which is a bad practice
 	local found
 		for line in chunk:gmatch('[^\n\r]+') do
 			if (not input_fx or found) and line:match('LASTSEL') then
@@ -10733,7 +10799,7 @@ end
 
 
 
-function Set_FX_Selected_In_FX_Chain(obj, input_fx, fx_idx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensible vesrion
+function Set_FX_Selected_In_FX_Chain(obj, input_fx, fx_idx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensive vesrion
 -- before build 7.06 relies on SetObjChunk() and on Esc() for dealing with takes
 -- functions FX_Copy_To_Take(), FX_Copy_To_Track() in particular change fx selection in the source chain, making selected the last addressed fx
 -- so the original selection requires restoration
@@ -10804,6 +10870,10 @@ local input_fx = tr and input_fx -- validate so it's only valid if object is tra
 		if not old then
 		return select(2, Get_Conf_Parm(obj, input_fx and 0x1000000 or 0, 'chain_sel')) -- returns value even if none is visually selected as long as there're fx in the chain
 		else -- use chunk, chunk holds the selected index even if none is visually selected
+		-- as an alternative to chunk, selected fx can be determined by opening FX chain with actions
+		-- with storage of selected objects and making the target object exclusively selected/last touched
+		-- then using FX_GetOpen and closing FX chain if it was initially closed which is evaluated with FX_GetChainVisible
+		-- but you're running the risk of removing the focus from any currently focused windows which is a bad practice
 		local found
 			for line in chunk:gmatch('[^\n\r]+') do
 				if (not input_fx or found) and line:match('LASTSEL') then
@@ -10818,6 +10888,7 @@ local input_fx = tr and input_fx -- validate so it's only valid if object is tra
 		else -- use chunk
 		-- if object data changed in between the function executions
 		-- the chunk must be re-get for the restoration stage
+		-- to select FX in a closed FX chain technically it can be done with FX_SetOpen after opening the chain and then closing it, but you're running the risk of removing the focus from any currently focused windows which is a bad practice
 		local fx_chain = ''
 			if tr then
 				for line in chunk:gmatch('[^\n\r]+') do
@@ -11344,35 +11415,116 @@ end
 
 
 
+function Get_Open(obj, fx_idx)
+-- evaluate whether the fx is open within fx chain or as a floating window
+-- whether fx is open in a floating window can only be reliably determined
+-- when it's not open within the fx chain or the fx chain is closed
+-- because GetOpen function doesn't differentiate between open states
+local tr, take = r.ValidatePtr(obj,'MediaTrack*'), r.ValidatePtr(obj,'MediaItem_Take*')
+local GetChainVisible, GetOpen = table.unpack(tr and {r.TrackFX_GetChainVisible, r.TrackFX_GetOpen}
+or take and {r.TakeFX_GetChainVisible, r.TakeFX_GetOpen})
+local open_in_chain_idx = GetChainVisible(obj)
+local open = GetOpen(obj, fx_idx)
+return open_in_chain_idx == fx_idx, open_in_chain_idx ~= fx_idx and open -- 1st return value is true when fx is opened in the open fx chain, whether it's also open in a floating window is impossible to determine, 2nd return value is true when the fx isn't open in the fx chain or the fx chain is closed but it's open in a floating window
+
+end
+
+
+
 function Apply_Video_Proc_Preset(obj, fx_idx, preset, preset_idx) -- used inside Split_Active_Take_Name()
 -- obj is track or take pointer
--- preset is preset name, preset_idx is its index, optional
+-- preset is preset name, preset_idx is its index, optional, 
+-- either one or the other,
 -- if applying by targetting index SetPresetByIndex 
 -- will have to be used (see below)
--- but it's still unreliable due to bug https://forum.cockos.com/showthread.php?t=302678
+-- but in builds older than 7.46 it's unreliable 
+-- due to bug https://forum.cockos.com/showthread.php?t=302678
 
--- in builds older than 7.20 'Overlay: Text/Timecode' preset doesn't work if applied via the API
+-- in builds older than 7.20 presets don't work if applied via the API
 -- without opening the Video processor beforehand
 -- because the parameter values shift downwards between parameters
 -- while 'text height' param ends up at 0 so the text becomes invisible
 -- bug report https://forum.cockos.com/showthread.php?t=293212
 local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.20
 local tr, take = r.ValidatePtr(obj,'MediaTrack*'), r.ValidatePtr(obj,'MediaItem_Take*')
-local SetPresetByName, SetPresetByIndex, FX_Show = 
-table.unpack(tr and {r.TrackFX_SetPreset, r.TrackFX_SetPresetByIndex, r.TrackFX_Show} 
-or take and {r.TakeFX_SetPreset, r.TakeFX_SetPresetByIndex, r.TakeFX_Show} or {})
+local SetPresetByName, SetPresetByIndex, GetOpen, GetChainVisible, FX_Show = 
+table.unpack(tr and {r.TrackFX_SetPreset, r.TrackFX_SetPresetByIndex, r.TrackFX_GetOpen, 
+r.TrackFX_GetChainVisible, r.TrackFX_Show} 
+or take and {r.TakeFX_SetPreset, r.TakeFX_SetPresetByIndex, r.TakeFX_GetOpen, 
+r.TakeFX_GetChainVisible, r.TakeFX_Show} or {})
 local Set_Preset = preset and SetPresetByName or preset_idx and SetPresetByIndex
 	if Set_Preset then
 	local preset = preset or preset_idx
-		if old_build then FX_Show(obj, fx_idx, 3) end -- showFlag 3 show floating window
+	local was_opened
+	-- only open if not already opened in the fx chain or a floating window 
+		if old_build and not r.GetOpen(obj, fx_idx) then
+		FX_Show(obj, fx_idx, 3) -- showFlag 3 show floating window
+		was_opened = 1
+		end
 	Set_Preset(obj, fx_idx, preset)
-		if old_build then FX_Show(obj, fx_idx, 2) end -- showFlag 2 hide floating window
+		if was_opened then FX_Show(obj, fx_idx, 2) end -- showFlag 2 hide floating window
 	end
 end
 
 
 
-function Get_Vid_Proc_Instance_Default_Name(obj, fx_GUID, chunk) -- used inside find_video_proc_instances()
+function Insert_Video_Proc_With_Preset(obj, preset)
+-- obj is track or take pointer,
+-- if there're video processor instances insert after the last found, 
+-- otherwise insert at the top of the chain
+
+local tr, take = r.ValidatePtr(obj,'MediaTrack*'), r.ValidatePtr(obj,'MediaItem_Take*')
+local GetCount, GetIOSize, GetPreset, GetFXName, SetFXName, AddByName, SetPresetByName, 
+SetPresetByIndex, FX_Show, SetNamedConfigParm = 
+table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, r.TrackFX_GetPreset, 
+r.TrackFX_GetFXName, r.TrackFX_SetFXName, r.TrackFX_AddByName, r.TrackFX_SetPreset, 
+r.TrackFX_SetPresetByIndex, r.TrackFX_Show, r.TrackFX_SetNamedConfigParm}
+or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize,r.TakeFX_GetPreset, r.TakeFX_GetFXName, 
+r.TakeFX_SetFXName, r.TakeFX_AddByName, r.TakeFX_SetPreset, r.TakeFX_SetPresetByIndex, 
+r.TakeFX_Show, r.TakeFX_SetNamedConfigParm} or {})
+
+local video_proc_idx
+	for i=0, GetCount(obj)-1 do
+	local plug_type = GetIOSize(obj, i)
+		if plug_type == 6 then -- video proc
+		local ret, presetname = GetPreset(obj, i, '')
+			if presetname == preset then
+			local ret, name = GetFXName(obj, i)
+			--[[ script specific
+				if name ~= 'Caption' then
+				SetFXName(obj, i)
+				end
+			--]]
+			return -- if preset is already activated in any of the video proc instances, abort operation
+			else
+			video_proc_idx = i -- keep collecting video processors indices, if any
+			end
+		end
+	end
+
+local fx_idx = video_proc_idx and video_proc_idx+1 or -1000 -- if there're video processor instances insert after the last, otherwise insert at the top of the chain
+
+AddByName(obj, 'Video processor', fx_idx)
+fx_idx = fx_idx < 0 and 0 or fx_idx -- change to target for processing
+-- in builds older than 7.20 'Overlay: Text/Timecode' preset doesn't work if applied via the API
+-- without opening the Video processor beforehand
+-- because the parameter values shift downwards between parameters
+-- while 'text height' param ends up at 0 so the text becomes invisible
+-- bug report https://forum.cockos.com/showthread.php?t=293212
+local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.20
+	if old_build then FX_Show(obj, fx_idx, 3) end -- showFlag 3 show floating window
+SetPresetByName(obj, fx_idx, preset)
+	if old_build then FX_Show(obj, fx_idx, 2) end -- showFlag 2 hide floating window
+--SetNamedConfigParm(obj, fx_idx, 'renamed_name', 'Caption') -- script specific
+
+return true
+
+end
+
+
+
+
+function Get_Vid_Proc_Instance_Default_Name(obj, fx_GUID, chunk)
 -- the line from the code which is added as video proc instance name in the FX chain
 -- by deafault
 -- if the code isn't preceded with comments or comment line are empty
@@ -11406,6 +11558,45 @@ local vid_proc, code = {}
 return #code > 0 and code[3]:match('//.-(%S.+%S)') or 'Video processor'-- code starts on line 3 of collected part of chunk
 
 end
+
+
+
+function Find_Video_Proc_Instance(take, preset, want_disabled)
+-- finds first instance which matches the conditions
+-- want_disabled is boolean to detect disabled (bypassed or offline)
+
+	for i=0, r.TakeFX_GetCount(take)-1 do
+	local plug_type = r.TakeFX_GetIOSize(take, i)
+	local vid_proc = plug_type == 6
+	local ret, name = r.TakeFX_GetFXName(take, i)
+	local ret, presetname = r.TakeFX_GetPreset(take, i, '')		
+		if vid_proc and presetname == '' then -- will be true after bringing a video proc instance online in builds older than 7.46, in the preset list its name will be replaced with (Customized preset) https://forum.cockos.com/showthread.php?t=303014, so identify the preset by its parameter names and order
+		local parm_names = {'text height', 'y position', 'x position', 'bg pad'} -- THESE WILL BE DIFFERENT FOR A DIFFERENT PRESET
+			for ii=0, r.TakeFX_GetNumParams(take, i)-1 do
+			local retval, parm_name = r.TakeFX_GetParamName(take, i, ii, '')
+				if parm_name == parm_names[ii+1] -- +1 to match 0-based inetator count with 1-based table indexation
+				or parm_name == 'text size' and ii == 0 then -- making allowance for variable name of the first parameter 
+				presetname = preset
+				break
+				end
+			end
+		end
+	local off = r.TakeFX_GetOffline(take, i)
+	local unbypassed = r.TakeFX_GetEnabled(take, i)
+		if vid_proc
+		and presetname == preset 
+		-- and name == 'Caption' -- script specific
+		and (not want_disabled and not off and unbypassed or (off or not unbypassed) and want_disabled)
+		then
+			if want_disabled then -- reenable
+			r.TakeFX_SetEnabled(take, i, true) -- enabled true
+			r.TakeFX_SetOffline(take, i, false) -- offline false
+			end
+		return i
+		end
+	end
+end
+
 
 
 --================================================  F X  E N D  ==============================================
@@ -12025,6 +12216,33 @@ return group_id_store, group_id_store+1
 end
 
 
+
+function get_same_group_items(item, sel_itms_t)
+	local function get_group(item)
+	return r.GetMediaItemInfo_Value(item, 'I_GROUPID')
+	end
+local group = get_group(item)
+sel_itms_t[item] = {}
+local t = sel_itms_t[item]
+	if group > 0 then -- 0 no group	
+		for i=0, r.CountMediaItems(0)-1 do
+		local item = r.GetMediaItem(0,i)
+			if get_group(item) == group and not sel_itms_t[item] then -- store if not already stored as selected
+				if r.IsMediaItemSelected(item) then -- if selected, store as selected in the main table
+				sel_itms_t[#sel_itms_t+1] = item
+				sel_itms_t[item] = ''
+				else -- store as grouped
+				table.insert(t, item)
+				end
+			end
+		end
+	end
+return sel_itms_t
+end
+
+
+
+
 function Insert_Empty_Item_To_Display_Text1(output) -- relies on Re_Store_Selected_Objects(); for the item notes to recognize line breaks in the output they must be replaced with '\r\n' if the string wasn't previously formatted in the notes field https://forum.cockos.com/showthread.php?t=214861#2
 local sel_itms_t, sel_trk_t = Re_Store_Selected_Objects() -- store
 local cur_pos = r.GetCursorPosition() -- store
@@ -12377,7 +12595,6 @@ end
 function Get_Arrange_and_Header_Heights2()
 -- if no SWS extension only works if the program window is fully open
 -- only runs when there's track or item under mouse cursor
--- relies on round() function
 
 -- !!! in newer builds, at least since 6.79 but likely since 6.76 when zoom height preference was added (from the changelog: Vertical zoom: overhaul, allow more fractional zoom state), actions 'View: Increase/Decrease selected track heights' don't work sharply any more in a loop so the change in track height when heights are restored is visible and ugly, especially when there're many tracks, so because of that Get_Arrange_and_Header_Heights1() version might be prefereable
 
@@ -12408,6 +12625,7 @@ local track, info = r.GetTrackFromPoint(x, y)
 	if (item or track) and (sws and window_h ~= wnd_h..'' or not window_h) then -- either only update if sws extension is installed and program window height has changed or initially store
 
 	-- get 'Maximum vertical zoom' set at Preferences -> Editing behavior, which affects max track height set with 'View: Toggle track zoom to maximum height', introduced in build 6.76
+--[[ INEFFICIENT
 	local cont
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.76 then
 		local f = io.open(r.get_ini_file(),'r')
@@ -12415,10 +12633,13 @@ local track, info = r.GetTrackFromPoint(x, y)
 		f:close()
 		end
 	local max_zoom = cont and cont:match('maxvzoom=([%.%d]+)\n') -- min value is 0.125 (13%), max is 8 (800%)
-	local max_zoom = not max_zoom and 100 or max_zoom*100 -- ignore in builds prior to 6.76 by assigning 100 so that when track height is divided by 100 and multiplied by 100% nothing changes, otherwise convert to conventional percentage value; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is accurate, otherwise there's ±1 px diviation, because the actual track height in pixels isn't fractional like the one obtained through calculation therefore some part is lost
+	local max_zoom = not max_zoom and 100 or max_zoom*100
+	--]]
+	local retval, max_zoom = r.get_config_var_string('maxvzoom') -- min value is 0.125 (13%), max is 8 (800%)
+	local max_zoom = #max_zoom == 0 and 100 or max_zoom*100 -- ignore in builds prior to 6.76 by assigning 100 so that when track height is divided by 100 and multiplied by 100% nothing changes, otherwise convert to conventional percentage value; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is accurate, otherwise there's ±1 px diviation, because the actual track height in pixels isn't fractional like the one obtained through calculation therefore some part is lost
 
 	-- Store track heights
-	local dock_open = r.GetToggleCommandStateEx(0,40279) -- View: Show docker // the result of the action 'View: Toggle track zoom to maximum height' depends on the visibility of the bottom docker so if open it needs to be temporarily closed, the action 40279 applies to all dockers
+	local dock_open = r.GetToggleCommandStateEx(0,40279) == 1 -- View: Show docker // the result of the action 'View: Toggle track zoom to maximum height' depends on the visibility of the bottom docker so if open it needs to be temporarily closed, the action 40279 applies to all dockers
 		if dock_open then r.Main_OnCommand(40279,0) end -- View: Show docker // close docks // placed before getting track heights to get the actual data unaffected by the docker visibility because it might be
 	local t = {}
 		for i=0, r.CountTracks(0)-1 do
@@ -12431,13 +12652,32 @@ local track, info = r.GetTrackFromPoint(x, y)
 	-- Get the data
 	-- When the actions are applied the UI jolts, but PreventUIRefresh() is not suitable because it blocks the function GetMediaTrackInfo_Value() from getting the return value
 	-- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled
+	-- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
+	-- which works like 40113 worked before the change and its use would obviate all the calculations above 
+	-- but it obviously doesn't cover the interim builds, so leaving the current code
 	r.Main_OnCommand(40110, 0) -- View: Toggle track zoom to minimum height
 	r.Main_OnCommand(40113, 0) -- View: Toggle track zoom to maximum height
 	local tr_height = r.GetMediaTrackInfo_Value(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
-	local tr_height = round(tr_height) -- round; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is integer, otherwise the calculated Arrange height is fractional because the actual track height in pixels is integer which is not what it looks like after calculation based on percentage (max_zoom) value, which means the value is rounded in REAPER internally because pixels cannot be fractional and the result is ±1 px diviation compared to the Arrange height calculated at percentages by which 100 can be divided without remainder
+	
+	-- if there're visible pinned tracks at the top (intriduced in build 7.46), calculate their height because
+	-- their presence affects max track height obtained above
+	local pin_tracks_h = 0
+		if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+			for i=0, r.GetNumTracks()-1 do
+			local tr = r.GetTrack(0,i)
+				if r.IsTrackVisible(tr, false) -- mixer false
+				and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 				
+				then
+				pin_tracks_h = pin_tracks_h + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
+				end
+			end
+		end
+	
+	pin_tracks_h = pin_tracks_h > 0 and pin_tracks_h+10 or pin_tracks_h -- 10 px is pinned track area separator width
+	local tr_height = math.floor(tr_height + pin_tracks_h + 0.5) -- round; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is integer, otherwise the calculated Arrange height is fractional because the actual track height in pixels is integer which is not what it looks like after calculation based on percentage (max_zoom) value, which means the value is rounded in REAPER internally because pixels cannot be fractional and the result is ±1 px diviation compared to the Arrange height calculated at percentages by which 100 can be divided without remainder
 	r.Main_OnCommand(40110, 0) -- View: Toggle track zoom to minimum height
-	r.SetExtState('WINDOW DIMS','window_dims', wnd_h..';'..tr_height, false) -- persist false // UNCOMMENT
-	r.SetProjExtState(0, 'WINDOW DIMS', 'window_dims', wnd_h..';'..tr_height) -- // UNCOMMENT
+	r.SetExtState('WINDOW DIMS','window_dims', wnd_h..';'..tr_height, false) -- persist false
+	r.SetProjExtState(0, 'WINDOW DIMS', 'window_dims', wnd_h..';'..tr_height)
 
 	-- Restore
 		for k, data in ipairs(t) do -- restore track heights
@@ -12471,7 +12711,7 @@ local track, info = r.GetTrackFromPoint(x, y)
 		r.SetTrackSelected(tr, data.sel)
 		end
 	r.PreventUIRefresh(1)
-		repeat -- restore track scroll
+		repeat -- restore track scroll position
 		r.CSurf_OnScroll(0, -1) -- negatve to scroll up because after track heights restoration the tracklist ends up being scrolled all the way down // 1 vert scroll unit is 8 px
 		until r.GetMediaTrackInfo_Value(ref_tr, 'I_TCPY') >= ref_tr_y
 	r.PreventUIRefresh(-1)
@@ -13488,6 +13728,7 @@ end
 
 
 function Move_Active_Take_Within_Item(sel_item, down)
+-- fully implemented in Move active take up-down within selected items.lua
 -- down is boolean to move down one take lane rather than up;
 -- when take is the topmost or the bottommost the movement
 -- wraps around;
@@ -13540,6 +13781,105 @@ Activate(act_take) -- restore active take active status
 r.UpdateItemInProject(item) -- to make re-activated take immediately visible
 --r.Undo_EndBlock('TEST', -1)
 
+end
+
+
+
+function get_active_take_index_via_chunk(item)
+-- useful when item contains empty takes which don't have a pointer
+-- and therefore cannot be evaluated for being active
+-- with other API functions
+local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
+local cntr = 0
+	for line in chunk:gmatch('[^\n\r]+') do		
+		if line:match('^TAKE$') or line:match('^TAKE ')then cntr = cntr+1 end		
+		if line:match('^TAKE SEL') or line:match('^TAKE NULL SEL') then return cntr end -- TAKE NULL is attribute of a take inserted with actions 'Item: Add an empty take before/after the active take'
+	end
+return 0 -- if no active take found in the chunk, it must be the topmost because in this case its TAKE attribute isn't listed
+end
+
+
+
+function Convert_Empty_Take_To_Valid_Take(take_idx, item)
+-- empty take is either empty item or take inserted with 
+-- actions 'Item: Add an empty take before/after the active take';
+-- take_idx is 0-based, index is used because empty takes 
+-- don't have a pointer so to set them active 
+-- 9 instances of the action 'Take: Set X take active' 
+-- have to be used, for this reason 9 is the max empty take index
+-- supported by the function;
+-- the fuction takes advantage of the fact that inserting
+-- take marker in an empty take turns it into a valid take
+-- which can have a label in paticular;
+-- relies on get_active_take_index_via_chunk();
+-- THE FUNCTION MUST BE WRAPPED WITHIN undo block
+-- so that the included actions don't create their
+-- own undo points
+
+	if take_idx > 9 then return end
+	
+local ACT = r.Main_OnCommand
+
+-- store active take before setting target take active
+-- to restore later
+local active_take = r.GetActiveTake(item)
+local active_take_idx
+	if not active_take then -- active take is an empty take
+	active_take_idx = get_active_take_index_via_chunk(item)
+	end
+	
+r.PreventUIRefresh(1)
+	
+local sel_empty_takes = r.GetToggleCommandStateEx(0, 41355) == 1 -- Options: Allow selecting empty takes
+	if not sel_empty_takes then ACT(41355, 0) end -- toggle to enable to be able to select empty takes with actions	
+	
+-- store for rstoration because it will have to be moved
+-- to intersect with the item for insert take marker action to work
+local cur_pos = r.GetCursorPosition()
+
+local item_st = r.GetMediaItemInfo_Value(item, 'D_POSITION')
+local item_len = r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+
+r.SetEditCurPos(item_st + item_len/2, false, false) -- moveview, boolean false // move to the middle of the item
+
+ACT(45000+take_idx, 0) -- set target empty take active
+
+-- store selected items to be able to select the target item exclusively
+-- and then restore original item selection
+local sel_itms = {}
+	for i=0, r.CountMediaItems(0)-1 do
+	local item = r.GetMediaItem(0,i)
+		if r.IsMediaItemSelected(item) then
+		sel_itms[#sel_itms+1] = item
+		end
+	end
+	
+-- select target item exclusively
+r.SelectAllMediaItems(0, false) -- selected false // deselect all
+r.SetMediaItemSelected(item, true) -- selected true
+ACT(42390, 0) -- Item: Quick add take marker at play position or edit cursor
+ACT(42386, 0) -- Item: Delete take marker at cursor
+
+-- restoration routine
+	if active_take then
+	r.SetActiveTake(active_take)
+	elseif active_take_idx < 10 then -- the action can only target first 9 takes
+	-- if originally active take was empty and it's index exceeds 9, it won't be re-activated
+	-- although it's possible via chank by setting 'TAKE NULL' to 'TAKE NULL SEL'
+	ACT(45000+active_take_idx, 0) -- active take
+	end
+r.SetEditCurPos(cur_pos, false, false) -- moveview, boolean false // cursor position
+r.SelectAllMediaItems(0, false) -- selected false // deselect all
+	for k, item in ipairs(sel_itms) do
+	r.SetMediaItemSelected(item, true) -- selected true
+	end
+	
+	if not sel_empty_takes then ACT(41355, 0) end -- toggle to disable, restoring original state
+	
+r.UpdateItemInProject(item)
+
+r.PreventUIRefresh(-1)
+	
 end
 
 
@@ -18258,12 +18598,47 @@ USE:
 
 function GetActionCommandIDByFilename(filename)
 -- https://github.com/ReaTeam/ReaScripts/pull/1301/files#diff-fcda7b077c9cd946c72884da52892a3e7a9eef2277562fd92630388cd55fd2a2
+-- OR
+-- https://github.com/mattia-marini/ReaScripts/blob/ce965acc9b26768dd46fe3d8f2b280e47030fdc4/FX/ReaLink/Marini_ReaLink_Background.lua#L4
+
 	for k in io.lines(r.GetResourcePath() .. "/reaper-kb.ini") do
 		if k:match("SCR") and k:match(filename) then
 		  return "_" .. k:match("SCR %d+ %d+ (%S*) ")
 		end
 	end
 end
+
+
+
+function Get_CommID_By_Script_Name(scriptName)
+-- https://raw.githubusercontent.com/NablaTools/Nabla/main/Looper%20A/Nabla%20Looper%20A%20-%20Settings.lua
+	
+	if type(scriptName)~="string" then
+	error("expects a 'string', got "..type(scriptName),2)
+	end;
+
+local file = io.open(reaper.GetResourcePath()..'/reaper-kb.ini','r');
+
+	if not file then
+	return -1
+	end;
+
+local scrName = string.gsub(string.gsub(scriptName, 'Script:%s+',''), "[%%%[%]%(%)%*%+%-%.%?%^%$]",function(s)return"%"..s;end);
+
+	for var in file:lines() do;
+		if match(var, scrName) then
+		id = "_"..gsub(gsub(match(var, ".-%s+.-%s+.-%s+(.-)%s"),'"',""), "'","")
+		return id
+		else
+		--
+		end
+	end;
+
+return -1;
+
+end
+
+
 
 
 function Get_Set_Script_Cont(scr_path, new_cont)
@@ -18351,6 +18726,7 @@ end
 -- https://stackoverflow.com/questions/9744693/how-can-i-pass-parameters-to-a-lua-file-when-loading-it-from-another-lua-file
 -- http://web.archive.org/web/20240105055546/http://lua-users.org/wiki/SandBoxes
 -- https://www.gammon.com.au/scripts/doc.php?lua=setfenv
+-- https://www.lua.org/manual/5.4/manual.html#pdf-load
 local func = assert( loadfile( path, 't', setmetatable({}, { __index = _G } ) ) )(...) -- load and create a function // the appended parentheses with vararg can be ommitted if no arguments need passing to the loaded file (THAT'S PROBABLY NOT TRUE AND THE PARENTHESIS MUST STAY WITH OR WITHOUT VARARG)
 func() -- execute
 --[[ OR, which isn't supported by ReaScript or the latest Lua version
@@ -18365,7 +18741,7 @@ func() -- execute
 -- as the host script
 local is_new_value, scr_name, sect_ID, cmdID_init, mode, resol, val, contextstr = reaper.get_action_context()
 package.path = scr_name:match('.+[\\/]') .. '?.lua'
-local t = require('my module') -- OR require 'my dodule'
+local t = require('my module') -- OR require 'my module'
 
 
 
@@ -18392,9 +18768,10 @@ end
 ]]
 -- if the loaded functions need to use local upvalues 
 -- from the main code which are not passed as arguments
--- these must be additonally included inside the returned function
+-- to individual functions these must be additonally included 
+-- inside the returned function
 -- otherwise only global variables from the main code
--- are accessible to the loaded functions
+-- are accessible to the loaded functions;
 -- alternatively, the upvalues should be passed as arguments
 -- to the returned function, e.g.
 --[[
@@ -18438,7 +18815,7 @@ func = func:match('.+(return function.+end)') -- exclude any trailing and preced
 	if func then
 	-- https://stackoverflow.com/questions/48629129/what-does-load-do-in-lua
 	-- https://forum.luanti.org/viewtopic.php?t=27810
-	local func, err = load(func)() -- closing double brackets are a must even though they're not mentioned in Lua documentation, they turn the namespace into an executable function
+	local func, err = load(func)() -- closing double brackets are a must even though they're not mentioned in Lua documentation, they turn the namespace into an executable function // in Lua versions 5.1 and older loadstring may also work but wasn't tested
 		if err then return err
 		else
 		-- https://www.gammon.com.au/scripts/doc.php?lua=pcall
@@ -18499,33 +18876,6 @@ function Parse_ReaBank_File(file_name)
 end
 
 
-
-function Get_CommID_By_Script_Name(scriptName)
--- https://raw.githubusercontent.com/NablaTools/Nabla/main/Looper%20A/Nabla%20Looper%20A%20-%20Settings.lua
-	if type(scriptName)~="string"then
-	error("expects a 'string', got "..type(scriptName),2)
-	end;
-
-local file = io.open(reaper.GetResourcePath()..'/reaper-kb.ini','r');
-
-	if not file then
-	return -1
-	end;
-
-local scrName = string.gsub(string.gsub(scriptName, 'Script:%s+',''), "[%%%[%]%(%)%*%+%-%.%?%^%$]",function(s)return"%"..s;end);
-
-	for var in file:lines() do;
-		if match(var, scrName) then
-		id = "_"..gsub(gsub(match(var, ".-%s+.-%s+.-%s+(.-)%s"),'"',""), "'","")
-		return id
-		else
-		--
-		end
-	end;
-
-return -1;
-
-end
 
 
 function GetUserFileNameForRead_Alt(cmd_ID)
@@ -18721,6 +19071,7 @@ end
 
 --=================================== F I L E S   E N D =========================================
 
+
 --============  M E A S U R E M E N T S / C A L C U L A T I O N S  =================
 
 --[[
@@ -18830,6 +19181,9 @@ local temp_tr
 -- Get the data
 -- When the actions are applied the UI jolts, but PreventUIRefresh() is not suitable because it blocks the function GetMediaTrackInfo_Value() from getting the return value
 -- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled
+-- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
+-- which works like 40113 worked before the change and its use would obviate all the calculations above 
+-- but it obviously doesn't cover the interim builds, so leaving the current code
 act(40110, 0) -- View: Toggle track zoom to minimum height
 act(40113, 0) -- View: Toggle track zoom to maximum height [in later builds comment '(limit to 100% of arrange view) has been added' and another action introduced to zoom to maxvzoom value]
 ------------------------------------
@@ -18838,7 +19192,23 @@ act(40113, 0) -- View: Toggle track zoom to maximum height [in later builds comm
 local retval, max_zoom = r.get_config_var_string('maxvzoom')-- min value is 0.125 (13%) which is roughly 1/8th, max is 8 (800%)
 max_zoom = retval and max_zoom*100 or 100 -- ignore in builds prior to 6.76 by assigning 100 so that when track height is divided by 100 and multiplied by 100% nothing changes, otherwise convert to conventional percentage value
 local tr_h = GetTrackVal(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
-local tr_h = math.floor(tr_h+0.5) -- round; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is integer, otherwise the calculated Arrange height is fractional because the actual track height in pixels is integer which is not what it looks like after calculation based on percentage (max_zoom) value, which means the value is rounded in REAPER internally because pixels cannot be fractional and the result is ±1 px diviation compared to the Arrange height calculated at percentages by which 100 can be divided without remainder
+
+-- if there're visible pinned tracks at the top (intriduced in build 7.46), calculate their height because
+-- their presence affects max track height obtained above
+local pin_tracks_h = 0
+	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+		for i=0, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i)
+			if r.IsTrackVisible(tr, false) -- mixer false
+			and GetTrackVal(tr, 'B_TCPPIN') == 1 				
+			then
+			pin_tracks_h = pin_tracks_h + GetTrackVal(tr, 'I_WNDH') -- incl. envelopes
+			end
+		end
+	end
+
+pin_tracks_h = pin_tracks_h > 0 and pin_tracks_h+10 or pin_tracks_h -- 10 px is pinned track area separator width	
+local tr_h = math.floor(tr_h + pin_tracks_h + 0.5) -- round; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is integer, otherwise the calculated Arrange height is fractional because the actual track height in pixels is integer which is not what it looks like after calculation based on percentage (max_zoom) value, which means the value is rounded in REAPER internally because pixels cannot be fractional and the result is ±1 px diviation compared to the Arrange height calculated at percentages by which 100 can be divided without remainder
 local del = temp_tr and r.DeleteTrack(temp_tr) -- delete temp track if one was inserted
 ------------------------------------
 
@@ -19472,7 +19842,7 @@ function validate_sett(sett, is_literal)
 -- if a long literal string is used for a setting it may happen to contain
 -- implicit new lines which should be accounted for in evaluation
 local pattern = is_literal and '[%s%c]' or ' '
-return type(sett) == 'string' and #sett:gsub(pattern,'') > 0 or type(sett) == 'number'
+return type(sett) == 'string' and #sett:gsub(pattern,'') > 0 or type(sett) == 'number' -- OR sett:match('[^%s%c]+') OR sett:match('%S') instead of #sett:gsub(pattern,'') > 0
 end
 
 
@@ -19481,7 +19851,7 @@ function validate_multi_line_sett(sett)
 -- to the last line, otherwise the last line won't be captured with the pattern
 -- in the gmatch loop below
 sett = not sett:match('.+\n%s*$') and sett..'\n' or sett
-return #sett:gsub('[%s%c]','') > 0 and sett
+return #sett:gsub('[%s%c]','') > 0 and sett -- OR sett:match('[^%s%c]+') and sett
 end
 
 
@@ -19492,7 +19862,7 @@ function validate_settings1(is_literal, ...) -- if actual setting value is immat
 local pattern = is_literal and '[%s%c]' or ' '
 local t = {...}
 	for k, sett in ipairs(t) do
-		if type(sett) == 'string' and #sett:gsub('[%s%c]','') > 0
+		if type(sett) == 'string' and #sett:gsub('[%s%c]','') > 0 -- OR sett:match('[^%s%c]+')
 		or type(sett) == 'number' then t[k] = true
 		else t[k] = false
 		end
@@ -19561,7 +19931,7 @@ local t = {...}
 local t2 = {}
 	for k, setting in ipairs(t) do
 	local glob_var = t[k]
-	t2[setting] = #_G[glob_var]:gsub(pattern,'') > 0 -- or #_G[t[k]]...
+	t2[setting] = #_G[glob_var]:gsub(pattern,'') > 0 -- OR #_G[t[k]]... // OR _G[glob_var]:match('[^%s%c]+')
 	end
 return t2
 end
@@ -19579,13 +19949,14 @@ Msg(t.a) Msg(t.b) Msg(t.c)
 function Settings_Management_Menu_And_Help(condition, want_help, want_run)
 -- manage script settings from a menu,
 -- mainly geared towards boolean settings
--- (aversion of the function which includes non-boolean settings
+-- (a version of the function which includes non-boolean settings
 -- is used in Trigger action by audio signal or silence.lua)
 -- the function updates the actual script file
 -- used in Transcribing A - Create and manage segments (MAIN).lua
 -- and Transcribing B - Create and manage segments (MAIN).lua
--- relies on Reload_Menu_at_Same_Pos2() and Esc() functions
--- want_help is boolean if About text needs to be displayed to the user
+-- relies on Reload_Menu_at_Same_Pos2() and Esc() functions;
+-- condition is boolean which triggers menu call,
+-- want_help is boolean if 'About' text needs to be displayed to the user,
 -- want_run is a boolean to create a menu button to execute the script;
 -- any user settings not explicitly listed in user_sett table below 
 -- will be ignored in the menu, i.e. MANAGE_SETTINGS_VIA_MENU setting
@@ -19705,6 +20076,145 @@ sett3 = validate_sett(sett3, user_sett and user_sett[3])
 
 
 
+
+function Toggle_Settings_From_Menu(t, menu, scr_path)
+-- t is table containing setting values, setting names and setting menu labels
+-- in the function instance before the menu loading it includes attributes of all settings,
+-- in the function instance triggered by a click on a menu item it only includes 
+-- attrinutes of a setting which corresponds to the clicked menu item;
+-- scr_path serves as trigger for the routine of toggling the setting directly from the menu
+-- if scr_path arg is absent the menu is updated based on the current
+-- settings passed as t (first function instance)
+
+	local function update_menu_items(menu, sett, menu_itm)
+	return menu:gsub((sett and '' or '!')..menu_itm,
+	(sett and '!' or '')..menu_itm, 1)
+	end
+
+	if not scr_path then
+	-- compare current settings in the script with the menu state loaded as extended data
+	-- at the menu loading stage
+		for k, nested_t in pairs(t) do -- using pairs in case indexing doesn't start at 1 and/or isn't sequential
+		local sett, menu_itm = nested_t[1], nested_t[3]
+		local menu_itm_checked = menu:match('!'..menu_itm) and true or false -- assign booleans for comparison of identical value type
+			if sett ~= menu_itm_checked then
+			menu = update_menu_items(menu, sett, menu_itm) -- if menu item is not checkmarked, add checkmark and vice versa
+			end
+		end
+	else
+	local sett_name, menu_itm = t[2], t[3]
+	-- toggle from the menu
+	local menu_itm_checked = menu:match('!'..menu_itm) and true or false -- assign booleans for comparison of identical value type 
+	-- toggle
+	menu = update_menu_items(menu, not menu_itm_checked, menu_itm) -- 'not' because here if menu item is checked it must be flipped as a result of a toggle and vice versa
+	 
+		if sett == menu_itm_checked then
+
+		-- Update the setting within the script
+
+		-- load the setting
+		local settings, sett_line
+			for line in io.lines(scr_path) do
+				if not settings and line:match('----- USER SETTINGS ------') then
+				settings = 1
+				elseif settings and line:match('^%s*'..sett_name..'%s*=%s*".-"') then -- ensuring that it's the setting line and not reference to it elsewhere
+				sett_line = line--:match('=%s*"(.-)"')
+				break
+				elseif line:match('END OF USER SETTINGS') then
+				break
+				end
+			end
+
+			-- update script if settings equal to the original menu item state
+			-- i.e. state before the change of the menu item state      
+			if sett_line and #sett_line:match('"([^%s]-)"') > 0 == menu_itm_checked then -- basically redundant condition because this was already evaluated as 'sett == menu_itm_checked' above
+			local f = io.open(scr_path,'r')
+			local cont = f:read('*a')
+			f:close()
+			local sett_upd = sett_name..' = "'..(menu_itm_checked and '' or '1')..'"' -- toggle
+			local cont, cnt = cont:gsub(sett_name..'%s*=%s*".-"', sett_upd, 1)
+				if cnt > 0 then -- settings were updated, write to file
+				local f = io.open(scr_path,'w')
+				f:write(cont)
+				f:close()
+				end
+			end
+
+		t[1] = not t[1] -- invert original setting boolean because it's been toggled
+
+		end 
+	 
+	end
+
+return menu, t[1] -- 2nd return value is the setting after toggling to be used by script functions downstream
+
+end
+
+--[[ USE EXAMPLE:
+
+-- MEANT TO BE USED IN PARALLEL WITH MENU STORAGE AS EXTENDED STATE
+
+-- validate settings
+sett1 = validate_sett(sett1)
+sett2 = validate_sett(sett2)
+sett3 = validate_sett(sett3)
+
+--	IF SETTING MENU ITEMS INDICES AREN'T SEQUENTIAL
+-- THE KEYS WILL HAVE TO BE EXPLICITLY SPECIFIED IN ALL THE TABLES
+local sett_t = table.pack(sett1, sett2, sett3) -- setting values, settings must be pure booleans, nil value isn't supported
+local menu_t = {'menu item1', 'menu item2', 'menu item3'} -- menu labels which match settings
+local t = {{'sett1'},{'sett2'},{'sett3'}} -- setting names
+
+  for k in pairs(t) do -- using pairs in case indexing doesn't start at 1 and/or isn't sequential
+  table.insert(t[k],1, sett_t[k])
+  table.insert(t[k], menu_t[k])
+  end
+--[=[ the loop above creates a table structured like this:
+{{sett1, 'sett1,', 'menu item1'},
+{sett2, 'sett2,', 'menu item2'},
+{sett3, 'sett3,', 'menu item3'},}
+--]=]
+
+local menu = table.concat(menu_t,'|')
+
+-------- LOAD/STORE MENU STATE START --------
+
+local ext_state = r.GetExtState(scr_name, KEY) -- first try loading the menu from the global extended state
+		if ext_state == '' then -- if absent, load from project extended state
+		ret, ext_state = r.GetProjExtState(0, scr_name, KEY)
+		end
+		if ext_state ~= '' then -- if there's extended state menu data
+		-- update items toggle state in the menu loaded from extended state
+		-- according to the current settings in the script in case it's changed
+		menu = Toggle_Settings_From_Menu(t, menu)
+		end
+
+::RELOAD::
+
+-- store updated menu item toggle state
+r.SetExtState(scr_name, KEY, menu, false) -- persist false
+r.SetProjExtState(0, scr_name, KEY, menu)
+
+-------- LOAD/STORE MENU STATE END --------
+
+local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
+
+  if output > 0 and output < 4 then -- the actual output values will depend on the menu structure, the output value may need offsetting if setting menu items don't start at index 1 as they do within the table
+  menu, retval = Toggle_Settings(t[output], menu, 1)
+    if output == 1 then
+    sett1 = retval
+    elseif output == 2 then
+    sett2 = retval
+    else
+    sett3 = retval
+    end
+  goto RELOAD
+  end
+
+--]]
+
+
+
 function Display_Script_Help_Txt(scr_path)
 -- scr_path stems from get_action_context()
 
@@ -19720,6 +20230,56 @@ local help_t = {}
 		end
 	end
 end
+
+
+
+function Get_Main_Script_Settings(main_scr_name)
+-- load main script settings in an ancillary script
+-- and only use ancillary script own setting if they're enabled
+-- main_scr_name must include extension
+
+package.path = debug.getinfo(1,"S").source:match[[^@?(.*[\/])[^\/]-$]]
+local path = package.path..'my_Multi-line caption aide (for use with Video processor).lua'
+local f = io.open(path,'r')
+local values = {OPERATOR, OVERLAY_PRESET, LINE_REMOVAL_MODE} -- variable values // not all settings have to be included, only those relevant to the current script
+	
+	if f then	
+
+	-- parse main script settings section
+	local sett_t = {}
+		for line in f:lines() do
+			if line:match('----- USER SETTINGS ------') and #sett_t == 0 or #sett_t > 0 then
+			sett_t[#sett_t+1] = line
+			elseif #sett_t > 0 and line:match('END OF USER SETTINGS')
+			and not sett_t[#sett_t]:match('END OF USER SETTINGS') then
+			break
+			end
+		end
+		
+	f:close()
+
+	-- not all settings have to be included, only those relevant to the current script
+	local names = {'OPERATOR', 'OVERLAY_PRESET', 'LINE_REMOVAL_MODE'} -- variable names, must match 'values' table above
+
+		for k, name in ipairs(names) do
+			for i, line in ipairs(sett_t) do
+			local sett = line:match(name..'%s*=%s*"(.-)"')
+				if sett then
+				local val = values[k]
+				values[k] = val:match('%S+') and val or sett -- if setting is enabled in the current script, use it, otherwise assign the state the setting has in the main script
+				end
+			end
+		end
+	
+	end
+
+return table.unpack(values)	
+	
+end
+--[[ USE:
+sett1, sett2, sett3 = Get_Main_Script_Settings(main_scr_name) -- first load them from the main script
+-- then validate as usual and as necessary depending on the setting type
+]]
 
 
 
@@ -19904,6 +20464,7 @@ local input = gfx.showmenu(menu) -- menu string
 local quit = old and gfx.quit()
 
 
+
 function Show_Menu_Dialogue(menu)
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
@@ -19935,6 +20496,7 @@ gfx.y = gfx.mouse_y
 return gfx.showmenu(menu)
 end
 -- if output == 0 then return r.defer(no_undo) end -- IF RELOADING AFTER CLICK IS CRUCIAL TO PREVENT ENDLESS LOOP OR do if output > 0 then ... else return r.defer(no_undo) end
+
 
 
 function Reload_Menu_at_Same_Pos1(menu, keep_menu_open, left_edge_dist)
@@ -20226,6 +20788,7 @@ Menu_With_Toggle_Options(named_ID, sett_t, menu_t, default_sett_state)
 ]]
 
 
+
 function Menu_With_Toggle_Options2(scr_cmd_ID, sett_t, menu_t, default_sett_state)
 -- this version stores enabled settings as a bitfield 
 -- rather than as a literal base 2 value;
@@ -20363,6 +20926,7 @@ local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open is true
 end
 -- USE:
 -- local user_choice = ShowMessageBox_Menu()
+
 
 
 function Re_Store_Ext_State(section, key, persist, val) 
@@ -20859,23 +21423,24 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 	or arg:match(('.-'..sep_esc):rep(field_cnt)):sub(1,-2) -- truncate arg when field_cnt value is smaller than the number of fields, excluding the last separator captured with the pattern inside string.match because the last field isn't followed by a separator
 	end
 
-	local function format_fields(arg, sep, field_cnt)
+	local function format_fields(arg, sep, field_cnt, trim_leading_space)
 	-- for field_names and field_cont as arg
 	local sep_esc = Esc(sep)
 	local arg = type(arg) == 'table' and table.concat(arg, sep) or arg
-	return add_separators(field_cnt, arg, sep):gsub(sep_esc..' ', sep) -- if there's space after separator, remove because with multiple fields the field names/content will not line up vertically
+	local formatted = add_separators(field_cnt, arg, sep)
+	return not trim_leading_space and formatted or formatted:gsub(sep_esc..' ', sep) -- if there's space after labels separator, remove because with multiple fields the field names will not line up vertically
 	end
 
 -- for field names sep must be a comma because that's what field names list is delimited by
 -- regardless of internal 'separator=' argument
 -- but if comma must be used in field names, they must be delimited
 -- by the main separator
-local field_names = format_fields(field_names, ',', field_cnt) -- if commas need to be used in field names and the main separator is not a comma (because if it is comma cannot delimit field names), pass here the separator arg from the function
+local field_names = format_fields(field_names, ',', field_cnt, 1) -- trim_leading_space true // if commas need to be used in field names and the main separator is not a comma (because if it is comma cannot delimit field names), pass here the separator arg from the function
 local sep = separator and #separator > 0 and separator or ','
 local sep_esc = Esc(sep)
 local field_cont = field_cont or ''
-field_cont = format_fields(field_cont, sep, field_cnt)
-local sep_cnt = select(2,comment:gsub(sep_esc,''))
+field_cont = format_fields(field_cont, sep, field_cnt, 1) -- trim_leading_space true, but may need to be false, depending on the field content and script design
+local sep_cnt = comment and select(2,comment:gsub(sep_esc,''))
 local comment_field = comment_field and type(comment) == 'string' and (#comment ~= sep_cnt or empty_comm_fields)
 local comment = comment_field and comment or ''
 local comment_field_cnt = select(2, comment:gsub(sep_esc,''))+1 -- +1 because last comment field isn't followed by the separator so one less will be captured
@@ -21160,6 +21725,55 @@ return act_name, mess -- mess is optional, returned if isn't used as a condition
 
 end
 
+
+
+function Get_Option_Script_Toggle_State(sectionID, scr_name)
+-- option script is an ancillary script on whose toggle state
+-- relies functionality of another script, much like REAPER
+-- native toggle option actions,
+-- this mechanism can be used instead of internal script setting,
+-- the drawback is that its toggle state isn't restored at
+-- REAPER starup unless the script is explicitly run at startup,
+-- so the main use is inside custom actions to modify the main
+-- script behavior on demand, setting the desired toggle state 
+-- during custom action execution with the sequence:
+--[[
+Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+<OPTION SCRIPT>
+Action: Skip next action if CC parameter >0/mid  // if toggle state is OFF, set to ON
+<OPTION SCRIPT>
+<MAIN SCRIPT>
+Action: Skip next action if CC parameter >0/mid // restore original toggle state if it was OFF
+<OPTION SCRIPT>
+]]
+-- section ID is integer ID of Action list section
+-- the option script toggle state must be looked in
+-- although probably unnecessary because script command ID
+-- includes section ID;
+-- relies on Esc() function
+
+local path = r.GetResourcePath()
+local sep = path:match('[\\/]')
+local scr_cmdID, scr_path
+	for line in io.lines(path..sep..'reaper-kb.ini') do
+		if line:match('SCR') and line:match(Esc(scr_name)) then
+		scr_cmdID, scr_path = line:match('SCR %d+ %d+ (%S*) ".-" "?(.+%a)') -- or "?([^"]+)
+		break end
+	end
+
+scr_path = scr_path and (scr_path:match('^%u:'..sep) and scr_path -- absolute path, script is outside of the Scripts folder
+or path..sep..'Scripts'..sep..scr_path) -- script is inside of the Scripts folder
+
+	if scr_path then -- validate script path
+	local f = io.open(scr_path, 'r')
+		if not f then return end
+	f:close()
+	end
+
+local numeric_ID = r.NamedCommandLookup('_'..scr_cmdID)
+return (sectionID and r.GetToggleCommandStateEx(sectionID, numeric_ID) or r.GetToggleCommandState(numeric_ID)) == 1
+
+end
 
 
 
@@ -22735,8 +23349,9 @@ end
 function Action_list_sections()
 -- consists of bits used in https://forum.cockos.com/showthread.php?p=2883303#post2883303
 
+-- srore section IDs
 local sectionIDs_t = {}
-	for i=0,15 do
+	for i=0,15 do -- Main and Main (alt)
 	sectionIDs_t[#sectionIDs_t+1] = i
 	end
 	
@@ -22745,8 +23360,9 @@ local non_Main = {100, 32060, 32061, 32062, 32063, 32064}
 	sectionIDs_t[#sectionIDs_t+1] = v
 	end
 
+-- store section names
 local sect_names = {}
-	for i=0,16 do
+	for i=0,16 do -- Main and Main (alt)
 	sect_names[i] = i==0 and 'Main' or 'Main (alt-'..i..')'
 	end
 
@@ -22812,6 +23428,224 @@ return notes_t, octaves_t
 end
 
 
+function Run_Functions_From_Table(...)
+-- this is an example of a syntax;
+-- the functions are wrapped in an anonymous function
+-- to prevent their execution at the time of table construction
+-- which is inevitable;
+-- the actions table can be constructed outside of the function
+local index, take, fx_idx = table.unpack({...})
+local actions = {function() return r.TakeFX_SetEnabled(take, fx_idx, false) end,
+function() return r.TakeFX_SetOffline(take, fx_idx, true) end,
+function() return r.TakeFX_Delete(take, fx_idx) end
+--[[ -- OR
+local t = {r.TakeFX_SetEnabled(take, fx_idx, false),
+r.TakeFX_SetOffline(take, fx_idx, true),
+r.TakeFX_Delete(take, fx_idx),
+}
+local actions = {}
+	for k, v in ipairs(t) do
+	actions[k] = function() return v end
+	end
+]]
+return actions[index]()
+end
+
+
+
+function gmem_write_read_str(index, str) -- cfillion
+-- https://forum.cockos.com/showthread.php?t=214162 gmem discussion
+
+	if str then -- write
+		for c in value:gmatch('.') do
+		r.gmem_write(index, string.byte(c))
+		index = index + 1
+		end
+	r.gmem_write(index, 0) -- null terminate // not sure how necessary this is
+	else -- read
+	local chars = {}
+		while true do
+		local value = r.gmem_read(index)
+			if value == 0 then break end
+			table.insert(chars, string.char(value))
+			index = index + 1
+		end
+	return table.concat(chars)
+	end
+
+end
+--[[ Jesusonic equivalent
+
+desc:Storing strings in global memory space
+version:1.0
+author:cfillion
+options:gmem=some_namespace
+
+@block
+function gmem_write_string(index, value) local(offset) (
+  offset = 0;
+
+  loop(strlen(value),
+    gmem[index] = str_getchar(value, offset);
+    offset += 1;
+    index += 1;
+  );
+  
+  gmem[index] = 0;
+);
+
+trigger ? gmem_write_string(0, "foo");
+
+@gfx
+
+function gmem_read_string(index, output) local(offset, buf) (
+  offset = 0;
+  buf = #;
+
+  while (
+    gmem[index] ? (
+      str_setchar(buf, offset, gmem[index]);
+      offset += 1;
+      index  += 1;
+    ) : 0;
+  );
+  
+  strcpy_substr(output, buf, 0, offset); // truncates the output
+);
+
+gfx_r = gfx_g = gfx_b = 1;
+gfx_x = 0;
+
+str = #;
+gmem_read_string(0, str);
+gfx_drawstr(str);
+
+--]]
+
+--[[
+
+function split_string_at_new_line_charA(str)
+
+/* 
+IN JESUSONIC PROBABLY ONLY SUPPORTS ASCII, OR IT'S A GFX LIBRARY PROBLEM
+this version ignores clusters of new line characters
+only respecting a single new line character as a line separator
+*/
+
+(
+  str_len = strlen(str); // store source string length
+  count = 0;
+  offset = 0;
+  substr_len = 1;
+  while(
+    // Keep scanning and storing substring to memory address until \n comes along
+    strcpy_substr(count, str, offset, substr_len);
+    single_new_line_char = substr_len == 1 && match("\n", count);
+    found = match("*\n", count); // operators + and +? work as well
+      // If the substring sarts with a new line char
+      // it immediately follows the preceding new line character
+      // of the previous capture and will be included in the current capture
+      // at its start, so skip it because it will throw off calculations
+      single_new_line_char ? (
+      offset += substr_len;
+      substr_len = 0;
+      ) :
+      ( found || offset + substr_len == str_len) ? ( // \n is found in the substring or end of the source string
+        // Strip trailing new line char from the substring if found, i.e. not if the end of the string,
+        // resaving it at the same address
+        trim = found ? substr_len-1 : substr_len;
+        strcpy_substr(count, str, offset, trim);
+        // Increment count to advance to next memory address for storage,
+        // the value will also be used to iterate over them in a loop
+        // to display the stored substrings
+        count += 1;
+        // Update offset to restart scanning from the last position
+        offset += substr_len;
+        // Reset to start the scanning from the 1st subtring byte,
+        // will be incremented below
+        substr_len = 0;
+      );
+    // Constantly increment by 1 to advance within the source string towards its end
+    substr_len += 1;
+    // Continue looping as long as this is true
+    offset + substr_len <= str_len;
+  );
+  count; // only needed if the value is assigned to another var outside, i.e. x = split_string_at_new_line_charA(str)
+);
+
+
+function split_string_at_new_line_charB(str)
+
+/* 
+IN JESUSONIC PROBABLY ONLY SUPPORTS ASCII, OR IT'S A GFX LIBRARY PROBLEM
+this version doesn't ignore clusters of new line characters
+which results in extra instances being included in actual lines of text
+which is a flaw
+*/
+
+(
+  str_len = strlen(str); // store source string length
+  count = 0;
+  offset = 0;
+  substr_len = 1;
+  while(
+	 // Keep scanning and storing substring to memory address until \n comes along
+    strcpy_substr(count, str, offset, substr_len);
+    found = match("*\n", count);
+	 (found || offset + substr_len == str_len) ? ( // \n is found in the substring or end of the source string
+     // Strip trailing new line char from the substring if found, i.e. not if the end of the string,
+     // resaving it at the same address
+		trim = found ? substr_len-1 : substr_len;
+      strcpy_substr(count, str, offset, trim);
+		// Increment count to advance to next memory address for storage,
+		// the value will also be used to iterate over them in a loop
+		// to display the stored substrings
+      count += 1;
+		// Update offset to restart scanning from the last position
+      offset += substr_len;
+		// Reset to start the scanning from the 1st subtring byte,
+		// will be incremented below
+      substr_len = 0;
+    );
+	 // Constantly increment by 1 to advance within the source string towards its end
+    substr_len += 1;
+	 // Continue looping as long as this is true
+    offset + substr_len <= str_len;
+  );
+  count; // only needed if the value is assigned to another var outside, i.e. x = split_string_at_new_line_charB(str)
+);
+
+
+function get_longest_str_idx(array_st, array_end)
+
+// array_st is index of the global array range start slot
+// array_end is index of the global array range end slot
+// i.e. if values where stored in slots 0 - 15, the args will be 0, 15
+
+// Couldn't make it work with while() loop
+
+(
+// First find the greatest length value
+range = array_end-array_st;
+i = array_st;
+	loop(range,
+	a = strlen(i);
+	mx = max(a, mx);
+	i+=1;
+	);
+// Now find the index of memory address
+// where the longest string is stored
+i = array_st;
+	loop(range,
+	mx = strlen(i) == mx ? i : mx;
+	i+=1;
+	);
+mx; // only needed if the value is assigned to another var outside, i.e. x = get_longest_str_idx(array_st, array_end)
+);
+
+
+
+--]]
 
 
 -- SYSTEM ENVIRONMENT VARIABLES
@@ -24372,8 +25206,11 @@ F X
 	Get_FX_Parm_By_Name_Or_Ident
 	Is_Same_Plugin
 	Validate_FX_Identity
+	Get_Open
 	Apply_Video_Proc_Preset
+	Insert_Video_Proc_With_Preset
 	Get_Vid_Proc_Instance_Default_Name
+	Find_Video_Proc_Instance
 
 
 I T E M S
@@ -24405,6 +25242,7 @@ I T E M S
 	Count_Sel_Itms_Unique_Tracks
 	Get_Item_Greatest_And_1st_Availab_Group_IDs1
 	Get_Item_Greatest_And_1st_Availab_Group_IDs2
+	get_same_group_items
 	Insert_Empty_Item_To_Display_Text1
 	Insert_Empty_Item_To_Display_Text2
 	Insert_Image
@@ -24448,6 +25286,9 @@ I T E M S
 	Get_Item_Lane_Index
 	Duplicate_Active_Take_Contiguously
 	Move_Active_Take_Within_Item
+	get_active_take_index_via_chunk
+	Convert_Empty_Take_To_Valid_Take
+
 
 
 C O L O R
@@ -24626,6 +25467,7 @@ F I L E S
 	Get_Or_Create_Dummy_Project_File2
 	META_Spawn_Scripts
 	GetActionCommandIDByFilename
+	Get_CommID_By_Script_Name
 	Get_Set_Script_Cont
 	Get_File_Size1
 	Get_File_Size2
@@ -24635,8 +25477,7 @@ F I L E S
 	(loadfile syntax)
 	(require syntax)
 	load_functions_from_file
-	Parse_ReaBank_File
-	Get_CommID_By_Script_Name
+	Parse_ReaBank_File	
 	GetUserFileNameForRead_Alt
 	sanitize_file_name1
 	sanitize_file_name2
@@ -24700,7 +25541,9 @@ U T I L I T Y
 	validate local variable (not a function)
 	Validate_All_Global_Settings
 	Settings_Management_Menu_And_Help
-	Display_Script_Help_Txt	
+	Toggle_Settings_From_Menu
+	Display_Script_Help_Txt
+	Get_Main_Script_Settings
 	validate_output1
 	validate_output2
 	Get_Action_ID
@@ -24730,8 +25573,8 @@ U T I L I T Y
 	defer_store
 	Count_Proj_Tabs
 	Open_Close_Temp_Proj_Tab_Without_Save_Prompt1
-	Open_Close_Temp_Proj_Tab_Without_Save_Prompt1
 	Open_Close_Temp_Proj_Tab_Without_Save_Prompt2
+	Open_Close_Temp_Proj_Tab_Without_Save_Prompt3
 	Validate_Proj_Tab
 	Is_Win
 	Get_OS
@@ -24747,6 +25590,7 @@ U T I L I T Y
 	Validate_Command_ID
 	Is_Non_Native_Action
 	Get_Action_Name
+	Get_Option_Script_Toggle_State
 	timed_tooltip1
 	timed_tooltip2
 	Error_Tooltip1
@@ -24810,7 +25654,12 @@ U T I L I T Y
 	en_de_code_bitfield
 	Action_list_sections
 	Generate_list_of_notes
-	os.getenv()	
+	Run_Functions_From_Table
+	gmem_write_read_str + JSFX
+	split_string_at_new_line_charA JSFX
+	split_string_at_new_line_charB JSFX
+	get_longest_str_idx JSFX
+	os.getenv()
 	CheckDependencies and validate_dependency
 	Break
 	J_Reverb_randomizer
