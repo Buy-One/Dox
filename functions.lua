@@ -8106,26 +8106,61 @@ function Is_Valid_Envelope(env, want_state)
 -- envelope GUID isn't necessarily unique, their GUIDs are retained in track and take copies
 -- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
 -- SUCH VALIDATION WORKS FOR VISIBLE TRACK BUILT-IN ENVELOPES EVEN WITHOUT USER CREATED POINTS
--- FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE
+-- FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS
+-- HIDDEN PROGRAMMATICALLY IT'S FALSE
 -- THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
 -- i.e. 'not env_chunk:match('\nPT %d')'
+-- BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER 
+-- THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, 
+-- FUNCTIONS DO RETURN THEIR POINTER,
+-- HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
 -- an open envelope by default has 1 point at position 0
 -- in track built-in envelopes without user created points 
 -- such point is ignored when the envelope is closed
--- while with user created points it's included in the total point count regardless of the visibility
+-- while with user created points it's included 
+-- in the total point count regardless of the visibility
 -- without user created points track enevelope chunk doesn't list any points;
--- IT ALSO WORKS FOR TRACK FX ENVELOPES AND ALL TAKE ENVELOPES BOTH VISIBLE AND HIDDEN
+-- THIS ALSO WORKS FOR TRACK FX ENVELOPES AND ALL TAKE ENVELOPES BOTH VISIBLE AND HIDDEN
 -- because their point count doesn't depend on visibility
--- and presence of user created points
+-- and presence of user created points;
+-- IN BUILDS OLDER THAN 7.38 ENVELOPE GUIDs WEREN'T NECESSARILY UNIQUE
+-- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME 
+-- GUIDs AS IN THE SOURCE TRACK/TAKE, 
+-- IN TAKES THEY ONLY WOULD UPDATE IF COPIED BY CTRL + MOUSE DRAG
+-- bug report https://forum.cockos.com/showthread.php?t=300279
+-- IN THOSE BUILDS IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER 
+-- MUST BE USED INSTEAD
 
-	if env and tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.06
+	local function get_hidden_built_in_track_env(env)
+	local env_name_t = {VOLENV='', VOLENV2='', VOLENV3='', PANENV='', PANENV2='', 
+	DUALPANENVL='', DUALPANENV='', DUALPANENVL2='', DUALPANENV2='', WIDTHENV='', 
+	WIDTHENV2='', MUTEENV='', AUXVOLENV='', AUXPANENV='', AUXMUTEENV='', PARMENV='', TEMPOENVEX=''}
+	local ret, env_name = r.GetEnvelopeName(env)
+		if env_name_t[env_name] then
+		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+			if not chunk:match('\nPT %d') then return env end
+		end
+	end
+
+local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
+
+	if env and build < 7.06
 	and r.CountEnvelopePoints(env) > 0
-	or env then
+	or env or get_hidden_built_in_track_env(env) then
 		if not want_state then return env
 		else
-		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
-		return env, chunk:match('\nVIS 1'), chunk:match('\nACT 1'), chunk:match('\nARM 1'),
-		chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
+			if build < 7.19 then
+			local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+			return env, chunk:match('\nVIS 1'), chunk:match('\nACT 1'), chunk:match('\nARM 1'),
+			chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
+			else
+			local t = {'VISIBLE', 'ACTIVE', 'ARM'}
+				for k, attr in ipairs(t) do
+				local retval, state = r.GetSetEnvelopeInfo_String(env, attr, '', false) -- setNewValue false
+				t[k] = state == '1'
+				end
+			return table.unpack(t)
+			end
 		end
 	end
 end
@@ -8135,7 +8170,17 @@ end
 
 
 function Is_Env_Visible(env)
-	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
+	local function get_hidden_built_in_track_env(env)
+	local env_name_t = {VOLENV='', VOLENV2='', VOLENV3='', PANENV='', PANENV2='', 
+	DUALPANENVL='', DUALPANENV='', DUALPANENVL2='', DUALPANENV2='', WIDTHENV='', 
+	WIDTHENV2='', MUTEENV='', AUXVOLENV='', AUXPANENV='', AUXMUTEENV='', PARMENV='', TEMPOENVEX=''}
+	local ret, env_name = r.GetEnvelopeName(env)
+		if env_name_t[env_name] then
+		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+			if not chunk:match('\nPT %d') then return env end
+		end
+	end
+	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
 	local retval, chunk, is_vis
 			if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 			retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
@@ -8150,8 +8195,27 @@ end
 function Set_Env_In_Visible(env, vis) -- can be expanded to armed and active
 -- vis is boolean, if true the envelope will be set to visible
 -- if false env will be set to hidden
+
+	local function get_hidden_built_in_track_env(env)
+	local env_name_t = {VOLENV='', VOLENV2='', VOLENV3='', PANENV='', PANENV2='', 
+	DUALPANENVL='', DUALPANENV='', DUALPANENVL2='', DUALPANENV2='', WIDTHENV='', 
+	WIDTHENV2='', MUTEENV='', AUXVOLENV='', AUXPANENV='', AUXMUTEENV='', PARMENV='', TEMPOENVEX=''}
+	local ret, env_name = r.GetEnvelopeName(env)
+		if env_name_t[env_name] then
+		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+			if not chunk:match('\nPT %d') then return env end
+		end
+	end
+	
 	if not env then return end
-	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
+	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
+	-- Changes produced with the function GetSetEnvelopeInfo_String() in builds 7.19+ aren't registered so undo point cannot be created, bug report https://forum.cockos.com/showthread.php?t=303814, and setting must be done via a chunk, or with actions 
+	-- Envelope: Toggle hide/display selected envelope 40884
+	-- Envelope: Toggle bypass for selected envelope 40883
+	-- Envelope: Toggle record arm for selected envelope 40863
+	-- that require selecting envelope which may not be the optimal solution
+	-- this bug should not prevent change from being registered when it includes 
+	-- data besides envelope attributes
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 		local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 		local state = vis and 0 or 1 -- invert the value for the sake of evaluation
@@ -8168,7 +8232,17 @@ end
 
 
 function Is_Env_Bypassed(env)
-	if r.CountEnvelopePoints(env) > 0 then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation was enabled at least once without any actual envelope, such ghost envelopes don't have points // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
+	local function get_hidden_built_in_track_env(env)
+	local env_name_t = {VOLENV='', VOLENV2='', VOLENV3='', PANENV='', PANENV2='', 
+	DUALPANENVL='', DUALPANENV='', DUALPANENVL2='', DUALPANENV2='', WIDTHENV='', 
+	WIDTHENV2='', MUTEENV='', AUXVOLENV='', AUXPANENV='', AUXMUTEENV='', PARMENV='', TEMPOENVEX=''}
+	local ret, env_name = r.GetEnvelopeName(env)
+		if env_name_t[env_name] then
+		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+			if not chunk:match('\nPT %d') then return env end
+		end
+	end
+	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation was enabled at least once without any actual envelope, such ghost envelopes don't have points // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
 	local retval, env_chunk, is_bypassed
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 		retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false		
@@ -8191,17 +8265,17 @@ end
 
 function Get_Env_GUID(env, want_vis)
 -- want_vis is boolean to only get GUID if the env is visible
--- ENVELOPE GUIDs ARE NOT NECESSARILY UNIQUE
--- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEEP THE THE SAME GUIDs
--- AS IN THE SOURCE TRACK/TAKE, IN TAKES THEY ONLY UPDATE IF COPIED BY CTRL + MOUSE DRAG
--- bug report https://forum.cockos.com/showthread.php?t=300279
--- IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER MUST BE USED INSTEAD
--- this is supposed to be fixed in build 7.38
 
 -- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
 -- SUCH VALIDATION WORKS FOR VISIBLE TRACK BUILT-IN ENVELOPES EVEN WITHOUT USER CREATED POINTS
--- FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE
--- THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
+-- FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS 
+-- HIDDEN PROGRAMMATICALLY IT'S FALSE
+-- THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE 
+-- i.e. 'not env_chunk:match('\nPT %d')'
+-- BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER 
+-- THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, 
+-- FUNCTIONS DO RETURN THEIR POINTER,
+-- HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
 -- an open envelope by default has 1 point at position 0
 -- in track built-in envelopes without user created points 
 -- such point is ignored when the envelope is closed
@@ -8210,6 +8284,13 @@ function Get_Env_GUID(env, want_vis)
 -- IT ALSO WORKS FOR TRACK FX ENVELOPES AND ALL TAKE ENVELOPES BOTH VISIBLE AND HIDDEN
 -- because their point count doesn't depend on visibility
 -- and presence of user created points
+-- IN BUILDS OLDER THAN 7.38 ENVELOPE GUIDs WEREN'T NECESSARILY UNIQUE
+-- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME 
+-- GUIDs AS IN THE SOURCE TRACK/TAKE, 
+-- IN TAKES THEY ONLY WOULD UPDATE IF COPIED BY CTRL + MOUSE DRAG
+-- bug report https://forum.cockos.com/showthread.php?t=300279
+-- IN THOSE BUILDS IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER 
+-- MUST BE USED INSTEAD
 
 local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
 	if not env
@@ -8241,14 +8322,21 @@ end
 
 
 function Get_Vis_Env_GUID(env)
--- ENVELOPE GUIDs ARE NOT NECESSARILY UNIQUE
--- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEEP THE THE SAME GUIDs
--- AS IN THE SOURCE TRACK/TAKE, IN TAKES THEY ONLY UPDATE IF COPIED BY CTRL + MOUSE DRAG
+-- IN BUILDS OLDER THAN 7.38 ENVELOPE GUIDs WEREN'T NECESSARILY UNIQUE
+-- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME 
+-- GUIDs AS IN THE SOURCE TRACK/TAKE, 
+-- IN TAKES THEY ONLY WOULD UPDATE IF COPIED BY CTRL + MOUSE DRAG
 -- bug report https://forum.cockos.com/showthread.php?t=300279
--- IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER MUST BE USED INSTEAD
--- this is supposed to be fixed in build 7.38
-local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
-return chunk:match('\nVIS 1 ') and chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
+-- IN THOSE BUILDS IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER 
+-- MUST BE USED INSTEAD
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
+	local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+	return chunk:match('\nVIS 1 ') and chunk:match('{.-}') -- OR chunk:match('EGUID (.-)\n')
+	else
+	local retval, vis = r.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false) -- setNewValue false
+	local retval, GUID = r.GetSetEnvelopeInfo_String(env, 'GUID', '', false) -- setNewValue false
+	return vis == '1' and GUID
+	end
 end
 
 
@@ -8293,7 +8381,7 @@ local env_cnt = 0
 		for j = 0, r.TrackFX_GetCount(tr)-1 do
 			for k = 0, r.TrackFX_GetNumParams(tr, j)-1 do
 			local env = r.GetFXEnvelope(tr, j, k, false) -- create is false; for env to be valid it suffices that param mod be enabled
-			env_cnt = env and r.ValidatePtr(env, 'TrackEnvelope*') and env_cnt + 1 or env_cnt -- When param modulation is enabled, GetFXEnvelope() returns parameter envelope even if there's none, if it's a ghost envelope ValidatePtr() will return false
+			env_cnt = env and r.ValidatePtr(env, 'TrackEnvelope*') and env_cnt + 1 or env_cnt -- When param modulation was enabled at least once, GetFXEnvelope() returns parameter envelope even if there's none, if it's a ghost envelope ValidatePtr() will return false (not sure about that, to be sure better use r.CountEnvelopePoints(env) > 0 instead)
 			end
 		end
 	end
@@ -8316,7 +8404,7 @@ local tr = r.GetMasterTrack(0)
 			for j = 0, r.TakeFX_GetCount(take)-1 do
 				for k = 0, r.TakeFX_GetNumParams(take, j)-1 do
 				local env = r.TakeFX_GetEnvelope(tr, j, k, false) -- create is false
-				env_cnt = r.CountEnvelopePoints(env) > 0 and env_cnt + 1 or env_cnt -- When param modulation was enabled at least once, in REAPER builds prior to 7.06 TakeFX_GetEnvelope() returns parameter envelope even if there's none, if it's a ghost envelope there're no points // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
+				env_cnt = r.CountEnvelopePoints(env) > 0 and env_cnt + 1 or env_cnt -- When param modulation was enabled at least once, in REAPER builds prior to 7.06 TakeFX_GetEnvelope() returns parameter envelope even if there's none, if it's a ghost envelope there're no points // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
 				end
 			end
 		end
@@ -8476,7 +8564,9 @@ return env and not take_env, env and take_env -- track env, take env // 2 return
 -- local take_env = env and r.GetSelectedTrackEnvelope(0) ~= env
 -- return env, take_env
 -- OR
+--	if env then
 -- return r.Envelope_GetParentTrack(env), r.Envelope_GetParentTake(env)
+-- end
 end
 
 
@@ -12523,7 +12613,6 @@ function Get_Arrange_and_Header_Heights1()
 -- fetches data from a temporary project tab, WORKS, but isn't ideal because of being way too intrusive, project loading process is usually visible
 -- if no SWS estension only works if the program window is fully open
 -- only runs when there's track or item under mouse cursor
--- relies on round() function
 
 -- !!!!!!!!!!! since build 6.76 there's a new preference for maximum vertical zoom (reaper.ini key maxvzoom=0.50000000) which will break the function if not 100% as if affects the action 'View: Toggle track zoom to maximum height' used here to get Arrange height; it will still be possible to calculate it using the action, e.g. (track_height/max_height)*100 to find 100% value
 -- a very convoluted alternative way is using actions 'Ruler: Set to default/max/min height', then checking toppane value in reaper.ini, checking where transport is located and toggling it temporarily off if on top, checking in reaper.ini for any toolbars/windows docked at the top, temporarily toggling it off, then adding about 90 px to toppane value and subtracting this from the screen or program window height depending on whether SWS extension is installed
@@ -12568,7 +12657,23 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 		r.Main_OnCommand(40113, 0) -- View: Toggle track zoom to maximum height (i.e. height of the Arrange) // selection isn't needed, all are toggled
 		end
 	local tr_height = r.GetMediaTrackInfo_Value(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
-	local tr_height = round(tr_height) -- round; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is integer, otherwise the calculated Arrange height is fractional because the actual track height in pixels is integer which is not what it looks like after calculation based on percentage (max_zoom) value, which means the value is rounded in REAPER internally because pixels cannot be fractional and the result is ±1 px diviation compared to the Arrange height calculated at percentages by which 100 can be divided without remainder
+	
+	-- if there're visible pinned tracks at the top (intriduced in build 7.46), calculate their height because
+	-- their presence affects max track height obtained above
+	local pin_tracks_h = 0
+		if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+			for i=0, r.GetNumTracks()-1 do
+			local tr = r.GetTrack(0,i)
+				if r.IsTrackVisible(tr, false) -- mixer false
+				and GetTrackVal(tr, 'B_TCPPIN') == 1 				
+				then
+				pin_tracks_h = pin_tracks_h + GetTrackVal(tr, 'I_WNDH') -- incl. envelopes
+				end
+			end
+		end
+
+	pin_tracks_h = pin_tracks_h > 0 and pin_tracks_h+10 or pin_tracks_h -- 10 px is pinned track area separator width	
+	local tr_height = math.floor(tr_height + pin_tracks_h + 0.5) -- round; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is integer, otherwise the calculated Arrange height is fractional because the actual track height in pixels is integer which is not what it looks like after calculation based on percentage (max_zoom) value, which means the value is rounded in REAPER internally because pixels cannot be fractional and the result is ±1 px diviation compared to the Arrange height calculated at percentages by which 100 can be divided without remainder
 	r.SetExtState('WINDOW DIMS','window_dims', wnd_h..';'..tr_height, false) -- persist false
 	r.SetProjExtState(cur_proj, 'WINDOW DIMS', 'window_dims', wnd_h..';'..tr_height)
 	-- Close temp project tab without save prompt; when a freshly opened project closes there's no prompt
@@ -12655,6 +12760,9 @@ local track, info = r.GetTrackFromPoint(x, y)
 	-- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
 	-- which works like 40113 worked before the change and its use would obviate all the calculations above 
 	-- but it obviously doesn't cover the interim builds, so leaving the current code
+	-- since build 7.48 the following toggle zoom actions affect pinned tracks as well,
+	-- introduced in build 7.46, but since their height is being taken into account
+	-- the calculation must still be accurate
 	r.Main_OnCommand(40110, 0) -- View: Toggle track zoom to minimum height
 	r.Main_OnCommand(40113, 0) -- View: Toggle track zoom to maximum height
 	local tr_height = r.GetMediaTrackInfo_Value(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
@@ -13660,7 +13768,9 @@ return Y+ratio / ratio -- Y+ratio is the analysed and preceding lanes combined h
 end 
 
 
+
 function Duplicate_Active_Take_Contiguously(sel_item, want_above)
+-- FULLY IMPLEMENTED IN Duplicate active take contiguously in selected items.lua
 -- duplicate and place immediately below the source take
 -- or above if want_above arg is valid
 -- contrary to the stock action which places it at the bottom;
@@ -13688,15 +13798,15 @@ local take_cnt = item and r.CountTakes(item)
 	
 --r.Undo_BeginBlock()
 
-ACT(40639, 0) -- Take: Duplicate active take // this will be placed at the bottom
+ACT(40639, 0) -- Take: Duplicate active take // this will be placed at the bottom // ignores empty takes created with 'Item: Add an empty take after the active take'
 local new_take_idx = r.CountTakes(item)-1 -- placed at the bottom hence the 0-based index is equal to take count-1
 local new_take = r.GetTake(item, new_take_idx)
 --[[ OR
 local new_take = r.GetTake(item, r.CountTakes(item)-1)
-local new_take_idx = r.GetMediaItemTackInfo_Value(new_take, 'IP_TAKENUMBER')
+local new_take_idx = r.GetMediaItemTakeInfo_Value(new_take, 'IP_TAKENUMBER')
 --]]
 
-	if act_take_idx ~= take_cnt-1 or want_above then -- if active take is last and want_above is false, not need to cycle, everything will fall in place, even though cycing would still work
+	if act_take_idx ~= take_cnt-1 or want_above then -- if active take is last and want_above is false, not need to cycle, everything will fall in place, even though cycling would still work
 	
 		if not want_above then
 		to_top() -- new take is active, move it to top
@@ -13709,11 +13819,11 @@ local new_take_idx = r.GetMediaItemTackInfo_Value(new_take, 'IP_TAKENUMBER')
 		to_top() -- move to top, now they're in the expected order relative to each other but at wrong places within the item
 		end
 	
-	-- Cycle takes until the originally active take ends up at its original index
-	-- and is immediately followed by the new take,
-	-- at this point the index of oringinally active take is 0 
-	-- and of the new take is 1
-		for i=1, act_take_idx do -- cycle as many times as the index of the originally active take, because it reflects the number of takes which preceded it and whose original position must be restored
+	-- At this point the index of oringinally active take is 0 
+	-- and of the new take is 1,
+	-- cycle takes until the originally active take ends up at its original index
+	-- and is immediately followed by the new take
+		for i=1, act_take_idx do -- cycle as many times as the original index of the originally active take, because it reflects the number of takes which preceded it and whose original position must be restored
 		Activate(r.GetTake(item, act_take_idx+1)) -- target take which now occupies position of the originally active take, +1 to account for the newly inserted take which precedes such take in the new take order
 		to_top() -- move to top
 		end
@@ -19129,7 +19239,9 @@ function GetSet_Track_Zoom_100_Perc(targ_tr)
 -- which limits Arrange height;
 -- targ_tr is optional, only used if there's a track
 -- which must be set to 100% hight after the height value in pixels has been retrieved
--- it's also the one which will be scrolled to
+-- it's also the one which will be scrolled to;
+-- pinned tracks are taken into account as they're
+-- not included in the Arrange height
 
 --[[INEFFICIENT
 -- get 'Maximum vertical zoom' set at Preferences -> Editing behavior, which affects max track height set with 'View: Toggle track zoom to maximum height', introduced in build 6.76
@@ -19183,7 +19295,10 @@ local temp_tr
 -- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled
 -- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
 -- which works like 40113 worked before the change and its use would obviate all the calculations above 
--- but it obviously doesn't cover the interim builds, so leaving the current code
+-- but it obviously doesn't cover the interim builds, so leaving the current code;
+-- since build 7.48 the following toggle zoom actions affect pinned tracks as well,
+-- introduced in build 7.46, but since their height is being taken into account
+-- the calculation must still be accurate
 act(40110, 0) -- View: Toggle track zoom to minimum height
 act(40113, 0) -- View: Toggle track zoom to maximum height [in later builds comment '(limit to 100% of arrange view) has been added' and another action introduced to zoom to maxvzoom value]
 ------------------------------------
@@ -20079,9 +20194,10 @@ sett3 = validate_sett(sett3, user_sett and user_sett[3])
 
 function Toggle_Settings_From_Menu(t, menu, scr_path)
 -- t is table containing setting values, setting names and setting menu labels
+-- see example after the function,
 -- in the function instance before the menu loading it includes attributes of all settings,
 -- in the function instance triggered by a click on a menu item it only includes 
--- attrinutes of a setting which corresponds to the clicked menu item;
+-- attributes of a setting which corresponds to the clicked menu item;
 -- scr_path serves as trigger for the routine of toggling the setting directly from the menu
 -- if scr_path arg is absent the menu is updated based on the current
 -- settings passed as t (first function instance)
@@ -20118,7 +20234,7 @@ function Toggle_Settings_From_Menu(t, menu, scr_path)
 				if not settings and line:match('----- USER SETTINGS ------') then
 				settings = 1
 				elseif settings and line:match('^%s*'..sett_name..'%s*=%s*".-"') then -- ensuring that it's the setting line and not reference to it elsewhere
-				sett_line = line--:match('=%s*"(.-)"')
+				sett_line = line
 				break
 				elseif line:match('END OF USER SETTINGS') then
 				break
@@ -20214,6 +20330,51 @@ local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
 --]]
 
 
+function Toggle_Setting_From_Menu(sett_name, scr_path)
+-- sett_name is a string
+-- the function is not designed to work
+-- with menu loaded from extended state
+
+-- load the setting
+local settings, sett_line
+	for line in io.lines(scr_path) do
+		if not settings and line:match('----- USER SETTINGS ------') then
+		settings = 1
+		elseif settings and line:match('^%s*'..sett_name..'%s*=%s*".-"') then -- ensuring that it's the setting line and not reference to it elsewhere
+		sett_line = line
+		break
+		elseif line:match('END OF USER SETTINGS') then
+		break
+		end
+	end
+
+local sett_new_state = sett_line:match('^%s*'..sett_name..'%s*=%s*"(%S+)"') and '' or '1' -- toggle
+
+-- update
+local f = io.open(scr_path,'r')
+local cont = f:read('*a')
+f:close()
+local sett_upd = sett_name..' = "'..sett_new_state..'"'
+local cont, cnt = cont:gsub(sett_name..'%s*=%s*".-"', sett_upd, 1)
+	if cnt > 0 then -- settings were updated, write to file
+	local f = io.open(scr_path,'w')
+	f:write(cont)
+	f:close()
+	end
+
+return sett_new_state
+
+end
+--[[ USE EXAMPLE:
+::RELOAD::
+sett = sett:match('%S+') -- validate
+local output = Reload_Menu_at_Same_Pos(menu)
+	if output == 1 then
+	sett = Toggle_Setting_From_Menu(sett_name, scr_path)
+	goto ::RELOAD::
+	end
+--]]
+
 
 function Display_Script_Help_Txt(scr_path)
 -- scr_path stems from get_action_context()
@@ -20241,8 +20402,8 @@ function Get_Main_Script_Settings(main_scr_name)
 package.path = debug.getinfo(1,"S").source:match[[^@?(.*[\/])[^\/]-$]]
 local path = package.path..'my_Multi-line caption aide (for use with Video processor).lua'
 local f = io.open(path,'r')
-local values = {OPERATOR, OVERLAY_PRESET, LINE_REMOVAL_MODE} -- variable values // not all settings have to be included, only those relevant to the current script
-	
+local values = {sett1, sett2, sett3} -- variable values // not all settings have to be included, only those relevant to the current script
+
 	if f then	
 
 	-- parse main script settings section
@@ -20259,7 +20420,7 @@ local values = {OPERATOR, OVERLAY_PRESET, LINE_REMOVAL_MODE} -- variable values 
 	f:close()
 
 	-- not all settings have to be included, only those relevant to the current script
-	local names = {'OPERATOR', 'OVERLAY_PRESET', 'LINE_REMOVAL_MODE'} -- variable names, must match 'values' table above
+	local names = {'sett1', 'sett2', 'sett3'} -- variable names, must match 'values' table above
 
 		for k, name in ipairs(names) do
 			for i, line in ipairs(sett_t) do
@@ -20634,7 +20795,7 @@ local retval = Reload_Menu_at_Same_Pos2(menu)
 -- to be used with a gfx window to open the menu when the window is clicked
 function Reload_Menu_at_Same_Pos_gfx(menu)
 	if gfx.mouse_y > gfx.y and gfx.mouse_y < gfx.h then
-	gfx.y = gfx.mouse_y + 3 -- open the menu 3 px under the mouse cursor to prevent activation of the top item submenu, only when the menu is opened by a mouse click, otherwise (when armed action is added) it will open at gfx window 0 y coordinate which doesn't include the title bar
+	gfx.y = gfx.mouse_y + 3 -- open the menu 3 px under the mouse cursor to prevent activation of the top menu item
 	end
 return gfx.showmenu(menu) -- menu string
 end
@@ -20951,28 +21112,7 @@ end
 -- Re_Store_Ext_State(section, key, persist, val) -- store
 
 
---------------------- T O G G L E S -------------------------
 
--- (re)setting toggle state and updating toolbar button, see also Re_Set_Toggle_State() below
-local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
-
-r.SetToggleCommandState(sect_ID, cmd_ID, 1)
-r.RefreshToolbar(cmd_ID)
-
--- CODE (mainly for defer functions)
-
-r.atexit(function() r.SetToggleCommandState(sect_ID, cmd_ID, 0); r.RefreshToolbar(cmd_ID) end)
-
-
-function EMERGENCY_TOGGLE()
-local t = {reaper.get_action_context()}
-reaper.SetToggleCommandState(t[3], t[4], 0)
-end
----------------- EMERGENCY -------------------
-
--- EMERGENCY_TOGGLE() do return end
-
----------------------------------------------
 
 local function Wrapper1(func,...) -- see Wrapper_multi_function() below
 -- r.atexit() CAN BE USED WITHOUT THE WRAPPER FUNCTION AS FOLLOWS
@@ -21048,6 +21188,31 @@ end
 
 
 
+
+--------------------- T O G G L E S -------------------------
+
+-- (re)setting toggle state and updating toolbar button, see also Re_Set_Toggle_State() below
+local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
+
+r.SetToggleCommandState(sect_ID, cmd_ID, 1)
+r.RefreshToolbar(cmd_ID)
+
+-- CODE (mainly for defer functions)
+
+r.atexit(function() r.SetToggleCommandState(sect_ID, cmd_ID, 0); r.RefreshToolbar(cmd_ID) end)
+
+
+function EMERGENCY_TOGGLE()
+local t = {reaper.get_action_context()}
+reaper.SetToggleCommandState(t[3], t[4], 0)
+end
+---------------- EMERGENCY -------------------
+
+-- EMERGENCY_TOGGLE() do return end
+
+---------------------------------------------
+
+
 local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
 function Re_Set_Toggle_State(sect_ID, cmd_ID, toggle_state) -- in deferred scripts can be used to set the toggle state on start and then with r.atexit and At_Exit_Wrapper() to reset it on script termination
 r.SetToggleCommandState(sect_ID, cmd_ID, toggle_state)
@@ -21061,6 +21226,57 @@ end
 -- r.atexit(function() r.SetToggleCommandState(sect_ID, cmd_ID, 0); r.RefreshToolbar(cmd_ID) end)
 
 -- TOGGLE MODE AND ARMABILITY ARE NOT COMPATIBLE
+
+
+
+function Get_Option_Script_Toggle_State(sectionID, scr_name)
+-- option script is an ancillary script on whose toggle state
+-- relies functionality of another script, much like REAPER
+-- native toggle option actions,
+-- this mechanism can be used instead of internal script setting,
+-- the drawback is that its toggle state isn't restored at
+-- REAPER starup unless the script is explicitly run at startup,
+-- so the main use is inside custom actions to modify the main
+-- script behavior on demand, setting the desired toggle state 
+-- during custom action execution with the sequence:
+--[[
+Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+<OPTION SCRIPT>
+Action: Skip next action if CC parameter >0/mid  // if toggle state is OFF, set to ON
+<OPTION SCRIPT>
+<MAIN SCRIPT>
+Action: Skip next action if CC parameter >0/mid // restore original toggle state if it was OFF
+<OPTION SCRIPT>
+]]
+-- section ID is integer ID of Action list section
+-- the option script toggle state must be looked in
+-- although probably unnecessary because script command ID
+-- includes section ID;
+-- relies on Esc() function
+
+local path = r.GetResourcePath()
+local sep = path:match('[\\/]')
+local scr_cmdID, scr_path
+	for line in io.lines(path..sep..'reaper-kb.ini') do
+		if line:match('SCR') and line:match(Esc(scr_name)) then
+		scr_cmdID, scr_path = line:match('SCR %d+ %d+ (%S*) ".-" "?(.+%a)') -- or "?([^"]+)
+		break end
+	end
+
+scr_path = scr_path and (scr_path:match('^%u:'..sep) and scr_path -- absolute path, script is outside of the Scripts folder
+or path..sep..'Scripts'..sep..scr_path) -- script is inside of the Scripts folder
+
+	if scr_path then -- validate script path
+	local f = io.open(scr_path, 'r')
+		if not f then return end
+	f:close()
+	end
+
+local numeric_ID = r.NamedCommandLookup('_'..scr_cmdID)
+return (sectionID and r.GetToggleCommandStateEx(sectionID, numeric_ID) or r.GetToggleCommandState(numeric_ID)) == 1
+
+end
+
 
 
 --------------------- T O G G L E S  E N D -------------------------
@@ -21726,57 +21942,6 @@ return act_name, mess -- mess is optional, returned if isn't used as a condition
 end
 
 
-
-function Get_Option_Script_Toggle_State(sectionID, scr_name)
--- option script is an ancillary script on whose toggle state
--- relies functionality of another script, much like REAPER
--- native toggle option actions,
--- this mechanism can be used instead of internal script setting,
--- the drawback is that its toggle state isn't restored at
--- REAPER starup unless the script is explicitly run at startup,
--- so the main use is inside custom actions to modify the main
--- script behavior on demand, setting the desired toggle state 
--- during custom action execution with the sequence:
---[[
-Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
-<OPTION SCRIPT>
-Action: Skip next action if CC parameter >0/mid  // if toggle state is OFF, set to ON
-<OPTION SCRIPT>
-<MAIN SCRIPT>
-Action: Skip next action if CC parameter >0/mid // restore original toggle state if it was OFF
-<OPTION SCRIPT>
-]]
--- section ID is integer ID of Action list section
--- the option script toggle state must be looked in
--- although probably unnecessary because script command ID
--- includes section ID;
--- relies on Esc() function
-
-local path = r.GetResourcePath()
-local sep = path:match('[\\/]')
-local scr_cmdID, scr_path
-	for line in io.lines(path..sep..'reaper-kb.ini') do
-		if line:match('SCR') and line:match(Esc(scr_name)) then
-		scr_cmdID, scr_path = line:match('SCR %d+ %d+ (%S*) ".-" "?(.+%a)') -- or "?([^"]+)
-		break end
-	end
-
-scr_path = scr_path and (scr_path:match('^%u:'..sep) and scr_path -- absolute path, script is outside of the Scripts folder
-or path..sep..'Scripts'..sep..scr_path) -- script is inside of the Scripts folder
-
-	if scr_path then -- validate script path
-	local f = io.open(scr_path, 'r')
-		if not f then return end
-	f:close()
-	end
-
-local numeric_ID = r.NamedCommandLookup('_'..scr_cmdID)
-return (sectionID and r.GetToggleCommandStateEx(sectionID, numeric_ID) or r.GetToggleCommandState(numeric_ID)) == 1
-
-end
-
-
-
 -- TO UNDO A TOOLTIP RUN THE SAME FUNCTION WITH AN EMPTY STRING,
 -- OTHER ARGUMENTS AREN'T NECESSARY
 
@@ -22048,7 +22213,7 @@ return UI, itm_env, env_hov, delay
 end
 
 
--- for keeping user stored parameter a limited amount of time, e.g. when two script runs must follow each other in close succession so that if the follow-up run isn't performed the value is invalid for the next run
+-- for keeping user stored parameter a limited amount of time, e.g. when two script runs must follow each other in close succession so that if the follow-up execution isn't performed within specific time frame, the value is invalid for the next run
 function Keep_ExtState_For_X_Mins1(Sect, Key, Val, Minutes, Set)
 -- Minutes is number, Set is boolean whether to set or get
 	if Set then
@@ -22062,6 +22227,7 @@ function Keep_ExtState_For_X_Mins1(Sect, Key, Val, Minutes, Set)
 		end
 	end
 end
+
 
 -- this version is to be used as a boolean to determine whether to run GetExtState() to retrieve the stored value
 function Keep_ExtState_For_X_Mins2(Minutes, Set)
@@ -22084,28 +22250,27 @@ local state = not elapsed and r.GetExtState(section, key) -- get the stored data
 --]]
 
 
-function Expiry_Timer(cmd_ID, threshold)
+function ExtState_Expiry_Timer(cmd_ID, threshold)
 -- threshold is integer, time in seconds
 -- useful for limiting the time of data storage in the buffer
 -- used in Import metadata from media into the Project Render Metadata.lua
 local timestamp = tonumber(r.GetExtState(cmd_ID, 'EXPIRY TIMER'))
-	if not timestamp and not threshold then -- this conditions timer setting after import
+	if not timestamp and not threshold then -- this conditions timer setting
 	r.SetExtState(cmd_ID, 'EXPIRY TIMER', r.time_precise(), false) -- persist false
-	elseif timestamp and threshold and r.time_precise()-timestamp >= threshold then -- this conditions greyed out Undo menu item after time has elapsed
-	r.DeleteExtState(cmd_ID, 'EXPIRY TIMER', true) -- persist true
-	Process_Undo(cmd_ID, true) -- clear_undo_data true (used in BuyOne_Import metadata from media into the Project Render Metadata.lua)
+	elseif timestamp and threshold and r.time_precise()-timestamp >= threshold then
+	r.DeleteExtState(cmd_ID, 'EXPIRY TIMER', true) -- persist true // clear timer	
 	return true
 	elseif not timestamp and threshold then
 	return true -- this conditions greyed out Undo menu item when the script hasn't been run yet and so the timer hasn't been set
 	end
 end
 --[[USE:
-Expiry_Timer(cmd_ID) -- store
-	if not Expiry_Timer(cmd_ID, 60) then -- 60 sec haven't elapsed
+ExtState_Expiry_Timer(cmd_ID) -- store
+	if not ExtState_Expiry_Timer(cmd_ID, 60) then -- 60 sec haven't elapsed
 	-- DO STAFF
 	end
 	-- OR
-	if Expiry_Timer(cmd_ID, 60) then return r.defer(no_undo) end
+	if ExtState_Expiry_Timer(cmd_ID, 60) then return r.defer(no_undo) end
 ]]
 
 
@@ -25542,6 +25707,7 @@ U T I L I T Y
 	Validate_All_Global_Settings
 	Settings_Management_Menu_And_Help
 	Toggle_Settings_From_Menu
+	Toggle_Setting_From_Menu
 	Display_Script_Help_Txt
 	Get_Main_Script_Settings
 	validate_output1
@@ -25564,12 +25730,13 @@ U T I L I T Y
 	Menu_With_Toggle_Options1
 	Menu_With_Toggle_Options2
 	ShowMessageBox_Menu
-	Re_Store_Ext_State
-	EMERGENCY_TOGGLE
+	Re_Store_Ext_State	
 	Wrapper1
 	Wrapper2
 	Wrapper_multi_function
+	EMERGENCY_TOGGLE
 	Re_Set_Toggle_State
+	Get_Option_Script_Toggle_State
 	defer_store
 	Count_Proj_Tabs
 	Open_Close_Temp_Proj_Tab_Without_Save_Prompt1
@@ -25589,8 +25756,7 @@ U T I L I T Y
 	Condition_Action_By_Armed_State
 	Validate_Command_ID
 	Is_Non_Native_Action
-	Get_Action_Name
-	Get_Option_Script_Toggle_State
+	Get_Action_Name	
 	timed_tooltip1
 	timed_tooltip2
 	Error_Tooltip1
@@ -25605,7 +25771,7 @@ U T I L I T Y
 	Get_Tooltip_Settings
 	Keep_ExtState_For_X_Mins1
 	Keep_ExtState_For_X_Mins2
-	Expiry_Timer
+	ExtState_Expiry_Timer
 	Set_Get_Delete_ExtState_Series
 	WAIT
 	Archie_WAIT
