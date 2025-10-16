@@ -189,8 +189,10 @@ ACT 1 0 "9fac5d43d8238c4dbe9280e5df948884" "Custom: gestrument.com_Render VSTi m
 ACT 1 0 "228d49eb35d5764182e493498ec18967" "Custom: gestrument.com_Render VSTi multisample: Render -- modifiable" _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884 _9fac5d43d8238c4dbe9280e5df948884
 ACT 1 0 "ae51735217612e4e949c55796326d74e" "Custom: Gianluca Apollaro_Snap multitrack to project BPM (stretch/shrink) - (1. put manually stretch marker at top of one of the items, 2. set grid to 1 bar or other appropriate division, 3. group all items needing adjustment)" 41842 40842 40625 40841 40841 40626 41847 40630 40841 40635
 ACT 1 0 "c33707c27c44004daa7b1882efefd546" "Custom: Glue and rename" 41588 _XENAKIOS_RENMTAKEANDSOURCE
-ACT 1 0 "6ad27d83e680c04eb20626db5a16d346" "Custom: Go to next item on the track (track and cur item must be selected)" 41173 40417
-ACT 1 0 "76554ce26cccb54f96013bfd015633c1" "Custom: Go to prev item on the track (track and cur item must be selected)" 41173 40416
+ACT 1 0 "6ad27d83e680c04eb20626db5a16d346" "Custom: Go to next item on the track (track must be selected or last touched, if cur item is selected edit cusror can be anywhere)" 41173 40417
+ACT 1 0 "76554ce26cccb54f96013bfd015633c1" "Custom: Go to prev item on the track (track must be selected or last touched, if cur item is selected edit cusror can be anywhere)" 41173 40416
+ACT 1 0 "0ad8f225c6de6644b65bc260c30d1cbc" "Custom: Go to item actross tracks - next (without SWS ext track selection isn't preserved)" 41238 _SWS_SAVESEL 40289 40297 40417 _SWS_RESTORESEL 41248
+ACT 1 0 "635700025b922949b250e1df5ddd4c57" "Custom: Go to item actross tracks - previous (without SWS ext track selection isn't preserved)" 41238 _SWS_SAVESEL 40289 40297 40416 _SWS_RESTORESEL 41248
 ACT 1 0 "2ea6e4c58dbd2f47b5ede2ee43e902bb" "Custom: Go to region start (place cursor within region) -- bind to Ruler mouse modifier" 40172
 ACT 1 0 "193b5a671be7f645ad4b44ea0e6a9349" "Custom: Go to selected (or under mouse cursor) item start and play" 40528 41173 40044
 ACT 1 0 "b6524971e186394abf922c026afe0bd2" "Custom: gofer_Select all items to the right of edit cursor on selected track" _SWS_SAVETIME1 _XENAKIOS_DOSTORECURPOS 40625 40043 40626 40718 _XENAKIOS_DORECALLCURPOS _SWS_RESTTIME1
@@ -911,6 +913,7 @@ ACT 1 32063 "286813b3c4177c4ea2e1b13dd4b51313" "Custom: Select previous sample a
 ACT 1 32063 "7097dbda25b3ca4895eba5800ac1e985" "Custom: Play next file (only useful if Auto-play is disabled)" 40030 1008
 ACT 1 32063 "8e2f72ec78351b4cb97a86a07974f858" "Custom: Play previous file (only useful if Auto-play is disabled)" 40029 1008
 ACT 1 32063 "69286e347f28954582244027cf74736f" "Custom: Select first file in the directory" 40041 40030 40029
+
 
 
 
