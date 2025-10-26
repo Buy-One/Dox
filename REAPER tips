@@ -562,7 +562,7 @@ in Project settings -> Time base for tempo/time sign envelope under the main tab
 
 
 https://www.youtube.com/watch?v=Zz3EccJygFg
-
+https://www.youtube.com/watch?v=YouvqoCgJBI
 
 =========================================================================
 
@@ -600,7 +600,14 @@ without making any changes in the tempo marker properties (probably except the t
 
 
 
-=========================================================================
+One method to find tempo
+
+stretch the audio to the grid and then just adjust the bpm until it says 'rate: 1.000' at the top of file
+
+https://old.reddit.com/r/Reaper/comments/jiwdve/finding_the_song_tempo/gaao6ep/
+
+===========================================================================
+
 
 reaper-kb.ini
 
@@ -1303,7 +1310,6 @@ https://forum.cockos.com/showthread.php?t=193007
 ===========================================================================
 
 
-
 If undo point entry isn't written into the undo list for changes in the MIDI Editor
 
 is solved by using Undo_OnStateChange_Item() or Undo_OnStateChange() and Undo_OnStateChange2()
@@ -1324,14 +1330,8 @@ https://forums.cockos.com/showthread.php?t=207466
 
 ===========================================================================
 
+-- Prevent ReaScript Task control dialogue in defer scripts in builds older than 7.03
 
-One method to find tempo
-
-stretch the audio to the grid and then just adjust the bpm until it says 'rate: 1.000' at the top of file
-
-https://old.reddit.com/r/Reaper/comments/jiwdve/finding_the_song_tempo/gaao6ep/
-
-===========================================================================
 
 https://forums.cockos.com/showthread.php?p=2089026
 
@@ -3979,7 +3979,7 @@ https://forum.cockos.com/showthread.php?p=2008003
 
 ==============================================================
 
--- IF, IF NOT, AND and OR statements for regular custom actions (conditional custom actions)
+-- IF, IF NOT statements, AND and OR operators for regular custom actions (conditional custom actions)
 
 Actions to be used are named 'Action: Skip next action ...'
 
@@ -4525,8 +4525,21 @@ https://www.youtube.com/watch?v=2SB73rGeIXQ
 Also
 https://www.youtube.com/watch?v=ScD5Z5jPL-o
 https://www.youtube.com/watch?v=C2Z5mjufb98
+https://www.youtube.com/watch?v=sjT9WuC1Zc0
+https://www.youtube.com/watch?v=2KZDpBWX5LA
 
 ==============================================================
+
+-- Exporting a tempo map
+
+Insert an empty track, insert a MIDI file on it spanning all project tempo changes,
+and export it via File -> Export project MIDI.
+The crucial setting in the export dialogue is Multitrack MIDI (type 1 MIDI file),
+type 0 won't allow REAPER to read the tempo data back when the MIDI file is imported
+
+
+==============================================================
+
 
 -- Creating midi note color maps
 
@@ -6094,14 +6107,16 @@ If no path is configured in any of the preferences, REAPER default path '%USER%\
 
 Path configured in default Project settings -> Media -> Path to save media files (...), ONLY IF ABSOLUTE
 
-Path configured at Preferences -> General -> Paths -> Default recording path, ... (defrecpath= key in reaper.ini)
+Path configured at Preferences -> General -> Paths -> Default recording path, ... (defrecpath= key in reaper.ini, can't be looked up with get_config_var_string
+
+('defrecpath'))
 
 
 For saved projects:
 
 Path configured in Project settings -> Media -> Path to save media files (...), relative to project directory or absolute
 
-Project directory if no path is configured in the Project Settings
+Project directory root if no path is configured in the Project Settings
 
 
 =============================================================
@@ -6188,6 +6203,7 @@ Track name 447 bytes, take name 512 bytes
 
 
 =============================================================
+
 
 
 
