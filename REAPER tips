@@ -627,6 +627,9 @@ Quote:
 
 
 -- Prevent ReaScript Task control dialogue in defer scripts in builds older than 7.03
+when a running script is relaunched
+
+(since 7.03 reaper.set_action_options(1) ) can be used for that purpose
 
 
 https://forums.cockos.com/showthread.php?p=2089026
