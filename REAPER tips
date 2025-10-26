@@ -625,33 +625,9 @@ Quote:
 
 =============================================================================
 
-
--- Prevent ReaScript Task control dialogue in defer scripts in builds older than 7.03
-when a running script is relaunched
-
-(since 7.03 reaper.set_action_options(1) ) can be used for that purpose
-
+-- Stopping a defer script with another script 
 
 https://forums.cockos.com/showthread.php?p=2089026
-
-To avoid forcing user to deal with ReaScript task control dialogue when there's
-a defered function in the script, the defer function can be conditioned with extended state
-so it stops when the value changes at the next script run, e.g.
-
--- at the start of the script
-
-reaper.SetExtState("section", "state", "OFF", false)
-
-
--- in the body of the script
-
-local state = reaper.GetExtState("section", "state")
-	if state == "ON" then
-	reaper.defer(function())
-	end
-
-The next time the script is explicitly launched the defer function will stop. 
-First run - defer is turned off, second run the script can be accessed, so it takes 2 steps.
 
 ===========================================================================
 
