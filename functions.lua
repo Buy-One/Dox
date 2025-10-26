@@ -2132,6 +2132,14 @@ return str:gsub(word, function(c) i = i and i+1 or 1; return c..' '..i end)
 end
 
 
+function sanitize_string_for_menu(name)
+-- stripping leading ! and # and replacing all instances of | with slash
+-- so that being menu special characters they don't affect 
+-- the way string is displayed in the menu
+return (name:sub(1,1):match('[!#]+') and name:sub(2) or name):gsub('|', '/')
+end
+
+
 
 --=========================== S T R I N G S  E N D ==============================
 
@@ -5256,10 +5264,10 @@ end
 
 
 function GetObjAllInfo_Values(obj) -- as of REAPER 6.12c
-local t = {'MediaItem*', 'MediaItem_Take*', 'MediaTrack*', 'TrackEnvelope*', 'ReaProject*'}
+local t = {'MediaItem*', 'MediaItem_Take*', 'MediaTrack*', 'TrackEnvelope*', 'ReaProject*', 'HWND'}
 local p
 	for _, v in ipairs(t) do
-		if reaper.ValidatePtr2(0, obj, v) then p = v break end
+		if reaper.ValidatePtr2(0, obj, v) then p = v break end -- in REAPER builds prior to 7.06 ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') recognize ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) > 0 because in this case there're no points // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
 	end
 local t = p == 'MediaItem*' and {B_MUTE = 0, B_MUTE_ACTUAL = 0, C_MUTE_SOLO = 0, B_LOOPSRC = 0, B_ALLTAKESPLAY = 0, B_UISEL = 0, C_BEATATTACHMODE = 0, C_AUTOSTRETCH = 0, C_LOCK = 0, D_VOL = 0, D_POSITION = 0, D_LENGTH = 0, D_SNAPOFFSET = 0, D_FADEINLEN = 0, D_FADEOUTLEN = 0, D_FADEINDIR = 0, D_FADEOUTDIR = 0, D_FADEINLEN_AUTO = 0, D_FADEOUTLEN_AUTO = 0, C_FADEINSHAPE = 0, C_FADEOUTSHAPE = 0, I_GROUPID = 0, I_LASTY = 0, I_LASTH = 0, I_CUSTOMCOLOR = 0, I_CURTAKE = 0, IP_ITEMNUMBER = 0, F_FREEMODE_Y = 0, F_FREEMODE_H = 0, P_TRACK = 0}
 or p == 'MediaItem_Take*' and {D_STARTOFFS = 0, D_VOL = 0, D_PAN = 0, D_PANLAW = 0, D_PLAYRATE = 0, D_PITCH = 0, B_PPITCH = 0, I_CHANMODE = 0, I_PITCHMODE = 0, I_CUSTOMCOLOR = 0, IP_TAKENUMBER = 0, P_TRACK = 0, P_ITEM = 0, P_SOURCE = 0}
@@ -5267,11 +5275,14 @@ or p == 'MediaTrack*' and {B_MUTE = 0, B_PHASE = 0, IP_TRACKNUMBER = 0, I_SOLO =
 or p == 'TrackEnvelope*' and {I_TCPY = 0, I_TCPH = 0, I_TCPY_USED = 0, I_TCPH_USED = 0, P_TRACK = 0, P_ITEM = 0, P_TAKE = 0}
 or p == 'ReaProject*' and {RENDER_SETTINGS = 0, RENDER_BOUNDSFLAG = 0, RENDER_CHANNELS = 0, RENDER_SRATE = 0, RENDER_STARTPOS = 0, RENDER_ENDPOS = 0, RENDER_TAILFLAG = 0, RENDER_TAILMS = 0, RENDER_ADDTOPROJ = 0, RENDER_DITHER = 0, PROJECT_SRATE = 0, PROJECT_SRATE_USE = 0}
 local GET = p == 'MediaItem*' and reaper.GetMediaItemInfo_Value or p == 'MediaItem_Take*' and reaper.GetMediaItemTakeInfo_Value or p == 'MediaTrack*' and reaper.GetMediaTrackInfo_Value or p == 'ReaProject*' and reaper.GetSetProjectInfo
+	if GET then -- not window handle HWND
 	if type(t) == 'table' and next(t) then
 		for k in pairs(t) do
-		t[k] = GET(obj, k, 0, false) -- last two args are for project data, is_set is false // overwrite zeros with actual return values
+		t[k] = GET(obj, k, 0, false) -- last two args are for project data, is_set is false // overwrite zeros in table fields with actual return values
 		end
 	return t
+	else -- window handle
+	return p
 	end
 end
 
@@ -5430,8 +5441,7 @@ function Get_Obj_By_GUID2(GUID) -- GUID is a string
 			local fx_GUID = r.TakeFX_GetFXGUID(take, fx_idx)
 				if fx_GUID == GUID then return tr, item, take, take_idx, fx_idx, parm_id, env, env_id end
 			-- CountTakeEnvelopes() lists both take and take fx envelopes hence fx envelopes should be targeted separately first to avoid mixing up envelopes in different contexts;
-			-- in REAPER builds prior to 7.06 it lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
-			-- in REAPER builds prior to 7.06 TakeFX_GetEnvelope() returns env even if there's none but parameter mudulation was enabled at least once for the corresponding fx parameter hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
+			-- in REAPER builds prior to 7.06 CountTakeEnvelopes() lists and TakeFX_GetEnvelope() returns ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
 				for parm_idx = 0, r.TakeFX_GetNumParams(take, fx_idx)-1 do
 				local env = r.TakeFX_GetEnvelope(take, fx_idx, parm_idx, false) -- create false
 					if env and r.CountEnvelopePoints(env) > 0 then -- real, not ghost envelope
@@ -5483,6 +5493,25 @@ Msg(parm_id, 'PARM ID')
 Msg(env, 'ENV')
 Msg(env_id, 'ENV ID')
 --]]
+
+
+function Cascade_To_Target_Object()
+-- priority is as follows: take under mouse, track under mouse, selected envelope parent take, selected envelope parent track, active take of selected item, selected track, last touched track
+local x, y = r.GetMousePosition()
+local item, take = r.GetItemFromPoint(x, y, false) -- allow_locked false
+local tr, info = r.GetTrackFromPoint(x, y)
+	if not take and not tr then -- no object under mouse		
+	tr, take = Is_Selected_Track_Or_Take_Env()
+		if not take and not tr then -- no selected envelope
+		local item = r.GetSelectedMediaItem(0,0)
+		take = item and r.GetActiveTake(item)
+		tr = not take and r.GetSelectedTrack(0,0) -- no selected item
+		tr = tr or r.GetLastTouchedTrack() -- no selected track
+		end
+	end
+return take, tr
+end
+
 
 --========================= O B J E C T S   E N D ============================
 
@@ -8124,7 +8153,7 @@ function Is_Valid_Envelope(env, want_state)
 -- because their point count doesn't depend on visibility
 -- and presence of user created points;
 -- IN BUILDS OLDER THAN 7.38 ENVELOPE GUIDs WEREN'T NECESSARILY UNIQUE
--- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME 
+-- IN TRACK/TAKE COPIES CREATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME 
 -- GUIDs AS IN THE SOURCE TRACK/TAKE, 
 -- IN TAKES THEY ONLY WOULD UPDATE IF COPIED BY CTRL + MOUSE DRAG
 -- bug report https://forum.cockos.com/showthread.php?t=300279
@@ -8166,7 +8195,6 @@ local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
 end
 -- USE:
 -- local env, vis, bypassed, armed, GUID = Is_Valid_Envelope(env, want_state)
-
 
 
 function Is_Env_Visible(env)
@@ -8252,6 +8280,95 @@ function Is_Env_Bypassed(env)
 	return is_bypassed and is_bypassed == '0' or env_chunk and env_chunk:match('\nACT 0 ')	
 	end
 end
+
+
+
+function Get_Env_State(env, attr)
+-- attr is integer:
+-- 1 - visibility, 2 - bypass state, 3 - armed state
+local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19
+local attr = attr == 1 and (old_build and 'VIS' or 'VISIBLE') or attr == 2 and (old_build and 'ACT' or 'ACTIVE')
+or attr == 3 and 'ARM' -- same in chunk and as a function attribute
+local retval, chunk, state
+	if old_build then
+	retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+	else
+	retval, state = r.GetSetEnvelopeInfo_String(env, attr, '', false) -- setNewValue false
+--Msg(state, 'state')
+	end
+return state and state == '1' or env_chunk and env_chunk:match('\n'..attr..' 1') or false
+end
+
+
+function Toggle_Env_State(arg, attr, state)
+-- arg is either an envelope pointer or an array of envelope pointers
+-- attr is integer:
+-- 1 - visibility, 2 - bypass state, 3 - armed state
+-- state: nil - set the state signified by attr argument of all envelopes to off, true/false - toggle
+-- if state is valid (true/false) its value stems from Get_Env_State()
+
+local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.99 -- changes produced with the function GetSetEnvelopeInfo_String() aren't registered so undo point cannot be created, bug report https://forum.cockos.com/showthread.php?t=303814, and toggling must be done via a chunk, or with actions listed above that require selecting envelope which may not be the optimal solution, so using build number with a leeway until fixed
+local attr = attr == 1 and (old_build and 'VIS' or 'VISIBLE') or attr == 2 and (old_build and 'ACT' or 'ACTIVE')
+or attr == 3 and 'ARM' -- same in chunk and as a function attribute
+local t, env = type(arg) == 'table' and arg, r.ValidatePtr(arg, 'TrackEnvelope*') and arg
+local hide = state == nil -- only for visibility state
+local state = state and 0 or 1
+local st, fin = 1, env and 1 or t and #t
+	for i=st, fin do
+	local env = env or t[i].env
+		if old_build then
+		local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+		-- when using chunk, arm state cannot be toggled
+		-- in a bypassed envelope, because arm flag 1 isn't cleared
+		-- on bypassing, so it first must be unbypassed,
+		-- this is not a problem when using GetSetEnvelopeInfo_String() function
+			if attr == 'ARM' and env_chunk:match('\nACT 0') then
+			env_chunk = env_chunk:gsub('\nACT 0', '\nACT 1')
+			end
+		env_chunk = env_chunk:gsub('\n'..attr..' %d', '\n'..attr..' '..(hide and 0 or state))
+		r.SetEnvelopeStateChunk(env, env_chunk, false) -- isundo false
+		else
+		r.GetSetEnvelopeInfo_String(env, attr, hide and 0 or state, true) -- setNewValue true
+		local take = r.Envelope_GetParentTake(env)
+		-- redraw the graphics
+			if take then
+			r.UpdateItemInProject(r.GetMediaItemTake_Item(take))
+			else
+			r.TrackList_AdjustWindows(true) -- isMinor true, TCP only
+			end
+		end
+	end
+end
+
+
+
+function Get_Active_Envelopes(obj)
+-- obj is take or track pointer
+	local function get_hidden_built_in_track_env(env)
+	local env_name_t = {VOLENV='', VOLENV2='', VOLENV3='', PANENV='', PANENV2='',
+	DUALPANENVL='', DUALPANENV='', DUALPANENVL2='', DUALPANENV2='', WIDTHENV='',
+	WIDTHENV2='', MUTEENV='', AUXVOLENV='', AUXPANENV='', AUXMUTEENV='', PARMENV='', TEMPOENVEX=''}
+	local ret, env_name = r.GetEnvelopeName(env)
+		if env_name_t[env_name] then
+		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+			if not chunk:match('\nPT %d') then return env end
+		end
+	end
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+local Count_Envs, GetEnv = table.unpack(take and {r.CountTakeEnvelopes, r.GetTakeEnvelope}
+or tr and {r.CountTrackEnvelopes, r.GetTrackEnvelope})
+
+local t = {}
+	for i=0, Count_Envs(obj)-1 do
+	local env = GetEnv(obj, i)
+		if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
+		local ret, name = r.GetEnvelopeName(env)
+		t[#t+1] = {name=name, env=env}
+		end
+	end
+return t
+end
+
 
 
 
@@ -8381,7 +8498,7 @@ local env_cnt = 0
 		for j = 0, r.TrackFX_GetCount(tr)-1 do
 			for k = 0, r.TrackFX_GetNumParams(tr, j)-1 do
 			local env = r.GetFXEnvelope(tr, j, k, false) -- create is false; for env to be valid it suffices that param mod be enabled
-			env_cnt = env and r.ValidatePtr(env, 'TrackEnvelope*') and env_cnt + 1 or env_cnt -- When param modulation was enabled at least once, GetFXEnvelope() returns parameter envelope even if there's none, if it's a ghost envelope ValidatePtr() will return false (not sure about that, to be sure better use r.CountEnvelopePoints(env) > 0 instead)
+			env_cnt = env and r.CountEnvelopePoints(env) > 0 and env_cnt + 1 or env_cnt -- When param modulation was enabled at least once, GetFXEnvelope() returns parameter envelope even if there's none, if it's a ghost envelope ValidatePtr() always returns 'true' therefore are useless
 			end
 		end
 	end
@@ -9278,9 +9395,12 @@ local function GetObjChunk2(obj)
 -- https://raw.githubusercontent.com/EUGEN27771/ReaScripts_Test/master/Functions/FXChain
 -- https://github.com/EUGEN27771/ReaScripts/blob/master/Various/FXRack/Modules/FXChain.lua
 	if not obj then return end
-local tr = r.ValidatePtr(obj, 'MediaTrack*')
-local item = r.ValidatePtr(obj, 'MediaItem*')
-local env = r.ValidatePtr(obj, 'TrackEnvelope*') -- works for take envelope as well
+local t = {}
+-- 'TrackEnvelope*' works for take envelope as well
+	for k, typename in ipairs({'MediaTrack*', 'MediaItem*', 'TrackEnvelope*'}) do
+	t[#t+1] = r.ValidatePtr(obj, typename)
+	end
+local tr, item, env = table.unpack(t)
 -- Try standard function -----
 local t = tr and {r.GetTrackStateChunk(obj, '', false)} or item and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
 local ret, obj_chunk = table.unpack(t)
@@ -9302,8 +9422,8 @@ end
 
 
 function Err_mess() -- if chunk size limit is exceeded and SWS extension isn't installed
-local sws_ext_err_mess = "              The size of data requires\n\n     the SWS/S&M extension to handle them.\n\nIf it's installed then it needs to be updated.\n\n         After clicking \"OK\" a link to the\n\n SWS extension website will be provided\n\n\tThe script will now quit."
-local sws_ext_link = 'Get the SWS/S&M extension at\nhttps://www.sws-extension.org/\n\n'
+local sws_ext_err_mess = "            The size of the data requires\n\n  the SWS/S&M extension to handle them.\n\nIf it's installed then it needs to be updated.\n\n         After clicking \"OK\" a link to the\n\n SWS extension website will be provided\n\n\tThe script will now quit."
+local sws_ext_link = 'Get the SWS/S&M extension at\n\nhttps://www.sws-extension.org/\n\nOR\n\nhttps://github.com/reaper-oss/sws/tags'
 local resp = r.MB(sws_ext_err_mess,'ERROR',0)
 	if resp == 1 then r.ShowConsoleMsg(sws_ext_link, r.ClearConsole()) return end
 end
@@ -9318,9 +9438,12 @@ end
 
 local function SetObjChunk2(obj, obj_chunk)
 	if not (obj and obj_chunk) then return end
-local tr = r.ValidatePtr(obj, 'MediaTrack*')
-local item = r.ValidatePtr(obj, 'MediaItem*')
-local env = r.ValidatePtr(obj, 'TrackEnvelope*') -- works for take envelope as well
+local t = {}
+-- 'TrackEnvelope*' works for take envelope as well
+	for k, typename in ipairs({'MediaTrack*', 'MediaItem*', 'TrackEnvelope*'}) do
+	t[#t+1] = r.ValidatePtr(obj, typename)
+	end
+local tr, item, env = table.unpack(t)
 return tr and r.SetTrackStateChunk(obj, obj_chunk, false) or item and r.SetItemStateChunk(obj, obj_chunk, false) or env and r.SetEnvelopeStateChunk(obj, obj_chunk, false) -- isundo is false // https://forum.cockos.com/showthread.php?t=181000#9
 end
 
@@ -9783,7 +9906,7 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 		elseif tr then
 		fx_alias = select(2, r.TrackFX_GetFXName(tr, fx_num))
 		fx_GUID = r.TrackFX_GetFXGUID(tr, fx_num)
-		is_cont = r.TrackFX_GetIOSize(tr, fx_num) == 8
+		is_cont = r.TrackFX_GetIOSize(tr, fx_num) == 8 -- FX containetr
 		end
 
 	local obj = take or tr
@@ -9998,9 +10121,20 @@ end
 
 
 
-function Get_FX_Chunk(obj, obj_chunk, fx_idx, take_idx) -- obj is track or item pointer; if no take_idx arg is supplied, the active take will be used // for track input FX and Mon FX fx_idx argument must look like fx_idx+0x1000000 or fx_idx+16777216; relies on Esc() function
--- since REAPER 7 'WAK 0 0' may be followed by PARALLEL 1 or PARALLEL 2 if 'Run selected FX in parallel with previous FX' or 'Run selected FX in parallel with previous FX (merge MIDI)' options are enabled respectively
--- due to introduction of FX containers in REAPER 7 'WAK 0 0' and 'PARALLEL X' tokens can be found in FX container chunk and the function may return incomlete chunk not having reached the end of the chain
+function Get_FX_Chunk(obj, obj_chunk, fx_idx, take_idx) 
+-- obj is track or item pointer; 
+-- if no take_idx arg is supplied, the active take will be used;
+-- for track input FX and Mon FX fx_idx argument must look like 
+-- fx_idx+0x1000000 or fx_idx+16777216; 
+-- relies on Esc() function;
+-- since REAPER 7 'WAK 0 0' may be followed by PARALLEL 1 or PARALLEL 2 
+-- if 'Run selected FX in parallel with previous FX' 
+-- or 'Run selected FX in parallel with previous FX (merge MIDI)' 
+-- options are enabled respectively;
+-- due to introduction of FX containers in REAPER 7 
+-- 'WAK 0 0' and 'PARALLEL X' tokens can be found in FX container chunk 
+-- and the function may return incomlete chunk 
+-- not having reached the end of the chain
 
 local track = r.ValidatePtr(obj, 'MediaTrack*')
 local item = r.ValidatePtr(obj, 'MediaItem*')
@@ -11222,10 +11356,14 @@ end
 
 
 
-function Get_FX_Parm_Orig_Name(obj, fx_idx, parm_idx)
+function Get_FX_Parm_Orig_Name_s(obj, fx_idx, parm_idx)
 -- in case it's been aliased by the user
--- obj is track or take
--- works with builds 6.37+
+-- obj is track or take;
+-- if parm_idx is valid, returns name of parameter 
+-- associated with fx_idx, otherwise collects
+-- all parameter names;
+-- works with builds 6.37+, for older builds use Validate_FX_Identity()
+
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 local GetConfig = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
 -- get fx name displayed in fx browser
@@ -11245,15 +11383,18 @@ r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
 fx_name = fx_name:gsub(' ','',1) -- 1 is index of the 1st space in the string
 r.TrackFX_AddByName(temp_track, fx_name, 0, -1) -- insert // recFX 0 = false, instantiate is -1
 -- search for the name of parameter at the same index as the one being evaluated
-local retval, parm_name
+local t, retval, parm_name = {}
 	for i = 0, r.TrackFX_GetNumParams(temp_track, 0)-1 do -- fx_idx 0
 	retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, i, '') -- fx_idx 0
-		if i == parm_idx then break end -- must break rather than return to allow deletion of the temp track before returning the value
+		if parm_idx and parm_idx > -1 and i == parm_idx then break -- must break rather than return to allow deletion of the temp track before returning the value
+		else
+		t[#t+1] = parm_name -- 1-based indexing
+		end
 	end
 r.DeleteTrack(temp_track)
 r.PreventUIRefresh(-1)
 
-return parm_name
+return parm_idx and parm_idx > -1 and parm_name, #t > 0 and t
 
 end
 
@@ -11345,11 +11486,13 @@ end
 
 
 function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, parm_ident_t, TAG)
--- since v7 EnumInstalledFX() can be used to retrieve the name listed in the FX browser and a unique identifier independent of the name in case changed but the identifier must of course be known in advance
+-- since v7 EnumInstalledFX() can be used to retrieve the name 
+-- listed in the FX browser and a unique identifier independent 
+-- of the name in case changed but the identifier must of course be known in advance
 
--- the function is based on Get_FX_Parm_Orig_Name() above
--- in case it's been aliased by the user
--- obj is track or take
+-- the function is based on Get_FX_Parm_Orig_Name_s() above
+-- in case it's been aliased by the user;
+-- obj is track or take;
 -- fx_name is the original name of the plugin being validated
 -- parm_t is a table indexed by param indices whose fields hold corresponding original param names
 -- e.g. {[4] = 'parm name 4', [12] = 'parm name 12', [23] = 'parm name 23'}
@@ -11360,6 +11503,7 @@ function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, parm_ident_t, TAG)
 -- to mark it as a target for script, optional
 -- works with builds 6.37+
 -- relies on Esc() function
+
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 local GetFXName, GetConfig, CopyFX, GetParmCount, GetParamName =
 table.unpack(tr and {r.TrackFX_GetFXName, r.TrackFX_GetNamedConfigParm,
@@ -11468,8 +11612,8 @@ local name_match = true
 
 
 --[[ -- THIS IS REDUNDANT SINCE IN BUILDS 6.37+ VALIDATION WILL SUCCEED THROUGH FX_GetNamedConfigParm()
-	  -- WHILE IN OLDER BUILDS FX CANNOT BE LOADED FROM BROWSER WITH FX_AddByName() TO CONTINUE COMPARING
-	  -- THEIR PARAMETERS
+	  -- WHILE IN OLDER BUILDS FX CANNOT BE RELIABLY LOADED FROM BROWSER WITH FX_AddByName() 
+	  -- TO CONTINUE COMPARING THEIR PARAMETERS
 -- if name_match ends up being false there's possibility that the parameters have been aliased
 -- in which case collate parm names in the clean instance of the fx loaded from the fx browser in builds 6.37+
 	if parm_t and not name_match and build_6_37 then
@@ -12360,15 +12504,16 @@ r.SetEditCurPos(cur_pos, false, false) -- moveview, seekplay false; restore posi
 end
 
 
-function Insert_Empty_Item_To_Display_Text2(tr) -- tr is the target track whose notes are to be edited
+function Insert_Empty_Item_To_Display_Text2(tr) -- tr is the target track
+-- USED IN 'Track embedded notes displayed as a tooltip'
 -- relies on Re_Store_Selected_Objects(); for the item notes to recognize line breaks in the output they must be replaced with '\r\n' if the string wasn't previously formatted in the notes field https://forum.cockos.com/showthread.php?t=214861#2
 
 local tr_GUID = r.GetTrackGUID(tr)
 
 local retval, tr_name = r.GetTrackName(tr)
 local ret, notes = r.GetSetMediaTrackInfo_String(tr, 'P_EXT:NOTES', '', false)
-local notes = not ret and ACCESS_SWS_TRACK_NOTES and Load_SWS_Track_Notes(tr):gsub('\n\n','\r\n\r\n') or notes -- load SWS track notes if no notes and the setting is enabled, adding carriage retun char to the notes edition warning divider, if any, for correct display in the item notes window
-local notes = notes:match('([\0-\255]+)\n \n%d+') or notes -- exlude date if there're stored notes
+local notes = not ret and ACCESS_SWS_TRACK_NOTES and Load_SWS_Track_Notes(tr):gsub('\n\n','\r\n\r\n') or notes -- load SWS track notes if no notes and the setting is enabled, adding carriage return char to the notes edition warning divider, if any, for correct display in the item notes window
+local notes = notes:match('([\0-\255]+)\n \n%d+') or notes -- exclude date if there're stored notes
 
 local sel_itms_t, sel_trk_t = Re_Store_Selected_Objects() -- store
 local cur_pos = r.GetCursorPosition() -- store
@@ -12382,7 +12527,7 @@ r.GetSetMediaTrackInfo_String(notes_tr, 'P_NAME', 'Track '..tr_idx..' notes', tr
 r.GetSetMediaTrackInfo_String(notes_tr, 'P_EXT:NOTES_TRACK', '+', true) -- setNewValue true // add extended data to be able to find the track later if left undeleted
 
 -- Insert notes item and configure
-r.SetEditCurPos(-3600, false, false) -- moveview seekplay false // move to -3600 or -1 hour mark in case project time start is negative, will surely move cursor to the very project start to reveal the notes item // thanks to moveview false the notes item will be accessible from anywehere in the project since its length will be set to full project length below
+r.SetEditCurPos(-3600, false, false) -- moveview, seekplay false // move to -3600 or -1 hour mark in case project time start is negative, will surely move cursor to the very project start to reveal the notes item // thanks to moveview false the notes item will be accessible from anywehere in the project since its length will be set to full project length below
 
 local notes_item = r.AddMediaItemToTrack(notes_tr)
 r.SetMediaItemSelected(notes_item, true) -- selected true // to be able to open notes with action
@@ -12486,6 +12631,9 @@ function Insert_Temp_Item(temp_tr, file_path, item_props_t, take_props_t)
 -- for adding temp_tr see Insert_Temp_Track()
 -- item_props_t, take_props_t are associative arrays of item and take attribute names and value to be set
 
+-- THE RESULTING ITEM WHILE BEHAVING LIKE AN EMPTY ITEM WHEN CLICKED,
+-- HAS FX CHAIN AND TAKE NAME FIELD, ITEM BUTTONS ARE NOT DISPLAYED
+-- SO LOOKS TIDER AND FX CHAIN CAN ONLY BE ACCESSED VIA ITEM PROPERTIES DIALOGUE
 local temp_itm = r.AddMediaItemToTrack(temp_tr)
 local take = r.AddTakeToMediaItem(temp_itm)
 local pcm_src = r.PCM_Source_CreateFromFile(file_path)
@@ -19554,6 +19702,8 @@ end
 -- https://forum.cockos.com/showthread.php?t=253381 jkooks
 -- https://github.com/majek/wdl/blob/master/WDL/db2val.h
 -- returns a dB value as the envelope/item volume value equivalent
+-- LESS PRECISE THAN Calc_New_Vol_Value(), see https://github.com/reaper-oss/sws/pull/1980
+-- REVERSE CONVERSION DOESN'T PRODUCE EXACTLY THE ORIGINAL VALUE
 function DbToVal(db)
 	local LN10_OVER_TWENTY = 0.11512925464970228420089957273422
 	return math.exp(db*LN10_OVER_TWENTY)
@@ -19578,6 +19728,8 @@ end
 
 -- spotted in MPL's script // https://forum.cockos.com/showthread.php?t=217951
 -- https://forum.cockos.com/showthread.php?t=263792#6
+-- LESS PRECISE THAN THE ABOVE METHOD, see https://github.com/reaper-oss/sws/pull/1980
+-- REVERSE CONVERSION DOESN'T PRODUCE EXACTLY THE ORIGINAL VALUE
 function WDL_DB2VAL(x) return math.exp((x)*0.11512925464970228420089957273422) end  -- https://github.com/majek/wdl/blob/master/WDL/db2val.h
 
 function WDL_VAL2DB(x, reduce) -- https://github.com/majek/wdl/blob/master/WDL/db2val.h
@@ -21015,6 +21167,47 @@ local output = Reload_Menu_at_Same_Pos2(table.concat(menu_t), 1) -- keep_menu_op
 	goto RELOAD end
   
 end
+
+
+
+function Create_Submenus_Dynamically(t, limit)
+-- meant for creation of a menu with a limited number
+-- of items in the main menu in order to fit within the screen height
+-- and placing all items in excess inside submenus 
+-- accessible from the main menu;
+-- t is either a table with values to be displayed as menu items
+-- or integer in which case numerals will be used as menu items;
+-- limit is integer denoting main menu max item count,
+-- if exceeded, for every next menu items count which equals the limit
+-- a submenu is created;
+-- the main menu is shortened by the number of submenus
+-- to accommodate submenu items and prevent exceeding the limit
+-- in the main menu itself;
+-- if the limit is smaller than the submenu count, 
+-- main_menu_cnt var will end up being negative
+-- and submenus will be created from the very first menu item;
+-- one extra submenu over submenu_count value could be added
+-- to accommodate remaining outstanding menu items
+
+local tab = type(t) == 'table'
+local max_cnt = tab and #t or t
+local int, frac = math.modf(max_cnt/limit)
+-- count submenus
+local submenu_count = int < 1 and 0 or int + (frac ~= 0 and 1 or 0) - 1 -- if there's fractional part count it as another submenu, because it exceeds the items count limit per submenu, subtract 1 to exclude the main menu items because these don't go into the submenu but this isn't mandatory
+local main_menu_cnt = limit-submenu_count -- allocate as many items to the main menu as there're going to be submenus by shortening it by submenu count so that main menu's own item count doesn't exceed the limit when submenus are created // the var will be negative if the limit is smaller than the submenu count
+local menu, count = '', 0
+	for k = 1, max_cnt do
+	local v = tab and t[k] or k
+	count = k > main_menu_cnt and (count == limit and 1 or count+1) or 0 -- reset once the limit is reached to start next submenu, keeping at 0 while main menu is being concatenated, i.e. as long as main_menu_cnt hasn't been exceeded
+	local opening = count == 1 and '>'..k..'-'..(max_cnt-k > limit and k+limit-1 or max_cnt)..'|' or ''
+	local closure = count == limit and '<' or ''
+	menu = menu..(#menu > 0 and '|' or '')..opening..closure..v
+	end
+return menu
+
+end
+
+
 
 
 
@@ -25012,6 +25205,7 @@ S T R I N G S
 	add_zero_padding
 	wrap_text
 	numerate_instances
+	sanitize_string_for_menu
 
 
 T A B L E S
@@ -25147,6 +25341,7 @@ O B J E C T S
 	GetObjAllInfo_Values
 	Get_Obj_By_GUID1
 	Get_Obj_By_GUID2
+	Cascade_To_Target_Object
 
 
 T R A C K S
@@ -25258,6 +25453,9 @@ E N V E L O P E S
 	Is_Env_Visible
 	Set_Env_In_Visible
 	Is_Env_Bypassed
+	Get_Env_State
+	Toggle_Env_State
+	Get_Active_Envelopes
 	Delete_Env
 	Get_Env_GUID
 	Get_Vis_Env_GUID
@@ -25367,7 +25565,7 @@ F X
 	Process_FX_Incl_In_All_Containers
 	Collect_All_Container_FX_Indices
 	Loop_Over_FX_Container_Table
-	Get_FX_Parm_Orig_Name
+	Get_FX_Parm_Orig_Name_s
 	Get_FX_Parm_By_Name_Or_Ident
 	Is_Same_Plugin
 	Validate_FX_Identity
@@ -25729,6 +25927,7 @@ U T I L I T Y
 	Get_Set_Menu_Toggle_Options
 	Menu_With_Toggle_Options1
 	Menu_With_Toggle_Options2
+	Create_Submenus_Dynamically
 	ShowMessageBox_Menu
 	Re_Store_Ext_State	
 	Wrapper1
