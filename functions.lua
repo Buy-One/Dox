@@ -2132,11 +2132,14 @@ return str:gsub(word, function(c) i = i and i+1 or 1; return c..' '..i end)
 end
 
 
-function sanitize_string_for_menu(name)
--- stripping leading ! and # and replacing all instances of | with slash
+function sanitize_string_for_menu(name, pipe)
+-- stripping leading !, #, < and > and replacing all instances of |
 -- so that being menu special characters they don't affect 
--- the way string is displayed in the menu
-return (name:sub(1,1):match('[!#]+') and name:sub(2) or name):gsub('|', '/')
+-- the way string is displayed in the menu;
+-- pipe argument is a replacement character for pipe
+-- if invalid or empty, underscore is used
+local pipe = pipe and #pipe > 0 and pipe or '_'
+return (name:sub(1,1):match('[!#<>]+') and name:sub(2) or name):gsub('|', pipe)
 end
 
 
@@ -8161,9 +8164,14 @@ function Is_Valid_Envelope(env, want_state)
 -- MUST BE USED INSTEAD
 
 	local function get_hidden_built_in_track_env(env)
-	local env_name_t = {VOLENV='', VOLENV2='', VOLENV3='', PANENV='', PANENV2='', 
-	DUALPANENVL='', DUALPANENV='', DUALPANENVL2='', DUALPANENV2='', WIDTHENV='', 
-	WIDTHENV2='', MUTEENV='', AUXVOLENV='', AUXPANENV='', AUXMUTEENV='', PARMENV='', TEMPOENVEX=''}
+	local env_name_t = {
+	-- regular track
+	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='', 
+	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='', 
+	Width='', ['Width (Pre-FX)']='', Mute='', ['Send Mute']='',
+	 -- master track
+	Playrate='', --['Tempo map']='' -- excluding tempo map envelope because when inactive and has no points at all it cannot be opened even though the chunk is there
+	}
 	local ret, env_name = r.GetEnvelopeName(env)
 		if env_name_t[env_name] then
 		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
@@ -8199,16 +8207,21 @@ end
 
 function Is_Env_Visible(env)
 	local function get_hidden_built_in_track_env(env)
-	local env_name_t = {VOLENV='', VOLENV2='', VOLENV3='', PANENV='', PANENV2='', 
-	DUALPANENVL='', DUALPANENV='', DUALPANENVL2='', DUALPANENV2='', WIDTHENV='', 
-	WIDTHENV2='', MUTEENV='', AUXVOLENV='', AUXPANENV='', AUXMUTEENV='', PARMENV='', TEMPOENVEX=''}
+	local env_name_t = {
+	-- regular track
+	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='', 
+	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='', 
+	Width='', ['Width (Pre-FX)']='', Mute='', ['Send Mute']='',
+	 -- master track
+	Playrate='', --['Tempo map']='' -- excluding tempo map envelope because when inactive and has no points at all it cannot be opened even though the chunk is there
+	}
 	local ret, env_name = r.GetEnvelopeName(env)
 		if env_name_t[env_name] then
 		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 			if not chunk:match('\nPT %d') then return env end
 		end
 	end
-	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
+	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES MAY BECOME INVALID
 	local retval, chunk, is_vis
 			if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 			retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
@@ -8225,9 +8238,14 @@ function Set_Env_In_Visible(env, vis) -- can be expanded to armed and active
 -- if false env will be set to hidden
 
 	local function get_hidden_built_in_track_env(env)
-	local env_name_t = {VOLENV='', VOLENV2='', VOLENV3='', PANENV='', PANENV2='', 
-	DUALPANENVL='', DUALPANENV='', DUALPANENVL2='', DUALPANENV2='', WIDTHENV='', 
-	WIDTHENV2='', MUTEENV='', AUXVOLENV='', AUXPANENV='', AUXMUTEENV='', PARMENV='', TEMPOENVEX=''}
+	local env_name_t = {
+	-- regular track
+	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='', 
+	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='', 
+	Width='', ['Width (Pre-FX)']='', Mute='', ['Send Mute']='',
+	 -- master track
+	Playrate='', --['Tempo map']='' -- excluding tempo map envelope because when inactive and has no points at all it cannot be opened even though the chunk is there
+	}
 	local ret, env_name = r.GetEnvelopeName(env)
 		if env_name_t[env_name] then
 		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
@@ -8236,7 +8254,7 @@ function Set_Env_In_Visible(env, vis) -- can be expanded to armed and active
 	end
 	
 	if not env then return end
-	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
+	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES MAY BECOME INVALID
 	-- Changes produced with the function GetSetEnvelopeInfo_String() in builds 7.19+ aren't registered so undo point cannot be created, bug report https://forum.cockos.com/showthread.php?t=303814, and setting must be done via a chunk, or with actions 
 	-- Envelope: Toggle hide/display selected envelope 40884
 	-- Envelope: Toggle bypass for selected envelope 40883
@@ -8261,16 +8279,21 @@ end
 
 function Is_Env_Bypassed(env)
 	local function get_hidden_built_in_track_env(env)
-	local env_name_t = {VOLENV='', VOLENV2='', VOLENV3='', PANENV='', PANENV2='', 
-	DUALPANENVL='', DUALPANENV='', DUALPANENVL2='', DUALPANENV2='', WIDTHENV='', 
-	WIDTHENV2='', MUTEENV='', AUXVOLENV='', AUXPANENV='', AUXMUTEENV='', PARMENV='', TEMPOENVEX=''}
+	local env_name_t = {
+	-- regular track
+	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='', 
+	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='', 
+	Width='', ['Width (Pre-FX)']='', Mute='', ['Send Mute']='',
+	 -- master track
+	Playrate='', --['Tempo map']='' -- excluding tempo map envelope because when inactive and has no points at all it cannot be opened even though the chunk is there
+	}
 	local ret, env_name = r.GetEnvelopeName(env)
 		if env_name_t[env_name] then
 		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 			if not chunk:match('\nPT %d') then return env end
 		end
 	end
-	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation was enabled at least once without any actual envelope, such ghost envelopes don't have points // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
+	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation was enabled at least once without any actual envelope, such ghost envelopes don't have points // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES MAY BECOME INVALID
 	local retval, env_chunk, is_bypassed
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 		retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false		
@@ -8307,7 +8330,7 @@ function Toggle_Env_State(arg, attr, state)
 -- state: nil - set the state signified by attr argument of all envelopes to off, true/false - toggle
 -- if state is valid (true/false) its value stems from Get_Env_State()
 
-local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.99 -- changes produced with the function GetSetEnvelopeInfo_String() aren't registered so undo point cannot be created, bug report https://forum.cockos.com/showthread.php?t=303814, and toggling must be done via a chunk, or with actions listed above that require selecting envelope which may not be the optimal solution, so using build number with a leeway until fixed
+local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.50 -- in older builds changes produced with the function GetSetEnvelopeInfo_String() aren't registered so undo point cannot be created, bug report https://forum.cockos.com/showthread.php?t=303814, and toggling must be done via a chunk, or with actions listed above that require selecting envelope which may not be the optimal solution
 local attr = attr == 1 and (old_build and 'VIS' or 'VISIBLE') or attr == 2 and (old_build and 'ACT' or 'ACTIVE')
 or attr == 3 and 'ARM' -- same in chunk and as a function attribute
 local t, env = type(arg) == 'table' and arg, r.ValidatePtr(arg, 'TrackEnvelope*') and arg
@@ -8343,17 +8366,23 @@ end
 
 
 function Get_Active_Envelopes(obj)
--- obj is take or track pointer
+
 	local function get_hidden_built_in_track_env(env)
-	local env_name_t = {VOLENV='', VOLENV2='', VOLENV3='', PANENV='', PANENV2='',
-	DUALPANENVL='', DUALPANENV='', DUALPANENVL2='', DUALPANENV2='', WIDTHENV='',
-	WIDTHENV2='', MUTEENV='', AUXVOLENV='', AUXPANENV='', AUXMUTEENV='', PARMENV='', TEMPOENVEX=''}
+	local env_name_t = {
+	-- regular track
+	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='', 
+	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='', 
+	Width='', ['Width (Pre-FX)']='', Mute='', ['Send Mute']='',
+	 -- master track
+	Playrate='', --['Tempo map']='' -- excluding tempo map envelope because when inactive and has no points at all it cannot be opened even though the chunk is there
+	}
 	local ret, env_name = r.GetEnvelopeName(env)
 		if env_name_t[env_name] then
 		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 			if not chunk:match('\nPT %d') then return env end
 		end
 	end
+
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 local Count_Envs, GetEnv = table.unpack(take and {r.CountTakeEnvelopes, r.GetTakeEnvelope}
 or tr and {r.CountTrackEnvelopes, r.GetTrackEnvelope})
@@ -8361,7 +8390,8 @@ or tr and {r.CountTrackEnvelopes, r.GetTrackEnvelope})
 local t = {}
 	for i=0, Count_Envs(obj)-1 do
 	local env = GetEnv(obj, i)
-		if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
+		if 
+		r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env)	then -- validation of fx envelopes in REAPER builds prior to 7.06 when ghost envelopes would be detected for fx parameters for which parameter modulation was enabled at least once // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES MAY BECOME INVALID
 		local ret, name = r.GetEnvelopeName(env)
 		t[#t+1] = {name=name, env=env}
 		end
@@ -9866,52 +9896,34 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 	--	local mon_fx = retval == 0 and mon_fx_num >= 0
 	--	local fx_num = mon_fx and mon_fx_num + 0x1000000 or fx_num -- mon fx index
 
-	local fx_alias, fx_GUID
-
-		if take then
-		fx_GUID = r.TakeFX_GetFXGUID(take, fx_num)
-		fx_alias = select(2, r.TakeFX_GetFXName(take, fx_num))
-		elseif tr then
-		fx_alias = select(2, r.TrackFX_GetFXName(tr, fx_num))
-		fx_GUID = r.TrackFX_GetFXGUID(tr, fx_num)
-		end
-
-	local fx_name, _ = fx_alias
-	-- if older version fx_name return value will be indentical to fx_alias
-		if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.31 then
-		local obj = take or tr
-		local GetNamedConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
-			if obj then
-			_, fx_name = GetNamedConfigParm(obj, fx_num, 'fx_name')
+	local obj = take or tr -- take is first to prevent false positive because when take is valid track is valid as well
+		
+		if obj then
+		local GetFXName, GetFXGUID, GetIOSize, GetNamedConfigParm = table.unpack(take and {r.TakeFX_GetFXName, r.TakeFX_GetFXGUID, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm} or tr and {r.TrackFX_GetFXName, r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm}) -- take is first to prevent false positive because when take valid track valud as well
+		local fx_alias, fx_GUID = select(2, GetFXName(obj, fx_num)), GetFXGUID(obj, fx_num)		
+		local fx_name, _ = fx_alias
+		-- in builds older than 6.31 fx_name return value will be indentical to fx_alias
+			if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.31 then
+			local ret
+			ret, fx_name = GetNamedConfigParm(obj, fx_num, 'fx_name')
 			fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
 			or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name -- if Video processor
 			end
+
+		return retval, tr_num-1, tr, itm_num, item, take_num, take, fx_num, mon_fx_num >= 0, fx_alias, fx_name, fx_GUID -- tr_num = -1 means Master;
 		end
 
-	return retval, tr_num-1, tr, itm_num, item, take_num, take, fx_num, mon_fx_num >= 0, fx_alias, fx_name, fx_GUID -- tr_num = -1 means Master;
-
-	else
-
-	-- supported since v7.0
+	else -- supported since v7.0
+	
 	local retval, tr_num, itm_num, take_num, fx_num, parm_num = reaper.GetTouchedOrFocusedFX(1) -- 1 last touched mode // parm_num only relevant for querying last touched (mode 0) // supports Monitoring FX and FX inside containers, container itself can also be focused
 	local tr = tr_num > -1 and r.GetTrack(0, tr_num) or retval and r.GetMasterTrack(0) -- Master track is valid when retval is true, tr_num in this case is -1
 	local item = tr and r.GetTrackMediaItem(tr, itm_num)
 	local take = item and r.GetTake(item, take_num)
-	local fx_alias, fx_GUID, is_cont
-
-		if take then
-		fx_alias = select(2, r.TakeFX_GetFXName(take, fx_num))
-		fx_GUID = r.TakeFX_GetFXGUID(take, fx_num)
-		is_cont = r.TakeFX_GetIOSize(take, fx_num) == 8
-		elseif tr then
-		fx_alias = select(2, r.TrackFX_GetFXName(tr, fx_num))
-		fx_GUID = r.TrackFX_GetFXGUID(tr, fx_num)
-		is_cont = r.TrackFX_GetIOSize(tr, fx_num) == 8 -- FX containetr
-		end
-
-	local obj = take or tr
+	local obj = take or tr -- take is first to prevent false positive because when take is valid track is valid as well
+	
 		if obj then
-		local GetNamedConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
+		local GetFXName, GetFXGUID, GetIOSize, GetNamedConfigParm = table.unpack(take and {r.TakeFX_GetFXName, r.TakeFX_GetFXGUID, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm} or tr and {r.TrackFX_GetFXName, r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm}) -- take is first to prevent false positive because when take valid track valud as well
+		local fx_alias, fx_GUID, is_cont = select(2, GetFXName(obj, fx_num)), GetFXGUID(obj, fx_num), GetIOSize(obj, fx_num) == 8
 		local ret, fx_name = GetNamedConfigParm(obj, fx_num, 'fx_name')
 		fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
 		or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name -- if Video processor or Container
@@ -10144,8 +10156,10 @@ local GetFXGUID = take and r.TakeFX_GetFXGUID or r.TrackFX_GetFXGUID
 
 local obj = track and obj or take
 
-local MON_FX = obj == r.GetMasterTrack(0) and fx_idx >= 16777216
-local FXCHAINSEC = take and '<TAKEFX' or fx_idx >= 16777216 and not MON_FX and '<FXCHAIN_REC' or ''
+local MON_FX = obj == r.GetMasterTrack(0) and fx_idx >= 16777216 -- OR 0x1000000
+local FXCHAINSEC = take and '<TAKEFX'
+or fx_idx >= 0x1000000 and fx_idx < 0x2000000 and not MON_FX and '<FXCHAIN_REC' -- 0x2000000+ is the range of fx inside containers, fx inside containers in input fx chain don't start with <FXCHAIN_REC attribute
+or ''
 
 	if MON_FX then
 	local path = r.GetResourcePath()
@@ -10156,9 +10170,16 @@ local FXCHAINSEC = take and '<TAKEFX' or fx_idx >= 16777216 and not MON_FX and '
 	end
 
 local target_fx_GUID = obj and fx_idx and GetFXGUID(obj, fx_idx)
+
+	if not target_fx_GUID then return end
+
+--[[ INEFFICIENT
 local prev_fx_GUID = obj and fx_idx and GetFXGUID(obj, fx_idx-1)
 
 return prev_fx_GUID and target_fx_GUID and obj_chunk:match(FXCHAINSEC..'\n.-'..Esc(prev_fx_GUID)..'.-\n(BYPASS %d %d[%s%d]*.-'..Esc(target_fx_GUID)..'.-WAK.-)\n') or target_fx_GUID and obj_chunk:match(FXCHAINSEC..'.-\n(BYPASS %d %d[%s%d]*.-'..Esc(target_fx_GUID)..'.-WAK.-)\n') -- in older REAPER versions BYPASS only has 2 flags; originally the capture was ending with 'WAK %d %d', but was changed to accommodate possible expansion of flags in the future
+]]
+
+return obj_chunk:match('.+\n(BYPASS %d %d[%s%d]*.-'..Esc(target_fx_GUID)..'.-WAK.-)\n')
 
 end
 
@@ -11278,6 +11299,39 @@ end
 
 
 
+function Loop_Over_FX_Container_Table(obj, t)
+-- obj is track or take, t is the table returned by Collect_All_Container_FX_Indices() above
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+
+-- add functions as necessary depending on the type of fx processing needed
+local FXCount, GetIOSize, GetConfig, SetConfig, GetFXName =
+table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm,
+r.TrackFX_SetNamedConfigParm, r.TrackFX_GetFXName}
+or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm,
+r.TakeFX_SetNamedConfigParm, r.TakeFX_GetFXName} or {})
+
+	-- target fx instances in a chain ignoring containers
+	for k, fx_idx in ipairs(t) do
+		if tonumber(fx_idx) then -- fx instance // if container evaluation will be false since the value is table
+	--  DO STUFF TO FX INSTANCES
+	--	local ret, name = GetFXName(obj, fx_idx, '')
+	--	Msg(name, fx_idx)
+		end
+	end
+	-- target containers, ignoring fx instances
+	for k, cont in ipairs(t) do
+		if not tonumber(cont) then -- table storing container index and its fx list
+	-- 	DO STUFF TO CONTAINER IF NEEDED USING ITS INDEX AT cont[1]
+		Loop_Over_FX_Container_Table(obj, cont[2]) -- go recursive to loop over container fx, cont[2] is the address of the nested table with container fx indices list, at cont[1] container own index is stored
+		end
+	end
+
+end
+
+
+
+
 function Collect_All_Container_FX_Indices(t, obj, recFX, parent_cntnr_idx, parents_fx_cnt)
 -- t must be nil, obj is track or take, recFX is boolean to target input/Monitoring FX
 -- parent_cntnr_idx, parents_fx_cnt must be nil
@@ -11324,32 +11378,124 @@ end
 
 
 
-function Loop_Over_FX_Container_Table(obj, t)
--- obj is track or take, t is the table returned by Collect_All_Container_FX_Indices() above
+function Get_FX_All_Parent_Containers(obj, fx_idx)
+-- supported since build 7.06
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 
--- add functions as necessary depending on the type of fx processing needed
-local FXCount, GetIOSize, GetConfig, SetConfig, GetFXName =
-table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm,
-r.TrackFX_SetNamedConfigParm, r.TrackFX_GetFXName}
-or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm,
-r.TakeFX_SetNamedConfigParm, r.TakeFX_GetFXName} or {})
+	if fx_idx > 0x2000000 and (tr or take) then -- range fx inside containers, or > 33554432
+	local GetConfigParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
+	local t, retval = {}	
+		repeat
+		retval, fx_idx = GetConfigParm(obj, fx_idx, 'parent_container')
+			if retval then
+			table.insert(t, 1, fx_idx+0)
+			end
+		until not retval -- or #fx_idx == 0
+	return t
+	end
 
-	-- target fx instances in a chain ignoring containers
-	for k, fx_idx in ipairs(t) do
-		if tonumber(fx_idx) then -- fx instance // if container evaluation will be false since the value is table
-	--  DO STUFF TO FX INSTANCES
-	--	local ret, name = GetFXName(obj, fx_idx, '')
-	--	Msg(name, fx_idx)
+end
+
+
+
+function GetSetClear_FX_Parm_Mapping_Across_Containers(obj, fx_idx, parm_idx, parent_cont_t, set)
+-- up to the outermost;
+-- only works for container fx;
+-- fx_idx is index of target container fx;
+-- parm_idx is index of the target container fx parameter;
+-- parent_cont_t is optional, a table of all parent containers 
+-- stored from the outermost to the innermost, comes from Get_FX_All_Parent_Containers()
+-- if empty or invalid it will be created inside this function;
+-- set arg: 1 or any valid value apart from 2 - map parameter across all containers (set), 
+-- 2 - unmap parameter across all containers (clear),
+-- using 1, 2 because relying on booleans true/false gets tricky in ternary expression
+-- where false is diffucult to assign reliably due to its being weak value
+-- i.e. expression local mode = a and not b and true or not a and b and false or nil
+-- instead of false will always fall back on nil,
+-- otherwise (nil) run in get mode,
+-- i.e. evaluate whether parm_idx is mapped across all containers;
+-- function is supported since build 7.06
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+
+	if fx_idx > 0x2000000 and (tr or take) then -- range fx inside containers, or > 33554432
+	local GetConfigParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
+	local parent_cont_t = parent_cont_t and #parent_cont_t > 0 and parent_cont_t or {}
+		if #parent_cont_t == 0 then -- collect parent container indices
+		local fx_idx, retval = fx_idx
+			repeat
+			retval, fx_idx = GetConfigParm(obj, fx_idx, 'parent_container')
+				if retval then
+				table.insert(parent_cont_t, 1, fx_idx+0) -- store in descending order, from the outermost to the innermost container
+				end
+			until not retval -- or #fx_idx == 0
+		end
+		if #parent_cont_t > 0 then -- map across containers
+		local child_cont_idx, mapped_parm_idx = fx_idx, parm_idx -- assign current fx parameters to variables which will be updated during the loop
+		local unmap_t = set == 2 and {} -- initialize to collect indices associated with parameter across all containers // use separate table because if a table passed as parent_cont_t arg has this exact name, it will be modified and likely unusable for further operations outside the function
+		-- first current fx parameter is mapped to its parent container parameter list
+		-- and then this parameter is mapped across containers using its index in the child container parameter list
+			for i = #parent_cont_t,1,-1 do -- loop in reverse because container indices are stored from the outermost to the innermost and it's the innermost which parameter of an fx inside a container must be mapped to first so that there's something to map to further up the chain
+			local cont_idx = parent_cont_t[i]
+			local parmname = 'container_map.'..(set and 'add.' or 'get.')..child_cont_idx..'.'..mapped_parm_idx -- this parameter must be applied to container therefore the 2nd argument in TrackFX_GetNamedConfigParm is always container index // in the very first cycle child_cont_idx is parent container of the fx whose index is passed as fx_idx, in subsequent cycles it's always a child container of container at cont_idx
+			retval, mapped_parm_idx = GetConfigParm(obj, cont_idx, parmname) -- return mapped parameter index associated with it in the parent container parameter list, for the next cycle to map it to next parent container
+				if not set and not retval then return -- if set is nil, i.e. get mode, retval being false means that parameter mapping hasn't reached the current (cont_idx) container, i.e. it's not mapped across all containers, therefore abort as there's no point to continue
+				elseif set == 2 then -- collect parameter indices associated with parameter list of each container for anmapping
+				unmap_t[i] = {cont_idx=cont_idx, parm_idx=mapped_parm_idx}
+				end
+			child_cont_idx = cont_idx -- update for the next cycle, for the next container (one level above current) current one becomes child
+			end
+			if not set then return true -- if set is nil, i.e. get mode, return true if the loop above wasn't aborted preemptively, which means that the parameter is mapped across ALL parent containers
+			elseif set == 2 then -- unmap parameter across all parent containers
+				for k, data in ipairs(unmap_t) do -- here loop directly because unmapping must be performed in the order opposite to mapping, i.e. from the outermost container down to the innermost
+				GetConfigParm(obj, data.cont_idx, 'param.'..data.parm_idx..'.container_map.delete')
+				end
+			end
 		end
 	end
-	-- target containers, ignoring fx instances
-	for k, cont in ipairs(t) do
-		if not tonumber(cont) then -- table storing container index and its fx list
-	-- 	DO STUFF TO CONTAINER IF NEEDED USING ITS INDEX AT cont[1]
-		Loop_Over_FX_Container_Table(obj, cont[2]) -- go recursive to loop over container fx, cont[2] is the address of the nested table with container fx indices list, at cont[1] container own index is stored
-		end
+
+end
+
+
+
+function Get_Container_Parm_Source_Props(obj, cont_idx, parm_idx)
+-- function is supported since build 7.06
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+local GetIOSize, GetNamedConfigParm, GetNumParams, GetFXName, GetParamName = 
+table.unpack(take and {r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm, 
+r.TakeFX_GetNumParams, r.TakeFX_GetFXName, r.TakeFX_GetParamName}
+or tr and {r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm, r.TrackFX_GetNumParams, 
+r.TrackFX_GetFXName, r.TrackFX_GetParamName}) -- take is first to prevent false positive because when take valid track valud as well
+	if GetIOSize and GetIOSize(obj, cont_idx) ~= 8 then return end -- not container
+
+-- container built-in parameters (Bypass, Wet, Delta) follow all mapped parameters, i.e. 3 very last
+local ret, src_fx_idx = GetNamedConfigParm(obj, cont_idx, 'param.'..parm_idx..'.container_map.fx_index') -- 0-based index // src_fx_idx is string // returns false and empty string if parm_idx refers to container built-in parameter or is out of range
+local parm_cnt = GetNumParams(obj, cont_idx)-1 -- -1 to conform to 0-based parameter indexation
+
+	if not ret and parm_idx > parm_cnt then return -- parm_idx is out of range
+	elseif parm_idx > parm_cnt-3 then -- container built-in parameter (Bypass, Wet, Delta)
+	local parm_idx = parm_idx - (parm_cnt-3)
+	local t = {[1]='Bypass', [2]='Wet', [3]='Delta'}
+	return t[parm_idx] -- return original name of a built-in parameter
+	else
+	local ret, src_fx_idx = GetNamedConfigParm(obj, cont_idx, 'container_item.'..src_fx_idx) -- 0x2000000 based index to be passed to all regular FX functions // src_fx_idx is string
+	src_fx_idx = src_fx_idx+0 -- converting index from string into integer
+	local ret, src_parm_idx = GetNamedConfigParm(obj, cont_idx, 'param.'..parm_idx..'.container_map.fx_parm') --  src_parm_idx is string
+	-- local ret, src_fx_name = GetNamedConfigParm(obj, src_fx_idx, 'original_name') -- or 'fx_name'
+	src_parm_idx = src_parm_idx+0 -- converting index from string into integer
+	local ret, src_fx_name = GetFXName(obj, src_fx_idx) -- returns aliased instance name if changed by the user; if parameter is mapped from a child container parameter list, returns name of the child container
+	--Msg(src_fx_name,'src_fx_name')
+	local ret, src_parm_name = GetParamName(obj, src_fx_idx, src_parm_idx) -- if aliased by user returns aliased name; if parameter is mapped from a grandchild container parameter list, returns full path to the parameter starting from grandchild container name, i.e. if source fx resides inside a grandchild container named 'cont123' the returned path will look like 'cont123: src FX name: src parm name'; the aliased path which is returned may be aliased at any level of container hierarchy
+	--Msg(src_parm_name,'src_parm_name')
+	-- concatenate mapped parameter name as it's supposed to appear in container parameter list in default format which is 
+	-- [container1 name]: [container2 name] ...: [FX instance name]: [param name]
+	-- when fx is deep within container hierarchy, for each container the parameter name is added container name;
+	-- when src_fx_name is not a container name, non-aliased FX instance name is stripped off the plugin type prefix and vendor name
+	local cont_parm_format = (src_fx_name:match('^[ADCJLPSTXVi]+:') and (src_fx_name:match('.-: (.-)%s%(') 
+	or src_fx_name:match('.-: (.+)')) or src_fx_name)..': '..src_parm_name
+	return cont_parm_format, src_fx_idx, src_parm_idx, src_fx_name, src_parm_name
 	end
 
 end
@@ -12793,6 +12939,15 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 	local max_zoom = not max_zoom and 100 or max_zoom*100 -- ignore in builds prior to 6.76 by assigning 100 so that when track height is divided by 100 and multiplied by 100% nothing changes, otherwise convert to conventional percentage value; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is accurate, otherwise there's ±1 px diviation, because the actual track height in pixels isn't fractional like the one obtained through calculation therefore some part is lost
 
 	-- Get Arrange and window header height
+	-- When track zoom actions are applied the UI jolts, but PreventUIRefresh() is not suitable 
+	-- because it blocks the function GetMediaTrackInfo_Value() from getting the return value;
+	-- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled;
+	-- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
+	-- which works like 40113 worked before the change and its use would obviate all the calculations above and below 
+	-- but it obviously doesn't cover the interim builds, so leaving the current code;
+	-- since build 7.48 the following toggle zoom actions affect pinned tracks as well,
+	-- introduced in build 7.46, but since their height is being taken into account
+	-- the calculation must still be accurate
 	local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer
 	-- r.PreventUIRefresh(1) -- PREVENTS GetMediaTrackInfo_Value RETURN VALUE PROBABLY BECAUSE THE HIGHT ISN'T UPDATED AFTER ACTION
 	r.Main_OnCommand(41929, 0) -- New project tab (ignore default template) // open new proj tab
@@ -12802,11 +12957,11 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 	local ref_tr = r.GetTrack(0,0)
 --	r.SetTrackSelected(ref_tr, true) -- selected true // not needed, the next actions are global
 		if r.GetToggleCommandStateEx(0,40113) == 0 then
-		r.Main_OnCommand(40113, 0) -- View: Toggle track zoom to maximum height (i.e. height of the Arrange) // selection isn't needed, all are toggled
+		r.Main_OnCommand(40113, 0) -- View: Toggle track zoom to maximum height (i.e. height of the Arrange) [in later builds comment '(limit to 100% of arrange view) has been added' and another action introduced to zoom to maxvzoom value] // selection isn't needed, all are toggled
 		end
 	local tr_height = r.GetMediaTrackInfo_Value(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
 	
-	-- if there're visible pinned tracks at the top (intriduced in build 7.46), calculate their height because
+	-- if there're visible pinned tracks at the top (introduced in build 7.46), calculate their height because
 	-- their presence affects max track height obtained above
 	local pin_tracks_h = 0
 		if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
@@ -12903,19 +13058,20 @@ local track, info = r.GetTrackFromPoint(x, y)
 	local ref_tr_y = r.GetMediaTrackInfo_Value(ref_tr, 'I_TCPY')
 
 	-- Get the data
-	-- When the actions are applied the UI jolts, but PreventUIRefresh() is not suitable because it blocks the function GetMediaTrackInfo_Value() from getting the return value
-	-- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled
+	-- When the actions are applied the UI jolts, but PreventUIRefresh() is not suitable 
+	-- because it blocks the function GetMediaTrackInfo_Value() from getting the return value;
+	-- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled;
 	-- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
-	-- which works like 40113 worked before the change and its use would obviate all the calculations above 
-	-- but it obviously doesn't cover the interim builds, so leaving the current code
+	-- which works like 40113 worked before the change and its use would obviate all the calculations above and below 
+	-- but it obviously doesn't cover the interim builds, so leaving the current code;
 	-- since build 7.48 the following toggle zoom actions affect pinned tracks as well,
 	-- introduced in build 7.46, but since their height is being taken into account
 	-- the calculation must still be accurate
 	r.Main_OnCommand(40110, 0) -- View: Toggle track zoom to minimum height
-	r.Main_OnCommand(40113, 0) -- View: Toggle track zoom to maximum height
+	r.Main_OnCommand(40113, 0) -- View: Toggle track zoom to maximum height [in later builds comment '(limit to 100% of arrange view) has been added' and another action introduced to zoom to maxvzoom value]
 	local tr_height = r.GetMediaTrackInfo_Value(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
 	
-	-- if there're visible pinned tracks at the top (intriduced in build 7.46), calculate their height because
+	-- if there're visible pinned tracks at the top (introduced in build 7.46), calculate their height because
 	-- their presence affects max track height obtained above
 	local pin_tracks_h = 0
 		if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
@@ -19440,9 +19596,9 @@ local temp_tr
 
 -- Get the data
 -- When the actions are applied the UI jolts, but PreventUIRefresh() is not suitable because it blocks the function GetMediaTrackInfo_Value() from getting the return value
--- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled
+-- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled;
 -- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
--- which works like 40113 worked before the change and its use would obviate all the calculations above 
+-- which works like 40113 worked before the change and its use would obviate all the calculations below 
 -- but it obviously doesn't cover the interim builds, so leaving the current code;
 -- since build 7.48 the following toggle zoom actions affect pinned tracks as well,
 -- introduced in build 7.46, but since their height is being taken into account
@@ -19456,7 +19612,7 @@ local retval, max_zoom = r.get_config_var_string('maxvzoom')-- min value is 0.12
 max_zoom = retval and max_zoom*100 or 100 -- ignore in builds prior to 6.76 by assigning 100 so that when track height is divided by 100 and multiplied by 100% nothing changes, otherwise convert to conventional percentage value
 local tr_h = GetTrackVal(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
 
--- if there're visible pinned tracks at the top (intriduced in build 7.46), calculate their height because
+-- if there're visible pinned tracks at the top (introduced in build 7.46), calculate their height because
 -- their presence affects max track height obtained above
 local pin_tracks_h = 0
 	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
@@ -25565,6 +25721,9 @@ F X
 	Process_FX_Incl_In_All_Containers
 	Collect_All_Container_FX_Indices
 	Loop_Over_FX_Container_Table
+	Get_FX_All_Parent_Containers
+	GetSetClear_FX_Parm_Mapping_Across_Containers
+	Get_Container_Parm_Source_Props
 	Get_FX_Parm_Orig_Name_s
 	Get_FX_Parm_By_Name_Or_Ident
 	Is_Same_Plugin
