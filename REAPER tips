@@ -625,9 +625,12 @@ Quote:
 
 =============================================================================
 
+
 -- Stopping a defer script with another script 
 
+
 https://forums.cockos.com/showthread.php?p=2089026
+
 
 ===========================================================================
 
@@ -3725,7 +3728,7 @@ https://forum.cockos.com/showthread.php?t=272617#2
 
 3. midi_hw_debug=1 ini file option to enable win32 debug messages on MIDI output errors 
 
-(since build 7.39 but may not be supported in official builds)
+(since build 7.39 but may not be supported in official builds, added officially in build 7.42)
 
 https://forum.cockos.com/showthread.php?t=300389
 
@@ -5947,7 +5950,13 @@ Track name 447 bytes, take name 512 bytes
 
 =============================================================
 
+-- REAPER Debug console
 
+called with the action [developer] Debug console
+
+To get list of supported commands, type help in the input field and click Run
+
+https://forum.cockos.com/showthread.php?t=304758
 
 
 
