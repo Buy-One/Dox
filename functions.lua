@@ -572,7 +572,7 @@ return t
 end
 
 
-function mod(a, b) -- same as math.fmod(a,b) since Lua 5.1 and math.mod in Lua 5.0
+function mod(a, b) -- same as math.fmod(a,b) since Lua 5.1 and math.mod in Lua 5.0 or % operator
 -- https://stackoverflow.com/a/20858039/8883033
     return a - (math.floor(a/b)*b)
 end
@@ -2141,6 +2141,128 @@ function sanitize_string_for_menu(name, pipe)
 local pipe = pipe and #pipe > 0 and pipe or '_'
 return (name:sub(1,1):match('[!#<>]+') and name:sub(2) or name):gsub('|', pipe)
 end
+
+
+
+function Construct_Roman_Numerals(...)
+-- vararg implies up to 2 arguments holding integers
+-- representing range bounds, i.e. start/fin,
+-- if both are supplied, invalid start defaults to 1,
+-- invalid fin defaults to 4999, unlike with numbers 4, 40, 400,
+-- number 4000 doesn't include V̅ (5000) character (although
+-- the Wikipedia article states that only numbers up to
+-- 3999 can be represented using regular notation, which 
+-- suggests that 4000 must include character for 5000);
+-- if start greater than fin, they're reversed;
+-- if only 1 arg is supplied only this supplied 
+-- number will be converted;
+-- if no argument is supplied 
+-- the range defaults to 1 - 4999;
+-- zero as range start is supported, if supplied explicitly;
+-- the function uses the commonest subtractive notation,
+-- i.e. for 4, 9, 40, 90, 400, 900 and their instances 
+-- https://en.wikipedia.org/wiki/Roman_numerals
+
+local a, b = table.unpack({...})
+local start, fin
+	if a and b then -- two arguments
+	start, fin = a, b	
+	else -- one argument
+	start, fin = a, a
+	end
+start, fin = tonumber(start), tonumber(fin)
+-- ensure that bounds are positive integers
+start, fin = start and math.floor(math.abs(start)) or 1, fin and math.floor(math.abs(fin)) or 10000
+	if start > fin then
+	start, fin = fin, start
+	end
+
+	local function parse_number(i, numeral)
+	local order = {[1000]='M', [500]='D', [100]='C', [50]='L', [10]='X', [5]='V'}
+	-- OR
+	-- order = {'M', 'D', 'C', 'L', 'X', 'V'} -- if used, must be accessed with order[k] in the loop below
+		
+		for k, divisor in ipairs({1000, 500, 100, 50, 10, 5}) do -- divisors correspond to numbers denoted with unique characters in order to catch numbers they're included in; iterating in descending order of divisors to get the greatest possible order of a number and continue to parse it in this way until the order of ones, iteration in ascending order of divisors would give wrong results because most of the numbers would be multiples of 5 (the lowest divisor) either with or without remainder, as if most of them included character 'V' which is false
+		local int = math.modf(i/divisor) -- OR math.floor(i/divisor) // whole part
+			if int > 0 then -- regular numbers, i.e. not 4, 9, 40, 90, 400, 900 and their instances which are fashioned in subtractive format
+			local numeral = (numeral or '')..order[divisor]:rep(int)
+			local remainder = i%divisor -- get remainder to parse firther
+			return parse_number(remainder, numeral)
+			elseif
+			-- the following conditions which capture numbers in subtractive notation
+			-- rely on the fact that result of modulo operation
+			-- equals the dividend if the divisor is greater, i.e. 4%5 is 4 and 91%100 is 91;
+			-- the descending order of contidions follows the divisiors order
+			-- in which they're interated over within the loop
+			divisor >= 500 and divisor - i%divisor <= 100 -- accommodate 400 & 900 and their instances whose range lies within 100 from 500 and from 1000 respectively // 'divisor >= 500' is the same as 'divisor > 100' because there're only two divisors above 100 denoted with a unique character, namely 500 and 1000
+			or divisor >= 50 and divisor - i%divisor <= 10 -- 40 & 90 and their instances whose range lies within 10 from 50 and from 100 respectively // 'divisor >= 50' is the same as 'divisor > 10' because there're only two divisors above 10 denoted with a unique character, namely 50 and 100
+			or divisor >= 5 and divisor - i%divisor == 1 -- 4 & 9 and all their instances under 40
+			then
+			local unit = divisor >= 500 and 'C' or divisor >= 50 and 'X' or divisor >= 5 and 'I' -- determine subtraction unit for non-standard nunbers, i.e. IV, IX, XL, XC, CD, CM
+			local numeral = (numeral or '')..unit..order[divisor]
+			local remainder = i - (divisor-(divisor > 100 and 100 or divisor > 10 and 10 or 0)) -- get remainder by subtracting order from the divisor and subtracting that from the input number, i.e. if input number is 42, the remainder is 2 = 42 - (50-10), if the input number is 916, the remainder is 16 = 916 - (1000-100); 'divisor > 100' is the same as 'divisor >= 500' because there're only two divisors above 100 denoted with a unique character, namely 500 and 1000, and 'divisor > 10' is the same as 'divisor >= 50' because there're only two divisors above 10 denoted with a unique character, namely 50 and 100; ignoring divisor 5 here because it's already accounted for in 'numeral' variable for numbers under 40 and if included an endless loop kicks in
+				if remainder > 0 then
+				return parse_number(remainder, numeral)
+				end
+			return numeral
+			end
+		end
+	return (numeral or '')..('I'):rep(i) -- attach ones, or return ones alone for numbers under 4
+	end
+	
+
+	-- A MORE COMPACT CODE
+	local function parse_number(i, numeral)
+
+	local order = {[1000]='M', [500]='D', [100]='C', [50]='L', [10]='X', [5]='V'}
+	-- OR
+	-- order = {'M', 'D', 'C', 'L', 'X', 'V'} -- if used, must be accessed with order[k] in the loop below
+		
+		for k, divisor in ipairs({1000, 500, 100, 50, 10, 5}) do -- divisors correspond to numbers denoted with unique characters in order to catch numbers they're included in; iterating in descending order of divisors to get the greatest possible order of a number and continue to parse it in this way until the order of ones, iteration in ascending order of divisors would give wrong results because most of the numbers would be multiples of 5 (the lowest divisor) either with or without remainder, as if most of them included character 'V' which is false
+		local int = math.modf(i/divisor) -- OR math.floor(i/divisor) // whole part
+		
+			if int > 0 -- regular numbers, i.e. not 4, 9, 40, 90, 400, 900 and their instances which are fashioned in subtractive format
+			-- the following conditions which capture numbers in subtractive notation
+			-- rely on the fact that result of modulo operation
+			-- equals the dividend if the divisor is greater, i.e. 4%5 is 4 and 91%100 is 91;
+			-- the descending order of contidions follows the divisiors order
+			-- in which they're interated over within the loop
+			or divisor >= 500 and divisor - i%divisor <= 100 -- accommodate 400 & 900 and their instances whose range lies within 100 from 500 and from 1000 respectively // 'divisor >= 500' is the same as 'divisor > 100' because there're only two divisors above 100 denoted with a unique character, namely 500 and 1000
+			or divisor >= 50 and divisor - i%divisor <= 10 -- 40 & 90 and their instances whose range lies within 10 from 50 and from 100 respectively // 'divisor >= 50' is the same as 'divisor > 10' because there're only two divisors above 10 denoted with a unique character, namely 50 and 100
+			or divisor >= 5 and divisor - i%divisor == 1 -- 4 & 9 and all their instances under 40
+			then
+			local unit = divisor >= 500 and 'C' or divisor >= 50 and 'X' or divisor >= 5 and 'I' -- determine subtraction unit for non-standard nunbers, i.e. IV, IX, XL, XC, CD, CM
+			local numeral = int > 0 and (numeral or '')..order[divisor]:rep(int) or (numeral or '')..unit..order[divisor]
+			local remainder = int > 0 and i%divisor -- get remainder to parse firther
+			or i - (divisor-(divisor > 100 and 100 or divisor > 10 and 10 or 0)) -- get remainder for numbers in subtractive notation by subtracting order from the divisor and subtracting that from the input number, i.e. if input number is 42, the remainder is 2 = 42 - (50-10), if the input number is 916, the remainder is 16 = 916 - (1000-100); 'divisor > 100' is the same as 'divisor >= 500' because there're only two divisors above 100 denoted with a unique character, namely 500 and 1000, and 'divisor > 10' is the same as 'divisor >= 50' because there're only two divisors above 10 denoted with a unique character, namely 50 and 100; ignoring divisor 5 here because it's already accounted for in 'numeral' variable for numbers under 40 and if included an endless loop kicks in
+				if int > 0 or remainder > 0 then
+				return parse_number(remainder, numeral)
+				else -- return numeral constructed in subtractive notation if remainders is smaller than 0
+				return numeral
+				end
+			end
+		end
+	return (numeral or '')..('I'):rep(i) -- attach ones, or return ones alone for numbers under 4
+	end
+	
+local t = {}
+	for i=start,fin do
+	local numeral
+		if i > 0 then
+		numeral = parse_number(i)
+		else
+		numeral = 'N'
+		end
+	t[i] = numeral
+	end
+return t
+end
+-- USE: 
+-- t = Construct_Roman_Numerals(1,100)
+-- roman_67 = t[67]
+-- t = Construct_Roman_Numerals(67)
+-- roman_67 = t[67]
+
 
 
 
@@ -8982,16 +9104,64 @@ r.PreventUIRefresh(-1)
 end
 
 
+
+function Insert_AI_with_Unique_Pool_ID(env, item)
+-- based on https://forum.cockos.com/showthread.php?t=304784
+-- if no selected items on the track inserts at all items
+
+local env = env or r.GetSelectedTrackEnvelope(0)
+local tr = r.GetEnvelopeInfo_Value(env, 'P_TRACK')
+local tr_itm_cnt = tr ~= 0 and r.CountTrackMediaItems(tr)
+	if not env or tr == 0 or tr_itm_cnt == 0 then 
+--	reaper.MB('No envelope is selected','',0) 
+	return end
+
+local itm_t, sel_exist = {}
+	for i=0, tr_itm_cnt-1 do
+	local item = r.GetTrackMediaItem(tr, i)
+	sel_exist = sel_exist or r.IsMediaItemSelected(item)
+	t[#t+1] = item
+	end
+	
+	if sel_exist then -- remove all non-selected
+		for i=#itm_t,1,-1 do
+			if not r.IsMediaItemSelected(itm_t[i]) then
+			table.remove(itm_t, i)
+			end
+		end
+	end
+	
+local pool_ID = math.floor(tonumber(os.date('%X'):gsub('[^0-9]',''))) -- time hh:mm:ss; removing all but digits and truncating decimal zeros with math.floor
+	
+--r.Undo_BeginBlock2(0)
+	for k, item in ipairs(itm_t) do
+	local item_pos = GetVal(item, 'D_POSITION')
+	local item_len = GetVal(item, 'D_LENGTH')
+	local AI_idx = r.InsertAutomationItem(env, pool_ID, item_pos, item_len)
+	pool_ID = pool_ID+1 -- increment explicitly for the next cycle, because since pool_ID value is taken from time value with resolution down to seconds it won't be naturally updated by the next cycle because script runs much faster
+	end
+--reaper.Undo_EndBlock2(0,'Insert pooled AI stretched to '..tostring(items)..' selected items', 1)
+end
+
+
+
 -- STORE, UNSELECT AND RESTORE SELECTED ITEMS (incl. autom items)
-function Delete_AutomItem(item, env, autoitem_idx, length, limit) -- length and limit are optional
+function Delete_AutomItem(item, env, AI_idx, length, limit, keep_points) 
+-- length and limit are optional;
+-- keep points is boolean;
+-- can be deleted via envelope chunk as well
+-- but keeping points will be challenging
+
 	if length and limit and length < limit  -- minimum length allowed is 0.1 sec when set programmatically or via input
 	or not length or not limit
 	then
 	-- https://forum.cockos.com/showpost.php?p=2239082&postcount=9 thanks to X-Raym for the tip
-	r.GetSetAutomationItemInfo(env, autoitem_idx, 'D_UISEL', 1, true) -- value 1 (select), ise_set true
-	r.Main_OnCommand(42086,0) -- Envelope: Delete automation items
+	r.GetSetAutomationItemInfo(env, AI_idx, 'D_UISEL', 1, true) -- value 1 (select), ise_set true
+	local cmdID = keep_points and 42088 or 42086 -- Envelope: Delete automation items, preserve points OR Envelope: Delete automation items
+	r.Main_OnCommand(cmdID,0)
 	r.SetMediaItemSelected(item, true) -- re-select media item
 	end
+
 end
 
 
@@ -10152,14 +10322,16 @@ local track = r.ValidatePtr(obj, 'MediaTrack*')
 local item = r.ValidatePtr(obj, 'MediaItem*')
 local take = item and (take_idx and r.GetTake(obj, take_idx) or r.GetActiveTake(obj))
 
-local GetFXGUID = take and r.TakeFX_GetFXGUID or r.TrackFX_GetFXGUID
+local GetFXGUID, GetIOSize = table.unpack(take and {r.TakeFX_GetFXGUID, r.TakeFX_GetIOSize} or {r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize})
 
 local obj = track and obj or take
 
 local MON_FX = obj == r.GetMasterTrack(0) and fx_idx >= 16777216 -- OR 0x1000000
+--[[ RELATED TO THE INEFFICIENT PART BELOW
 local FXCHAINSEC = take and '<TAKEFX'
 or fx_idx >= 0x1000000 and fx_idx < 0x2000000 and not MON_FX and '<FXCHAIN_REC' -- 0x2000000+ is the range of fx inside containers, fx inside containers in input fx chain don't start with <FXCHAIN_REC attribute
 or ''
+--]]
 
 	if MON_FX then
 	local path = r.GetResourcePath()
@@ -10179,7 +10351,19 @@ local prev_fx_GUID = obj and fx_idx and GetFXGUID(obj, fx_idx-1)
 return prev_fx_GUID and target_fx_GUID and obj_chunk:match(FXCHAINSEC..'\n.-'..Esc(prev_fx_GUID)..'.-\n(BYPASS %d %d[%s%d]*.-'..Esc(target_fx_GUID)..'.-WAK.-)\n') or target_fx_GUID and obj_chunk:match(FXCHAINSEC..'.-\n(BYPASS %d %d[%s%d]*.-'..Esc(target_fx_GUID)..'.-WAK.-)\n') -- in older REAPER versions BYPASS only has 2 flags; originally the capture was ending with 'WAK %d %d', but was changed to accommodate possible expansion of flags in the future
 ]]
 
-return obj_chunk:match('.+\n(BYPASS %d %d[%s%d]*.-'..Esc(target_fx_GUID)..'.-WAK.-)\n')
+
+-- optionally conditioning pattern by fx container type instance 
+-- if only the closing part of fx container chunk must be captured
+-- i.e. from FLOATPOS onwards,
+-- otherwise the captured part will include container portion of the chunk
+-- starting from the data of the last fx instance and closing parts
+-- if all child containers;
+-- the choice depends on the task at hand
+local fx_container = GetIOSize(obj, fx_idx) == 8
+local patt = fx_container and '.+\n(FLOATPOS.-'..Esc(target_fx_GUID)..'.-WAK.-)\n' 
+or '.+\n(BYPASS %d %d[%s%d]*.-'..Esc(target_fx_GUID)..'.-WAK.-)\n' -- in older REAPER versions BYPASS only has 2 flags; originally the capture was ending with 'WAK %d %d', but was changed to accommodate possible expansion of flags in the future
+
+return obj_chunk:match(patt)
 
 end
 
@@ -11409,7 +11593,8 @@ function GetSetClear_FX_Parm_Mapping_Across_Containers(obj, fx_idx, parm_idx, pa
 -- if empty or invalid it will be created inside this function;
 -- set arg: 1 or any valid value apart from 2 - map parameter across all containers (set), 
 -- 2 - unmap parameter across all containers (clear),
--- using 1, 2 because relying on booleans true/false gets tricky in ternary expression
+-- integers 1, 2 were opted for because relying on booleans true/false 
+-- gets tricky in ternary expression
 -- where false is diffucult to assign reliably due to its being weak value
 -- i.e. expression local mode = a and not b and true or not a and b and false or nil
 -- instead of false will always fall back on nil,
@@ -11431,24 +11616,24 @@ local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaIte
 				end
 			until not retval -- or #fx_idx == 0
 		end
-		if #parent_cont_t > 0 then -- map across containers
-		local child_cont_idx, mapped_parm_idx = fx_idx, parm_idx -- assign current fx parameters to variables which will be updated during the loop
-		local unmap_t = set == 2 and {} -- initialize to collect indices associated with parameter across all containers // use separate table because if a table passed as parent_cont_t arg has this exact name, it will be modified and likely unusable for further operations outside the function
+		if #parent_cont_t > 0 then -- map across containers or collect data for unmapping and unmap or find it mapped across containers
+		local child_cont_idx, mapped_parm_idx = fx_idx, parm_idx -- assign current fx parameters to variables which will be updated during the loop // parm_idx is 0-based
+		local map_t = set ~= 1 and {} -- initialize to collect indices associated with parameter across all containers // use separate table because if a table passed as parent_cont_t arg has this exact name, it will be modified and likely unusable for further operations outside the function
 		-- first current fx parameter is mapped to its parent container parameter list
 		-- and then this parameter is mapped across containers using its index in the child container parameter list
-			for i = #parent_cont_t,1,-1 do -- loop in reverse because container indices are stored from the outermost to the innermost and it's the innermost which parameter of an fx inside a container must be mapped to first so that there's something to map to further up the chain
+			for i = #parent_cont_t,1,-1 do -- loop in reverse because container indices are stored from the outermost to the innermost and it's the innermost container which parameter of an fx inside a container must be mapped to first so that there's something to map to further up the chain
 			local cont_idx = parent_cont_t[i]
-			local parmname = 'container_map.'..(set and 'add.' or 'get.')..child_cont_idx..'.'..mapped_parm_idx -- this parameter must be applied to container therefore the 2nd argument in TrackFX_GetNamedConfigParm is always container index // in the very first cycle child_cont_idx is parent container of the fx whose index is passed as fx_idx, in subsequent cycles it's always a child container of container at cont_idx
+			local parmname = 'container_map.'..(set and 'add.' or 'get.')..child_cont_idx..'.'..mapped_parm_idx -- this parameter must be applied to container therefore the 2nd argument in GetConfigParm is always container index // in the very first cycle child_cont_idx is parent container of the fx whose index is passed as fx_idx, in subsequent cycles it's always a child container of container at cont_idx
 			retval, mapped_parm_idx = GetConfigParm(obj, cont_idx, parmname) -- return mapped parameter index associated with it in the parent container parameter list, for the next cycle to map it to next parent container
 				if not set and not retval then return -- if set is nil, i.e. get mode, retval being false means that parameter mapping hasn't reached the current (cont_idx) container, i.e. it's not mapped across all containers, therefore abort as there's no point to continue
-				elseif set == 2 then -- collect parameter indices associated with parameter list of each container for anmapping
-				unmap_t[i] = {cont_idx=cont_idx, parm_idx=mapped_parm_idx}
+				elseif set ~= 1 then -- collect parameter indices associated with parameter list of each container for unmapping or returning to the main routine
+				map_t[i] = {cont_idx=cont_idx, parm_idx=mapped_parm_idx}
 				end
 			child_cont_idx = cont_idx -- update for the next cycle, for the next container (one level above current) current one becomes child
 			end
-			if not set then return true -- if set is nil, i.e. get mode, return true if the loop above wasn't aborted preemptively, which means that the parameter is mapped across ALL parent containers
+			if not set then return true, map_t -- if set is nil, i.e. get mode, return true if the loop above wasn't aborted preemptively, which means that the parameter is mapped across ALL parent containers, plus return table with the parameter data
 			elseif set == 2 then -- unmap parameter across all parent containers
-				for k, data in ipairs(unmap_t) do -- here loop directly because unmapping must be performed in the order opposite to mapping, i.e. from the outermost container down to the innermost
+				for k, data in ipairs(map_t) do -- here loop directly because unmapping must be performed in the order opposite to mapping, i.e. from the outermost container down to the innermost
 				GetConfigParm(obj, data.cont_idx, 'param.'..data.parm_idx..'.container_map.delete')
 				end
 			end
@@ -11483,13 +11668,10 @@ local parm_cnt = GetNumParams(obj, cont_idx)-1 -- -1 to conform to 0-based param
 	local ret, src_fx_idx = GetNamedConfigParm(obj, cont_idx, 'container_item.'..src_fx_idx) -- 0x2000000 based index to be passed to all regular FX functions // src_fx_idx is string
 	src_fx_idx = src_fx_idx+0 -- converting index from string into integer
 	local ret, src_parm_idx = GetNamedConfigParm(obj, cont_idx, 'param.'..parm_idx..'.container_map.fx_parm') --  src_parm_idx is string
-	-- local ret, src_fx_name = GetNamedConfigParm(obj, src_fx_idx, 'original_name') -- or 'fx_name'
 	src_parm_idx = src_parm_idx+0 -- converting index from string into integer
 	local ret, src_fx_name = GetFXName(obj, src_fx_idx) -- returns aliased instance name if changed by the user; if parameter is mapped from a child container parameter list, returns name of the child container
-	--Msg(src_fx_name,'src_fx_name')
 	local ret, src_parm_name = GetParamName(obj, src_fx_idx, src_parm_idx) -- if aliased by user returns aliased name; if parameter is mapped from a grandchild container parameter list, returns full path to the parameter starting from grandchild container name, i.e. if source fx resides inside a grandchild container named 'cont123' the returned path will look like 'cont123: src FX name: src parm name'; the aliased path which is returned may be aliased at any level of container hierarchy
-	--Msg(src_parm_name,'src_parm_name')
-	-- concatenate mapped parameter name as it's supposed to appear in container parameter list in default format which is 
+	-- concatenate mapped parameter name as it's supposed to appear in container parameter list in default format which is:
 	-- [container1 name]: [container2 name] ...: [FX instance name]: [param name]
 	-- when fx is deep within container hierarchy, for each container the parameter name is added container name;
 	-- when src_fx_name is not a container name, non-aliased FX instance name is stripped off the plugin type prefix and vendor name
@@ -11506,9 +11688,11 @@ function Get_FX_Parm_Orig_Name_s(obj, fx_idx, parm_idx)
 -- in case it's been aliased by the user
 -- obj is track or take;
 -- if parm_idx is valid, returns name of parameter 
--- associated with fx_idx, otherwise collects
+-- at parm_idx, otherwise collects
 -- all parameter names;
--- works with builds 6.37+, for older builds use Validate_FX_Identity()
+-- works with builds 6.37+ since which original non-aliased
+-- fx name can be retrieved for use in TrackFX_AddByName(),
+-- for older builds use Validate_FX_Identity()
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 local GetConfig = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
@@ -11978,6 +12162,19 @@ function Find_Video_Proc_Instance(take, preset, want_disabled)
 end
 
 
+function Collect_FX_Parm_Aliases(fx_chunk)
+-- fx_chunk arg stems from Get_FX_Chunk()
+local t = {}
+	for line in fx_chunk:gmatch('[^\n\r]+') do
+		if line:match('PARMALIAS') then
+		local parm_idx, alias = line:match('PARMALIAS (%d+).- "?(.+)') -- '.-' becase since presumably build 6.48 between index and the alias, parameter identifier (returned by r.Track/TakeFX_GetParamIdent) or VST3/CLAP internal param index can be tucked in separated by a colon
+		t[parm_idx+0] = alias:match('[%s#]+') and alias:sub(1,-2) or alias -- converting index into a number and truncating trailing quotation mark if alias contains spaces or hash (#) because it's captured along with it
+		end
+	end
+return t
+end
+
+
 
 --================================================  F X  E N D  ==============================================
 
@@ -12117,20 +12314,6 @@ function Re_Store_Active_Take_By_GUID(item, GUID)
 	end
 end
 
-
-
-function Delete_Take_Src(take)
-ACT(40440) -- Item: Set selected media temporarily offline // if source is removed before take is removed
--- Thanks to cfillion and MPL
--- https://forum.cockos.com/showthread.php?t=211250
--- https://forum.cockos.com/showthread.php?p=1889202
-local src = r.GetMediaItemTake_Source(take)
-local src = r.GetMediaSourceParent(src) or src -- in case the item is a section or a reversed source
-local file_name = r.GetMediaSourceFileName(src, '')
-os.remove(file_name)
-os.remove(file_name..'.reapeaks')
-ACT(40439) -- Item: Set selected media online // if source is removed before take is removed
-end
 
 
 function Delete_Track_Items(tr)
@@ -13492,6 +13675,54 @@ end
 local fade_in, fade_out, xfade_in, xfade_out, xfade_in_nonuniform, xfade_out_nonuniform = Fades_Exist(r.GetSelectedMediaItem(0,0))
 
 
+
+function is_audio_src(obj)
+-- obj is either take source or take pointer
+-- take is advised in cases where source may be set to section or reversed
+
+local validate = r.ValidatePtr
+local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
+	if src then
+	src = obj
+	elseif take then
+	src = r.GetMediaItemTake_Source(obj) -- won't return accurate pointer for reversed takes and sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+	src = r.GetMediaSourceParent(src) or src
+	end
+	
+	if src then
+	local typ = r.GetMediaSourceType(src, '')
+		for k, v in ipairs({'MIDI', 'RPP', 'EMPTY', 'CLICK', 'LTC', 'VIDEO'}) do
+			if typ:match(v) then
+				if v == 'VIDEO' then -- as of build 7.52 wma and m4a files are recognized as video even though they only contain audio, so need to be validated further
+				local ext = r.GetMediaSourceFileName(src, ''):match('.+%.(.+)$')
+					if ext == 'wma' and ext == 'm4a' then 
+					return true
+					end
+				end
+			return
+			end
+		end
+	return true
+	end
+
+end
+
+
+function Delete_Take_Src(take)
+ACT(40440) -- Item: Set selected media temporarily offline // if source is removed before take is removed
+-- Thanks to cfillion and MPL
+-- https://forum.cockos.com/showthread.php?t=211250
+-- https://forum.cockos.com/showthread.php?p=1889202
+local src = r.GetMediaItemTake_Source(take)
+local src = r.GetMediaSourceParent(src) or src -- in case the item is a section or a reversed source
+local file_name = r.GetMediaSourceFileName(src, '')
+os.remove(file_name)
+os.remove(file_name..'.reapeaks')
+ACT(40439) -- Item: Set selected media online // if source is removed before take is removed
+end
+
+
+
 function Get_Take_Src_Props(take)
 	if take then
 	local src = r.GetMediaItemTake_Source(take)
@@ -14295,6 +14526,7 @@ r.UpdateItemInProject(item)
 r.PreventUIRefresh(-1)
 	
 end
+
 
 
 
@@ -17297,8 +17529,6 @@ local col_idx = 0
 	until col_idx == col_cnt
 
 end
-
-
 
 
 
@@ -21326,6 +21556,26 @@ end
 
 
 
+function Toggle_Option(option, data, output, scr_ID)
+-- toggle in response to menu item click;
+-- option arg is string, one of the options stored as extended state in 0 and 1 format;
+-- data is string, stems from extended state extracted before loading the menu, i.e.
+--[[ 
+local data = r.GetExtState(scr_ID, 'OPTIONS')
+local option1, option2, option3 = data:match('(%d)(%d)(%d)')
+]]
+-- output is integer, menu output;
+-- scr_ID stems from get_action_context();
+-- if option index in extended state doesn't match its index in the menu
+-- output value will have to be adjusted accordingly
+local option = option == '1' and '0' or '1'
+local i = 0
+local data = data:gsub('%d', function() i=i+1; if i==output then return option end end)
+r.SetExtState(scr_ID, 'OPTIONS', data, false) -- persist false
+end
+
+
+
 function Create_Submenus_Dynamically(t, limit)
 -- meant for creation of a menu with a limited number
 -- of items in the main menu in order to fit within the screen height
@@ -21364,6 +21614,22 @@ return menu
 end
 
 
+
+function Options_State_Readout(...)
+-- vararg is a list of option vars holding strings '1' or '0';
+-- in place of irrelevant options false must passed instead of nil
+-- so that ipairs loop below doesn't break;
+-- meant to display in the main menu
+-- the state of options hidden in a submenu
+local result
+	for k, opt in ipairs({...}) do
+	result = (result or '')
+	..(not opt and '' or opt == '1' and string.char(226,157,181+k)..' ' or string.char(226,145,159+k)..' ') -- Dingbat Negative Circled Digit X OR Circled Digit X, starting from 1, 226,157,182 or 226,145,160 respectively
+	-- OR
+	-- ..(not opt and '' or opt == '1' and string.char(0xE2,0x9D,B5+k)..' ' or string.char(0xE2,0x91,0x9F+k)..' ')
+	end
+return result
+end
 
 
 
@@ -23966,6 +24232,32 @@ return actions[index]()
 end
 
 
+function get_Lua_bitdepth()
+-- which isn't necessarily system bitdepth
+-- https://stackoverflow.com/a/61326632/8883033
+-- In 32 bit Lua 0xffffffff(8f) would be the max int number and 0xfffffffff(9f) would overflow
+    if(0xfffffffff==0xffffffff) then return 32 else return 64 end
+end
+
+
+function get_system_bitdepth1()
+-- https://stackoverflow.com/a/48094597/8883033
+-- https://en.wikipedia.org/wiki/Environment_variable
+local arch
+	if (os.getenv'os' or ''):match'Windows' then
+	arch = os.getenv'PROCESSOR_ARCHITECTURE'
+	else -- Linux
+	arch = io.popen'uname -m':read'*a'
+	end
+return (arch or ''):match'64' or '32'
+end
+
+
+function get_system_bitdepth2()
+local _os = r.GetOS()
+return _os:match'64' or _os:match'32' or 'Linux'
+end
+
 
 function gmem_write_read_str(index, str) -- cfillion
 -- https://forum.cockos.com/showthread.php?t=214162 gmem discussion
@@ -25362,6 +25654,7 @@ S T R I N G S
 	wrap_text
 	numerate_instances
 	sanitize_string_for_menu
+	Construct_Roman_Numerals
 
 
 T A B L E S
@@ -25640,6 +25933,7 @@ A U T O M A T I O N  I T E M S
 
 	UnTrim_AutomItem_LeftEdge
 	Trim_AutomItem_LeftEdge
+	Insert_AI_with_Unique_Pool_ID
 	Delete_AutomItem
 	Split_AutomItem
 	Re_Store_Sel_AIs1
@@ -25745,7 +26039,6 @@ I T E M S
 	Rename_Item_Take_Src_File2
 	Re_Store_Active_Take_At_Index
 	Re_Store_Active_Take_By_GUID
-	Delete_Take_Src
 	Delete_Track_Items
 	Count_Track_Sel_Items1
 	Count_Track_Sel_Items2
@@ -25783,6 +26076,8 @@ I T E M S
 	Item_Time_2_Proj_Time
 	ApplyNudge scenarios
 	Fades_Exist
+	is_audio_src
+	Delete_Take_Src
 	Get_Take_Src_Props
 	Select_Items_With_Same_Src_Media
 	Audio_Or_MIDI_Takes
@@ -25809,7 +26104,7 @@ I T E M S
 	Duplicate_Active_Take_Contiguously
 	Move_Active_Take_Within_Item
 	get_active_take_index_via_chunk
-	Convert_Empty_Take_To_Valid_Take
+	Convert_Empty_Take_To_Valid_Take	
 
 
 
@@ -25916,7 +26211,7 @@ W I N D O W S
 	Get_All_Parent_Windows
 	Get_Top_Parent_Window
 	Is_Parent_Window
-	Is_Window_Docked	
+	Is_Window_Docked
 	Traverse_List1
 	Traverse_List2
 	GetSet_SWS_Notes_Wnd_Scroll_Pos
@@ -26086,7 +26381,9 @@ U T I L I T Y
 	Get_Set_Menu_Toggle_Options
 	Menu_With_Toggle_Options1
 	Menu_With_Toggle_Options2
+	Toggle_Option
 	Create_Submenus_Dynamically
+	Options_State_Readout
 	ShowMessageBox_Menu
 	Re_Store_Ext_State	
 	Wrapper1
@@ -26179,6 +26476,9 @@ U T I L I T Y
 	Action_list_sections
 	Generate_list_of_notes
 	Run_Functions_From_Table
+	get_Lua_bitdepth
+	get_system_bitdepth1
+	get_system_bitdepth2
 	gmem_write_read_str + JSFX
 	split_string_at_new_line_charA JSFX
 	split_string_at_new_line_charB JSFX
