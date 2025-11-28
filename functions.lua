@@ -2247,13 +2247,7 @@ start, fin = start and math.floor(math.abs(start)) or 1, fin and math.floor(math
 	
 local t = {}
 	for i=start,fin do
-	local numeral
-		if i > 0 then
-		numeral = parse_number(i)
-		else
-		numeral = 'N'
-		end
-	t[i] = numeral
+	t[i] = i == 0 and 'N' or parse_number(i)
 	end
 return t
 end
@@ -17072,6 +17066,7 @@ function Move_Window_To_Another_Dock(wnd_id, new_pos, cur_pos)
 -- cur_pos is optional, if passed, docker position will only be changed of the window's current pos matches cur_pos value, otherwise position will be changed regardless of the current one
 -- also to figure out how to toggle midi editor visibility
 -- some info on docks https://forum.cockos.com/showthread.php?t=207081
+-- https://github.com/Buy-One/Dox/blob/main/reaper.ini%20toolbars%20and%20dockers
 
 	if not new_pos or not tonumber(new_pos)
 	or tonumber(new_pos) < 0 or tonumber(new_pos) > 4 then
@@ -17081,7 +17076,7 @@ function Move_Window_To_Another_Dock(wnd_id, new_pos, cur_pos)
 	or tonumber(new_pos) < 0 or tonumber(new_pos) > 4) then
 	return end
 
-local dockermode = r.GetConfigWantsDock(wnd_id) -- ger dockermode the window is currently assigned to
+local dockermode = r.GetConfigWantsDock(wnd_id) -- get dockermode the window is currently assigned to, there're 16 dockermodes in the range of 0-15 each of which can be assigned one of 4 positons (left, top, right, bottom)
 
 	if cur_pos and r.DockGetPosition(dockermode) ~= cur_pos then return end -- compare the position the dockermode belongs to with the cur_pos value if any
 
@@ -17099,7 +17094,7 @@ local function is_region_render_vis(routing)
 		return end -- so region render matrix visibility is false
 	end
 -- if the function didn't exit early, all windows with toggle action are closed
--- 'View: Show region render matrix window' is not a toggle, so evaluate that via reaper,ini
+-- 'View: Show region render matrix window' is not a toggle, so evaluate that via reaper.ini
 	for line in io.lines(r.get_ini_file()) do
 		if line:match('routingwnd_vis') and line:sub(-1) == '1' then
 		-- the key has value 1 when region render matrix is open as well
@@ -17164,7 +17159,7 @@ end
 --[-[ WORKS
 local function wait_and_reopen(commandID)
 	if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 0 then
-	r.Main_OnCommand(commandID, 0) -- re-open // must be inside defer loop, for some reason when the defer loop stops commandID  is not accessible to Main_OnCommand() function outside
+	r.Main_OnCommand(commandID, 0) -- re-open // must be inside defer loop, for some reason when the defer loop stops commandID is not accessible to Main_OnCommand() function outside
 	return
 	elseif commandID == 41888 then
 		for line in io.lines(r.get_ini_file()) do
@@ -17190,17 +17185,18 @@ local wnd_id = wnd_id:match('routing') and 'routing' or wnd_id
 	for i = 0, 15 do -- there're 16 dockermode indices in total
 		if r.DockGetPosition(i) == new_pos then -- find dockermode associated with the desired position
 		-- in reaper.ini it's e.g. dockermode5=0;
-		-- update dockermode to which the window is assigned in reaper.ini;
+		-- update position of dockermode to which the window is assigned in reaper.ini
 		-- in [REAPERdockpref] section
 		r.Dock_UpdateDockID(wnd_id, i)
 	--	r.UpdateArrange() -- doesn't work to visually update window position
 		-- must be refreshed for the change to become visible, that is its visibility toggled
+		-- THESE r.DockWindowRefresh() AND r.DockWindowRefreshForHWND(wnd_id) DON'T WORK FOR REFRESHING
 			if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1
 			or commandID == 41888 and is_region_render_vis(routing)
 			then -- visible // will work when updating dock position of a window regardless of visibility if 'if not vis then' condition isn't used above, in which case only if a window is visible it will be reloaded, the rest will be moved in the background
 			r.Main_OnCommand(commandID, 0) -- close
 			wait_and_reopen(commandID) -- toggle state is updated slower than the function runs hence the need to wait and only then re-open, the same is true for routingwnd_vis value update in reaper.ini
-		-- 	OR
+		-- OR
 		--	r.defer(wrapper(wait_and_reopen, commandID)) -- re-open
 			end
 		break end
@@ -24233,7 +24229,7 @@ end
 
 
 function get_Lua_bitdepth()
--- which isn't necessarily system bitdepth
+-- Lua compiler bitdepth which isn't necessarily system bitdepth
 -- https://stackoverflow.com/a/61326632/8883033
 -- In 32 bit Lua 0xffffffff(8f) would be the max int number and 0xfffffffff(9f) would overflow
     if(0xfffffffff==0xffffffff) then return 32 else return 64 end
