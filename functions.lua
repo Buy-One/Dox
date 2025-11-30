@@ -723,7 +723,7 @@ end
 -- a % b == a - math.floor(a/b)*b
 
 
-function get_integer_length(int)
+function get_integer_length1(int)
 	if not int or not tonumber(int) then return 0 end
 local int = math.abs(tonumber(int)) -- rectify negative	
 	for i = 0, math.huge do
@@ -732,6 +732,17 @@ local int = math.abs(tonumber(int)) -- rectify negative
 	end
 end
 -- OR #(integer..'') -- convert to string and measure string length
+
+
+function get_integer_len2(int)
+-- supports integers up to 1 billion
+	for i=9,0,-1 do
+		if int == 0 then return 1
+		elseif int/10^i >= 1 then
+		return i+1
+		end
+	end
+end
 
 
 function un_pack_integers(t, length, packed_int)
@@ -17055,6 +17066,117 @@ function Exclude_Visible_Windows(t) -- t stems from Re_Store_Windows_Props_By_Na
 end
 
 
+
+function Is_Window_Docked1(wnd)
+-- includes floating docker as well
+local GetParent = r.BR_Win32_GetParent or r.JS_Window_GetParent
+	if not GetParent then return end -- no extension is installed
+local wnd, retval, title = wnd
+	repeat
+	wnd = GetParent(wnd)
+		if r.BR_Win32_GetWindowText then
+		retval, title = r.BR_Win32_GetWindowText(wnd)
+		elseif r.JS_Window_GetTitle then
+		title = r.JS_Window_GetTitle(wnd)
+		end
+		if title == 'REAPER_dock' then return true end
+	until not wnd
+end
+
+
+function Is_Window_Docked2(win_id)
+-- win_id is a string that identifies window in reaper.ini
+-- most of them are listed as keys in the t table in the function
+-- Move_Window_To_Another_Dock()
+
+local found
+	for line in io.lines(r.get_ini_file()) do
+		if line == '['..win_id..']' then found = 1
+		elseif found and line:match('^dock=') then
+		return line:match('^dock=1')
+		elseif found and line:match('^%[.-%]') then -- new section
+		return
+		end
+	end
+
+end
+
+
+
+function Is_Wnd_Docked_In_Floating_Docker1(wnd_id)
+-- the function determines if floating docker was the LAST docker 
+-- the window was docked at and current visibility status of the docker
+-- and doesn't determine the state if window itself, 
+-- whether currently docked or not, open or not,
+-- the window docked state info must be gleaned from the window section in reaper.ini
+-- see Is_Window_Docked1() and Is_Window_Docked2()
+-- while its visibility status either from the window section or from the toggle state
+-- of the action which toggles its visibility;
+-- wnd_id is a string which identifies window in reaper.ini
+-- most of them are listed as keys in the t table in the function
+-- Move_Window_To_Another_Dock()
+
+local dockermode = r.GetConfigWantsDock(wnd_id)
+local ini = r.get_ini_file()
+
+	if not dockermode then -- normally won't be necessary because GetConfigWantsDock() should work
+	local found
+		for line in io.lines(ini) do
+			if line == '[REAPERdockpref]' then found = 1 -- find dock preferences section
+			elseif found and line:match('^'..wnd_id..'=') then -- find window entry in the dock preferences section
+			dockermode = line:match('=.+ (%d+)') -- get the dockermode index the window is assigned to
+				if dockermode then break end
+			end
+		end
+	end
+	
+	if dockermode then
+		for line in io.lines(ini) do -- determine dockermode status
+		local status = line:match('^dockermode'..dockermode..'=(%d+)')
+			if status then
+			-- first return value indicated whether it's the floating docker which the window is docked at
+			-- the second - the floating docker visibility status
+			-- if first one is false, the second is irrelevant
+			return status+0 > 32000, -- i.e. 32768, 32770, 98304 or 98306
+			status+0 < 90000 and 1 -- i.e. 32768 or 32770, open floating docker
+			or 2 -- i.e. 98304 or 98306, closed floating docker
+			end
+		end
+	end
+
+end
+
+
+
+function Is_Wnd_Docked_In_Floating_Docker2(hwnd)
+-- hwnd is window handle which can be obtained with
+-- Find_Window_SWS() or reaper.JS_Window_Find()
+-- or Get_Window_And_Children_JS()
+-- unlike Is_Wnd_Docked_In_Floating_Docker1() this function
+-- only works for open windows, because hwnd
+-- must be valid;
+-- the window can be opened in a closed floating docker
+
+local dockermode, isFloatingDocker = r.DockIsChildOfDock(hwnd)
+
+	if isFloatingDocker then
+		for line in io.lines(r.get_ini_file()) do -- determine dockermode status
+		local status = line:match('^dockermode'..dockermode..'=(%d+)')
+			if status then
+			-- first return value indicated whether it's the floating docker which the window is docked at
+			-- the second - the floating docker visibility status
+			-- if first one is false, the second is irrelevant
+			return status+0 > 32000, -- i.e. 32768, 32770, 98304 or 98306
+			status+0 < 90000 and 1 -- i.e. 32768 or 32770, open floating docker
+			or 2 -- i.e. 98304 or 98306, closed floating docker
+			end
+		end
+	end
+
+end
+
+
+
 function Move_Window_To_Another_Dock(wnd_id, new_pos, cur_pos)
 -- same as the native 'Docker: Show in bottom/top/left/right of main window'
 -- only that the action affects explicitly selected window;
@@ -17065,7 +17187,9 @@ function Move_Window_To_Another_Dock(wnd_id, new_pos, cur_pos)
 -- cur_pos and new_pos args are integer: 0 - bottom, 1 - left, 2 - top, 3 - right, 4 - floating
 -- cur_pos is optional, if passed, docker position will only be changed of the window's current pos matches cur_pos value, otherwise position will be changed regardless of the current one
 -- also to figure out how to toggle midi editor visibility
--- some info on docks https://forum.cockos.com/showthread.php?t=207081
+-- some info on docks 
+-- https://forum.cockos.com/showthread.php?t=207081
+-- https://forum.cockos.com/showpost.php?p=2427144
 -- https://github.com/Buy-One/Dox/blob/main/reaper.ini%20toolbars%20and%20dockers
 
 	if not new_pos or not tonumber(new_pos)
@@ -17076,7 +17200,7 @@ function Move_Window_To_Another_Dock(wnd_id, new_pos, cur_pos)
 	or tonumber(new_pos) < 0 or tonumber(new_pos) > 4) then
 	return end
 
-local dockermode = r.GetConfigWantsDock(wnd_id) -- get dockermode the window is currently assigned to, there're 16 dockermodes in the range of 0-15 each of which can be assigned one of 4 positons (left, top, right, bottom)
+local dockermode = r.GetConfigWantsDock(wnd_id) -- get dockermode the window is currently assigned to, there're 16 dockermodes in the range of 0-15 each of which can be assigned one of 4 positons (left, top, right, bottom) // to find dockermode by window handle use r.DockIsChildOfDock(hwnd)
 
 	if cur_pos and r.DockGetPosition(dockermode) ~= cur_pos then return end -- compare the position the dockermode belongs to with the cur_pos value if any
 
@@ -17108,14 +17232,15 @@ projbay_0 = 41157, projbay_1 = 41628, projbay_2 = 41629,
 projbay_3 = 41630, projbay_4 = 41631, projbay_5 = 41632,
 projbay_6 = 41633, projbay_7 = 41634, --routing = rout,
 regmgr = 40326, explorer = 50124, trackmgr = 40906, grpmgr = 40327,
-bigclock = 40378, video = 50125, perf = 40240, navigator = 40268,
+envmgr = 42678, bigclock = 40378, video = 50125, perf = 40240, navigator = 40268,
 vkb = 40377, fadeedit = 41827, undo = 40072, fxbrowser = 40271,
-itemprops = 41589, midiedit = '', ['toolbar:1'] = 41679,
-['toolbar:2'] = 41680, ['toolbar:3'] = 41681, ['toolbar:4'] = 41682,
-['toolbar:5'] = 41683, ['toolbar:6'] = 41684, ['toolbar:7'] = 41685,
-['toolbar:8'] = 41686, ['toolbar:9'] = 41936, ['toolbar:10'] = 41937,
-['toolbar:11'] = 41938, ['toolbar:12'] = 41939, ['toolbar:13'] = 41940,
-['toolbar:14'] = 41941, ['toolbar:15'] = 41942, ['toolbar:16'] = 41943,
+itemprops = 41589, xfadeedit = 41827, phasealign = 43466, midiedit = '', 
+['toolbar:1'] = 41679, ['toolbar:2'] = 41680, ['toolbar:3'] = 41681, 
+['toolbar:4'] = 41682, ['toolbar:5'] = 41683, ['toolbar:6'] = 41684, 
+['toolbar:7'] = 41685, ['toolbar:8'] = 41686, ['toolbar:9'] = 41936, 
+['toolbar:10'] = 41937, ['toolbar:11'] = 41938, ['toolbar:12'] = 41939, 
+['toolbar:13'] = 41940, ['toolbar:14'] = 41941, ['toolbar:15'] = 41942, 
+['toolbar:16'] = 41943, 
 ['toolbar:17'] = 42404, -- MX toolbar // toolbars don't work, the numbers in their window titles are likely to not correspond to their section numbers in reaper.ini
 SWSAutoColor = '_SWSAUTOCOLOR_OPEN', -- SWS: Open auto color/icon/layout window ('Auto Color/Icon/Layout')
 ['BR - ContextualToolbars WndPos'] = '_BR_CONTEXTUAL_TOOLBARS_PREF', -- SWS/BR: Contextual toolbars... ('Contextual toolbars')
@@ -17181,26 +17306,58 @@ or commandID == 41888 and is_region_render_vis(routing)
 	if not vis then return end -- only update visible windows
 
 local wnd_id = wnd_id:match('routing') and 'routing' or wnd_id
+local set
 
 	for i = 0, 15 do -- there're 16 dockermode indices in total
-		if r.DockGetPosition(i) == new_pos then -- find dockermode associated with the desired position
-		-- in reaper.ini it's e.g. dockermode5=0;
-		-- update position of dockermode to which the window is assigned in reaper.ini
-		-- in [REAPERdockpref] section
+		if r.DockGetPosition(i) == new_pos then -- find dockermode associated with the desired position (one of four, 0 - bottom, 1 - left, 2 - top, 3 - right)
+		-- in reaper.ini it's e.g. dockermode5=0, i.e. position 0 - bottom;
+		-- assign the window to dockermode associated with the desired position
+		-- in [REAPERdockpref] section in reaper.ini		
 		r.Dock_UpdateDockID(wnd_id, i)
-	--	r.UpdateArrange() -- doesn't work to visually update window position
-		-- must be refreshed for the change to become visible, that is its visibility toggled
-		-- THESE r.DockWindowRefresh() AND r.DockWindowRefreshForHWND(wnd_id) DON'T WORK FOR REFRESHING
-			if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1
-			or commandID == 41888 and is_region_render_vis(routing)
-			then -- visible // will work when updating dock position of a window regardless of visibility if 'if not vis then' condition isn't used above, in which case only if a window is visible it will be reloaded, the rest will be moved in the background
-			r.Main_OnCommand(commandID, 0) -- close
-			wait_and_reopen(commandID) -- toggle state is updated slower than the function runs hence the need to wait and only then re-open, the same is true for routingwnd_vis value update in reaper.ini
-		-- OR
-		--	r.defer(wrapper(wait_and_reopen, commandID)) -- re-open
-			end
+		set = 1
 		break end
 	end
+	
+	if not set then r.Dock_UpdateDockID(wnd_id, 0) end -- if dockermode associated with the desired position wasn't found, assign to dockermode0, which may already be associated with another window, in which case dock will be split
+	
+	--	r.UpdateArrange(), r.DockWindowRefresh() AND r.DockWindowRefreshForHWND(wnd_id) don't work to visually update window position
+	-- must be refreshed for the change to become visible, that is its visibility toggled
+	if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1
+	or commandID == 41888 and is_region_render_vis(routing)
+	then -- visible // will work when updating dock position of a window regardless of visibility if 'if not vis then' condition isn't used above, in which case only if a window is visible it will be reloaded, the rest will be moved in the background
+	r.Main_OnCommand(commandID, 0) -- close window
+	wait_and_reopen(commandID) -- toggle state is updated slower than the function runs hence the need to wait and only then re-open, the same is true for routingwnd_vis value update in reaper.ini
+	-- OR
+	--	r.defer(wrapper(wait_and_reopen, commandID)) -- re-open
+	end
+
+end
+
+
+function Dock_Floating_Window(hwnd, tab_title, arg)
+-- hwnd can be obtained with Find_Window_SWS() or reaper.JS_Window_Find()
+-- or Get_Window_And_Children_JS()
+-- tab_title is text to be displayed in the tab, typically
+-- window actual title;
+-- arg is either integer denoting position: 0-bottom, 1- left, 2-top, 3-right,
+-- or string denoting window identifier from reaper.ini,
+-- behavior details for each see in the comments to the functions below
+
+local position = arg and tonumber(position)
+position = position and math.floor(position)
+local identstr = not position and arg and type(arg) == 'string' and arg
+
+	if not position and not identstr then return end
+
+	if hwnd and r.ValidatePtr(hwnd, 'HWND') then
+		if position and position > -1 and position < 4 then
+		r.DockWindowAdd(hwnd, tab_title, position, false) -- allowShow true/false doesn't matter if window is visible to begin with // the function accepts invalid hwnd and creates a tab in a dock without a window so must be conditioned by window handle validity // only affects floating windows // after window is docked with this function 'Dock X window in the docker' option in the tab right click context menu doesn't get checkmarked, reaper.ini isn't updated, so dock= key value in the window section will remain 0, neither is association with dokermodes updated, hence when REAPER is restarted window's floating state will be restored
+		elseif identstr then
+		r.DockWindowAddEx(hwnd, tab_title, identstr, false) -- comments are same as above; the function opens the window at a position the dockermode it was assigned last is associated with // if 'identstr' argument is invalid window identifier, seems to always get docked at the top docker, if it belongs to a different window, uses that window dock properties without affecting it
+		end
+	r.DockWindowActivate(action_list) -- activates the attached window tab; if not used or if is used but window gets attached to a not yet visible dock even as the only visible window there, the UI isn't properly redrawn and window graphics remain on the screen, in which case r.DockWindowRefreshForHWND(hwnd), r.DockWindowRefresh() and r.UpdateArrange() don't help
+	end
+	
 end
 
 
@@ -17452,19 +17609,6 @@ local last
 		last = last ~= hwnd and hwnd or last
 		end
 	until not hwnd or hwnd == last
-end
-
-
-
-
-function Is_Window_Docked(wnd)
--- includes floating docker as well
-local wnd = wnd
-	repeat
-	wnd = r.BR_Win32_GetParent(wnd)	
-	local retval, title = r.BR_Win32_GetWindowText(wnd)
-		if title == 'REAPER_dock' then return true end
-	until not wnd
 end
 
 
@@ -25576,7 +25720,8 @@ M A T H
 	count_bits_in_number
 	hex2dec
 	dec2hex
-	get_integer_length
+	get_integer_length1
+	get_integer_length2
 	un_pack_integers
 	calculate_median_value
 	split_combine_64bit_integer
@@ -26197,7 +26342,12 @@ W I N D O W S
 	Is_Window_Visible1
 	Is_Window_Visible2
 	Exclude_Visible_Windows
+	Is_Window_Docked1
+	Is_Window_Docked2
+	Is_Wnd_Docked_In_Floating_Docker1
+	Is_Wnd_Docked_In_Floating_Docker2
 	Move_Window_To_Another_Dock
+	Dock_Floating_Window
 	JS_Window_IsVisible
 	Find_Window_SWS
 	Get_Child_Windows_JS1
@@ -26207,7 +26357,6 @@ W I N D O W S
 	Get_All_Parent_Windows
 	Get_Top_Parent_Window
 	Is_Parent_Window
-	Is_Window_Docked
 	Traverse_List1
 	Traverse_List2
 	GetSet_SWS_Notes_Wnd_Scroll_Pos
