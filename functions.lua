@@ -17115,6 +17115,8 @@ function Is_Wnd_Docked_In_Floating_Docker1(wnd_id)
 -- wnd_id is a string which identifies window in reaper.ini
 -- most of them are listed as keys in the t table in the function
 -- Move_Window_To_Another_Dock()
+-- https://github.com/Buy-One/Dox/blob/main/reaper.ini%20toolbars%20and%20dockers
+-- returns nil if window is not docked in the floating docker
 
 local dockermode = r.GetConfigWantsDock(wnd_id)
 local ini = r.get_ini_file()
@@ -17133,12 +17135,8 @@ local ini = r.get_ini_file()
 	if dockermode then
 		for line in io.lines(ini) do -- determine dockermode status
 		local status = line:match('^dockermode'..dockermode..'=(%d+)')
-			if status then
-			-- first return value indicated whether it's the floating docker which the window is docked at
-			-- the second - the floating docker visibility status
-			-- if first one is false, the second is irrelevant
-			return status+0 > 32000, -- i.e. 32768, 32770, 98304 or 98306
-			status+0 < 90000 and 1 -- i.e. 32768 or 32770, open floating docker
+			if status then			
+			return status+0 < 90000 and 1 -- i.e. 32768 or 32770, open floating docker
 			or 2 -- i.e. 98304 or 98306, closed floating docker
 			end
 		end
@@ -17156,6 +17154,8 @@ function Is_Wnd_Docked_In_Floating_Docker2(hwnd)
 -- only works for open windows, because hwnd
 -- must be valid;
 -- the window can be opened in a closed floating docker
+-- https://github.com/Buy-One/Dox/blob/main/reaper.ini%20toolbars%20and%20dockers
+-- returns nil if window is not docked in the floating docker
 
 local dockermode, isFloatingDocker = r.DockIsChildOfDock(hwnd)
 
@@ -17163,11 +17163,7 @@ local dockermode, isFloatingDocker = r.DockIsChildOfDock(hwnd)
 		for line in io.lines(r.get_ini_file()) do -- determine dockermode status
 		local status = line:match('^dockermode'..dockermode..'=(%d+)')
 			if status then
-			-- first return value indicated whether it's the floating docker which the window is docked at
-			-- the second - the floating docker visibility status
-			-- if first one is false, the second is irrelevant
-			return status+0 > 32000, -- i.e. 32768, 32770, 98304 or 98306
-			status+0 < 90000 and 1 -- i.e. 32768 or 32770, open floating docker
+			return status+0 < 90000 and 1 -- i.e. 32768 or 32770, open floating docker
 			or 2 -- i.e. 98304 or 98306, closed floating docker
 			end
 		end
