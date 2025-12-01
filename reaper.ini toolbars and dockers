@@ -27,7 +27,7 @@ Correspond to the docker right-click context menu options:
 'Attached Docker position:left' = 1
 'Attached Docker position:top' = 2
 'Attached Docker position:right' = 3
-'Attach Docker to main window' OFF (floating docker) = 32768 - detached manually by dragging, 32770 - detached via action 40313 'View: Attach/unattach docker to/from main window' 
+'Attach Docker to main window' OFF (floating docker) = 32768 - detached manually by dragging, 32770 - detached via action 40313 'View: Attach/unattach docker to/from main window' / option in the context menu
 'Attach Toolbar Docker to main window' (dockermode15) OFF (floating Toolbar Docker) = 32770
 when ON then previously listed values are used
 Closed floating Docker = 98304 originally floated by dragging and having ID 32768 before closure
