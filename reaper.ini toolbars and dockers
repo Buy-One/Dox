@@ -27,7 +27,7 @@ Correspond to the docker right-click context menu options:
 'Attached Docker position:left' = 1
 'Attached Docker position:top' = 2
 'Attached Docker position:right' = 3
-'Attach Docker to main window' OFF (floating docker) = detached manually by dragging - 32768, detached via action 32770
+'Attach Docker to main window' OFF (floating docker) = 32768 - detached manually by dragging, 32770 - detached via action 40313 'View: Attach/unattach docker to/from main window' 
 'Attach Toolbar Docker to main window' (dockermode15) OFF (floating Toolbar Docker) = 32770
 when ON then previously listed values are used
 Closed floating Docker = 98304 originally floated by dragging and having ID 32768 before closure
@@ -124,14 +124,14 @@ Program window dimensions
 
 leftpanewid=  		- TCP width if it was ever changed from the default
 leftpanewid_alt=	- TCP width to restore to when TCP/Arrange divider is double clicked, https://forums.cockos.com/showthread.php?t=230919
-toppane=		- top pane width above the first track below the ruler https://forums.cockos.com/showthread.php?p=1991096#post1991096
-			- https://forums.cockos.com/showthread.php?t=206711 post 11
+toppane=            - top pane width above the first track below the ruler https://forums.cockos.com/showthread.php?p=1991096#post1991096
+                    - https://forums.cockos.com/showthread.php?t=206711 post 11
 dockheight  =		- bottom, left, top and right docker width respectively, only changes if changed manually by dragging the divider
 dockheight_l=		--
 dockheight_t=		--
 dockheight_r=		--
-wnd_x=			-- coordinate of a shrunk program window, inly updates when REAPER closes, decreases wnd_w value
-wnd_y=			--
+wnd_x=              -- coordinate of a shrunk program window, inly updates when REAPER closes, decreases wnd_w value
+wnd_y=              --
 			
 
 
@@ -177,8 +177,8 @@ fadeedit
 fx#{7737D010-1543-482E-900B-00EDC9AF7852}
 fxchain							| one for all track main FX chains, only referenced in [REAPERdockpref] section, no docking indication
 fxchainin						| one for all track input FX chains, same
-fxchain:master						| Master track FX chain
-fxchain:hwout						| Monitor FX chain, only referenced in [REAPERdockpref] section
+fxchain:master					| Master track FX chain
+fxchain:hwout					| Monitor FX chain, only referenced in [REAPERdockpref] section
 fxchain:take
 fxbrowser						| no dedicated section, fxadd_vis= , fxadd_dock=
 itemprops						| Media item properties window
@@ -205,7 +205,7 @@ trackmgr
 transport						| no dedicated section, transport_vis= , transport_dock=
 undo							| Undo log window, no dedicated section, undownd_vis= , undownd_dock=
 video							| [reaper_video] visible= , docked=
-vkb							| Virtual MIDI keyboard
+vkb							    | Virtual MIDI keyboard
 
 TESTING.lua - ReaScript Development Environment_TESTING.lua=	| IDE window
 
