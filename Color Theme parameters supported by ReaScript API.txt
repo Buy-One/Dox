@@ -401,7 +401,7 @@ idx   retval                              desc                                  
 _______________________________________________________________________________________________________________________
 
 
-
+--[[
 
 RETRIEVED AND COMPILED WITH THE FOLLOWING CODE
 
@@ -448,4 +448,5 @@ f = io.open('C:\\1.txt','w')
 f:write(list)
 f:close()
 
+--]]
 
