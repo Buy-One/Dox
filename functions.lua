@@ -8615,6 +8615,39 @@ end
 
 
 
+function Hidden_Track_Envelopes_Exist(track, want_all)
+-- want_all is boolean, if true, the function returns truth
+-- only when all valid active envelopes are hidden
+-- otherwise when at least one envelope is hidden
+
+	local function is_hidden(env)	
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
+		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+		return chunk:match('\nVIS 0 ')
+		else
+		local retval, vis = r.GetSetEnvelopeInfo_String(env, 'VISIBLE', '', false) -- setNewValue false
+		return vis == '0'
+		end
+	end
+
+local hidden
+	for i=0, r.CountTrackEnvelopes(track)-1 do
+	local env = r.GetTrackEnvelope(track, i)
+	local point_cnt = r.CountEnvelopePoints(env)
+		if point_cnt > 1 then -- only envelopes with at least two points
+		local is_hidden = is_hidden(env)
+			if want_all and not is_hidden then return false
+			elseif is_hidden then
+			hidden = true
+				if not want_all then	return true end
+			end
+		end
+	end
+return hidden
+end
+
+
+
 function Re_Store_Env_Selection(...)
 -- after setting a chunk and reordering envelopes, originally selected envelope pointer ends up belonging to another envelope, so in order to keep the original envelope selected its new pointer must be retrieved because now it will differ from the originally selected envelope pointer
 -- 1st function run is without arguments, returns 3 values
@@ -14315,7 +14348,7 @@ function Duplicate_Active_Take_Contiguously(sel_item, want_above)
 -- or above if want_above arg is valid
 -- contrary to the stock action which places it at the bottom;
 -- the function must be applied to each selected item separately
--- because action is involved which affects all selected items
+-- because an action is involved which affects all selected items
 -- simultaneously, so the function must be preceded and followed 
 -- by storage and restoration of item selection;
 -- the function must be executed within the Undo block
@@ -14532,6 +14565,85 @@ r.PreventUIRefresh(-1)
 	
 end
 
+
+
+function Get_Set_Take_Channels(take, ch_idx)
+-- valid ch_idx denotes SET mode,
+-- ch_idx is a real world mono or stereo channel index 
+-- in the range of 1-128,
+-- can be integer or string for mono channels 
+-- and must be a string for stereo channels in the format '1/2', '2/3' etc.
+-- values -2, -1 and 0 in Set mode are used for 
+-- and in Get mode are returned for 3 other modes:
+-- normal (stereo or mono), reverse stereo and downmix L+R respectively
+-----------------------------------
+-- 'I_CHANMODE' values for Get/SetMediaItemTakeInfo_Value():
+-- 0 = normal, 1 = reverse stereo, 2 = mono (downmix)
+-- 3 = mono (left), 4 = mono (right),
+-- 5-194 = Mono (3-128), the break point is channel 65
+-- whose index is 131, so mono channel ranges are
+-- 5-66 = 3-64, 131-194 = 65-128;
+-- 67-257 = Stereo (1-128), the break point is channel 
+-- 65/66 whose index is 195, so stereo channel ranges are
+-- 67-130 = 1/2-64/65, 195-257 = 65/66-127/128
+-- Initially REAPER supported up to 64 source media channels
+-- at indices 3-130, first 64 are mono, second 64 are stereo,
+-- since presumably v7 REAPER supports up to 128 channels,
+-- that's the reason for the gap between first 64 mono/stereo
+-- and next 64 mono/stereo channels, new channels were added
+-- at indices above first 128 (mono and stereo) channels,
+-- i.e. mono channel 65 starts at index 129, i.e. after stereo
+-- channel 64, stereo channel 65 starts at index 193, i.e. after
+-- mono channel 128, in all cases 2 must be added to the index 
+-- because the count starts at 3 and not 1, values 0, 1 and 2 
+-- are taken by modes normal, reverse and downmix respectively;
+-- in Get mode for channel modes normal, reversed stereo 
+-- L/R downmix the return value is -2, -1 and 0 respectively
+
+
+local FUNC = ch_idx and r.SetMediaItemTakeInfo_Value or r.GetMediaItemTakeInfo_Value
+local parm = 'I_CHANMODE'
+local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed takes and sections, that is those which have either 'Reverse' or 'Section' checkboxes checked in the 'Item properties' window, hence next line
+src = r.GetMediaSourceParent(src) or src
+local ch_cnt = r.GetMediaSourceNumChannels(src)
+
+	local function convert_ch_idx_2_ch_No(ch_idx)
+	local floor = math.floor
+	local ch_No = (ch_idx < 67 and ch_idx or (ch_idx > 130 and ch_idx < 195) and ch_idx-128) -- mono
+	local stereo = not ch_No
+	ch_No = ch_No or (ch_idx > 66 and ch_idx < 131 and ch_idx-64 or ch_idx > 194 and ch_idx-128) -- stereo // ch_idx > 66 isn't really necessary here due to preceding ch_No, but is useful when evaluating raw ch_idx value
+	ch_No = ch_No and ch_No-2 -- -2 because channel indexing starts from value 3, preceded by 0 - normal (i.e. stereo), 1 - reverse stereo and 2 - downmix, i.e. 2 meaningful values (excluding 0)
+	return ch_No and (stereo and floor(ch_No)..'/'..floor(ch_No+1) or floor(ch_No)) -- math.floor to strip trailing decimal 0 // for modes normal, reverse stereo and L/R downmix the return value is -2, -1 and 0 respectively
+	end
+	
+	local function convert_ch_No_2_ch_idx(ch_No)
+	-- ch_No can be integer or string for mono channels 
+	-- and must be a string for stereo channels in the format '1/2'
+	-- mono and stereo channel ranges are 1-128 each
+	local ch_No = tonumber(ch_No) or ch_No:match('(%d+)/')
+	local stereo
+		if not ch_No or ch_No+0 < -2 and ch_No+0 > 128 then return 
+		else
+		stereo = type(ch_No) == 'string'
+		ch_No = tonumber(ch_No)
+		end
+	local ch_idx = not stereo and ch_No < 65 and ch_No or ch_No > 64 and ch_No+64 -- mono
+	ch_idx = ch_idx or ch_No < 65 and ch_No+64 or ch_No > 64 and ch_No+128 -- stereo
+	return ch_idx+2 -- +2 because channel indexing starts from value 3, preceded by 0 - normal (i.e. stereo), 1 - reverse stereo and 2 - downmix, i.e. 2 meaningful values (excluding 0)
+	end
+
+	if ch_idx then -- set
+	local ch_idx = convert_ch_No_2_ch_idx(ch_idx)
+--Msg(ch_idx, 'ch_idx')
+	FUNC(take, parm, ch_idx)
+	r.UpdateItemInProject(r.GetMediaItemTake_Item(take))
+	else -- get
+--Msg('GET')
+	local ch = FUNC(take, parm)
+	return convert_ch_idx_2_ch_No(ch)
+	end
+
+end
 
 
 
@@ -14904,7 +15016,7 @@ end
 -- Parameters for use with ThemeLayout_GetParameter, ThemeLayout_SetParameter
 -- Supported since last builds of the version 5, exact one is uknown since their addition
 -- isn't listed in the changelog
--- In version 5 these are the only one supported
+-- In version 5 these are the only ones supported
 -- Since version 6 and the new default theme there're other parameters with positive indices
 
  idx		retval					desc							value	defValue	minValue	maxValue
@@ -14935,6 +15047,7 @@ Msg((i*-1-1000)..', '..retval..', '..desc..', '..value..', '..defValue..', '..mi
 Sources:
 https://forum.cockos.com/showthread.php?t=291551#6
 https://forum.cockos.com/showthread.php?t=242022 basic_theme_adjuster.lua
+see https://github.com/Buy-One/Dox/blob/main/Color%20Theme%20parameters%20supported%20by%20ReaScript%20API.txt
 
 ]]
 
@@ -17084,15 +17197,20 @@ local wnd, retval, title = wnd
 end
 
 
-function Is_Window_Docked2(win_id)
--- win_id is a string that identifies window in reaper.ini
--- most of them are listed as keys in the t table in the function
--- Move_Window_To_Another_Dock()
+function Is_Window_Docked2(wnd_sect_title)
+-- wnd_sect_title is a string of window section title in reaper.ini,
+-- most of them are the same as window identifiers
+-- listed as keys in the t table in the function
+-- Move_Window_To_Another_Dock(),
+-- however some window identifiers listed in Move_Window_To_Another_Dock()
+-- may differ from window section title required by this function, 
+-- such as in case of Media Explorer:
+-- 'explorer' and '[reaper_explorer]' respectively
 
 local found
 	for line in io.lines(r.get_ini_file()) do
-		if line == '['..win_id..']' then found = 1
-		elseif found and line:match('^dock=') then
+		if line == '['..wnd_sect_title..']' then found = 1 -- window section title has been found
+		elseif found and line:match('^dock=') then -- docked state setting
 		return line:match('^dock=1')
 		elseif found and line:match('^%[.-%]') then -- new section
 		return
@@ -17358,6 +17476,25 @@ end
 
 
 
+function Send_Message(hwnd, msg)
+-- msg is hexadecimal message code
+-- JS_WindowMessage_Send also supports message name instead of the code
+-- but not for all message type it seems, i.e. not 'WM_SETFOCUS'
+-- 0x0007 WM_SETFOCUS, 0x0010 WM_CLOSE, these work properly
+-- some messages will require non-zero wParam, lParam 
+-- (and maybe wParamHighWord, lwParamHighWord for JS_WindowMessage_Send),
+-- consult https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessage
+-- and use search by the message type name
+	if r.BR_Win32_SendMessage then
+	r.BR_Win32_SendMessage(hwnd, msg, 0, 0) -- 0x0010 WM_CLOSE; 0x0002 WM_DESTROY contributes to creation of ghost windows if followed by window toggle action, doesn't destroy floating window; 0x0012 WM_QUIT leaves tab if window is docked and doesn't set toggle state to off
+	elseif r.JS_WindowMessage_Send then
+	r.JS_WindowMessage_Send(hwnd, msg, 0, 0, 0, 0)
+	end
+-- https://ecs.syr.edu/faculty/fawcett/Handouts/CoreTechnologies/windowsprogramming/WinUser.h
+end
+
+
+
 function JS_Window_IsVisible(hwnd)
 -- visibility functions JS_Window_IsVisible() and BR_Win32_IsWindowVisible() aren't suitable for visibility validation of windows in multi-window dockers because these return false if a docked window is inactive, but they're accurate if there's only one window in a docker
 local parent, parent_tit
@@ -17473,7 +17610,16 @@ end
 
 
 
-function Get_Child_Windows_JS1(parent_hwnd) -- see alternative method of collecting chilren in Get_Window_And_Children_JS below
+function Get_Child_Windows_JS1(parent_hwnd) 
+-- !!! the order child windows are listed by JS_Window_ListAllChild()
+-- is not constant, it will be different for each new instance of a window,
+-- neither are child window hexadecimal addresses constant,
+-- therefore if the child window lacks title or a fixed title, finding it will be impossible
+-- see alternative method of collecting children with fixed order
+-- in Get_Window_And_Children_JS3 and Get_Window_And_Children_JS below
+
+	if not parent_hwnd then return end -- exit, because JS_Window_ListAllChild() accepts invalid argument and returns system child windows instead
+
 local retval, list = r.JS_Window_ListAllChild(parent_hwnd)
 local t = {}
 	for address in list:gmatch('0x%x+') do
@@ -17484,25 +17630,64 @@ return #t > 0 and t
 end
 
 
-function Get_Child_Windows_JS2(parent_name, want_exact)  -- see alternative method of collecting chilren in Get_Window_And_Children_JS below
+
+function Get_Child_Windows_JS2(parent_name, want_exact)  
+-- !!! the order child windows are listed by JS_Window_ListAllChild()
+-- is not constant, it will be different for each new instance of a window,
+-- neither are child window hexadecimal addresses constant,
+-- therefore if the child window lacks title or a fixed title, finding it will be impossible
+-- see alternative method of collecting children with fixed order
+-- in Get_Window_And_Children_JS3 and Get_Window_And_Children_JS below;
+-- want_exact is boolean
+
 local parent_wnd = r.JS_Window_Find(parent_name, want_exact)
-	if parent_wnd then
-	local retval, list = r.JS_Window_ListAllChild(parent_hwnd)
-	local t = {}
-		for address in list:gmatch('0x%x+') do
-		local wnd = r.JS_Window_HandleFromAddress(address)
-		t[#t+1] = {child=wnd, title=r.JS_Window_GetTitle(wnd)}
-		end
-	return #t > 0 and t
+	
+	if not parent_wnd then return end
+
+local retval, list = r.JS_Window_ListAllChild(parent_hwnd)
+local t = {}
+	for address in list:gmatch('0x%x+') do
+	local wnd = r.JS_Window_HandleFromAddress(address)
+	t[#t+1] = {child=wnd, title=r.JS_Window_GetTitle(wnd)}
 	end
+return #t > 0 and t
+
+end
+
+
+
+function Get_Child_Windows_JS3(parent_hwnd)
+-- good for locating child windows which don't have a title,
+-- or a fixed title, by their index in the child windows list
+-- because their order is constant
+
+	if not parent_hwnd then return end
+	
+local child = r.JS_Window_GetRelated(parent_hwnd, 'CHILD')
+local child_t = {}
+	if child then
+		repeat
+		local title = r.JS_Window_GetTitle(child)
+		child_t[title] = child
+	--[[ OR, depending on the design
+		child_t[#child_t+1] = {child=child, title=title}
+	]]
+		child = r.JS_Window_GetRelated(child, 'NEXT')
+		until not child
+	end
+return (#child_t > 0 or next(child_t)) and child_t
+
 end
 
 
 
 function Get_Window_And_Children_JS(wnd_title, want_exact_title)
+-- good for locating child windows which don't have a title,
+-- or a fixed title, by their index in the child windows list
+-- because their order is constant;
 -- want_exact_title is boolean
 
-local want_exact_title = want_exact_title or false -- the argument in the function doesn't support nil
+local want_exact_title = want_exact_title or false -- the argument in r.JS_Window_Find function doesn't support nil
 
 local Find = r.JS_Window_Find
 -- more reliable if want_exact_title is true to ignore string appearances
@@ -18093,7 +18278,7 @@ local Send = r.BR_Win32_SendMessage
 	for k, msg in ipairs({0x0201,0x0202}) do -- WM_LBUTTONDOWN 0x0201, WM_LBUTTONUP 0x0202
 	Send(wnd, msg, 0x0001, 1+1<<16) -- MK_LBUTTON 0x0001, x (low order) and y (high order) are 1, in lParam client window refers to the actual target window, x and y coordinates are relative to the client window and have nothing to do with the actual mouse cursor position, 1 px for both is enough to hit the window
 	end
-
+-- less efficient:
 --Send(wnd, 0x0201, 0x0001, 1+1<<16) -- WM_LBUTTONDOWN 0x0201, MK_LBUTTON 0x0001, x (low order) and y (high order) are 1, in lParam client window refers to the actual target window, x and y coordinates are relative to the client window and have nothing to do with the actual mouse cursor position, 1 px for both is enough to hit the window
 --Send(wnd, 0x0202, 0x0001, 1+1<<16) -- WM_LBUTTONUP 0x0202, MK_LBUTTON 0x0001, x and y are 1
 end
@@ -18452,6 +18637,22 @@ function smandrap_Change_MCP_Width(PIXEL_STEP, PERSIST) -- v7.0 default theme on
 reaper.ThemeLayout_RefreshAll()
 
 end
+
+
+function find_layout(layout_name, want_mcp)
+-- want_mcp is boolean to search among MCP layouts,
+-- support for transport, EnvCP, master TCP and MCP
+-- can be added 
+local i = 0
+	repeat
+	local retval, name = reaper.ThemeLayout_GetLayout(want_mcp and 'mcp' or 'tcp', i)
+		if name == alt_tcp_layout_name then return true end
+		i=i+1
+	until not retval
+return false, i
+end
+
+
 
 -- see also 'Option: Show theme color controls' dialogue in the C O L O R section
 
@@ -20463,8 +20664,46 @@ function Msg(...)
 end
 
 
+local Debug = ""
+function Msg2(msgbox, ...)
+-- msgbox is boolean, if true the input will be displayed 
+-- in a message box instead of the ReaScript console,
+-- which allows aborting the script with 'Cancel' button
+-- via the following syntax:
+-- if Msg2(1, value, 'value') then return end;
+-- if msgbox is nil/false or true and 'OK' button is clicked,
+-- after the above statement the script execution will continue,
+-- for nil/false underscore _ can be passed,
+-- the message box idea is borrowed from https://forum.cockos.com/showthread.php?t=254149;
+-- accepts either a single arg, or multiple pairs of value and caption
+-- caption must follow value because if value is nil
+-- and the vararg ends with it, it will be ignored
+-- because nil isn't a valid table value, and won't be displayed
+-- so vararg must not be allowed to end with nil when multiple
+-- arguments are passed, i.e. always end with a caption
+	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
+	local t = {...} -- constucting table this way, i.e. by packing, allows getting table length even if it contains nils
+--	local str = #t == 1 and tostring(t[1])..'\n' or not t[1] and 'nil\n' or ''
+	local str = #t < 2 and tostring(t[1])..'\n' or '' -- covers cases when table only contains a single nil entry in which case its length is 0 or a single valid entry in which case its length is 1
+		if #t > 1 then -- OR if #str == 0
+			for i=1,#t,2 do
+				if i > #t then break end
+			local val, cap = t[i], t[i+1]
+			str = str..tostring(cap)..' = '..tostring(val)..'\n'
+			end
+		end
+		if msgbox then
+			if reaper.MB(str, 'DEBUG INFO', 1) == 2 then return true end
+		else
+		reaper.ShowConsoleMsg(str)
+		end
+	end
+end
 
-function Msg2(f, ...)
+
+
+local Debug = ""
+function Msg3(f, ...)
 -- same as Msg(...) above but with argument f which is integer
 -- to modify floating point numbers precision;
 -- accepts either a single arg, or multiple pairs of value and caption
@@ -20491,6 +20730,51 @@ end
 			end
 		end
 	reaper.ShowConsoleMsg(str)
+	end
+end
+
+
+local Debug = ""
+function Msg4(msgbox, f, ...)
+-- same as Msg(...) above but with argument f which is integer
+-- to modify floating point numbers precision;
+-- msgbox is boolean, if true the input will be displayed 
+-- in a message box instead of the ReaScript console,
+-- which allows aborting the script with 'Cancel' button
+-- via the following syntax:
+-- if Msg2(1, value, 'value') then return end;
+-- if msgbox is nil/false or true and 'OK' button is clicked, 
+-- after the above statement the script execution will continue,
+-- for nil/false underscore _ can be passed,
+-- the message box idea is borrowed from https://forum.cockos.com/showthread.php?t=254149;
+-- accepts either a single arg, or multiple pairs of value and caption
+-- caption must follow value because if value is nil
+-- and the vararg ends with it, it will be ignored
+-- because nil isn't a valid table value, and won't be displayed
+-- so vararg must not be allowed to end with nil when multiple
+-- arguments are passed, i.e. always end with a caption
+
+-- https://stackoverflow.com/questions/1133639/how-can-i-print-a-huge-number-in-lua-without-using-scientific-notation
+local function form(f, s)
+return string.format(tonumber(s) and f and '%.'..f..'f' or '%s', s)
+end
+
+	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	local t = {...} -- constucting table this way, i.e. by packing, allows getting table length even if it contains nils
+--	local str = #t == 1 and form(f, t[1])..'\n' or not t[1] and 'nil\n' or ''
+	local str = #t < 2 and tostring(t[1])..'\n' -- covers cases when table only contains a single nil entry in which case its length is 0 or a single valid entry in which case its length is 1
+		if #t > 1 then -- OR if #str == 0
+			for i=1,#t,2 do
+				if i > #t then break end
+			local val, cap = t[i], t[i+1]		
+			str = str..form(f, cap)..' = '..form(f, val)..'\n'
+			end
+		end
+		if msgbox then
+			if reaper.MB(str, 'DEBUG INFO', 1) == 2 then return true end
+		else
+		reaper.ShowConsoleMsg(str)
+		end
 	end
 end
 
@@ -20735,389 +21019,6 @@ Msg(t.a) Msg(t.b) Msg(t.c)
 
 
 
-function Settings_Management_Menu_And_Help(condition, want_help, want_run)
--- manage script settings from a menu,
--- mainly geared towards boolean settings
--- (a version of the function which includes non-boolean settings
--- is used in Trigger action by audio signal or silence.lua)
--- the function updates the actual script file
--- used in Transcribing A - Create and manage segments (MAIN).lua
--- and Transcribing B - Create and manage segments (MAIN).lua
--- relies on Reload_Menu_at_Same_Pos2() and Esc() functions;
--- condition is boolean which triggers menu call,
--- want_help is boolean if 'About' text needs to be displayed to the user,
--- want_run is a boolean to create a menu button to execute the script;
--- any user settings not explicitly listed in user_sett table below 
--- will be ignored in the menu, i.e. MANAGE_SETTINGS_VIA_MENU setting
--- if present
-
---[[ -- HERE INSERT SOME CONDITION TO OPEN THE SETTINGS MENU IN A REGULAR SCRIPT
-	 -- LIKE MOUSE POSITION SO THE MENU IS ONLY DISPLAYED AT CERTAIN MOUSE COORDINATES
-	if not condition then return end -- this will allow the main script routine to run if the condition for menu display isn't met
-]]
-
-::RELOAD::
-
-local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context() -- TO BE AWARE THAT HERE THIS FUNCTION WILL GLITCH OUT IF IT'S ALREADY USED OUTSIDE OF THE FUNCTION SO scr_name VAR MAY NEED TO BE FED AS AN ARGUMENT
-
-local sett_t, help_t, about = {}, want_help and {} -- help_t is optional if help is important enough
-	for line in io.lines(scr_name) do
-	-- collect settings
-		if line:match('----- USER SETTINGS ------') and #sett_t == 0 then
-		sett_t[#sett_t+1] = line
-		elseif line:match('END OF USER SETTINGS')
-		and not sett_t[#sett_t]:match('END OF USER SETTINGS') then
-		sett_t[#sett_t+1] = line
-		break
-		elseif #sett_t > 0 then
-		sett_t[#sett_t+1] = line
-		end
-		-- collect help
-		if want_help then
-			if #help_t == 0 and line:match('About:') then
-			help_t[#help_t+1] = line:match('About:%s*(.+)')
-			about = 1
-			elseif line:match('----- USER SETTINGS ------') then
-			about = nil -- reset to stop collecting lines
-			elseif about then -- collect lines
-			help_t[#help_t+1] = line:match('%s*(.-)$')
-			end
-		end
-	end
-
-local user_sett = {'setting1', 'setting2'} -- POPULATE WITH NAMES OF ACTUAL SETTING VARIABLES // not all settings have to be included, those which aren't listed will not be available in the menu
-local menu_sett = {}
-	for k, v in ipairs(user_sett) do
-		for k, line in ipairs(sett_t) do
-		local sett = line:match(v..'%s*=%s*"(.-)"')
-			if sett then
-			menu_sett[#menu_sett+1] = #sett:gsub(' ','') > 0 and '!' or ''
-			end
-		end
-	end
-
--- type in actual setting names or their versions as menu item labels
-local menu = ('USER SETTINGS'):gsub('.','%0 ')..'||'..menu_sett[1]..'sett1||'
-..menu_sett[2]..'sett2||'..menu_sett[3]..'sett3||'
-..menu_sett[4]..'sett4|||View Help|'..(want_run and ('RUN'):gsub('.','%0 ') or ' ')
-
-local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
-
-	if output == 6 and want_help and #help_t > 0 then -- THE output VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
-	r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'),r.ClearConsole()) -- trimming the first line of user settings section because it's captured by the loop
-	end
-	
-	if want_run and output == 7 then -- THE output VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
-	return menu_sett
-	elseif output == 0 then return 1 -- i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited
-	elseif output < 2 or output >= 6 then -- THE VALUES DEPEND ON THE NUMBER OF MENU ITEMS
-	return 1 -- 1 i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited
-	-- OR goto RELOAD -- if clicked on an invalid item, i.e. title or blank
-	end
-
-output = output-1 -- offset the 1st menu item which is a title
-local src = user_sett[output]
-local sett = menu_sett[output] == '!' and '' or '1' -- fashion toggle
-local repl = src..' = "'..sett..'"'
-local cur_settings = table.concat(sett_t,'\n')
-local upd_settings, cnt = cur_settings:gsub(src..'%s*=%s*".-"', repl, 1)
-
-	if cnt > 0 then -- settings were updated, get script
-	local f = io.open(scr_name,'r')
-	local cont = f:read('*a')
-	f:close()
-	cur_settings = Esc(cur_settings)
-	upd_settings = upd_settings:gsub('%%','%%%%')
-	cont, cnt = cont:gsub(cur_settings, upd_settings)
-		if cnt > 0 then -- settings were updated, write to file
-		local f = io.open(scr_name,'w')
-		f:write(cont)
-		f:close()
-		end
-	end
-
-goto RELOAD
-
-end
---[[ USE:
-	if Settings_Management_Menu_And_Help(condition, want_help) then -- want_run is nil so the script will be aborted in any event
-	return r.defer(no_undo) -- menu was exited or item is invalid
-	end
-
--- OR (if MANAGE_SETTINGS_VIA_MENU setting is present or the settings are meant to be managed via the menu always)
-
-local menu = #MANAGE_SETTINGS_VIA_MENU:gsub(' ','') > 0 -- only if such setting is present
-
-local user_sett = menu and Settings_Management_Menu_And_Help(condition, want_help, 1) -- want_run true
-
-	if not user_sett then r.defer(no_undo) end
-	
--- initialize here if settings menu is enabled, 
--- otherwise use original variables from USER SETTINGS section
-function validate_sett(sett, menu_sett)
-return #(menu_sett or sett):gsub(' ','') > 0
-end
-sett1 = validate_sett(sett1, user_sett and user_sett[1])
-sett2 = validate_sett(sett2, user_sett and user_sett[2])
-sett3 = validate_sett(sett3, user_sett and user_sett[3])
-
-]]
-
-
-
-
-function Toggle_Settings_From_Menu(t, menu, scr_path)
--- t is table containing setting values, setting names and setting menu labels
--- see example after the function,
--- in the function instance before the menu loading it includes attributes of all settings,
--- in the function instance triggered by a click on a menu item it only includes 
--- attributes of a setting which corresponds to the clicked menu item;
--- scr_path serves as trigger for the routine of toggling the setting directly from the menu
--- if scr_path arg is absent the menu is updated based on the current
--- settings passed as t (first function instance)
-
-	local function update_menu_items(menu, sett, menu_itm)
-	return menu:gsub((sett and '' or '!')..menu_itm,
-	(sett and '!' or '')..menu_itm, 1)
-	end
-
-	if not scr_path then
-	-- compare current settings in the script with the menu state loaded as extended data
-	-- at the menu loading stage
-		for k, nested_t in pairs(t) do -- using pairs in case indexing doesn't start at 1 and/or isn't sequential
-		local sett, menu_itm = nested_t[1], nested_t[3]
-		local menu_itm_checked = menu:match('!'..menu_itm) and true or false -- assign booleans for comparison of identical value type
-			if sett ~= menu_itm_checked then
-			menu = update_menu_items(menu, sett, menu_itm) -- if menu item is not checkmarked, add checkmark and vice versa
-			end
-		end
-	else
-	local sett_name, menu_itm = t[2], t[3]
-	-- toggle from the menu
-	local menu_itm_checked = menu:match('!'..menu_itm) and true or false -- assign booleans for comparison of identical value type 
-	-- toggle
-	menu = update_menu_items(menu, not menu_itm_checked, menu_itm) -- 'not' because here if menu item is checked it must be flipped as a result of a toggle and vice versa
-	 
-		if sett == menu_itm_checked then
-
-		-- Update the setting within the script
-
-		-- load the setting
-		local settings, sett_line
-			for line in io.lines(scr_path) do
-				if not settings and line:match('----- USER SETTINGS ------') then
-				settings = 1
-				elseif settings and line:match('^%s*'..sett_name..'%s*=%s*".-"') then -- ensuring that it's the setting line and not reference to it elsewhere
-				sett_line = line
-				break
-				elseif line:match('END OF USER SETTINGS') then
-				break
-				end
-			end
-
-			-- update script if settings equal to the original menu item state
-			-- i.e. state before the change of the menu item state      
-			if sett_line and #sett_line:match('"([^%s]-)"') > 0 == menu_itm_checked then -- basically redundant condition because this was already evaluated as 'sett == menu_itm_checked' above
-			local f = io.open(scr_path,'r')
-			local cont = f:read('*a')
-			f:close()
-			local sett_upd = sett_name..' = "'..(menu_itm_checked and '' or '1')..'"' -- toggle
-			local cont, cnt = cont:gsub(sett_name..'%s*=%s*".-"', sett_upd, 1)
-				if cnt > 0 then -- settings were updated, write to file
-				local f = io.open(scr_path,'w')
-				f:write(cont)
-				f:close()
-				end
-			end
-
-		t[1] = not t[1] -- invert original setting boolean because it's been toggled
-
-		end 
-	 
-	end
-
-return menu, t[1] -- 2nd return value is the setting after toggling to be used by script functions downstream
-
-end
-
---[[ USE EXAMPLE:
-
--- MEANT TO BE USED IN PARALLEL WITH MENU STORAGE AS EXTENDED STATE
-
--- validate settings
-sett1 = validate_sett(sett1)
-sett2 = validate_sett(sett2)
-sett3 = validate_sett(sett3)
-
---	IF SETTING MENU ITEMS INDICES AREN'T SEQUENTIAL
--- THE KEYS WILL HAVE TO BE EXPLICITLY SPECIFIED IN ALL THE TABLES
-local sett_t = table.pack(sett1, sett2, sett3) -- setting values, settings must be pure booleans, nil value isn't supported
-local menu_t = {'menu item1', 'menu item2', 'menu item3'} -- menu labels which match settings
-local t = {{'sett1'},{'sett2'},{'sett3'}} -- setting names
-
-  for k in pairs(t) do -- using pairs in case indexing doesn't start at 1 and/or isn't sequential
-  table.insert(t[k],1, sett_t[k])
-  table.insert(t[k], menu_t[k])
-  end
---[=[ the loop above creates a table structured like this:
-{{sett1, 'sett1,', 'menu item1'},
-{sett2, 'sett2,', 'menu item2'},
-{sett3, 'sett3,', 'menu item3'},}
---]=]
-
-local menu = table.concat(menu_t,'|')
-
--------- LOAD/STORE MENU STATE START --------
-
-local ext_state = r.GetExtState(scr_name, KEY) -- first try loading the menu from the global extended state
-		if ext_state == '' then -- if absent, load from project extended state
-		ret, ext_state = r.GetProjExtState(0, scr_name, KEY)
-		end
-		if ext_state ~= '' then -- if there's extended state menu data
-		-- update items toggle state in the menu loaded from extended state
-		-- according to the current settings in the script in case it's changed
-		menu = Toggle_Settings_From_Menu(t, menu)
-		end
-
-::RELOAD::
-
--- store updated menu item toggle state
-r.SetExtState(scr_name, KEY, menu, false) -- persist false
-r.SetProjExtState(0, scr_name, KEY, menu)
-
--------- LOAD/STORE MENU STATE END --------
-
-local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
-
-  if output > 0 and output < 4 then -- the actual output values will depend on the menu structure, the output value may need offsetting if setting menu items don't start at index 1 as they do within the table
-  menu, retval = Toggle_Settings(t[output], menu, 1)
-    if output == 1 then
-    sett1 = retval
-    elseif output == 2 then
-    sett2 = retval
-    else
-    sett3 = retval
-    end
-  goto RELOAD
-  end
-
---]]
-
-
-function Toggle_Setting_From_Menu(sett_name, scr_path)
--- sett_name is a string
--- the function is not designed to work
--- with menu loaded from extended state
-
--- load the setting
-local settings, sett_line
-	for line in io.lines(scr_path) do
-		if not settings and line:match('----- USER SETTINGS ------') then
-		settings = 1
-		elseif settings and line:match('^%s*'..sett_name..'%s*=%s*".-"') then -- ensuring that it's the setting line and not reference to it elsewhere
-		sett_line = line
-		break
-		elseif line:match('END OF USER SETTINGS') then
-		break
-		end
-	end
-
-local sett_new_state = sett_line:match('^%s*'..sett_name..'%s*=%s*"(%S+)"') and '' or '1' -- toggle
-
--- update
-local f = io.open(scr_path,'r')
-local cont = f:read('*a')
-f:close()
-local sett_upd = sett_name..' = "'..sett_new_state..'"'
-local cont, cnt = cont:gsub(sett_name..'%s*=%s*".-"', sett_upd, 1)
-	if cnt > 0 then -- settings were updated, write to file
-	local f = io.open(scr_path,'w')
-	f:write(cont)
-	f:close()
-	end
-
-return sett_new_state
-
-end
---[[ USE EXAMPLE:
-::RELOAD::
-sett = sett:match('%S+') -- validate
-local output = Reload_Menu_at_Same_Pos(menu)
-	if output == 1 then
-	sett = Toggle_Setting_From_Menu(sett_name, scr_path)
-	goto ::RELOAD::
-	end
---]]
-
-
-function Display_Script_Help_Txt(scr_path)
--- scr_path stems from get_action_context()
-
-local help_t = {}
-	for line in io.lines(scr_path) do
-		if #help_t == 0 and line:match('About:') then
-		help_t[#help_t+1] = line:match('About:%s*(.+)')
-		about = 1
-		elseif line:match('----- USER SETTINGS ------') then -- captures without escaped '-' for some reason
-		r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'), r.ClearConsole()) return -- trimming the first line of user settings section because it's captured by the loop
-		elseif about then
-		help_t[#help_t+1] = line:match('%s*(.-)$')
-		end
-	end
-end
-
-
-
-function Get_Main_Script_Settings(main_scr_name)
--- load main script settings in an ancillary script
--- and only use ancillary script own setting if they're enabled
--- main_scr_name must include extension
-
-package.path = debug.getinfo(1,"S").source:match[[^@?(.*[\/])[^\/]-$]]
-local path = package.path..'my_Multi-line caption aide (for use with Video processor).lua'
-local f = io.open(path,'r')
-local values = {sett1, sett2, sett3} -- variable values // not all settings have to be included, only those relevant to the current script
-
-	if f then	
-
-	-- parse main script settings section
-	local sett_t = {}
-		for line in f:lines() do
-			if line:match('----- USER SETTINGS ------') and #sett_t == 0 or #sett_t > 0 then
-			sett_t[#sett_t+1] = line
-			elseif #sett_t > 0 and line:match('END OF USER SETTINGS')
-			and not sett_t[#sett_t]:match('END OF USER SETTINGS') then
-			break
-			end
-		end
-		
-	f:close()
-
-	-- not all settings have to be included, only those relevant to the current script
-	local names = {'sett1', 'sett2', 'sett3'} -- variable names, must match 'values' table above
-
-		for k, name in ipairs(names) do
-			for i, line in ipairs(sett_t) do
-			local sett = line:match(name..'%s*=%s*"(.-)"')
-				if sett then
-				local val = values[k]
-				values[k] = val:match('%S+') and val or sett -- if setting is enabled in the current script, use it, otherwise assign the state the setting has in the main script
-				end
-			end
-		end
-	
-	end
-
-return table.unpack(values)	
-	
-end
---[[ USE:
-sett1, sett2, sett3 = Get_Main_Script_Settings(main_scr_name) -- first load them from the main script
--- then validate as usual and as necessary depending on the setting type
-]]
-
-
-
 function validate_output1(str) -- with GetUserInputs()
 local str = str:gsub(' ','')
 return #str > 0 and str ~= ',,' -- 3 field user dialogue if separator is a comma
@@ -21284,7 +21185,7 @@ if not Reminder_Off(REMINDER_OFF) then return r.defer(function() do return end e
 -- such character must be preceded with ampresand '&' otherwise it will be overriden
 -- by its earliest appearance in the menu
 -- some characters still do need ampresand, e.g. < and >
-local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+local old = r.GetOS():match('Win') and tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 -- screen reader used by blind users with OSARA extension may be affected
 -- by the absence if the gfx window therefore only disable it in builds
 -- newer than 6.82 if OSARA extension isn't installed
@@ -21317,7 +21218,7 @@ function Show_Menu_Dialogue(menu)
 -- some characters still do need ampresand, e.g. < and >;
 -- characters which aren't the first in the menu item name
 -- must also be explicitly preceded with ampersand
-local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+local old = r.GetOS():match('Win') and tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 -- screen reader used by blind users with OSARA extension may be affected
 -- by the absence if the gfx window therefore only disable it in builds
 -- newer than 6.82 if OSARA extension isn't installed
@@ -21365,7 +21266,7 @@ local x, y = r.GetMousePosition()
 	-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
 	-- BUT LACK OF gfx WINDOW DOESN'T ALLOW RE-OPENING THE MENU AT THE SAME POSITION via ::RELOAD::
 	-- therefore enabled when keep_menu_open is valid
-	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+	local old = r.GetOS():match('Win') and tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 	-- screen reader used by blind users with OSARA extension may be affected
 	-- by the absence if the gfx window therefore only disable it in builds
 	-- newer than 6.82 if OSARA extension isn't installed
@@ -21421,7 +21322,7 @@ local x, y = r.GetMousePosition()
 	-- https://forum.cockos.com/showthread.php?t=280658&page=2#44
 	-- BUT LACK OF gfx WINDOW DOESN'T ALLOW RE-OPENING THE MENU AT THE SAME POSITION via ::RELOAD::
 	-- therefore enabled with keep_menu_open is valid
-	local old = tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
+	local old = r.GetOS():match('Win') and tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 	-- screen reader used by blind users with OSARA extension may be affected
 	-- by the absence if the gfx window therefore only disable it in builds
 	-- newer than 6.82 if OSARA extension isn't installed
@@ -21480,6 +21381,492 @@ local output = Reload_Menu_at_Same_Pos_gfx(menu)
 	-- DO STUFF
 	goto RELOAD
 	end
+]]
+
+
+
+function Settings_Management_Menu_And_Help(condition, want_help, want_run)
+-- manage script settings from a menu,
+-- mainly geared towards boolean settings
+-- (a version of the function which includes non-boolean settings
+-- is used in Trigger action by audio signal or silence.lua)
+-- the function updates the actual script file
+-- used in Transcribing A - Create and manage segments (MAIN).lua
+-- and Transcribing B - Create and manage segments (MAIN).lua
+-- relies on Reload_Menu_at_Same_Pos2() and Esc() functions;
+-- condition is boolean which triggers menu call,
+-- want_help is boolean if 'About' text needs to be displayed to the user,
+-- want_run is a boolean to create a menu button to execute the script;
+-- any user settings not explicitly listed in user_sett table below 
+-- will be ignored in the menu, i.e. MANAGE_SETTINGS_VIA_MENU setting
+-- if present
+
+--[[ -- HERE INSERT SOME CONDITION TO OPEN THE SETTINGS MENU IN A REGULAR SCRIPT
+	 -- LIKE MOUSE POSITION SO THE MENU IS ONLY DISPLAYED AT CERTAIN MOUSE COORDINATES
+	if not condition then return end -- this will allow the main script routine to run if the condition for menu display isn't met
+]]
+
+::RELOAD::
+
+local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context() -- TO BE AWARE THAT HERE THIS FUNCTION WILL GLITCH OUT IF IT'S ALREADY USED OUTSIDE OF THE FUNCTION SO scr_name VAR MAY NEED TO BE FED AS AN ARGUMENT
+
+local sett_t, help_t, about = {}, want_help and {} -- help_t is optional if help is important enough
+	for line in io.lines(scr_name) do
+	-- collect settings
+		if line:match('----- USER SETTINGS ------') and #sett_t == 0 then
+		sett_t[#sett_t+1] = line
+		elseif line:match('END OF USER SETTINGS')
+		and not sett_t[#sett_t]:match('END OF USER SETTINGS') then
+		sett_t[#sett_t+1] = line
+		break
+		elseif #sett_t > 0 then
+		sett_t[#sett_t+1] = line
+		end
+		-- collect help
+		if want_help then
+			if #help_t == 0 and line:match('About:') then
+			help_t[#help_t+1] = line:match('About:%s*(.+)')
+			about = 1
+			elseif line:match('----- USER SETTINGS ------') then
+			about = nil -- reset to stop collecting lines
+			elseif about then -- collect lines
+			help_t[#help_t+1] = line:match('%s*(.-)$')
+			end
+		end
+	end
+
+local user_sett = {'setting1', 'setting2'} -- POPULATE WITH NAMES OF ACTUAL SETTING VARIABLES // not all settings have to be included, those which aren't listed will not be available in the menu
+local menu_sett = {}
+	for k, v in ipairs(user_sett) do
+		for k, line in ipairs(sett_t) do
+		local sett = line:match(v..'%s*=%s*"(.-)"')
+			if sett then
+			menu_sett[#menu_sett+1] = #sett:gsub(' ','') > 0 and '!' or ''
+			end
+		end
+	end
+
+-- type in actual setting names or their versions as menu item labels
+local menu = ('USER SETTINGS'):gsub('.','%0 ')..'||'..menu_sett[1]..'sett1||'
+..menu_sett[2]..'sett2||'..menu_sett[3]..'sett3||'
+..menu_sett[4]..'sett4|||View Help|'..(want_run and ('RUN'):gsub('.','%0 ') or ' ')
+
+local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
+
+	if output == 6 and want_help and #help_t > 0 then -- THE output VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
+	r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'),r.ClearConsole()) -- trimming the first line of user settings section because it's captured by the loop
+	end
+	
+	if want_run and output == 7 then -- THE output VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
+	return menu_sett
+	elseif output == 0 then return 1 -- i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited
+	elseif output < 2 or output >= 6 then -- THE VALUES DEPEND ON THE NUMBER OF MENU ITEMS
+	return 1 -- 1 i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited
+	-- OR goto RELOAD -- if clicked on an invalid item, i.e. title or blank
+	end
+
+output = output-1 -- offset the 1st menu item which is a title
+local src = user_sett[output]
+local sett = menu_sett[output] == '!' and '' or '1' -- fashion toggle
+local repl = src..' = "'..sett..'"'
+local cur_settings = table.concat(sett_t,'\n')
+local upd_settings, cnt = cur_settings:gsub(src..'%s*=%s*".-"', repl, 1)
+
+	if cnt > 0 then -- settings were updated, get script
+	local f = io.open(scr_name,'r')
+	local cont = f:read('*a')
+	f:close()
+	cur_settings = Esc(cur_settings)
+	upd_settings = upd_settings:gsub('%%','%%%%')
+	cont, cnt = cont:gsub(cur_settings, upd_settings)
+		if cnt > 0 then -- settings were updated, write to file
+		local f = io.open(scr_name,'w')
+		f:write(cont)
+		f:close()
+		end
+	end
+
+goto RELOAD
+
+end
+--[[ USE:
+	if Settings_Management_Menu_And_Help(condition, want_help) then -- want_run is nil so the script will be aborted in any event
+	return r.defer(no_undo) -- menu was exited or item is invalid
+	end
+
+-- OR (if MANAGE_SETTINGS_VIA_MENU setting is present or the settings are meant to be managed via the menu always)
+
+local menu = #MANAGE_SETTINGS_VIA_MENU:gsub(' ','') > 0 -- only if such setting is present
+
+local user_sett = menu and Settings_Management_Menu_And_Help(condition, want_help, 1) -- want_run true
+
+	if not user_sett then r.defer(no_undo) end
+	
+-- initialize here if settings menu is enabled, 
+-- otherwise use original variables from USER SETTINGS section
+function validate_sett(sett, menu_sett)
+return #(menu_sett or sett):gsub(' ','') > 0
+end
+sett1 = validate_sett(sett1, user_sett and user_sett[1])
+sett2 = validate_sett(sett2, user_sett and user_sett[2])
+sett3 = validate_sett(sett3, user_sett and user_sett[3])
+
+]]
+
+
+
+
+function Toggle_Settings_From_Menu1(t, menu, scr_path)
+-- t is table containing setting values, setting names and setting menu labels
+-- see example after the function,
+-- in the function instance before the menu loading it includes attributes of all settings,
+-- in the function instance triggered by a click on a menu item it only includes 
+-- attributes of a setting which corresponds to the clicked menu item;
+-- scr_path serves as trigger for the routine of toggling the setting directly from the menu
+-- if scr_path arg is absent the menu is updated based on the current
+-- settings passed as t (first function instance)
+
+	local function update_menu_items(menu, sett, menu_itm)
+	return menu:gsub((sett and '' or '!')..menu_itm,
+	(sett and '!' or '')..menu_itm, 1)
+	end
+
+	if not scr_path then
+	-- compare current settings in the script with the menu state loaded as extended data
+	-- at the menu loading stage
+		for k, nested_t in pairs(t) do -- using pairs in case indexing doesn't start at 1 and/or isn't sequential
+		local sett, menu_itm = nested_t[1], nested_t[3]
+		local menu_itm_checked = menu:match('!'..menu_itm) and true or false -- assign booleans for comparison of identical value type
+			if sett ~= menu_itm_checked then
+			menu = update_menu_items(menu, sett, menu_itm) -- if menu item is not checkmarked, add checkmark and vice versa
+			end
+		end
+	else
+	local sett_name, menu_itm = t[2], t[3]
+	-- toggle from the menu
+	local menu_itm_checked = menu:match('!'..menu_itm) and true or false -- assign booleans for comparison of identical value type 
+	-- toggle
+	menu = update_menu_items(menu, not menu_itm_checked, menu_itm) -- 'not' because here if menu item is checked it must be flipped as a result of a toggle and vice versa
+	 
+		if sett == menu_itm_checked then
+
+		-- Update the setting within the script
+
+		-- load the setting
+		local settings, sett_line
+			for line in io.lines(scr_path) do
+				if not settings and line:match('----- USER SETTINGS ------') then
+				settings = 1
+				elseif settings and line:match('^%s*'..sett_name..'%s*=%s*".-"') then -- ensuring that it's the setting line and not reference to it elsewhere
+				sett_line = line
+				break
+				elseif line:match('END OF USER SETTINGS') then
+				break
+				end
+			end
+
+			-- update script if settings equal to the original menu item state
+			-- i.e. state before the change of the menu item state      
+			if sett_line and #sett_line:match('"([^%s]-)"') > 0 == menu_itm_checked then -- basically redundant condition because this was already evaluated as 'sett == menu_itm_checked' above
+			local f = io.open(scr_path,'r')
+			local cont = f:read('*a')
+			f:close()
+			local sett_upd = sett_name..' = "'..(menu_itm_checked and '' or '1')..'"' -- toggle
+			local cont, cnt = cont:gsub(sett_name..'%s*=%s*".-"', sett_upd, 1)
+				if cnt > 0 then -- settings were updated, write to file
+				local f = io.open(scr_path,'w')
+				f:write(cont)
+				f:close()
+				end
+			end
+
+		t[1] = not t[1] -- invert original setting boolean because it's been toggled
+
+		end 
+	 
+	end
+
+return menu, t[1] -- 2nd return value is the setting after toggling to be used by script functions downstream
+
+end
+
+--[[ USE EXAMPLE:
+
+-- MEANT TO BE USED IN PARALLEL WITH MENU STORAGE AS EXTENDED STATE
+-- BUT IS PROBABLY OVERCOMPLICATED, see Toggle_Settings_From_Menu2()
+-- which doesn't imply storage of the entire menu as extended state
+
+-- validate settings
+sett1 = validate_sett(sett1)
+sett2 = validate_sett(sett2)
+sett3 = validate_sett(sett3)
+
+--	IF SETTING MENU ITEMS INDICES AREN'T SEQUENTIAL
+-- THE KEYS WILL HAVE TO BE EXPLICITLY SPECIFIED IN ALL THE TABLES
+local sett_t = table.pack(sett1, sett2, sett3) -- setting values, settings must be pure booleans, nil value isn't supported
+local menu_t = {'menu item1', 'menu item2', 'menu item3'} -- menu labels which match settings
+local t = {{'sett1'},{'sett2'},{'sett3'}} -- setting names
+
+  for k in pairs(t) do -- using pairs in case indexing doesn't start at 1 and/or isn't sequential
+  table.insert(t[k], 1, sett_t[k])
+  table.insert(t[k], menu_t[k])
+  end
+--[=[ the loop above creates a table structured like this:
+{{sett1, 'sett1', 'menu item1'},
+{sett2, 'sett2', 'menu item2'},
+{sett3, 'sett3', 'menu item3'},}
+--]=]
+
+local menu = table.concat(menu_t,'|')
+
+-------- LOAD/STORE MENU STATE START --------
+-- priority is given to global extended state
+-- to override project extended state in case the project file
+-- is reloaded during the session without prior saving, because
+-- the extended data loaded along with it may be outdated
+
+local ext_state = r.GetExtState(scr_name, KEY) -- first try loading the menu from the global extended state
+		if ext_state == '' then -- if absent, load from project extended state
+		ret, ext_state = r.GetProjExtState(0, scr_name, KEY)
+		end
+		if ext_state ~= '' then -- if there's extended state menu data
+		-- update items toggle state in the menu loaded from extended state
+		-- according to the current settings in the script in case it's changed
+		menu = Toggle_Settings_From_Menu1(t, menu)
+		end
+
+::RELOAD::
+
+-- store updated menu item toggle state
+r.SetExtState(scr_name, KEY, menu, false) -- persist false
+r.SetProjExtState(0, scr_name, KEY, menu)
+
+-------- LOAD/STORE MENU STATE END --------
+
+local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
+
+  if output > 0 and output < 4 then -- the actual output values will depend on the menu structure, the output value may need offsetting if setting menu items don't start at index 1 as they do within the table
+  menu, retval = Toggle_Settings_From_Menu1(t[output], menu, scr_path)
+    if output == 1 then
+    sett1 = retval
+    elseif output == 2 then
+    sett2 = retval
+    else
+    sett3 = retval
+    end
+  goto RELOAD
+  end
+
+--]]
+
+
+
+function Toggle_Settings_From_Menu2(idx, sett_t, scr_path, exclusive_t)
+-- idx is menu output value, i.e. index of the menu item
+-- corresponding to the setting being toggled 
+-- and to the setting index within the table of settings
+-- contructed below from the USER SETTINGS section, 
+-- if in the menu settings don't start at index 1
+-- their indices will have to be offset and so idx,
+-- because list of settings retrieved from the USER SETTINGS section
+-- is indexed from 1;
+-- sett_t is table of all settings boolean values in the order
+-- they're listed in the USER SETTINGS section;
+-- scr_path comes from get_action_context();
+-- exclusive_t is and optional argument, a table of toggle settings 
+-- which are mutually exclusive, where keys are indices of the settings 
+-- in the menu offset so that the 1st setting has index 1 to match 
+-- USER SETTING section sequence, and where values are their boolean values;
+-- the function is not designed to work
+-- with menu loaded from extended state
+-- see USE EXAMPLE below
+
+-- load the settings
+local settings, found = {}
+	for line in io.lines(scr_path) do
+		if #settings == 0 and line:match('----- USER SETTINGS ------') then
+		found = 1
+		elseif found and line:match('^%s*[%u%w_]+%s*=%s*".-"') then -- ensuring that it's the setting line and not reference to it elsewhere
+		settings[#settings+1] = line
+		elseif line:match('END OF USER SETTINGS') then
+		break
+		end
+	end	
+
+
+--local sett_new_state = settings[idx]:match('=%s*"(%S+)"') and '' or '1' -- toggle
+local sett_new_state = sett_t[idx] and '' or '1' -- toggle, relying on the actual user facing value, which may differ from the value in the USER SETTINGS used in the line above
+local sett_name = settings[idx]:match('^(%s*[%u%w_]+%s*=)')
+
+-- handle mutually exclusive settings
+local exclusive_toggle = exclusive_t and exclusive_t[idx] ~= nil and sett_new_state == '1' -- exclusive_t[idx] may be true or false
+	if exclusive_toggle then
+		for k in pairs(exclusive_t) do
+			if k ~= idx and exclusive_t[k] then -- only if mutually exclusive setting is true to avoid unnecessary writing to this file
+			exclusive_t[k] = ''
+			end
+		end	
+	end
+
+-- update
+local f = io.open(scr_path,'r')
+local cont = f:read('*a')
+f:close()
+local sett_upd = sett_name..' "'..sett_new_state..'"'
+local cont, cnt = cont:gsub(settings[idx], sett_upd, 1)
+
+-- update mutually exclusive settings state
+	if exclusive_toggle then
+		for k, state in pairs(exclusive_t) do
+			if k ~= idx and state == '' then
+			local sett_name = settings[k]:match('^(%s*[%u%w_]+%s*=)')
+			local sett_upd = sett_name..' ""'
+			cont, cnt = cont:gsub(settings[k], sett_upd, 1)
+			end
+		end
+	end
+	
+	if cnt > 0 then -- settings were updated, write to file
+	local f = io.open(scr_path,'w')
+	f:write(cont)
+	f:close()
+	end
+
+return sett_new_state == '1'
+
+end
+--[[ USE EXAMPLE:
+local sett_t = {sett1:match('%S+') or false, sett2:match('%S+') or false, sett2:match('%S+') or false} -- maintaining the order of settings in the script USER SETTINGS
+::RELOAD::
+local output = Reload_Menu_at_Same_Pos(menu)
+	if output < 4  then -- all 3 options are first in the menu, i.e. at indices 1-3, if not, the outut value will have to be offset by the number of intervening menu items
+	local exclusive_t = {[3]=sett_t[3],[4]=sett_t[4]} -- mutually exclusive settings, 3 and 4, the order within the table is immaterial
+	sett_t[output] = Toggle_Settings_From_Menu2(output, sett_t, scr_path, exclusive_t)
+	-- handle mutually exclusive settings
+		if exclusive_t and exclusive_t[output] ~= nil and sett_t[output] then -- exclusive_t[output] may be true or false, the condition ensures that this is one of the mutually exclusive settings; sett_t[output] is true so set the rest mutually exclusive to false
+			for k in pairs(exclusive_t) do
+				if k ~= output then
+				sett_t[k] = false
+				end
+			end
+		end
+	goto RELOAD
+	end
+--]]
+
+
+
+function Toggle_Setting_From_Menu(sett_name, scr_path)
+-- sett_name is a string;
+-- scr_path comes from get_action_context();
+-- the function is not designed to work
+-- with menu loaded from extended state
+
+-- load the setting
+local settings, sett_line
+	for line in io.lines(scr_path) do
+		if not settings and line:match('----- USER SETTINGS ------') then
+		settings = 1
+		elseif settings and line:match('^%s*'..sett_name..'%s*=%s*".-"') then -- ensuring that it's the setting line and not reference to it elsewhere
+		sett_line = line
+		break
+		elseif line:match('END OF USER SETTINGS') then
+		break
+		end
+	end
+
+local sett_new_state = sett_line:match('^%s*'..sett_name..'%s*=%s*"(%S+)"') and '' or '1' -- toggle
+
+-- update
+local f = io.open(scr_path,'r')
+local cont = f:read('*a')
+f:close()
+local sett_upd = sett_name..' = "'..sett_new_state..'"'
+local cont, cnt = cont:gsub(sett_name..'%s*=%s*".-"', sett_upd, 1)
+	if cnt > 0 then -- settings were updated, write to file
+	local f = io.open(scr_path,'w')
+	f:write(cont)
+	f:close()
+	end
+
+return sett_new_state
+
+end
+--[[ USE EXAMPLE:
+::RELOAD::
+sett = sett:match('%S+') -- validate
+local output = Reload_Menu_at_Same_Pos(menu)
+	if output == 1 then
+	sett = Toggle_Setting_From_Menu(sett_name, scr_path)
+	goto RELOAD
+	end
+--]]
+
+
+function Display_Script_Help_Txt(scr_path)
+-- scr_path stems from get_action_context()
+
+local help_t = {}
+	for line in io.lines(scr_path) do
+		if #help_t == 0 and line:match('About:') then
+		help_t[#help_t+1] = line:match('About:%s*(.+)')
+		about = 1
+		elseif line:match('----- USER SETTINGS ------') then -- captures without escaped '-' for some reason
+		r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'), r.ClearConsole()) return -- trimming the first line of user settings section because it's captured by the loop
+		elseif about then
+		help_t[#help_t+1] = line:match('%s*(.-)$')
+		end
+	end
+end
+
+
+
+function Get_Main_Script_Settings(main_scr_name)
+-- load main script settings in an ancillary script
+-- and only use ancillary script own setting if they're enabled
+-- main_scr_name must include extension
+
+package.path = debug.getinfo(1,"S").source:match[[^@?(.*[\/])[^\/]-$]]
+local path = package.path..'my_Multi-line caption aide (for use with Video processor).lua'
+local f = io.open(path,'r')
+local values = {sett1, sett2, sett3} -- variable values // not all settings have to be included, only those relevant to the current script
+
+	if f then	
+
+	-- parse main script settings section
+	local sett_t = {}
+		for line in f:lines() do
+			if line:match('----- USER SETTINGS ------') and #sett_t == 0 or #sett_t > 0 then
+			sett_t[#sett_t+1] = line
+			elseif #sett_t > 0 and line:match('END OF USER SETTINGS')
+			and not sett_t[#sett_t]:match('END OF USER SETTINGS') then
+			break
+			end
+		end
+		
+	f:close()
+
+	-- not all settings have to be included, only those relevant to the current script
+	local names = {'sett1', 'sett2', 'sett3'} -- variable names, must match 'values' table above
+
+		for k, name in ipairs(names) do
+			for i, line in ipairs(sett_t) do
+			local sett = line:match(name..'%s*=%s*"(.-)"')
+				if sett then
+				local val = values[k]
+				values[k] = val:match('%S+') and val or sett -- if setting is enabled in the current script, use it, otherwise assign the state the setting has in the main script
+				end
+			end
+		end
+	
+	end
+
+return table.unpack(values)	
+	
+end
+--[[ USE:
+sett1, sett2, sett3 = Get_Main_Script_Settings(main_scr_name) -- first load them from the main script
+-- then validate as usual and as necessary depending on the setting type
 ]]
 
 
@@ -21754,7 +22141,8 @@ end
 function Options_State_Readout(...)
 -- vararg is a list of option vars holding strings '1' or '0';
 -- in place of irrelevant options false must passed instead of nil
--- so that ipairs loop below doesn't break;
+-- so that ipairs loop below doesn't break
+-- (can be repurposed for true/false instead which entails code adjustment below);
 -- meant to display in the main menu
 -- the state of options hidden in a submenu
 local result
@@ -22203,14 +22591,6 @@ function Bump_Proj_Change_Cnt() -- API functions seems to not update project cha
 r.Main_OnCommand(41156,0) -- Options: Selecting one grouped item selects group
 r.Main_OnCommand(41156,0)
 end
-
-
-
-function PAUSE()
-do r.MB('PAUSE','PAUSE',0) return end
-end
-
-do r.MB('PAUSE','PAUSE',0) return end
 
 
 
@@ -22693,6 +23073,7 @@ return act_name, mess -- mess is optional, returned if isn't used as a condition
 end
 
 
+
 -- TO UNDO A TOOLTIP RUN THE SAME FUNCTION WITH AN EMPTY STRING,
 -- OTHER ARGUMENTS AREN'T NECESSARY
 
@@ -22818,13 +23199,14 @@ end
 
 
 
-function Error_Tooltip3(text, format) -- format must be true
+function Error_Tooltip3(text, format)
 -- the tooltip sticks under the mouse within Arrange
 -- but quickly disappears over the TCP, to make it stick
 -- just a tad longer there it must be directly under the mouse
 -- not directly under the mouse the tooltip sticks if mouse is over Arrange
 -- but soon disappears if mouse is in the TCP area but not over the TCP
--- and immediately disappears if the mouse is over the TCP
+-- and immediately disappears if the mouse is over the TCP 
+-- if format is true the text is capitalized and spaced out
 local x, y = r.GetMousePosition()
 -- supporting UTF-8 char
 local utf8 = '[\0-\127\194-\244][\128-\191]*'
@@ -23050,6 +23432,25 @@ local named_ID = r.ReverseNamedCommandLookup(cmd_ID)
 		i = i+1
 		until r.GetExtState(sect, i) == '' -- first key without stored value
 	end
+end
+
+
+
+function PAUSE()
+do r.MB('PAUSE','PAUSE',0) return end
+end
+
+do r.MB('PAUSE','PAUSE',0) return end
+
+
+
+function pause(duration) 
+-- duration is time in seconds
+-- during which the script execution
+-- will pause, REAPER will hang
+local t = r.time_precise()
+	repeat
+	until r.time_precise()-t >= duration
 end
 
 
@@ -26045,6 +26446,7 @@ E N V E L O P E S
 	Delete_Env
 	Get_Env_GUID
 	Get_Vis_Env_GUID
+	Hidden_Track_Envelopes_Exist
 	Re_Store_Env_Selection
 	Manipulate_Envelope_With_Actions
 	Count_FX_Envelopes
@@ -26241,8 +26643,8 @@ I T E M S
 	Duplicate_Active_Take_Contiguously
 	Move_Active_Take_Within_Item
 	get_active_take_index_via_chunk
-	Convert_Empty_Take_To_Valid_Take	
-
+	Convert_Empty_Take_To_Valid_Take
+	Get_Set_Take_Channels
 
 
 C O L O R
@@ -26344,10 +26746,12 @@ W I N D O W S
 	Is_Wnd_Docked_In_Floating_Docker2
 	Move_Window_To_Another_Dock
 	Dock_Floating_Window
+	Send_Message
 	JS_Window_IsVisible
 	Find_Window_SWS
 	Get_Child_Windows_JS1
 	Get_Child_Windows_JS2
+	Get_Child_Windows_JS3
 	Get_Window_And_Children_JS
 	Get_Child_Windows_SWS
 	Get_All_Parent_Windows
@@ -26377,6 +26781,11 @@ W I N D O W S
 	store_or_update_coordinates_after_quitting1
 	store_or_update_coordinates_after_quitting2
 
+
+T H E M E
+	
+	smandrap_Change_MCP_Width
+	find_layout
 
 F I L E S
 
@@ -26481,8 +26890,10 @@ M E A S U R E M E N T S / C A L C U L A T I O N S
 
 U T I L I T Y
 
-	Msg
+	Msg (several versions)
 	Msg2
+	Msg3
+	Msg4
 	printf
 	DebugMsg
 	execute_function_from_table
@@ -26497,12 +26908,7 @@ U T I L I T Y
 	validate_settings3
 	validate_global_var
 	validate local variable (not a function)
-	Validate_All_Global_Settings
-	Settings_Management_Menu_And_Help
-	Toggle_Settings_From_Menu
-	Toggle_Setting_From_Menu
-	Display_Script_Help_Txt
-	Get_Main_Script_Settings
+	Validate_All_Global_Settings	
 	validate_output1
 	validate_output2
 	Get_Action_ID
@@ -26519,6 +26925,12 @@ U T I L I T Y
 	Reload_Menu_at_Same_Pos1
 	Reload_Menu_at_Same_Pos2
 	Reload_Menu_at_Same_Pos_gfx
+	Settings_Management_Menu_And_Help
+	Toggle_Settings_From_Menu1
+	Toggle_Settings_From_Menu2
+	Toggle_Setting_From_Menu
+	Display_Script_Help_Txt
+	Get_Main_Script_Settings
 	Get_Set_Menu_Toggle_Options
 	Menu_With_Toggle_Options1
 	Menu_With_Toggle_Options2
@@ -26542,8 +26954,7 @@ U T I L I T Y
 	Is_Win
 	Get_OS
 	All_Proj_Change_Cnt
-	Bump_Proj_Change_Cnt
-	PAUSE
+	Bump_Proj_Change_Cnt	
 	EvaluateTAG
 	is_tbl_or_ptr_or_fnc
 	GetUserInputs_Alt
@@ -26569,6 +26980,8 @@ U T I L I T Y
 	Keep_ExtState_For_X_Mins2
 	ExtState_Expiry_Timer
 	Set_Get_Delete_ExtState_Series
+	PAUSE
+	pause
 	WAIT
 	Archie_WAIT
 	REAPER_Ver_Check1
