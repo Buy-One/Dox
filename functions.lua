@@ -13762,13 +13762,28 @@ end
 
 
 function Get_Take_Src_Props(take)
-	if take then
-	local src = r.GetMediaItemTake_Source(take)
-	local sect, startoffs, length, rev = r.PCM_Source_GetSectionInfo(src) -- if sect is false startoffs is 0
-	local src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or reversed
-	local filename = r.GetMediaSourceFileName(src, '') -- source pointer in takes with the same source is different therefore for comparison file name must be retrieved
-	return sect, startoffs, length, rev, filename
-	end
+
+	if not take then return end
+
+local src = r.GetMediaItemTake_Source(take)
+local sect, startoffs, length, rev = r.PCM_Source_GetSectionInfo(src) -- if sect is false startoffs is 0	
+local src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or reversed
+local ch_cnt = r.GetMediaSourceNumChannels(src)
+local filename = r.GetMediaSourceFileName(src, '') -- source pointer in takes with the same source is different therefore for comparison file name must be retrieved
+return sect, startoffs, length, rev, filename, ch_cnt
+
+end
+
+
+
+function Get_Take_Src_Channel_Count(take)
+
+	if not take then return end
+
+local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed takes and sections, that is those which have either 'Reverse' or 'Section' checkboxes checked in the 'Item properties' window, hence next line
+src = r.GetMediaSourceParent(src) or src
+return r.GetMediaSourceNumChannels(src)
+
 end
 
 
@@ -14619,7 +14634,9 @@ local ch_cnt = r.GetMediaSourceNumChannels(src)
 	local function convert_ch_No_2_ch_idx(ch_No)
 	-- ch_No can be integer or string for mono channels 
 	-- and must be a string for stereo channels in the format '1/2'
-	-- mono and stereo channel ranges are 1-128 each
+	-- mono and stereo channel ranges are 1-128 each;
+	-- ch_No values -2, -1 and 0 denote notmal, reverse stereo and L/R dowmix
+	-- channel modes respectively
 	local ch_No = tonumber(ch_No) or ch_No:match('(%d+)/')
 	local stereo
 		if not ch_No or ch_No+0 < -2 and ch_No+0 > 128 then return 
@@ -26618,6 +26635,7 @@ I T E M S
 	is_audio_src
 	Delete_Take_Src
 	Get_Take_Src_Props
+	Get_Take_Src_Channel_Count
 	Select_Items_With_Same_Src_Media
 	Audio_Or_MIDI_Takes
 	Get_Src_Orig_Length
