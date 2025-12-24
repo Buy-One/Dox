@@ -5958,6 +5958,44 @@ To get list of supported commands, type help in the input field and click Run
 
 https://forum.cockos.com/showthread.php?t=304758
 
+=============================================================
+
+-- Protect REAPER from accidental or malicious/intrusive keyboard input
+
+
+REAPER has 16 'Main (alt)' action list sections all of which are duplicates of the Main section 
+
+allowing to have different shortcuts for the same actions.
+
+These 'alt' sections are enabled with 16 actions
+
+'Main action section: Toggle override to alt-N'
+
+where N is the number of the 'alt' section.
+
+By default in the 'Main' and 'Main (alt)' sections the shortcuts are identical. But they can be overwritten or cleared from any section.
+
+So the solution is to
+
+A. Select one such section from the 'Section' drop-down list of the Action list window to be used to protect REAPER from keyboard input
+B. Clear all shortcuts from it with the option 'Remove all shortcuts from this section' found under the 'Key map...' button of the Action list window
+C. When you need to protect your session activate this section with the action mentioned above and no keyboard input will disturb 
+your session until the Action list section is switched back to one which does have shortcuts.
+
+=============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
