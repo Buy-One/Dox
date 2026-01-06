@@ -2034,20 +2034,26 @@ function embellish_string(str, ornam_code_t, want_spaces)
 -- 6/16 - bold dashed underline; 7 - tilde strikethrough; 8 - dash srtikethrough;
 -- 9 - solid line strikethrough; 10/11 - short/long slash srikethrough;
 -- 13 - solid bold overline; 14 - tilde overline (lower above digits); 
--- 15 - sold bold underline; 18 - dotted overline which crosses characters at the top;
+-- 15 - solid bold underline; 18 - dotted overline which crosses characters at the top;
 
 -- when ornament is applied to spaces its level under/above the line
 -- may differ from that applied to characters when displayed in the menu;
 -- the level under/above numerals may also differ from the level under/above 
 -- alphabetic chars when displayed in the menu;
 -- https://www.charset.org/utf-8
-local t = {'\xCC\xA0','\xCC\xA3','\xCC\xA4','\xCC\xA5','\xCC\xB2','\xCC\xB3','\xCC\xB4',
-'\xCC\xB5','\xCC\xB6','\xCC\xB7','\xCC\xB8','\xCC\xBB','\xCC\xBF','\xCD\x82','\xCD\x87',
-'\xCD\x9A','\xDF\xB2','\xDF\xB3'}
+-- the numeric keys aren't necessary,  
+-- only included for convenience
+local t = {[1]='\xCC\xA0',[2]='\xCC\xA3',[3]='\xCC\xA4',
+[4]='\xCC\xA5',[5]='\xCC\xB2',[6]='\xCC\xB3',[7]='\xCC\xB4',
+[8]='\xCC\xB5',[9]='\xCC\xB6',[10]='\xCC\xB7',[11]='\xCC\xB8',
+[12]='\xCC\xBB',[13]='\xCC\xBF',[14]='\xCD\x82',[15]='\xCD\x87',
+[16]='\xCD\x9A',[17]='\xDF\xB2',[18]='\xDF\xB3'}
 --[[ OR
-local t = {'\204\160','\204\163','\204\164','\204\165','\204\178','\204\179','\204\180',
-'\204\181','\204\182','\204\183','\204\184','\204\187','\204\191','\205\130','\205\135',
-'\205\154','\223\178','\223\179'}
+local t = {[1]='\204\160',[2]='\204\163',[3]='\204\164',
+[4]='\204\165', [5]='\204\178',[6]='\204\179',[7]='\204\180',
+[8]='\204\181',[9]='\204\182',[10]='\204\183',[11]='\204\184',
+[12]='\204\187',[13]='\204\191',[14]='\205\130',[15]='\205\135',
+[16]='\205\154',[17]='\223\178',[18]='\223\179'}
 --]]
 table.sort(ornam_code_t) -- some chars may not mix well if inserted not in ascending order 
 -- e.g. 18,5 or 18,1
@@ -2055,7 +2061,7 @@ local ornam = ''
 	for k, v in ipairs(ornam_code_t) do
 	ornam = ornam..t[v]
 	end
-local str = str:gsub('[\192-\255]*.[\128-\191]*', function(c) return not want_spaces and #c:gsub(' ','') == 0 and c or c..ornam end) -- accounting for non-ASCII characters by including leading and trailing bytes if any
+local str = str:gsub('[\192-\255]*.[\128-\191]*', function(c) return not want_spaces and #c:gsub(' ','') == 0 and c or c..ornam end) -- accounting for non-ASCII characters by including leading and trailing bytes if any, ornamentation characters FOLLOW the target character 
 return str
 end
 
@@ -5154,9 +5160,10 @@ end
 
 
 
-function ReStoreSelectedItems(t, keep_last_selected)
+function Re_Store_Selected_Items1(t, keep_last_selected)
 -- keep_last_selected is boolean relevant for the restoration stage
 -- to add last selected items to the original selection
+
 	if not t then -- Store selected items
 	-- REAPER devs don't recommend using CountSelectedMediaItems()
 	-- and GetSelectedMediaItem in favor of CountMediaItems()
@@ -5189,7 +5196,9 @@ end
 
 
 
-function Re_Store_Selected_Items(t, keep_last_selected)
+function Re_Store_Selected_Items2(t, keep_last_selected)
+-- keep_last_selected is boolean relevant for the restoration stage
+-- to add last selected items to the original selection
 -- at the restoration stage when evaluating whether any items 
 -- were saved into the table, 'if next(t) then' statement is used
 -- because the table isn't indexed and 'if #t > 0 then' won't work
@@ -14635,7 +14644,7 @@ local ch_cnt = r.GetMediaSourceNumChannels(src)
 	-- ch_No can be integer or string for mono channels 
 	-- and must be a string for stereo channels in the format '1/2'
 	-- mono and stereo channel ranges are 1-128 each;
-	-- ch_No values -2, -1 and 0 denote notmal, reverse stereo and L/R dowmix
+	-- ch_No values -2, -1 and 0 denote normal, reverse stereo and L/R dowmix
 	-- channel modes respectively
 	local ch_No = tonumber(ch_No) or ch_No:match('(%d+)/')
 	local stereo
@@ -16262,6 +16271,20 @@ gfx.rect(0, 0, gfx.w, gfx.h, 1) -- Draw the colored rectangle
 end
 
 
+function draw_gear(x, y, size)
+-- cogwheel image for settings menu
+-- https://www.youtube.com/watch?v=523v6xc_3KU
+-- https://github.com/mykrobinson/Let-s-Talk-About-REAPER/blob/main/Scripts/LTAR_DrummerClock.lua
+gfx.set(0.35, 0.35, 0.35, 1)
+	for i = 0, 7 do
+	  local ang = i * (math.pi / 4)
+	  gfx.line(x + math.cos(ang)*size*0.5, y + math.sin(ang)*size*0.5, x + math.cos(ang)*size, y + math.sin(ang)*size)
+	end
+gfx.circle(x, y, size * 0.5, 0)
+end
+-- draw_gear(gfx.w - 25, 25, 12)
+
+
 -- see also RGB_To_Normalized in the "C O L O R" section
 
 
@@ -16313,6 +16336,8 @@ end
 
 
 ]]
+
+
 
 
 
@@ -21692,7 +21717,7 @@ function Toggle_Settings_From_Menu2(idx, sett_t, scr_path, exclusive_t)
 -- scr_path comes from get_action_context();
 -- exclusive_t is and optional argument, a table of toggle settings 
 -- which are mutually exclusive, where keys are indices of the settings 
--- in the menu offset so that the 1st setting has index 1 to match 
+-- in the menu, offset so that the 1st setting has index 1 to match 
 -- USER SETTING section sequence, and where values are their boolean values;
 -- the function is not designed to work
 -- with menu loaded from extended state
@@ -21711,7 +21736,7 @@ local settings, found = {}
 	end	
 
 
---local sett_new_state = settings[idx]:match('=%s*"(%S+)"') and '' or '1' -- toggle
+--local sett_new_state = settings[idx]:match('=%s*"(%S)"') and '' or '1' -- toggle
 local sett_new_state = sett_t[idx] and '' or '1' -- toggle, relying on the actual user facing value, which may differ from the value in the USER SETTINGS used in the line above
 local sett_name = settings[idx]:match('^(%s*[%u%w_]+%s*=)')
 
@@ -21753,12 +21778,12 @@ return sett_new_state == '1'
 
 end
 --[[ USE EXAMPLE:
-local sett_t = {sett1:match('%S+') or false, sett2:match('%S+') or false, sett2:match('%S+') or false} -- maintaining the order of settings in the script USER SETTINGS
+local sett_t = {sett1:match('%S') or false, sett2:match('%S') or false, sett2:match('%S') or false, sett3:match('%S') or false, sett4:match('%S') or false} -- maintaining the order of settings in the script USER SETTINGS // false alternative will be needed for Options_State_Readout() which doesn't support nil
 ::RELOAD::
 local output = Reload_Menu_at_Same_Pos(menu)
-	if output < 4  then -- all 3 options are first in the menu, i.e. at indices 1-3, if not, the outut value will have to be offset by the number of intervening menu items
-	local exclusive_t = {[3]=sett_t[3],[4]=sett_t[4]} -- mutually exclusive settings, 3 and 4, the order within the table is immaterial
-	sett_t[output] = Toggle_Settings_From_Menu2(output, sett_t, scr_path, exclusive_t)
+	if output < 4  then -- all 3 settings are first in the menu, i.e. at indices 1-3, if not, the output value will have to be offset by the number of intervening menu items
+	local exclusive_t = {[3]=sett_t[3],[4]=sett_t[4]} -- mutually exclusive settings, 3 and 4, the order within this table is immaterial
+	sett_t[output] = Toggle_Settings_From_Menu2(output, sett_t, scr_path, exclusive_t) -- scr_path comes from get_action_context()
 	-- handle mutually exclusive settings
 		if exclusive_t and exclusive_t[output] ~= nil and sett_t[output] then -- exclusive_t[output] may be true or false, the condition ensures that this is one of the mutually exclusive settings; sett_t[output] is true so set the rest mutually exclusive to false
 			for k in pairs(exclusive_t) do
@@ -21792,7 +21817,7 @@ local settings, sett_line
 		end
 	end
 
-local sett_new_state = sett_line:match('^%s*'..sett_name..'%s*=%s*"(%S+)"') and '' or '1' -- toggle
+local sett_new_state = sett_line:match('^%s*'..sett_name..'%s*=%s*"(%S)"') and '' or '1' -- toggle
 
 -- update
 local f = io.open(scr_path,'r')
@@ -21811,7 +21836,7 @@ return sett_new_state
 end
 --[[ USE EXAMPLE:
 ::RELOAD::
-sett = sett:match('%S+') -- validate
+sett = sett:match('%S') -- validate
 local output = Reload_Menu_at_Same_Pos(menu)
 	if output == 1 then
 	sett = Toggle_Setting_From_Menu(sett_name, scr_path)
@@ -21871,7 +21896,7 @@ local values = {sett1, sett2, sett3} -- variable values // not all settings have
 			local sett = line:match(name..'%s*=%s*"(.-)"')
 				if sett then
 				local val = values[k]
-				values[k] = val:match('%S+') and val or sett -- if setting is enabled in the current script, use it, otherwise assign the state the setting has in the main script
+				values[k] = val:match('%S') and val or sett -- if setting is enabled in the current script, use it, otherwise assign the state the setting has in the main script
 				end
 			end
 		end
@@ -22155,7 +22180,7 @@ end
 
 
 
-function Options_State_Readout(...)
+function Options_State_Readout(...) -- OR Settings_State_Readout
 -- vararg is a list of option vars holding strings '1' or '0';
 -- in place of irrelevant options false must passed instead of nil
 -- so that ipairs loop below doesn't break
@@ -26330,8 +26355,8 @@ M I D I
 	Re_Store_Selected_Objects
 	re_store_sel_trks1
 	re_store_sel_trks2
-	ReStoreSelectedItems
-	Re_Store_Selected_Items
+	Re_Store_Selected_Items1
+	Re_Store_Selected_Items2
 	re_store_obj_selection
 
 
