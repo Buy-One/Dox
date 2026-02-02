@@ -4520,6 +4520,11 @@ and follow steps 6-7 from above
 https://forums.cockos.com/showthread.php?t=11905#12
 https://forum.cockos.com/showthread.php?t=158271#10
 
+For REAPER to recognize non-ASCII characters, these must be listed as their codepoints,
+i.e. Ù must be listed as 217 (decimal) or 0x00D9 (hexadecimal) which you can look up 
+for example here https://www.charset.org/utf-8 where the code in hexadecimal format appears as U+00D9,
+mere saving the file in UTF-8 format won't work.
+
 
 ==============================================================
 
@@ -5983,6 +5988,171 @@ C. When you need to protect your session activate this section with the action m
 your session until the Action list section is switched back to one which does have shortcuts.
 
 =============================================================
+
+-- Setting REAPER to support hi res toolbar icons and HiDPI / Retina
+
+Toolbar icons come in two flavours, the main toolbar icons that are part of the theme (save, load, metronome, ripple edit) 
+and may have separate on/off state images and so forth. I'm assuming we're not talking about them, but the second type, 
+the custom toolbars with custom icons.
+
+When you first create a custom toolbar button it will have text, let's assume you're replacing that with an icon. 
+The custom icons buttons are made up of a composite of a background image, an icon, and an overlay, 
+plus some additional highlight and armed animations. The background image may be very simple 
+and the overlay completely blank (like in the Default 7.0 theme) or they may be very elaborate to create a button 
+with an icon and a glass top, like in Imperial, because those images are part of the theme.
+
+The icon images themselves are in (Reaper path) > data > toolbar_icons, which means you can swap themes at a whim 
+but your carefully setup toolbars will continue to have its icon images.
+
+Download these test images and unzip them into that folder. Note that each of the three images goes 
+into a different folder: the root, 150 and 200. 
+Then go View > Toolbar docker, and right click on that floating docker and open a blank toolbar, which will have 
+a single 'Edit me" button. Rick click 
+that toolbar and click 'customise toolbar'. Click the Edit button at the bottom, choose 'Set icon', and choose 
+that toolbar_hidpi_testing image.
+
+If you have an old theme that isn't set up for HiDPI (retina) display, no matter what you do, you will only see 
+the red 100% image, even on your 200% HiDPI retina 4k wizbang screen that was supposed to make everything look better. 
+Set Reaper to support HiDPI / Retina, and make sure this bit is in the rtconfig file of your theme:
+
+
+misc_dpi_translate 50 100
+misc_dpi_translate 134 150
+misc_dpi_translate 174 200
+
+
+Then, if you drag your new toolbar onto a 150% screen, it will show the green 150% image, and if its a 200% screen, 
+it will show the blue 200% image instead - same apparent image, same apparent size, but double the resolution.
+
+
+https://forum.cockos.com/showpost.php?p=2910480&postcount=7
+
+
+=============================================================
+
+-- Trooubleshooting REAPER not starting up (Segmentation Fault / Crash on Startup)
+
+IMPORTANT: Back up your files first!
+
+Step 1: Backup Your Configuration
+
+Navigate to: C:\Users\[YourUsername]\AppData\Roaming\REAPER
+Make a copy of REAPER.ini and name it REAPER.ini.backup
+Also backup reaper-vstplugins64.ini if it exists
+
+Step 2: Fix Window Position
+
+Open REAPER.ini in a text editor (Notepad works fine)
+Search for wnd_x= (usually near the top of the file)
+If wnd_x has a negative value (like wnd_x=-8), change it to:
+
+wnd_x=100
+wnd_y=100
+
+Don't save yet - continue to Step 3
+
+Step 3: Reset Audio Driver to Safe Mode
+
+In the same REAPER.ini file, search for [REAPER] section
+Look for the line that says mode= (might be mode=3 for ASIO)
+Change it to:
+
+mode=0
+
+(This sets it to dummy audio, which is safe and won't crash)
+
+Save and close the file
+
+Step 4: Clear VST Plugin Cache
+
+In the same C:\Users\[YourUsername]\AppData\Roaming\REAPER folder
+Find these files (if they exist):
+
+- reaper-vstplugins64.ini
+- reaper-vstshells64.ini
+
+Rename them by adding .old to the 
+
+- reaper-vstplugins64.ini.old
+- reaper-vstshells64.ini.old
+
+(REAPER will rebuild these files with a fresh plugin scan on next startup)
+
+Step 5: Start REAPER
+
+Launch REAPER normally
+It should now start successfully!
+REAPER will automatically rescan your plugins on first launch
+
+Step 6: Reconfigure Audio (Important!)
+
+Once REAPER is running:
+
+Go to Options → Preferences → Audio → Device
+Set your audio driver back to what you normally use (ASIO, WASAPI, etc.)
+Configure your audio interface settings
+Click OK and restart REAPER to confirm it still works
+
+Why This Works (if it does):
+
+- Window position fix: Prevents REAPER from trying to draw itself off-screen
+
+- Audio mode reset: Bypasses potentially crashed ASIO drivers
+
+- Plugin cache clear: Removes corrupted VST data that can cause segfaults during initialization
+
+https://reddit.com/r/Reaper/comments/1q0a28g/how_to_fix_reaper_not_starting_segmentation_fault/
+
+
+=============================================================
+
+-- Action list filter syntax
+
+https://www.youtube.com/watch?v=n-4jyHS7eVM
+
+
+=============================================================
+
+-- 'Save project As...' dialogue flags
+
+
+saveFlags2 (reaper.ini config value)
+
+Create subdirectory for project: &1 (checkbox in the dialogue is reset after a single usage of the setting, the config parameter value however isn't reset)
+
+Copy all media to project path: &2
+
+Copy all media to project path -> Convert media: &16 ('Convert media' checkbox in the dialogue is reset after a single usage of the setting, the config parameter value however isn't reset)
+
+Move all media into project directory: &4
+
+Move all media into project directory -> Copy rather than move source media if not in old project path: &36
+
+HOWEVER THE FLAGS CANNOT BE GET AND/OR SET WIITH SNM_GetIntConfigVar/reaper.get_config_var_string AND SNM_SetIntConfigVar FUNCTIONS
+
+=============================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
