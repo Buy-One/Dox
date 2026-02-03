@@ -1725,6 +1725,12 @@ local a = utf8.len(str);
 end
 
 
+function utf8_len2(str)
+-- borrowed and streamlined from REAPER stock lyrics.lua
+return utf8.len(str) or #str -- utf8.len() returns false if invalid bytes hence the fallback value
+end
+
+
 -- this will overwrite the stock function in the global environment
 -- doesn't affect # operator
 string.len = 	function(self) -- self here is the source string
@@ -1736,12 +1742,6 @@ return #self:gsub('[\128-\191]','')
 end
 -- USE NORMALLY
 -- str:len()
-
--- OR
-function utf8_len2(str)
--- borrowed and streamlined from REAPER stock lyrics.lua
-return utf8.len(str) or #str -- utf8.len() returns false if invalid bytes hence the fallback value
-end
 
 
 -- reverse non-ASCII string
@@ -1758,15 +1758,6 @@ end
 -- str:reverse()
 
 
-
--- iterate over a UTF-8 string by character
--- https://stackoverflow.com/questions/22129516/string-sub-issue-with-non-english-characters
-for c in str:gmatch(".[\128-\191]*") do
--- OR for c in str:gmatch('[\192-\255]*.[\128-\191]*') do -- with leading bytes
--- DO STUFF
-end
-
-
 function utf8_chars_to_bytes(str, a, b)
 -- REAPER stock lyrics.lua
 a = utf8.offset(str,a)
@@ -1776,6 +1767,100 @@ b = utf8.offset(str,b)
   if b < a then return b,a end
   return a,b
 end
+
+
+
+function utf8_string_iterator(str, truncate_by, rev)
+-- by character;
+-- truncate_by is integer, number of chars to truncate from end;
+-- rev is boolean, whether to reverse the string;
+-- truncation happens after reversal, in this case
+-- the text is still truncated from its original end;
+-- RTL text is supported;
+-- if truncate_by and rev arguments are nil, original str is returned
+
+local length = #str:gsub('[\128-\191]','') -- length in characters // discard the continuation bytes, if any
+	if truncate_by and truncate_by >= length then return end
+length = truncate_by and length-truncate_by -- expected final length
+local output = ''
+local st, fin, char = 1
+	while st <= #str do
+	st, fin, char = str:find('(.)', st) -- str.find requires capture parantresis
+	local byte = string.byte(char)
+	-- in multi-byte code points first several bits of the first byte indicate how many bytes
+	-- there're in the character in total, an info which allows to modify the length of pattern
+	-- in order to be able to capture the character entire byte sequence
+	-- https://stackoverflow.com/questions/1543613/how-does-utf-8-variable-width-encoding-work
+	local bytes_cnt = byte&224 == 192 and 2 or byte&240 == 224 and 3 or byte&248 == 240 and 4 or 1 -- masking first 3 bits, then first 4, finally first 5 each tyme expecting to receive first 2, first 3 and first 4 respectively
+	st, fin, char = str:find('('..('.'):rep(bytes_cnt)..')', st)
+	st = fin+1
+	output = rev and char..output or (output..char)
+		if length and #output:gsub('[\128-\191]','') == length then break end
+	end
+return output
+end
+--[[ OR native iteration method supported since Lua 5.3
+for pos, code in utf8.codes(str) do
+-- Convert the code point back to a character for display
+local char = utf8.char(code)
+print(string.format("Character: %s | Position (byte offset): %d | Code point (integer): %d", char, pos, code))
+end
+--]]
+-- OR
+-- iterate over a UTF-8 string by character
+-- https://stackoverflow.com/questions/22129516/string-sub-issue-with-non-english-characters
+for c in str:gmatch(".[\128-\191]*") do
+-- OR for c in str:gmatch('[\192-\255]*.[\128-\191]*') do -- with leading bytes
+-- DO STUFF
+end
+
+
+
+function utf8_str_sub(str, st, fin)
+-- extract substring by character indices;
+-- st, fin args are identical to stock string.sub
+-- logic is the same as in string.sub,
+-- the only difference is that when st and fin are not supplied
+-- or are nil the function returns empry srting 
+-- instead of throwing an error
+
+local length = #str:gsub('[\128-\191]','') -- length in characters // discard the continuation bytes, if any
+
+-- convert to positive integers if negative
+-- by subtracting from length and compare,
+-- adding 1 because the coordinates are supposed to match
+-- character index but the result of subtraction
+-- is short of the character index by 1, 
+-- e.g. -1 is index of the the last character (first from the end), 
+-- so when length is 5, the result of 5+-1 = 4 includes
+-- last (5th) and penultimate (4th) characters as if the index were -2
+-- which is fixed by adding 1 to the result
+local st = st and (st >= 0 and st or length+st+1)
+local fin = fin and (fin < 0 and length+fin+1 or fin)
+
+	if not st and not fin or st and fin and fin < st or fin == 0 or st > length then return '' end -- positive window/frame end coordinate being smaller than positive window/frame start coordinate means an impossible window/frame where start and end are reversed; fin is 0 and st is greater than string length make string.sub return empty string so is emulated here; without arguments string.sub throws an error but this function returns empty string
+
+	local st = st >= 0 and st-1 or length+st -- each cycle reduces str length by 1 character from start, i.e. window/frame start moves rightwards, -1 because positive st coordinate matches the index of a character window/frame starts at, so when st is 2, i.e. the second character, the loop only needs a single cycle to cut off the 1st character and so on; on the other hand when st is negative the calculated value matches exactly the number of cycles required to move the window/frame start to the character, e.g. when st is -2 while length is 5, the calculated value is 5+-2 = 3, -2 is index of the penultimate character which in order to be reached from start character by character requires 3 loop cycles
+		for i=1, st do
+		str = str:match('^[\192-\255].[\128-\191](.+)') or str:match('^[\192-\255]*.[\128-\191](.+)') 
+		or str:match('^[\192-\255]*.[\128-\191]*(.+)') -- accounting for non-ASCII characters so that truncation occurs by character rather than bytes, accommodates all cases whether lead and continuation bytes present or not
+		end
+
+
+	if fin then 
+	local fin = fin > 0 and length-fin or math.abs(fin)-1 -- each cycle reduces str length by 1 character from end, i.e. window/frame end moves leftwards, -1 because negative fin coordinate matches the index of a character window/frame ends at, so when fin is -2, i.e. the second character from end, the loop only needs a single cycle to cut off the last character and so on; on the other hand when fin is positive the calculated value matches exactly the number of cycles required to move the window/frame end to the character, e.g. when fin is 2 while length is 5, the calculated value is 5-2 = 3, 2 is index of the second character which in order to be reached from end character by character requires 3 loop cycles
+	-- OR
+	-- local fin = math.abs(fin > 0 and fin-length or fin+1) -- converting positive fin value into negative before rectification, and if comes in negative adding 1 before rectification which is equivalent to subtracting 1 after rectification as done above
+		for i=1, fin do
+		str = str:match('(.+)[\192-\255].[\128-\191]') or str:match('(.+)[\192-\255]*.[\128-\191]') 
+		or str:match('(.+)[\192-\255]*.[\128-\191]*') -- accounting for non-ASCII characters so that truncation occurs by character rather than bytes, accommodates all cases whether lead and continuation bytes present or not
+		end
+	end
+
+return str
+
+end
+
 
 
 function format_time(US_order, _12_hour, Isr_date, Roman_month, dot) -- all booleans
@@ -1902,19 +1987,19 @@ end
 -- https://stackoverflow.com/questions/13235091/extract-the-first-letter-of-a-utf-8-string-with-lua
 -- https://q-syshelp.qsc.com/content/control_scripting/Lua_5.3_Reference_Manual/Standard_Libraries/4_-_Basic_UTF-8_Support.htm
 -- iterate over a UTF-8 string
--- UTF-8 code point either begins with a byte from 0 to 127, or with a byte from 194 to 244 followed by one or several bytes from 128 to 191.
+-- UTF-8 code point begins either with a byte from 0 to 127, or with a byte from 194 to 244 followed by one or several bytes from 128 to 191.
 -- returns string
 for code in str:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 print(code)
 end
 -- using utf8 library since Lua 5.3
 for _, c in utf8.codes(str) do
-  print(utf8.char(c))
+print(utf8.char(c))
 end
 -- OR
 -- utf8.charpattern is the string "[\0-\x7F\xC2-\xF4][\x80-\xBF]*" for the pattern to match one UTF-8 byte sequence, equal to "[\0-\127\194-\244][\128-\191]*]"
 for w in str:gmatch(utf8.charpattern) do
-  print(w)
+print(w)
 end
 
 
@@ -13732,7 +13817,7 @@ local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
 	if src then
 	src = obj
 	elseif take then
-	src = r.GetMediaItemTake_Source(obj) -- won't return accurate pointer for reversed takes and sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+	src = r.GetMediaItemTake_Source(obj) -- won't return accurate pointer for reversed audio takes and audio sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
 	src = r.GetMediaSourceParent(src) or src
 	end
 	
@@ -13740,7 +13825,7 @@ local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
 	local typ = r.GetMediaSourceType(src, '')
 		for k, v in ipairs({'MIDI', 'RPP', 'EMPTY', 'CLICK', 'LTC', 'VIDEO'}) do
 			if typ:match(v) then
-				if v == 'VIDEO' then -- as of build 7.52 wma and m4a files are recognized as video even though they only contain audio, so need to be validated further
+				if v == 'VIDEO' then -- as of build 7.52 wma and m4a files are recognized as video even though they only contain audio, so need to be validated further https://forum.cockos.com/showthread.php?t=304924
 				local ext = r.GetMediaSourceFileName(src, ''):match('.+%.(.+)$')
 					if ext == 'wma' and ext == 'm4a' then 
 					return true
@@ -13770,6 +13855,25 @@ end
 
 
 
+function Replace_Take_Src(take, new_file_path, delete_file)
+-- supports both audio and non-audio sources, such as image files
+-- for video takes
+local old_src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed audio takes and audio sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+old_src = r.GetMediaSourceParent(src) or old_src
+local old_file_path = r.GetMediaSourceFileName(old_src, '')
+local new_src = r.PCM_Source_CreateFromFile(new_file_path)
+r.SetMediaItemTake_Source(take, new_src)
+r.PCM_Source_Destroy(old_src)
+r.UpdateItemInProject()
+
+	if delete_file then
+	os.remove(old_file_path)
+	end	
+	
+end
+
+
+
 function Get_Take_Src_Props(take)
 
 	if not take then return end
@@ -13789,7 +13893,7 @@ function Get_Take_Src_Channel_Count(take)
 
 	if not take then return end
 
-local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed takes and sections, that is those which have either 'Reverse' or 'Section' checkboxes checked in the 'Item properties' window, hence next line
+local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed audio takes and audio sections, that is those which have either 'Reverse' or 'Section' checkboxes checked in the 'Item properties' window, hence next line
 src = r.GetMediaSourceParent(src) or src
 return r.GetMediaSourceNumChannels(src)
 
@@ -14627,7 +14731,7 @@ function Get_Set_Take_Channels(take, ch_idx)
 
 local FUNC = ch_idx and r.SetMediaItemTakeInfo_Value or r.GetMediaItemTakeInfo_Value
 local parm = 'I_CHANMODE'
-local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed takes and sections, that is those which have either 'Reverse' or 'Section' checkboxes checked in the 'Item properties' window, hence next line
+local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed audio takes and audio sections, that is those which have either 'Reverse' or 'Section' checkboxes checked in the 'Item properties' window, hence next line
 src = r.GetMediaSourceParent(src) or src
 local ch_cnt = r.GetMediaSourceNumChannels(src)
 
@@ -18969,6 +19073,17 @@ local keyword = Invalid_Script_Name3(scr_name, 'right', 'left', 'up', 'down')
 	-- DO STUFF
 	-- ETC.
 	end
+	
+-- OR
+	if not Invalid_Script_Name3(scr_name, 'right', 'left', 'up', 'down') then
+	return r.defer(no_undo) end
+	
+	if scr_name:match('right') then
+	-- DO STUFF
+	elseif scr_name:match('left') then
+	-- DO STUFF
+	-- ETC.
+	end
 ]]
 
 
@@ -19033,25 +19148,139 @@ end
 
 function file_exists_alt(path) -- a fix for the buggy ReaScript API function
 -- file_exists() returns true if passed a file name only and a file with the same name
--- is found in the current working directory, which is a bug https://forum.cockos.com/showthread.php?t=300386
+-- is found in the current working directory
+-- https://forum.cockos.com/showthread.php?t=300386
 -- so must be additionaly validated
 	if not path:match('[\\/]') -- excluding file names without a path, i.e. without separators, due to the bug mentioned above
-	or not r.file_exists(path) then
+	and not r.file_exists(path) then
 	return
 	end
 end
 
 
-function make_file_name_unique(f_path)
+
+function make_file_name_unique(f_path) -- see also resolve_file_name_collision() below
 -- prevent file name clash
 -- relies on any of File_Exists1, File_Exists2 or file_exists_alt functions above
+-- BUT AFTER ADDITION OF TIME DATA FILE PATH MAY
+-- EXCEED THE 256 CHARACTER LIMIT SO MUST BE ADDITIONALLY
+-- VALIDATED WITH sanitize_file_path()
 local name, path, ext, sep = f_path:match('.+[\\/](.+)'), f_path:match('(.+)[\\/]'), 
 f_path:match('.+(%..+)$'), f_path:match('[\\/]')
-	if File_Exists2(name, path, ext, sep) then 
-	return f_path:sub(1,-#ext-1)..'_'..(os.time()+0)..ext -- os.date('%H-%M-%S_%d.%m.%y') insted of (os.time()+0)	
+	if File_Exists2(name, path, ext, sep) then
+	return f_path:sub(1,-#ext-1)..'_'..(os.time()+0)..ext -- OR os.date('%H-%M-%S_%d.%m.%y') instead of (os.time()+0)
 	end 
 return f_path
 end
+
+
+function resolve_file_name_collision1(f_path) -- see more comprehensive verson below
+-- the function is supposed to be used after existence 
+-- of a homonymous file at the destination path 
+-- has already been ascertained with functions such as File_Exists3();
+-- f_path is the file new path it's supposed to have after
+-- movement/copying;
+-- if the path after file name resolution exceeds 256 char limit
+-- returns false
+
+local ref_file_size = Get_File_Size4(f_path, 'rb')
+local path, name, ext = f_path:match('(%S.+[\\/])(.+)(%..+%S)$')
+-- find name which doesn't collide with file names inside the destinaion folder
+-- by adding numerical suffix inside parentheses to the target file name
+	for i=2,100 do -- starting with 2 to mark second or greater instance of the file
+	name = name:match('.+(%(%d+%))%.') and name:gsub('%(%d+%)%.', '('..i..').', 1) or name..' ('..i..')' -- if file name already contains suffix of numeral inside paranthesis, only update the numeral
+	local exists = File_Exists3(name, path, ext, sep)
+		if exists and Get_File_Size4(path..name..ext, 'rb') == ref_file_size
+		then return -- exit if identical file was already renamed and copied ------------- THIS MAY NOT WORK BECAUSE OF LAG IN FILE UPDATE ON THE DISK DUE TO WHICH BY THE TIME THIS CONDITION COMES ALONG THE FILE COPED EARLIER WON'T BE REGISTERED BY THE OS AND THUS ACCESSIBLE TO Lua
+		elseif not exists then -- new file name doesn't occur in the destination folder, good to use		
+		local f_path = path..name..ext
+		return #f_path:gsub('[\128-\191]','') <= 256 and f_path -- discarding continuation bytes, if any // exiting even if exceeds character limit, although rechnically the file name length could be reduced, in which case the numeric resolution of collision would likely not even be required // alternatively return as is and use sanitize_file_path() outside to ensure that 256 char limit is met
+	--[[ ALTERNATIVE (see continuation below)
+		f_path = path..name..ext
+		break
+	--]]
+		end
+	end
+
+-- no homonymous file exists in the destination folder in the first place
+return f_path -- use the original new path, meeting 256 char limit still must be ensured, see sanitize_file_path()
+--[[ ALTERNATIVE
+return #f_path:gsub('[\128-\191]','') <= 256 and f_path -- discarding continuation bytes, if any // exiting even if exceeds character limit, although rechnically the file name length could be reduced, in which case the numeric resolution of collision would likely not even be required // alternatively return as is and use sanitize_file_path() outside to ensure that 256 char limit is met
+--]]
+
+end
+
+
+
+function resolve_file_name_collision2(f_path)
+-- for preventing collision the function is supposed to be used after existence 
+-- of a homonymous file at the destination path 
+-- has already been ascertained with functions such as File_Exists3(),
+-- but it can also be used for mere truncation of the file name
+-- due to excessive path length;
+-- f_path is the file new path it's supposed to have after
+-- movement/copying;
+-- another method of resolving file path excessive length
+-- see in sanitize_file_path()
+
+	local function len(str)
+	local l = #str:gsub('[\128-\191]','')
+	return l
+	end
+
+--local ref_file_size = Get_File_Size4(f_path, 'rb') -- OPTIONAL
+local path, name, ext = f_path:match('(%S.+[\\/])(.+)(%..+%S)$')
+
+-- find name which doesn't collide with file names inside the destinaion folder
+-- by appending numerical suffix inside parentheses to the target file name;
+-- at this point the file path length may already be in excess,
+-- but evaluating this before the loop below complicates the code
+-- so if this indeed is the case will be determined in the course of the main loop
+
+	for i=2,100 do -- starting with 2 to mark second or greater instance of the file
+	local num = name:match('.+(%(%d+%))%.')
+	name = num and name:gsub(num..'%.', '('..i..').', 1) or name..' ('..i..')' -- if file name already contains suffix of numeral inside paranthesis, only update the numeral
+--[[ OPTIONAL
+--	local exists = File_Exists3(name, path, ext, sep)
+	--	if exists and Get_File_Size4(path..name..ext, 'rb') == ref_file_size
+	--	then return -- exit if identical file was already renamed and copied ------------- THIS MAY NOT WORK BECAUSE OF LAG IN FILE UPDATE ON THE DISK DUE TO WHICH BY THE TIME THIS CONDITION COMES ALONG THE FILE COPED EARLIER WON'T BE REGISTERED BY THE OS AND THUS ACCESSIBLE TO Lua
+	--	else
+--]]
+	f_path = path..name..ext
+	local excess = len(f_path) > 256
+		if not File_Exists3(f_path) and not excess then -- discarding continuation bytes, if any // new file name doesn't occur in the destination folder AND path char limit hasn't been exceeded, good to use
+		break
+		elseif excess then
+		local name_len = len(name)
+		local extra_char = len(f_path) - 256
+			if extra_char >= name_len then -- truncating name won't help
+			return
+			elseif extra_char == 1 then -- this allows removing 1 parenthesis and replacing the other one with underscore
+			-- shorten the name by removing the parenthesis around the number
+			local name, num = name:match('(.+)%((%d+)%)%.')
+			f_path = path..name..'_'..num..ext
+				if not File_Exists3(f_path) then break end
+			else
+			local name = name:match('(.+)%(%d+%)') -- exclude number in parenthesis completely, file with such name already exists at the destination path which is why this function is being executed in the first place, so it still should not collide and since inclusion of a number makes its path go over the character limit it needs truncation instead
+			name_len = len(name) -- get length of name without number
+				for i=1, name_len do -- each cycle reduces name length by 1 character
+				name = name:match('(.+)[\192-\255].[\128-\191]') or name:match('(.+)[\192-\255]*.[\128-\191]') 
+				or name:match('(.+)[\192-\255]*.[\128-\191]*') -- accounting for non-ASCII characters so that truncation occurs by character rather than bytes, accommodates all cases whether lead and continuation bytes present or not
+				f_path = path..name..ext
+					if len(f_path) <= 256 and not file_exists(f_path) then break end
+				end
+				if i < name_len then break -- break out of the main loop
+				elseif i == name_len then return end -- in case all versions of the truncated file name collided with already existing files, a fairly unlikely scenario, exit to prevent returning the last concatenated f_path, or 'f_path = nil' could be used instead of return
+			end
+		elseif i==100 then return -- by the end of the loop collision hasn't been resolved, exit to prevent returning the last concatenated f_path
+		end
+	end
+
+return f_path
+
+end
+
+
 
 
 function file_status(path)
@@ -19072,7 +19301,11 @@ function move_file_to_another_folder(file_path, folder_path, delete_old)
 -- DOES NOT RESOLVE FILE NAME COLLISIONS
 -- folder_path is path of the new folder, must not end with a separator
 -- delete_old is boolean to delete file at its old location
+
+local folder_path = folder_path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
+local folder_path = folder_path:match('.+[\\/]$') and folder_path:sub(1,-2) or folder_path -- last separator is removed so the path is properly formatted for io.open()
 local sep = folder_path:match('[\\/]')
+local file_path = file_path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$') 
 local f = io.open(file_path,'rb')
 local cont = f:read('*a')
 f:close()
@@ -19114,7 +19347,10 @@ local fx_chain_dir = CUSTOM_FX_CHAIN_DIR and Dir_Exists(Validate_Folder_Path(CUS
 ]]
 
 
-function print_or_write_to_file(str, PATH_TO_DUMP_FILE, file_name) -- PATH_DO_DUMP_FILE is a directory path; uses 2 additional functions Dir_Exists() and open_dir_in_file_browser() // the routine is used in 'List all linked FX parameters in the project.lua'
+function print_or_write_to_file(str, PATH_TO_DUMP_FILE, file_name) 
+-- PATH_TO_DUMP_FILE is a directory path; 
+-- uses 2 additional functions Dir_Exists() and open_dir_in_file_browser()
+-- the routine is used in 'List all linked FX parameters in the project.lua'
 
 	if #str <= 16380 then -- print to ReaConsole
 	-- ReaScript console can display maximum of 16,382 (almost 16,384) bytes. Couldn't go any higher. Once this number is exceeded the printed content is cut by 2,052 (a little over 2,048) bytes. And as far as i understand the process is repeated from there on out.
@@ -19152,7 +19388,7 @@ function ScanPath1(path)
         path_child = reaper.EnumerateSubdirectories(path, subdirindex)
         if path_child then
             table.insert(t,path_child)
-            local tmp = ScanPath(path .. "/" .. path_child)
+            local tmp = ScanPath1(path .. "/" .. path_child)
             for i = 1, #tmp do
                 --table.insert(t, path .. "/" .. path_child .. "/" .. tmp[i])
                 table.insert(t, tmp[i])
@@ -19178,34 +19414,36 @@ local t = ScanPath(path)
 
 -- My version
 function ScanPath2(path)
+
 local path = path:match('^%s*(.-)%s*$') -- trim spaces
 local path = #path > 0 and path:match('.+[\\/]$') and path:match('(.+)[\\/]$') or path -- remove last separator if any
 local sep = path:match('[\\/]') and path:match('[\\/]') or '' -- extract the separator
-    local t = {}
-    local subdir_idx, file_idx = 0, 0
-    local subdir
-    repeat
-    local subdir = r.EnumerateSubdirectories(path, subdir_idx)
-        if subdir then
+local t = {}
+local subdir_idx, file_idx, subdir = 0, 0
+
+	repeat
+	local subdir = r.EnumerateSubdirectories(path, subdir_idx)
+		if subdir then
 		t[#t+1] = path..sep..subdir..sep -- for file scan separator isn't needed as EnumerateFiles() works without it
-        local tmp = ScanPath(path..sep..subdir)
-	table.sort(tmp, function(a,b) return tonumber(a:match('.+[\\/](.-)$')) < tonumber(b:match('.+[\\/](.-)$')) end) -- sort paths by the last folder name IF IT'S NUMERIC in case the numbers aren't preceded with 0 and 10 appears earlier than 2, alphabetical names are sorted automatically
+		local tmp = ScanPath2(path..sep..subdir)
+		table.sort(tmp, function(a,b) return (tonumber(a:match('.+[\\/](.-)$')) or 0) < (tonumber(b:match('.+[\\/](.-)$')) or 0) end) -- sort paths by the last folder name IF IT'S NUMERIC in case the numbers aren't preceded with 0 and 10 appears earlier than 2, alphabetical names are sorted automatically
 			for i = 1, #tmp do
-            t[#t+1] = tmp[i]
-            end
-        end
-    subdir_idx = subdir_idx + 1
-    until not subdir
+			t[#t+1] = tmp[i]
+			end
+		end
+	subdir_idx = subdir_idx + 1
+	until not subdir
 
 	repeat
 	local fn = r.EnumerateFiles(path, file_idx)
 		if fn then
-        t[#t+1] = path..sep..fn
-        end
+		t[#t+1] = path..sep..fn
+		end
 	file_idx = file_idx + 1
 	until not fn
 
-    return t
+return t
+
 end
 
 
@@ -19704,7 +19942,7 @@ return tonumber(io.popen(command):read('*a')) -- OR r.ExecProcess(command, 0) --
 end
 
 
-function Get_File_Size4(file_path, mode) -- used inside remove_duplicates_from_other_folders()
+function Get_File_Size4(file_path, mode)
 -- mode is either 'r' for strings and 'rb' for binaries
 local f = io.open(file_path, mode)
 	if f then
@@ -20011,11 +20249,11 @@ local diff = 256 - (path:len()+ext:len())
 local mess
 
 	if diff <= 0 then
-	local excess = diff < 0 and '\n\n   by '..math.abs(diff)..' characters.' or ''
+	local excess = diff < 0 and '\n\n   by '..math.abs(diff)..' characters.' or '' -- the length of the path without the file name is already in excess, truncation of the file name won't help
 	Error_Tooltip('\n\n the file path length \n\n   exceeds the limit '..excess..' \n\n', 1, 1) -- caps, spaced true
 	mess = name
 	elseif diff < name:len() then -- truncate file name
-	name = name:sub(1, diff)
+	name = name:sub(1, diff) -- ONLY WORKS ACCURATELY FOR ASCII CHARACTERS BECAUSE OF BEING BASED ON BYTES, for non-ASCII chars use utf8_string_iterator() function with valid truncate_by argument or utf8_str_sub()
 	--[[ OR in a more convoluted way
 	local diff = diff-name:len() -- subtracting smaller from greater to obtain negative value
 	name = name:sub(1, diff-1) -- additional -1 because the end argument includes the last character, i.e. 1 greater than the actual difference
@@ -20090,6 +20328,35 @@ local path = os.getenv(Win and 'USERPROFILE' or 'HOME')
 return path..path:match('[\\/]')..'Desktop'
 end
 
+
+
+function remove_line_breaks(file_path)
+local cont = ''
+  for line in io.lines(file_path) do
+    if not line:match('%S') then -- empty line, keep empty
+    cont = cont..'\n'
+    else -- replace line break with single space
+    cont = cont..' '..line
+    end
+  end
+--[[
+local f = io.open([[C:\Users\ME\Desktop\1.txt]], 'w')
+local f = io.open(file_path, 'r')
+local cont = f:read('*a')
+f:close()
+cont = cont:gsub('.[\128-\191]­ .[\128-\191]', function(c) return c:gsub('­ ','') end)
+--]]
+local f = io.open(file_path, 'w')
+f:write(cont)
+f:close()
+end
+
+
+function is_image_file(file_path)
+local t = {PNG='',PCX='',JPG='',JPEG='',JFIF='',ICO='',BMP='',GIF=''}
+local ext = file_path:match('.+%.(.+)$')
+return ext and t[ext:upper()]
+end
 
 
 --=================================== F I L E S   E N D =========================================
@@ -20399,7 +20666,7 @@ local dimens_t = sws and {r.BR_Win32_GetWindowRect(r.GetMainHwnd())}
 or {r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)} -- true - work area, false - the entire screen // https://forum.cockos.com/showthread.php?t=195629#4
 	if #dimens_t == 5 then table.remove(dimens_t, 1) end -- remove retval value if BR's function
 local lt, top, rt, bot = table.unpack(dimens_t)
-local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero, when isSet (2nd arg) is true
 --local TCP_width = tonumber(cont:match('leftpanewid=(.-)\n')) -- only changes in reaper.ini when dragged
 local Top_area_h = sws and top + 65 or tonumber(cont:match('toppane=(.-)\n')) or 65 -- 'toppane' only changes in reaper.ini when dragged so not reliable // Y coordinate, OPTIONAL, can be changed on a case by case basis
 -- https://forums.cockos.com/showpost.php?p=1991096&postcount=11 thanks to mespotine
@@ -26212,10 +26479,12 @@ S T R I N G S
 	Convert_Text_To_Menu
 	multibyte_str_len
 	utf8_len
-	string.len
 	utf8_len2
+	string.len	
 	string.reverse
 	utf8_chars_to_bytes
+	utf8_string_iterator
+	utf8_str_sub
 	format_time
 	format_timestr_alt
 	magiclines
@@ -26659,6 +26928,7 @@ I T E M S
 	Fades_Exist
 	is_audio_src
 	Delete_Take_Src
+	Replace_Take_Src
 	Get_Take_Src_Props
 	Get_Take_Src_Channel_Count
 	Select_Items_With_Same_Src_Media
@@ -26849,6 +27119,8 @@ F I L E S
 	File_Exists3
 	file_exists_alt
 	make_file_name_unique
+	resolve_file_name_collision1
+	resolve_file_name_collision2
 	file_status
 	move_file_to_another_folder
 	Validate_Folder_Path
@@ -26896,6 +27168,8 @@ F I L E S
 	Get_Last_Accessed_Dir
 	get_cwd()
 	Get_Desktop_Path
+	remove_line_breaks
+	is_image_file
 
 
 M E A S U R E M E N T S / C A L C U L A T I O N S
