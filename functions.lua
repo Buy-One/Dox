@@ -974,7 +974,7 @@ end
 
 function Esc(str)
 	if not str then return end -- prevents error
--- isolating the 1st return value so that if vars are initialized in a row outside of the function the next var isn't assigned the 2nd return value
+-- isolating the 1st return value so that if multiple var assignnments are performed outside of the function the next var isn't assigned the 2nd return value
 local str = str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0')
 return str
 end
@@ -12385,8 +12385,8 @@ function Rename_Item_Take_Src_File2(take)
 -- https://forum.cockos.com/showthread.php?t=211250 file rename
 -- https://forum.cockos.com/showthread.php?p=1889202 file rename
 
-local old_src = r.GetMediaItemTake_Source(take)
-local old_src = r.GetMediaSourceParent(src) or old_src -- in case the item is a section or a reversed source
+local old_src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+local old_src = r.GetMediaSourceParent(old_src) or old_src -- in case the item is a section or a reversed source
 
 local old_fn = r.GetMediaSourceFileName(old_src, "") -- extract rendered file path and name
 --local rend_file_ext = old_fn:match("%.%w+") -- extract rendered file extension
@@ -13817,7 +13817,7 @@ local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
 	if src then
 	src = obj
 	elseif take then
-	src = r.GetMediaItemTake_Source(obj) -- won't return accurate pointer for reversed audio takes and audio sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+	src = r.GetMediaItemTake_Source(obj) -- won't return accurate pointer for reversed source and source sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
 	src = r.GetMediaSourceParent(src) or src
 	end
 	
@@ -13845,8 +13845,8 @@ ACT(40440) -- Item: Set selected media temporarily offline // if source is remov
 -- Thanks to cfillion and MPL
 -- https://forum.cockos.com/showthread.php?t=211250
 -- https://forum.cockos.com/showthread.php?p=1889202
-local src = r.GetMediaItemTake_Source(take)
-local src = r.GetMediaSourceParent(src) or src -- in case the item is a section or a reversed source
+local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+src = r.GetMediaSourceParent(src) or src -- in case the item is a section or a reversed source
 local file_name = r.GetMediaSourceFileName(src, '')
 os.remove(file_name)
 os.remove(file_name..'.reapeaks')
@@ -13855,18 +13855,18 @@ end
 
 
 
-function Replace_Take_Src(take, new_file_path, delete_file)
+function Replace_Take_Src(take, new_file_path, want_file_deleted)
 -- supports both audio and non-audio sources, such as image files
 -- for video takes
-local old_src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed audio takes and audio sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
-old_src = r.GetMediaSourceParent(src) or old_src
+local old_src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+old_src = r.GetMediaSourceParent(old_src) or old_src
 local old_file_path = r.GetMediaSourceFileName(old_src, '')
 local new_src = r.PCM_Source_CreateFromFile(new_file_path)
 r.SetMediaItemTake_Source(take, new_src)
 r.PCM_Source_Destroy(old_src)
-r.UpdateItemInProject()
+r.UpdateItemInProject(r.GetMediaItemTake_Item(take))
 
-	if delete_file then
+	if want_file_deleted then
 	os.remove(old_file_path)
 	end	
 	
@@ -13879,8 +13879,12 @@ function Get_Take_Src_Props(take)
 	if not take then return end
 
 local src = r.GetMediaItemTake_Source(take)
+----------------
 local sect, startoffs, length, rev = r.PCM_Source_GetSectionInfo(src) -- if sect is false startoffs is 0	
-local src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or reversed
+src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or reversed
+-- OR just
+-- src = r.GetMediaSourceParent(src) or src -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+----------------
 local ch_cnt = r.GetMediaSourceNumChannels(src)
 local filename = r.GetMediaSourceFileName(src, '') -- source pointer in takes with the same source is different therefore for comparison file name must be retrieved
 return sect, startoffs, length, rev, filename, ch_cnt
@@ -13893,8 +13897,8 @@ function Get_Take_Src_Channel_Count(take)
 
 	if not take then return end
 
-local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed audio takes and audio sections, that is those which have either 'Reverse' or 'Section' checkboxes checked in the 'Item properties' window, hence next line
-src = r.GetMediaSourceParent(src) or src
+local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+src = r.GetMediaSourceParent(src) or src 
 return r.GetMediaSourceNumChannels(src)
 
 end
@@ -13934,8 +13938,12 @@ end
 function Get_Src_Orig_Length(take)
 local src = r.GetMediaItemTake_Source(take)
 -- retrieve original media source if section or reversed
+-----------------
 local sect, startoffs, sect_len, rev = r.PCM_Source_GetSectionInfo(src)
-local src = (sect or rev) and r.GetMediaSourceParent(src) or src
+src = (sect or rev) and r.GetMediaSourceParent(src) or src
+-- OR just
+-- src = r.GetMediaSourceParent(src) or src -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+-----------------
 local file = r.GetMediaSourceFileName(src, '')
 local src = r.PCM_Source_CreateFromFile(file) -- must be re-created because source length within take depends of section properties if enabled and is likely to be inaccurate
 local sect, startoffs, src_len, rev = r.PCM_Source_GetSectionInfo(src) -- re-get data from the mint source
@@ -13952,8 +13960,12 @@ end
 function Is_Take_Source_Trimmed(take)
 
 local src = r.GetMediaItemTake_Source(take)
+--------------------
 local sect, startoffs, sect_len, rev = r.PCM_Source_GetSectionInfo(src) -- sect is true if 'Section' checkbox is checkmarked in 'Item Properties' (can be checkmarked with action 'Item properties: Loop section of audio item source'); when not sect startoffs is 0 and sect_len is full source length, that's because src pointer stems from a specific take; startoffs and sect_len values are raw, i.e. without accounting for the playrate just as they are displayed in the Item Properties
-local src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or reversed
+src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or 
+-- OR just
+-- src = r.GetMediaSourceParent(src) or src -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+--------------------
 local playrate = r.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
 local GET = r.GetMediaItemInfo_Value
 local item = r.GetMediaItemTake_Item(take)
@@ -14000,8 +14012,12 @@ end
 
 function Create_Take_Source_Section(item, take, trim_left, trim_right) -- trim_left & trim_right vars can be positive and negative
 local src = r.GetMediaItemTake_Source(src_take)
+----------------
 local sect, startoffs, len, rev = r.PCM_Source_GetSectionInfo(src_src) -- sect_src is true if 'Section' checkbox is checkmarked in 'Item Properties' (can be checkmarked with action 'Item properties: Loop section of audio item source')
-local src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or reversed
+src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or reversed
+-- OR just
+-- src = r.GetMediaSourceParent(src) or src -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+----------------
 	if sect then r.Main_OnCommand(40547,0) end -- Item properties: Loop section of audio item source // uncheck if checked
 r.SetMediaItemTakeInfo_Value(take, 'D_STARTOFFS', trim_left)
 r.SetMediaItemInfo_Value(item, 'D_LENGTH', trim_right) -- set to the desired section length
@@ -14181,7 +14197,7 @@ local pitch_env_val
 
 -- get original media source to calculate unit for convertion of item boundaries into region boundaries within RS5k
 local src = r.GetMediaItemTake_Source(take)
-local src = r.GetMediaSourceParent(src) or src -- in case the item is a section or a reversed source; if item is a section the next function will return actual item length rather than the source's, hence unsuitable for unit calculation (for which full source length is required) neither suitable for file name retrieval and parent source must be retrieved
+src = r.GetMediaSourceParent(src) or src -- in case the item is a section or a reversed source; if item is a section the next function will return actual item length rather than the source's, hence unsuitable for unit calculation (for which full source length is required) neither suitable for file name retrieval and parent source must be retrieved
 -- convert source length to sample region units used in rs5k (0 - 1)
 local len_src, is_lengthInQN = r.GetMediaSourceLength(src)
 local unit = 1/len_src
@@ -14731,7 +14747,7 @@ function Get_Set_Take_Channels(take, ch_idx)
 
 local FUNC = ch_idx and r.SetMediaItemTakeInfo_Value or r.GetMediaItemTakeInfo_Value
 local parm = 'I_CHANMODE'
-local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed audio takes and audio sections, that is those which have either 'Reverse' or 'Section' checkboxes checked in the 'Item properties' window, hence next line
+local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source sections, that is those which have either 'Reverse' or 'Section' checkboxes checked in the 'Item properties' window, hence next line
 src = r.GetMediaSourceParent(src) or src
 local ch_cnt = r.GetMediaSourceNumChannels(src)
 
@@ -18989,7 +19005,7 @@ local found
 	local br = '\n\n'
 	r.MB([[The script name has been changed]]..br..Rep(7)..[[which renders it inoperable.]]..br..
 	[[   please restore the original name]]..br..[[  referring to the list in the header,]]..br..
-	Rep(9)..[[or reinstall it.]], 'ERROR', 0)
+	Rep(20)..[[or reinstall it.]], 'ERROR', 0)
 --[[ OR using Error_Tooltip()
 	local err = 'The script name has been changed\n\n    which renders it inoperable. \n\n'
 ..' please restore the original name\n\n\t referring to the names\n\n\t\t in the header,\n\n'
@@ -19035,7 +19051,7 @@ local t = {...}
 local br = '\n\n'
 r.MB([[The script name has been changed]]..br..Rep(7)..[[which renders it inoperable.]]..br..
 [[   please restore the original name]]..br..[[  referring to the list in the header,]]..br..
-Rep(9)..[[or reinstall it.]], 'ERROR', 0)
+Rep(20)..[[or reinstall it.]], 'ERROR', 0)
 return true
 
 end
@@ -19059,7 +19075,7 @@ local t = {...}
 local br = '\n\n'
 r.MB([[The script name has been changed]]..br..Rep(7)..[[which renders it inoperable.]]..br..
 [[   please restore the original name]]..br..[[  referring to the name in the header,]]..br..
-Rep(9)..[[or reinstall it.]], 'ERROR', 0)
+Rep(20)..[[or reinstall it.]], 'ERROR', 0)
 
 end
 -- USE:
@@ -19099,10 +19115,13 @@ function Dir_Exists1(path) -- see version 2 below
 --local path = not path:match('.+[\\/]%s*$') and path:match('^%s*(.-)%s*$')..sep or path:match('^%s*(.+'..sep..')%s*$') -- add last separator if none and remove leading/trailing spaces
 
 local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces
-local sep = path:match('[\\/]')
-local path = path..(not path:match('.+[\\/]$') and path:match('[\\/]') or '') -- add last separator if none
 
-local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- if there's separator remove it // not always necessary
+--[[
+local sep = path:match('[\\/]') or '/' -- extract the separator, if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
+local path = path..(not path:match('.+[\\/]$') and sep or '') -- add last separator if none
+--]]
+
+local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- if there's trailing separator remove it // not always necessary
 local _, mess = io.open(path:sub(1,-2)) -- last separator is removed to return 1 (valid)
 local result = #path:gsub('[%c%.]', '') > 0 and mess and (mess:match('Permission denied') and 1 -- or 'and path..sep' // dir exists // this one is enough HOWEVER THIS IS ALSO THE RESULT IF THE path var ONLY INCLUDES DOTS, therefore gsub ensures that besides dots there're other characters
 or mess:match('No such file or directory') and 2
@@ -19114,7 +19133,7 @@ end
 function Dir_Exists2(path) -- short
 -- path is a directory path, not file
 local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
-local sep = path:match('[\\/]')
+local sep = path:match('[\\/]') or '/' -- extract the separator, if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
 	if not sep then return end -- likely not a string representing a path
 local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed so the path is properly formatted for io.open()
 local _, mess = io.open(path)
@@ -19181,24 +19200,40 @@ function resolve_file_name_collision1(f_path) -- see more comprehensive verson b
 -- f_path is the file new path it's supposed to have after
 -- movement/copying;
 -- if the path after file name resolution exceeds 256 char limit
--- returns false
+-- returns false;
+-- in case of collision REAPER overwrites namesake files 
+-- unless at the very least their sizes differ
+-- in which case it resolves the collision by appending -001 suffix
 
 local ref_file_size = Get_File_Size4(f_path, 'rb')
-local path, name, ext = f_path:match('(%S.+[\\/])(.+)(%..+%S)$')
+local path, name, ext = f_path:match('(%S.+[\\/])(.+%.)(.+%S)$')
+
 -- find name which doesn't collide with file names inside the destinaion folder
--- by adding numerical suffix inside parentheses to the target file name
+-- by adding numerical suffix inside parentheses to the target file name;
+-- file extension dot is used as an anchor for the numeric suffix
+-- so that it's only modified at the end of the file name
+-- in case there're matches elsewhere within the name
+
 	for i=2,100 do -- starting with 2 to mark second or greater instance of the file
-	name = name:match('.+(%(%d+%))%.') and name:gsub('%(%d+%)%.', '('..i..').', 1) or name..' ('..i..')' -- if file name already contains suffix of numeral inside paranthesis, only update the numeral
+	name = name:match('.+(%(%d+%)%.)') and name:gsub('%(%d+%)%.', '('..i..').', 1) or name:sub(1,-2)..' ('..i..').' -- if file name already contains suffix of numeral inside paranthesis, only update the numeral
 	local exists = File_Exists3(name, path, ext, sep)
+	--[[ OR
+	local num = name:match('.+(%(%d+%)%.)')
+	num = num and Esc(num)
+	name = num and name:gsub(num, '('..i..').', 1) or name:sub(1,-2)..' ('..i..').' -- if file name already contains suffix of numeral inside paranthesis, only update the numeral
+	f_path = path..name..ext
+	local exists = File_Exists1(f_path)
+	--]]
 		if exists and Get_File_Size4(path..name..ext, 'rb') == ref_file_size
 		then return -- exit if identical file was already renamed and copied ------------- THIS MAY NOT WORK BECAUSE OF LAG IN FILE UPDATE ON THE DISK DUE TO WHICH BY THE TIME THIS CONDITION COMES ALONG THE FILE COPED EARLIER WON'T BE REGISTERED BY THE OS AND THUS ACCESSIBLE TO Lua
-		elseif not exists then -- new file name doesn't occur in the destination folder, good to use		
+		elseif not exists then -- new file name doesn't occur in the destination folder, good to use
 		local f_path = path..name..ext
 		return #f_path:gsub('[\128-\191]','') <= 256 and f_path -- discarding continuation bytes, if any // exiting even if exceeds character limit, although rechnically the file name length could be reduced, in which case the numeric resolution of collision would likely not even be required // alternatively return as is and use sanitize_file_path() outside to ensure that 256 char limit is met
 	--[[ ALTERNATIVE (see continuation below)
 		f_path = path..name..ext
 		break
 	--]]
+		elseif i==100 then return -- by the end of the loop collision hasn't been resolved, exit to prevent returning the last concatenated f_path
 		end
 	end
 
@@ -19221,7 +19256,11 @@ function resolve_file_name_collision2(f_path)
 -- f_path is the file new path it's supposed to have after
 -- movement/copying;
 -- another method of resolving file path excessive length
--- see in sanitize_file_path()
+-- see in sanitize_file_path();
+-- relies on Esc() function;
+-- in case of collision REAPER overwrites namesake files 
+-- unless at the very least their sizes differ
+-- in which case it resolves the collision by appending -001 suffix
 
 	local function len(str)
 	local l = #str:gsub('[\128-\191]','')
@@ -19229,17 +19268,21 @@ function resolve_file_name_collision2(f_path)
 	end
 
 --local ref_file_size = Get_File_Size4(f_path, 'rb') -- OPTIONAL
-local path, name, ext = f_path:match('(%S.+[\\/])(.+)(%..+%S)$')
+local path, name, ext = f_path:match('(%S.+[\\/])(.+%.)(.+%S)$')
 
 -- find name which doesn't collide with file names inside the destinaion folder
 -- by appending numerical suffix inside parentheses to the target file name;
 -- at this point the file path length may already be in excess,
 -- but evaluating this before the loop below complicates the code
--- so if this indeed is the case will be determined in the course of the main loop
+-- so if this indeed is the case will be determined in the course of the main loop;
+-- file extension dot is used as an anchor for the numeric suffix
+-- so that it's only modified at the end of the file name
+-- in case there're matches elsewhere within the name
 
 	for i=2,100 do -- starting with 2 to mark second or greater instance of the file
-	local num = name:match('.+(%(%d+%))%.')
-	name = num and name:gsub(num..'%.', '('..i..').', 1) or name..' ('..i..')' -- if file name already contains suffix of numeral inside paranthesis, only update the numeral
+	local num = name:match('.+(%(%d+%)%.)')
+	num = num and Esc(num)
+	name = num and name:gsub(num, '('..i..').', 1) or name:sub(1,-2)..' ('..i..').' -- if file name already contains suffix of numeral inside paranthesis, only update the numeral
 --[[ OPTIONAL
 --	local exists = File_Exists3(name, path, ext, sep)
 	--	if exists and Get_File_Size4(path..name..ext, 'rb') == ref_file_size
@@ -19248,7 +19291,7 @@ local path, name, ext = f_path:match('(%S.+[\\/])(.+)(%..+%S)$')
 --]]
 	f_path = path..name..ext
 	local excess = len(f_path) > 256
-		if not File_Exists3(f_path) and not excess then -- discarding continuation bytes, if any // new file name doesn't occur in the destination folder AND path char limit hasn't been exceeded, good to use
+		if not File_Exists1(f_path) and not excess then -- new file name doesn't occur in the destination folder AND path char limit hasn't been exceeded, good to use
 		break
 		elseif excess then
 		local name_len = len(name)
@@ -19282,6 +19325,39 @@ end
 
 
 
+function reduce_file_name_length(f_path)
+-- to be used when file path exceeds the limit of 256 chars
+-- relies on File_Exists1() function
+
+	local function len(str)
+	local l = #str:gsub('[\128-\191]','')
+	return l
+	end
+
+local path, name, ext = f_path:match('(%S.+[\\/])(.+)(%..+%S)$')
+
+	if len(path) >= 256 then return end -- the path length is in excess even without the file name
+
+	if len(f_path) > 256 then
+	local name_len = len(name)
+		for i=1, name_len-1 do -- each cycle reduces name length by 1 character, -1 because otherwise the last cycle of the loop the name will reach with only the 1st character left, so no point to continue past that
+		name = name:match('(.+)[\192-\255].[\128-\191]') or name:match('(.+)[\192-\255]*.[\128-\191]')
+		or name:match('(.+)[\192-\255]*.[\128-\191]*') -- accounting for non-ASCII characters so that truncation occurs by character rather than bytes, accommodates all cases whether lead and continuation bytes present or not
+		f_path = path..name..ext
+			if len(f_path) <= 256 and not File_Exists1(f_path) then break end
+		end
+
+		if len(f_path) > 256 then return end -- in case all versions of the truncated file name collided with already existing files, a fairly unlikely scenario, exit to prevent returning the last concatenated f_path, or 'f_path = nil' could be used instead of return
+
+	end
+	
+return f_path
+
+end
+
+
+
+
 
 function file_status(path)
 -- based on https://www.tutorialspoint.com/lua/index.htm
@@ -19304,7 +19380,7 @@ function move_file_to_another_folder(file_path, folder_path, delete_old)
 
 local folder_path = folder_path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
 local folder_path = folder_path:match('.+[\\/]$') and folder_path:sub(1,-2) or folder_path -- last separator is removed so the path is properly formatted for io.open()
-local sep = folder_path:match('[\\/]')
+local sep = file_path:match('[\\/]')
 local file_path = file_path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$') 
 local f = io.open(file_path,'rb')
 local cont = f:read('*a')
@@ -19327,9 +19403,9 @@ end
 function Validate_Folder_Path(path) -- returns empty string if path is empty and nil if it's not a string
 	if type(path) == 'string' then
 	local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
-	-- return not path:match('.+[\\/]$') and path:match('[\\/]') and path..path:match('[\\/]') or path -- add last separator if none
+-- return not path:match('.+[\\/]$') and (path:match('[\\/]') and path..path:match('[\\/]') or path..'/') or path -- add last separator if none // if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
 -- more efficient:
-	return path..(not path:match('.+[\\/]$') and path:match('[\\/]') or '') -- add last separator if none
+	return path..(not path:match('.+[\\/]$') and (path:match('[\\/]') or '/') or '') -- add last separator if none // if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
 	end
 end
 
@@ -19417,7 +19493,7 @@ function ScanPath2(path)
 
 local path = path:match('^%s*(.-)%s*$') -- trim spaces
 local path = #path > 0 and path:match('.+[\\/]$') and path:match('(.+)[\\/]$') or path -- remove last separator if any
-local sep = path:match('[\\/]') and path:match('[\\/]') or '' -- extract the separator
+local sep = path:match('[\\/]') and path:match('[\\/]') or '/' -- extract the separator, if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
 local t = {}
 local subdir_idx, file_idx, subdir = 0, 0
 
@@ -19518,7 +19594,13 @@ end
 
 
 -- streamlined
-function get_file_timestamp3(file_name, dir) -- both args are strings // dir MUST NOT end with separator, if dir isn't provided file arg must be full path // Windows only // special chars in args must either be escaped or the args inclosed in [[]]
+function get_file_timestamp3(file_name, dir) 
+-- both args are strings;
+-- dir MUST NOT end with separator,
+-- if dir isn't provided file arg must be full path;
+-- Windows only, special chars in args must either 
+-- be escaped or the args inclosed in [[]]
+
 local command
 local capt
 	if not dir then -- time without seconds
@@ -19585,9 +19667,10 @@ end
 function get_proj_path()
 local _, projfn = r.EnumProjects(-1) -- active
 return projfn -- empty string for a project with no file, if the proj file was deleted while the project is open will still return its full path
--- OR
---local path = r.GetProjectPath('')
---return path..path:match('[\\/]')..r.GetProjectName(0,'')
+--[[ WRONG, BECAUSE GetProjectPath() returns project media path, even though it sometimes may match project file path
+-- local path = r.GetProjectPath('')
+-- return path..(path:match('[\\/]') or '/')..r.GetProjectName(0,'') -- if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
+--]]
 end
 
 
@@ -19766,7 +19849,7 @@ function META_Spawn_Scripts(fullpath, scr_name, names_t)
 
 	local function Dir_Exists(path) -- short
 	local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces
-	local sep = path:match('[\\/]')
+	local sep = path:match('[\\/]') or '/' -- extract the separator, if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
 	local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed to return 1 (valid)
 	local _, mess = io.open(path)
 	return mess:match('Permission denied') and path..sep -- dir exists // this one is enough
@@ -20154,6 +20237,7 @@ end
 
 
 function sanitize_file_name1(name)
+-- only suitable for file/folder names, not paths
 -- the name must exclude extension
 -- https://stackoverflow.com/questions/1976007/what-characters-are-forbidden-in-windows-and-linux-directory-names
 -- relies on Error_Tooltip() function
@@ -20194,8 +20278,26 @@ end
 
 
 function sanitize_file_name2(filename)
+-- only suitable for file/folder names, not paths
 -- https://github.com/ReaTeam/ReaScripts/blob/04c8142b91a09ba84f0dcd766fdbacc744a3d7c8/Tracks/Tylereddington_Smart_Track_Manager_Package.lua
 return filename:gsub('[\\/:*?\"<>|]', '_') -- colon may be supported on MacOS
+end
+
+
+
+function invalid_path_chars(path)
+-- relies on sanitize_file_name1()
+-- doesn't detect excessivle path length, i.e. > 256 chars
+local sep = path:match('[\\/]') or '/' -- extract the separator, if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
+local path = path:sub(-1) == sep and path or path..sep -- add to simplify capture below
+local vol
+	for name in path:gmatch('(.-)'..sep) do
+		if not vol and name:match(':') then vol = 1
+		elseif vol and sanitize_file_name1(name)
+		then return
+		end
+	end
+return true
 end
 
 
@@ -20357,6 +20459,25 @@ local t = {PNG='',PCX='',JPG='',JPEG='',JFIF='',ICO='',BMP='',GIF=''}
 local ext = file_path:match('.+%.(.+)$')
 return ext and t[ext:upper()]
 end
+
+
+local function get_file_mod_time(path)
+-- https://github.com/vovvee/MBCleaner/blob/main/MBCleaner.lua
+    -- Try lfs
+    local success, lfs = pcall(require, "lfs")
+    if success and lfs then
+        return lfs.attributes(path, "modification") or 0
+    end
+    -- Fallback for macOS/Linux
+    local handle = io.popen("stat -f %m \"" .. path .. "\"")
+    if handle then
+        local result = handle:read("*a")
+        handle:close()
+        return tonumber(result) or 0
+    end
+    return 0
+end
+
 
 
 --=================================== F I L E S   E N D =========================================
@@ -22834,7 +22955,7 @@ function Open_Close_Temp_Proj_Tab_Without_Save_Prompt3(path)
 -- stemming from the extended state
 -- if not stored yet, use REAPER own last/current working directory
 local path = path or select(2, r.get_config_var_string('lastcwd'))
-local sep = path:match('[\\/]')
+local sep = path:match('[\\/]') or '/' -- extract the separator, if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
 	if #path > 0 then
 	path = path..(path:sub(1,-2) == sep and '' or sep)..tostring(r.time_precise())..'.RPP' -- using time precise since the odds of it being a unique name are pretty high
 	local f = io.open(path,'w')
@@ -27121,6 +27242,7 @@ F I L E S
 	make_file_name_unique
 	resolve_file_name_collision1
 	resolve_file_name_collision2
+	reduce_file_name_length
 	file_status
 	move_file_to_another_folder
 	Validate_Folder_Path
@@ -27163,6 +27285,7 @@ F I L E S
 	GetUserFileNameForRead_Alt
 	sanitize_file_name1
 	sanitize_file_name2
+	invalid_path_chars
 	sanitize_file_path
 	Copy_Or_Move_File
 	Get_Last_Accessed_Dir
@@ -27170,6 +27293,7 @@ F I L E S
 	Get_Desktop_Path
 	remove_line_breaks
 	is_image_file
+	get_file_mod_time
 
 
 M E A S U R E M E N T S / C A L C U L A T I O N S
