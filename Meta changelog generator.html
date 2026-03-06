@@ -53,7 +53,8 @@
 		}
 
 		.btn-container { text-align: center; padding: 1rem 0; }
-		button {
+		
+		button { /* raw properties apply to Format for Forum button */
 			background: var(--primary);
 			color: white;
 			border: none;
@@ -66,14 +67,26 @@
 
 		button:hover { background: #1d4ed8; }
 		button:active { transform: scale(0.98); }
-		.copy-btn:disabled {
+		
+		/* Copy BBCode to Clipboard button rules */
+		
+		.copy-btn:disabled {			 
 			 background: #cbd5e1; /* Light gray */
 			 color: #94a3b8;      /* Muted text */
 			 cursor: not-allowed;
 			 opacity: 0.7;
-		}
+		}		
+		
+		/* enabled state propetries */
+		.copy-btn { 
+			background: #64748b; 
+			margin-top: 20px;
+			padding: 0.75rem 2rem;
+			border: none;
+			cursor: pointer;
+			}
 
-		/* Ensure the hover effect only happens when enabled */
+		/* ensure the hover effect only happens when enabled */
 		.copy-btn:not(:disabled):hover {
 			 background: #475569;
 		}
