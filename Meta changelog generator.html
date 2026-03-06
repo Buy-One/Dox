@@ -66,8 +66,17 @@
 
 		button:hover { background: #1d4ed8; }
 		button:active { transform: scale(0.98); }
-		.copy-btn { background: #64748b; margin-top: 0.5rem; }
-		.copy-btn:hover { background: #475569; }
+		.copy-btn:disabled {
+			 background: #cbd5e1; /* Light gray */
+			 color: #94a3b8;      /* Muted text */
+			 cursor: not-allowed;
+			 opacity: 0.7;
+		}
+
+		/* Ensure the hover effect only happens when enabled */
+		.copy-btn:not(:disabled):hover {
+			 background: #475569;
+		}
 
 		.helper-text {
 		display: block;
@@ -162,7 +171,7 @@
             <div>
                 <label>Formatted BBCode Output</label>
 						<textarea id="output" readonly placeholder="Formatted code will appear here. E.g.&#10;&#10;[code][color=&quot;DarkGreen&quot;][b]N E W   F E A T U R E S[/b][/color][/code]&#10;&#10;[LIST]&#10;&#10;&#10;[*][b][i]Media explorer[/i][/b]&#10;[list]&#10;[*]add rewind/home button&#10;[/list]&#10;&#10;&#10;[*][b][i]Ruler[/i][/b]&#10;[list]&#10;[*]add support for ruler lanes&#10;[/list]&#10;&#10;[/LIST]"></textarea>
-                <button class="copy-btn" onclick="copyText()">Copy BBCode to Clipboard</button>
+                <button id="copyBtn" class="copy-btn" onclick="copyText()" disabled>Copy BBCode to Clipboard</button>
             </div>
         </div>
 
@@ -307,6 +316,7 @@
 						  versionLine = vMatch[0];
 						  break;
 					 }
+					 
 				}
 
             // Grouping Logic (Replicating Lua Loop)
@@ -356,8 +366,15 @@
             categories.forEach(c => {
                 output += returnCategory(c, ref_t[c]);
             });
-
+				
+				// At the end, set the output value
             document.getElementById('output').value = output.trim();
+				
+				// Enable the copy button if there is text in the output
+				 const copyBtn = document.getElementById('copyBtn');
+				 if (document.getElementById('output').value.length > 0) {
+					  copyBtn.disabled = false;
+				 }
         }
 
         function copyText() {
