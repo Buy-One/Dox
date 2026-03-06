@@ -1,0 +1,390 @@
+<!-- Converted from Lua and coded by Gemini -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>REAPER Meta Changelog Formatter</title>
+    <style>
+		:root {
+			--primary: #2563eb;
+			--bg: #c2d9f0;
+			--card: #f1f5f9; /*#ffffff;*/
+			--text: #334155;
+		}
+		body {
+			font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+			background-color: var(--bg);
+			color: var(--text);
+			max-width: 1000px;
+			margin: 2rem auto;
+			padding: 0 1rem;
+		}
+
+		.card {
+			background: var(--card);
+			padding: 2rem;
+			border-radius: 12px;
+			box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+		}
+
+		h1 { 
+		margin-top: 0; 
+		margin-bottom: 2.5rem; 
+		color: var(--primary); 
+		font-size: 1.5rem; 
+		text-align: center; 
+		/* letter-spacing: -0.02em; /* Makes the title look a bit more modern */
+		}
+		
+		.grid { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
+		label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 1.2rem; }
+		textarea {
+			width: 100%;
+			height: 320px;
+			padding: 1rem;
+			border: 1px solid #cbd5e1;
+			border-radius: 8px;
+			font-family: 'Courier New', monospace;
+			font-size: 0.85rem;
+			box-sizing: border-box;
+			resize: vertical;
+		}
+
+		.btn-container { text-align: center; padding: 1rem 0; }
+		button {
+			background: var(--primary);
+			color: white;
+			border: none;
+			padding: 0.75rem 2rem;
+			border-radius: 6px;
+			font-weight: bold;
+			cursor: pointer;
+			transition: transform 0.1s, background 0.2s;
+		}
+
+		button:hover { background: #1d4ed8; }
+		button:active { transform: scale(0.98); }
+		.copy-btn { background: #64748b; margin-top: 0.5rem; }
+		.copy-btn:hover { background: #475569; }
+
+		.helper-text {
+		display: block;
+		font-size: 0.9rem;
+		color: #64748b; /* Subtle gray */
+		font-weight: normal;
+		margin-bottom: 1.8rem;
+		line-height: 1.4;
+		font-style: italic;
+		}
+
+		.helper-text a {
+		 color: var(--primary);
+		 text-decoration: none;
+		}
+
+		.helper-text a:hover {
+		 text-decoration: underline;
+		}
+
+	  .helper-text code {
+		 background: #e2e8f0;
+		 padding: 1px 4px;
+		 border-radius: 3px;
+		 font-style: normal;
+		}
+
+	.legend-container {
+		 margin-top: 50px; /* This creates the physical gap */
+		 padding-top: 0px;
+		 border-top: 2px solid var(--border); /* Optional: a solid line to define the section */
+		 clear: both; /* Ensures it stays below floated elements if any exist */
+	}
+
+		.legend-item {
+			 font-size: 0.75rem;
+			 line-height: 2.2; /* Increased line-height to give space for the boxes when wrapping */
+			 margin-bottom: 12px;
+		}
+
+		.legend-item strong {
+			 font-size: 0.8rem;
+			 margin-right: 8px; /* Space between the label and the first keyword */
+			 /* Removed display: flex or block to allow inline flow */
+		}
+
+		.legend-item span {
+			 display: inline; /* Key change: allows tags to flow like text */
+		}
+
+		.legend-item code {
+			 background: var(--bg);
+			 color: var(--text);
+			 border: 1px solid var(--border);
+			 padding: 2px 5px;
+			 border-radius: 4px;
+			 font-size: 0.7rem;
+			 font-family: monospace;
+			 white-space: nowrap;
+			 margin-right: 4px; /* Space between individual boxes */
+			 display: inline-block; /* Allows padding/borders but keeps them in the text flow */
+			 vertical-align: middle;
+			 line-height: 1; /* Reset line-height inside the box */
+		}
+
+		/* Optional: Subtle hover effect for the keyword tags */
+		.legend-item code:hover {
+			 border-color: var(--primary);
+			 background: var(--card);
+		}
+
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>REAPER Meta Changelog Formatter</h1>
+        <div class="grid">
+            <div>
+              <label for="input">Raw Changelog Input</label>
+					<span class="helper-text">
+					 The changelog can be obtained from A) <a href="http://www.reaper.fm/whatsnew.txt" target="_blank">reaper.fm/whatsnew.txt</a> B) <strong><code>whatsnew.txt</code></strong> file which comes with the REAPER install, or C) called within REAPER via <strong><code>Help -> Check for new versions of REAPER</code></strong>.
+					 <br><strong><code>Note:</code></strong> The formatted changelog needs proofing due to possible duplicates in different meta categories and appearence of non-categorized change descriptions in the category "OTHER", which nevertheless still may fit any of the meta categories. In these cases refer to the <strong>Keyword Classificaton Legend</strong> below to determine whether the change description fits the meta category it has been placed under.
+					 </span>
+                <textarea id="input" placeholder="Paste your raw changelog lines here... e.g.&#10;&#10;+ Media explorer: add rewind/home button&#10;+ Ruler: add support for ruler lanes&#10;..."></textarea>
+            </div>
+
+            <div class="btn-container">
+                <button onclick="processChangelog()">Format for Forum ↓</button>
+            </div>
+
+            <div>
+                <label>Formatted BBCode Output</label>
+						<textarea id="output" readonly placeholder="Formatted code will appear here. E.g.&#10;&#10;[code][color=&quot;DarkGreen&quot;][b]N E W   F E A T U R E S[/b][/color][/code]&#10;&#10;[LIST]&#10;&#10;&#10;[*][b][i]Media explorer[/i][/b]&#10;[list]&#10;[*]add rewind/home button&#10;[/list]&#10;&#10;&#10;[*][b][i]Ruler[/i][/b]&#10;[list]&#10;[*]add support for ruler lanes&#10;[/list]&#10;&#10;[/LIST]"></textarea>
+                <button class="copy-btn" onclick="copyText()">Copy BBCode to Clipboard</button>
+            </div>
+        </div>
+
+		<div class="legend-container">
+			 <h3>Keyword Classification Legend</h3>
+			 <div class="legend-grid">
+				  <div class="legend-item">
+						<strong style="color: #ef4444;">Bug Fixes:</strong>
+						<span id="legend-bugs"></span>
+				  </div>
+				  <div class="legend-item">
+						<strong style="color: #22c55e;">New Features:</strong>
+						<span id="legend-features"></span>
+				  </div>
+				  <div class="legend-item">
+						<strong style="color: #3b82f6;">Improvements:</strong>
+						<span id="legend-improvements"></span>
+				  </div>
+				  <div class="legend-item">
+						<strong style="color: #a855f7;">Enhancements:</strong>
+						<span id="legend-enhancements"></span>
+				  </div>
+				  <div class="legend-item">
+						<strong style="color: #f97316;">Regressions:</strong>
+						<span id="legend-regressions"></span>
+				  </div>
+			 </div>
+		</div>
+
+    </div>
+
+    <script>
+        // --- Keyword Tables from your Lua Script ---
+        const bug_fixes = ['fix', 'fixes'];
+        const new_features = ['add', 'support'];
+        const improvements = ['adjust', 'avoid', 'better', 'better support', 'clarify', 'clearer', 'consistent', 'correct', 'decrease', 'detect', 'disambiguate', 'do not', "don't", 'document', 'enforce', 'ensure', 'to ensure', 'extend', 'faster', 'follow', 'for better', 'for compatibility', 'ignore','improve', 'improvement', 'limit', 'keep', 'minimize', 'only if', 'only try', 'omit', 'optimize', 'permissive', 'preserve', 'prevent', 'prompt', 'properly', 'rather than', 'reasonable', 'reduce', 'remove', 'resolve', 'respect', 'reword', 're-word', 'save', 'separate', 'simplify', 'smoother', 'tweak', 'to match'];
+        const enhancements = ['account for', 'accept', 'allow', 'always allow', 'apply', 'automatically', 'auto-detect', 'disable', 'display', 'enable', 'enhance', 'even if', 'even when', 'indicate', 'include', 'increase', 'inform ', 'obey', 'optionally', 'permit', 'remember', 'respond', 'show', 'update', 'use'];
+        const regressions = ['regression', 'restore'];
+
+        // --- Helper Functions ---
+
+        function esc(str) {
+            if (!str) return "";
+            // JS Regex escape equivalent to your Lua Esc function
+            return str.replace(/[()+\-[\].^$*?%]/g, '\\$&');
+        }
+
+        function validateCat(str, keywords) {
+            const s = str.toLowerCase();
+
+            for (let v of keywords) {
+                // Duplicate prevention logic ported from Lua script
+					 // ignore earlier categories key words in the later ones
+                const isSupportOrDisplay = (v === 'support' || v === 'display');
+                const startsWithAction = (s.startsWith('fix') || s.startsWith('improve') || s.startsWith('add') || s.startsWith('limit') || s.startsWith('allow'));
+                if (isSupportOrDisplay && startsWithAction) return false; // preventing duplicates in New Features and Enhancements categories caused by phrases 'fix support', 'fix/add/limit display' and 'improve support' which belong to Bugfixes and Improvements respectively
+
+                if (['ignore', 'ensure', 'do not', 'permit'].includes(v) && (s.startsWith('add') || s.startsWith('support'))) return false; // preventing New Features duplicates in Improvements and Enhanvements
+
+					 if (v === 'include' && s.includes('do not include')) return false; // same purpose, as 'do not' belongs to Improvements while 'include' to Enhancements
+
+                const isEnhancementTrigger = (v === 'disable' || v === 'enable' || v === 'display' || v.startsWith('even') || v === 'allow');
+                if (isEnhancementTrigger && (s.startsWith('add') || s.startsWith('support') || s.startsWith('resolve') || s.includes('consistent'))) return false; // preventing New Features and Improvements dupicates in Enhancements, ^ operator before 'even' to disambiguate it from 'prevent' or Improvements
+
+                // Keyword Matching Logic
+                const escV = esc(v);
+                const regRegression = (v === 'regression' && s.includes('regression')); // these keywords may appear anywhere in the line
+                const regRather = (v === 'rather than' && s.includes('rather than')); // these keywords may appear anywhere in the line
+                const regMid = (['fixes', 'correct', 'ensure'].includes(v) && new RegExp(' ' + escV + '[^a-zA-Z0-9]').test(s)); // in the middle of the description, the leading space prevents 'incorrect' being a valid capture // ensuring that declensions of 'correct' and 'ensure' are ignored
+                const regStart = (v === 'add' && s.startsWith(v)); // 'add' is only valid when appears at the top of the change description to ignore 'to add' colocation in the middle of it
+                const regNegation = (['do not', "don't"].includes(v) && s.includes(' ' + v + ' ')); // these may appear in the middle of the change description
+                const regStartOther = (new RegExp('^' + escV + '[^a-zA-Z0-9]').test(s)); // other keywords appear at the top of the line // ensuring that declensions are ignored
+                const regThirdPerson = (new RegExp(' ' + escV + 's').test(s)); // keyword in 3d person in the middle of the change description
+                const regSecondClause = (new RegExp(', ' + escV + '[^a-zA-Z0-9]').test(s)); // the keyword is in the second clause // ensuring that declensions are ignored
+                const regFuture = (new RegExp('will ' + escV).test(s)); // the key word is in future tense in the middle of the line
+                const regOptionally = (v === 'optionally' && s.includes(v)); // optionally can appear in the middle of a sentence
+
+                if (regRegression || regRather || regMid || regStart || regNegation || regStartOther || regThirdPerson || regSecondClause || regFuture || regOptionally) {
+                    return true;
+                }
+            }
+            return null;
+        }
+
+        function collectThreads(changeDesc) {
+            // Regex for [t=123], [p=123], [rr=123]
+            const threadRegex = /\[[tpr]+=\w+\]/g;
+            return changeDesc.replace(threadRegex, (match) => {
+                const isReddit = match.includes('rr=');
+                const baseUrl = isReddit ? 'https://www.reddit.com/r/Reaper/comments/' : 'https://forum.cockos.com/showthread.php?';
+                const id = isReddit ? match.match(/rr=(.+)/)[1].replace(']', '') : match.substring(1).replace(']', '');
+                return `[url=${baseUrl}${id}]${match}[/url]`;
+            });
+        }
+
+        function returnCategory(catName, dataArray) {
+            if (dataArray.length === 0) return "";
+
+            const colors = {
+                'Bug fixes': 'Red',
+                'New features': 'DarkGreen',
+                'Improvements': 'Blue',
+                'Enhancements': 'Purple',
+                'Regressions': 'DarkOrange',
+                'Other': 'Black'
+            };
+
+            const comments = {
+                'Improvements': '\n\n(elimination of a deficiency short of a bugfix)',
+                'Enhancements': '\n\n(augmentation of functionality short of a new feature)'
+            };
+
+            const color = colors[catName] || 'Black';
+            const comment = comments[catName] || '';
+            const spacedName = catName.toUpperCase().split('').join(' ');
+
+            return `[code][color="${color}"][b]${spacedName}[/b]${comment}[/color][/code]\n\n[LIST]\n${dataArray.join('')}[/list]\n\n[/LIST]\n\n`;
+        }
+
+        // --- Main Processing Engine ---
+
+        function processChangelog() {
+            const rawText = document.getElementById('input').value;
+            const lines = rawText.split(/\r?\n/);
+
+            let versionLine = "";
+            const categories = ['Bug fixes', 'New features', 'Improvements', 'Enhancements', 'Regressions', 'Other'];
+            const ref_t = { 'Bug fixes': [], 'New features': [], 'Improvements': [], 'Enhancements': [], 'Regressions': [], 'Other': [] };
+
+				// Find version line - updated to be more flexible
+				for (let line of lines) {
+					 // This matches "v7.63..." OR "REAPER 7.63..." OR "REAPER v7.63..."
+						// let vMatch = line.match(/v[\.\d]+.+/i) || line.match(/REAPER\s+[v\.\d]+.+/i);
+
+					 // This looks for "v" followed by numbers OR "REAPER" followed by a space and numbers
+						// let vMatch = line.match(/v[\.\d]+.+/i) || line.match(/REAPER\s+[\.\d]+.+/i);
+
+					 // This regex specifically looks for "REAPER" followed by a space and a number
+					 // OR a line starting with 'v' and a number
+					 let vMatch = line.match(/^v[\.\d]+.+/i) || line.match(/REAPER\s+[\.\d]+.+/i);
+					 if (vMatch) {
+						  versionLine = vMatch[0];
+						  break;
+					 }
+				}
+
+            // Grouping Logic (Replicating Lua Loop)
+            categories.forEach(cat => {
+                let mainCatInit = null;
+                let currentCatArray = ref_t[cat];
+
+                lines.forEach(line => {
+                    const mainCatMatch = line.match(/\+ (.*?):/);
+                    const descMatch = line.match(/: (.+)/);
+
+                    if (descMatch) {
+                        const mainCat = mainCatMatch ? mainCatMatch[1] : "General";
+                        const changeDescRaw = descMatch[1];
+                        let isValid = false;
+
+                        if (cat === 'Bug fixes') isValid = validateCat(changeDescRaw, bug_fixes);
+                        else if (cat === 'New features') isValid = validateCat(changeDescRaw, new_features);
+                        else if (cat === 'Improvements') isValid = validateCat(changeDescRaw, improvements) && !validateCat(changeDescRaw, bug_fixes);
+                        else if (cat === 'Enhancements') isValid = validateCat(changeDescRaw, enhancements);
+                        else if (cat === 'Regressions') isValid = validateCat(changeDescRaw, ['regression']);
+                        else if (cat === 'Other') {
+                            const allKeywords = [...bug_fixes, ...new_features, ...improvements, ...enhancements, ...regressions];
+                            isValid = validateCat(changeDescRaw, allKeywords) === null;
+                        }
+
+                        if (isValid) {
+                            const changeDesc = collectThreads(changeDescRaw);
+
+                            if (mainCat !== mainCatInit) {
+                                // If not first entry, close previous list
+                                if (currentCatArray.length > 0) {
+                                    currentCatArray[currentCatArray.length - 1] += '[/list]\n';
+                                }
+                                currentCatArray.push(`\n\n[*][b][i]${mainCat}[/i][/b]\n[list]\n[*]${changeDesc}\n`);
+                            } else {
+                                currentCatArray[currentCatArray.length - 1] += `[*]${changeDesc}\n`;
+                            }
+                            mainCatInit = mainCat;
+                        }
+                    }
+                });
+            });
+
+            // Assemble Final String
+            let output = versionLine ? `[b]${versionLine}[/b]\n\n` : "";
+            categories.forEach(c => {
+                output += returnCategory(c, ref_t[c]);
+            });
+
+            document.getElementById('output').value = output.trim();
+        }
+
+        function copyText() {
+            const output = document.getElementById('output');
+            output.select();
+            document.execCommand('copy');
+            alert("Copied to clipboard!");
+        }
+
+
+		  // Function to populate the legend automatically from the keyword tables
+			function populateLegend() {
+				 // Helper function to turn an array of words into a string of <code> tags
+				 const toCodeTags = (arr) => arr.map(function(word) {
+				  return '<code>' + word + '</code>';
+				}).join(' ');
+
+				 document.getElementById('legend-bugs').innerHTML = toCodeTags(bug_fixes);
+				 document.getElementById('legend-features').innerHTML = toCodeTags(new_features);
+				 document.getElementById('legend-improvements').innerHTML = toCodeTags(improvements);
+				 document.getElementById('legend-enhancements').innerHTML = toCodeTags(enhancements);
+				 document.getElementById('legend-regressions').innerHTML = toCodeTags(regressions);
+			}
+
+		   // Run this as soon as the window finishes loading
+			window.onload = populateLegend;
+
+    </script>
+</body>
+</html>
