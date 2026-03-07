@@ -171,8 +171,9 @@
             <div>
               <label for="input">Raw Changelog Input</label>
 					<span class="helper-text">
-					 The changelog can be obtained A) at <a href="http://www.reaper.fm/whatsnew.txt" target="_blank">reaper.fm/whatsnew.txt</a> B) from <strong><code>whatsnew.txt</code></strong> file which comes with the REAPER install, or C) within REAPER via <strong><code>Help -> Check for new versions of REAPER</code></strong>.
-					 <br><strong><code>Note:</code></strong> The formatted changelog needs proofing due to possible duplicates in different meta categories and appearence of non-categorized change descriptions in the meta category "OTHER", which nevertheless still may fit any of the meaningful meta categories. In these cases refer to the <strong>Keyword Classification Legend</strong> below to determine whether the change description fits the meta category it has been placed under.
+					 The changelog can be obtained A) at reaper.fm/whatsnew.txt</a> B) from <strong><code>whatsnew.txt</code></strong> file which comes with the REAPER install, or C) within REAPER via <strong><code>Help -> Check for new versions of REAPER</code></strong>.
+					 <br><strong><code>Note:</code></strong> The formatted changelog needs proofing due to possible duplicates in different meta categories and appearence of non-categorized change descriptions in the meta category <strong><code>OTHER</code></strong>, which nevertheless still may fit any of the meaningful meta categories. In these cases refer to the <strong>Keyword Classification Legend</strong> below to determine whether the change description fits the meta category it has been placed under.<br>
+					 <strong>If you encounter duplicates in meta categories other than <strong><code>REGRESSIONS</code></strong> or have a suggestion for new keyword please submit a <a href="https://github.com/Buy-One/buy-one.github.io/issues" target="_blank">bug report / feature request</a> or a <a href="https://github.com/Buy-One/buy-one.github.io/pulls" target="_blank">pull request</a> so this can be addressed.</strong>
 					 </span>
                 <textarea id="input" placeholder="Paste your raw changelog lines here... e.g.&#10;&#10;+ Media explorer: add rewind/home button&#10;+ Ruler: add support for ruler lanes&#10;..."></textarea>
             </div>
@@ -380,8 +381,11 @@
                 output += returnCategory(c, ref_t[c]);
             });
 				
-				// At the end, set the output value
-            document.getElementById('output').value = output.trim();
+				// 1. Trim the existing output to remove any trailing category newlines
+				// 2. Add \n\n\n (which creates two empty lines of space)
+				// 3. Append your footer text
+				document.getElementById('output').value = output.trim() + 
+				"\n\n\n[B][I][SIZE=\"1\"]Formatted with [url=https://buy-one.github.io/]REAPER Meta Changelog Formatter[/url][/SIZE][/I][/B]";
 				
 				// Enable the copy button if there is text in the output
 				 const copyBtn = document.getElementById('copyBtn');
@@ -394,7 +398,7 @@
             const output = document.getElementById('output');
             output.select();
             document.execCommand('copy');
-            alert("Copied to clipboard!");
+            // alert("Copied to clipboard!");
         }
 
 
