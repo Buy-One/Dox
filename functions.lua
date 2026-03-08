@@ -957,7 +957,7 @@ end
 
 -- add spaces
 function space(n) -- number of repeats, integer
-local n = not n and 0 or tonumber(n) and math.abs(math.floor(n)) or 0
+local n = n and tonumber(n) and math.abs(math.floor(n)) or 0
 return string.rep(' ',n)
 -- OR
 -- return (' '):rep(n)
@@ -965,7 +965,7 @@ end
 
 -- same
 function Rep(x) -- repeat space x times, to be added to the Message box text
-local x = not n and 0 or tonumber(x) and math.abs(math.floor(x)) or 0
+local x = x and tonumber(x) and math.abs(math.floor(x)) or 0
 return string.rep(' ', x)
 -- OR
 -- return (' '):rep(x)
@@ -1069,7 +1069,7 @@ return str:match('^%s*(.-)%s*$') -- seems more reliable
 -- OR
 -- return str:match('(%S.-)%s*$')
 -- OR
--- return str:match('%S.+%S') -- returns nil if empty string
+-- return str:match('%S.*%S') or item:match('%S') -- returns nil if empty string // * operator instead of + to account for strings consisting of 2 characters only which are already covered by two %S operators // the alternative is meant to account for strings constisting of a single character on which first match will produce nil
 end
 
 
@@ -1096,7 +1096,8 @@ function split_into_lines(input, want_empty_lines)
 local input = input:sub(-1):match('\n') and input..'\n' or input -- OR input:sub(-1) ~= '\n'
 local t = {}
 	for line in input:gmatch('(.-)\n') do -- respects empty lines; '[^\n]+' to skip empty lines
-		if want_empty_lines and #line:gsub(' ','') == 0 -- OR not line:gsub['[^%s]+'] / not line:gsub['%S']
+		if want_empty_lines 
+		and #line:gsub(' ','') == 0 -- OR 'and not line:gsub['[^%s]+'] / not line:gsub['%S']'
 		or not want_empty_lines then
 		t[#t+1] = line
 		end
@@ -1665,7 +1666,7 @@ function Convert_Text_To_Menu(text, max_line_len, indent)
 -- relies on multibyte_str_len() function (see below) to accurately count UTF-8 characters; can be removed if the text is sure to only contain basic Latin, in which case the line 'multibyte_str_len(text_clean)' can be replaced with '#text_clean'
 
 
-local text = text:gsub('|', 'ㅣ') -- replace pipe, if any, with Hangul character for /i/ since its a menu special character, vertical line '│' (Unicode 2502), can be used indtead of Hangul
+local text = text:gsub('|', 'ㅣ') -- replace pipe, if any, with Hangul character for /i/ since its a menu special character, vertical line '│' (Unicode 2502), can be used instead of Hangul
 local text = text:gsub('&', '+') -- convert ampersand to + because it's a menu special character used as a quick access shortuct hence not displayed in the menu
 local text = text:gsub('\n', '|')-- OR text:gsub('\r', '|') // convert user line breaks into pipes to divide lines by creating menu items, otherwise user line breaks aren't respected; multiple line break is created thanks to the space between pipes originally left after each \n character, if there's none a solid line is displayed instead or several thereof starting from 3 pipes and more
 local t = {}
@@ -7214,6 +7215,18 @@ local tr, info = r.GetTrackFromPoint(r.GetMousePosition())
 return info>>8
 end
 
+
+function Insert_New_Track(wantDefaults)
+-- inertsg after the first selected to mimic 'Track: Insert new track' behavior
+-- otherwise after the last track
+	if r.InsertTrackAtIndex then
+	local tr = r.GetSelectedTrack(0,0) 
+	local idx = tr and r.CSurf_TrackToID(tr, false) or r.GetNumTracks()-1 -- mcpView false
+	r.InsertTrackAtIndex(idx, wantDefaults)
+	else
+	r.Main_OnCommand(40001, 0) -- Track: Insert new track
+	end
+end
 
 
 --================================ T R A C K S  E N D ================================
@@ -15283,6 +15296,10 @@ end
 
 function gmatch_alt(str, ...)
 -- vararg is a list of alternative capture patterns
+-- not suitable for parsing lists where more that one
+-- captute pattern will produce a capture,
+-- i.e. meant to parse strings where only one
+-- capture pattern is sure to produce a capture
 local i = 1
 local t = {...}
 	return function()
@@ -21665,6 +21682,22 @@ end
 
 
 
+function Esc_Menu_Ops(str)
+-- useful when user input can change
+-- menu content
+	for k, op in ipairs({'!','#','>','<','|'}) do
+		if str:match('^%s*|') or str:match('^%s*'..'\226\157\152') then -- if pipe (Vetcial Line (U+007C) '\124') or Light Vertical Bar (U+2758) '\226\157\152' which is interpreted by REAPER as pipe, replace with Full Width Vertical Line (U+FF5C) '\239\189\156', OR can be replaced with Box Drawings Light Vertical (U+2502) '\226\148\132' or with Hangul character for /i/ (U+3163) '\227\133\163'
+		str = str:gsub('[|\226\157\152]', '\239\189\156', 1)
+		elseif str:sub(1,1) == op then
+		str = ' '..str -- OR '\r'..str OR '\n'..str // when operator other than pipe is preceeded by space or any other character it's ignored by gfx library, so if it's not the very first character in the string it doesn't need fixing
+		end
+	end
+return str
+end
+
+
+
+
 function Reload_Menu_at_Same_Pos1(menu, keep_menu_open, left_edge_dist)
 -- only useful for looking up the result of a toggle action, 
 -- see a more practical example as Reload_Menu_at_Same_Pos2() below
@@ -22390,8 +22423,41 @@ function Menu_With_Toggle_Options1(scr_cmd_ID, sett_t, menu_t, default_sett_stat
 
 ::RELOAD::
 
+local default_sett_state = default_sett_state and #default_sett_state == #sett_t and default_sett_state 
+or ('0'):rep(#sett_t) -- if invalid or length doesn't match sett_t length default to all Off
+local sett = r.GetExtState(scr_cmd_ID, 'SETTINGS')
+local ret
+	if #sett == 0 then -- first use after project load or project creation
+	ret, sett = r.GetProjExtState(0, scr_cmd_ID, 'SETTINGS')
+	end
+local sett_bools_t = {(#sett > 0 and sett or default_sett_state):match(('(%d)'):rep(#sett_t))} -- initializing defaults if first load
+
+-- POPULATE WITH NAMES OF TOGGLE SETTINGS AS THEY APPEAR IN THE MENU
 local sett_t = sett_t or {'My setting 1', 'My setting 2', 'My setting 3'}
 local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',  sett_t[2]..'|', 'Item 3|', sett_t[3]..'|'}
+
+-- OPTIONAL
+-- associate indices of boolean settings from sett_t (values)
+-- with menu_t indices of their mutually exclusive counterparts (keys)
+-- i.e. 'My setting 1' with menu index 4 ('My setting 2'), 
+-- 'My setting 3' with menu index 7 ('My setting 4');
+-- IF MUTUALLY EXCLUSIVE SETTINGS ARE PAIRS, IT'S ENOUGH THAT ONLY ONE
+-- OF MEMBER OF A PAIR IS INCLUDED IN sett_t TABLE, MUTUALLY EXCLUSIVE
+-- SETTINGS WITH GREATER NUMBER OF MEMBERS AREN'T SUPPORTED YET;
+-- this table ensures that when an item of a mutually exclusive setting pair
+-- is clicked in the menu it is its counterpart state which is changed
+-- and stored, i.e. the one which IS included in sett_t table, 
+-- while the state of the 2nd member only changes visually in the menu
+local excl_sett_t = {[4]=1,[7]=3}
+
+-- OPTIONAL
+-- associate indices of boolean settings from sett_t (keys)
+-- with menu_t indices or index ranges or non-contiguous sequences
+-- of indices (values) which should be grayed out when a boolean is true,
+-- i.e. 'Item 1' and 'Item 2' (indices 1 and 2 respectively in menu_t) with 'My setting 1',
+-- 'Item 3', 'My setting 3', 'My setting 4' (indices 5-7 in menu_t) with 'My setting 2'
+local grayout_t = {[1]={1,2}, [2]={1,7}} -- here index ranges are used
+
 
 local sett_indices_t = {}
 	for menu_idx, item in ipairs(menu_t) do
@@ -22402,33 +22468,72 @@ local sett_indices_t = {}
 		end
 	end
 
-local default_sett_state = default_sett_state and #default_sett_state == #sett_t and default_sett_state 
-or ('0'):rep(#sett_t) -- if invalid or length doesn't match sett_t length default to all Off
-local sett = r.GetExtState(scr_cmd_ID, 'SETTINGS')
-local sett_bools_t = {(#sett > 0 and sett or default_sett_state):match(('(%d)'):rep(#sett_t))} -- initializing defaults if first load
-
 	-- Checkmark enabled settings in the menu
 	for sett_idx, bool in ipairs(sett_bools_t) do
 		for menu_idx, v in pairs(sett_indices_t) do
 			if v+0 == sett_idx then -- a setting index in the menu has been found
 			local sett = menu_t[menu_idx]
 			menu_t[menu_idx] = bool == '1' and '!'..sett or sett
+			-- OR
+			-- menu_t[menu_idx] = (bool == '1' and '!' or '')..sett
 			break end
 		end
 	end
+	
+	-- Checkmark menu settings which are mutually exclusive
+	-- to the booleans stored in the bitfield
+	if excl_sett_t then
+		for menu_idx, bool_idx in pairs(excl_sett_t) do
+		local sett = menu_t[menu_idx]
+		menu_t[menu_idx] = (sett_bools_t[bool_idx] == '1' and '!' or '')..sett
+		end
+	end
+	
+	
+	-- Gray out items in the menu
+	if grayout_t then
+		for bool_idx, range in pairs(grayout_t) do
+			if sett_bools_t[bool_idx] == '1' then -- true
+				for menu_idx=range[1], range[#range] do -- if instead of a range non-continguous sequence is stored in range table, ipairs loop will have to be used
+					if sett_indices_t[menu_idx] ~= bool_idx then -- prevent graying out the very menu item which triggers graying out of other menu items in case its own index is included within the range
+					local menu_item = menu_t[menu_idx]
+						if menu_item:sub(1,1) ~= '#' then -- prevent accrual of hash signs if item was already grayed out in previous cycles
+						local _, lines_cnt = menu_item:gsub('%w|[%s%w]+','')
+							if lines_cnt > 0 then -- menu item which occupies several menu lines
+							menu_item = menu_item:gsub('|','|#',lines_cnt) -- if menu item doesn't start with pipe |, as is the case here, hash # will only be applied to lines other than the 1st
+							end
+							if menu_idx ~= 6 then -- SCRIPT SPECFIC, ADDITIONALLY EXCLUDE CERTAIN MENU INDICES FROM BEING AFFECTED IF THEY FALL WITHIN THE RANGE
+							menu_t[menu_idx] = '#'..menu_item
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+		
+	-- OPTIONAL, SCRIPT SPECIFIC IF AN OPTION TO HIDE	
+	-- SETTINGS MENU INTO A SUBMENU IS PRESENT
+	-- collapse settings menu into a submenu
+	if collapse_sett=='1' then -- setting which is stored as extended state
+	menu_t[14] = '<EXPAND SETTINGS MENU||' -- precede table.insert otherwise collapse menu item index will be different
+	table.insert(menu_t, 1, '>'..('S E T T I N G S')..'|') -- inserting SETTINGS submenu title
+	end	
+		
 
 local output = Reload_Menu_at_Same_Pos2(table.concat(menu_t), 1) -- keep_menu_open true
-	
+
 	if output == 0 then return
-	elseif sett_indices_t[output] then
-	local idx = sett_indices_t[output] -- extract index relevant for sett_t table
+	elseif excl_sett_t and excl_sett_t[output] or sett_indices_t[output] then -- toggle a setting // in this order of priority in case both members of mutually exclusive setting pair are included in sett_t table because in this case sett_indices_t[output] will always be valid and produce false positives
+	local idx = excl_sett_t and excl_sett_t[output] or sett_indices_t[output] -- extract index relevant for sett_t table // same priority logic as in the preceding line
 	local i = 0
 	sett = table.concat(sett_bools_t):gsub('%d', function(c) i=i+1 if i==idx then return math.floor(c+0~1) end end) -- flipping the bit
 	else -- expand with other menu items if necessary
 	end
 	
-	if sett_indices_t[output] then -- this condition will likely need expansion to include indices of other menu items which aren't settings
+	elseif excl_sett_t and excl_sett_t[output] or sett_indices_t[output] then -- this condition will likely need expansion to include indices of other menu items which aren't settings
 	r.SetExtState(scr_cmd_ID, 'SETTINGS', sett, false) -- persist false
+	r.SetProjExtState(0, scr_cmd_ID, 'SETTINGS', sett)
 	goto RELOAD end
 	
 end
@@ -22451,10 +22556,45 @@ function Menu_With_Toggle_Options2(scr_cmd_ID, sett_t, menu_t, default_sett_stat
 -- 2|8|16 - options 2,4 and 5 are On by default
 -- relies on Reload_Menu_at_Same_Pos2() function
 
+Error_Tooltip('') -- clear tooltips
+
 ::RELOAD::
 
-local sett_t = sett_t or {'My setting 1', 'My setting 2', 'My setting 3'}
-local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',  sett_t[2]..'|', 'Item 3|', sett_t[3]..'|'}
+local bitfield = r.GetExtState(scr_cmd_ID, 'SETTINGS')
+local ret
+	if #settings == 0 then -- first use after project load or project creation
+	ret, bitfield = r.GetProjExtState(0, scr_cmd_ID, 'SETTINGS')
+	end
+bitfield = #bitfield > 0 and bitfield+0 or default_sett_state or 0
+
+-- POPULATE WITH NAMES OF TOGGLE SETTINGS AS THEY APPEAR IN THE MENU
+local sett_t = sett_t or {'My setting 1', 'My setting 2', 'My setting 3', 'My setting 4'}
+
+local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',  
+sett_t[2]..'|', 'Item 3|', sett_t[3]..'|', sett_t[4]..'|'}
+
+-- OPTIONAL
+-- associate indices of boolean settings from sett_t (values)
+-- with menu_t indices of their mutually exclusive counterparts (keys)
+-- i.e. 'My setting 1' with menu index 4 ('My setting 2'), 
+-- 'My setting 3' with menu index 7 ('My setting 4');
+-- IF MUTUALLY EXCLUSIVE SETTINGS ARE PAIRS, IT'S ENOUGH THAT ONLY ONE
+-- OF MEMBER OF A PAIR IS INCLUDED IN sett_t TABLE, MUTUALLY EXCLUSIVE
+-- SETTINGS WITH GREATER NUMBER OF MEMBERS AREN'T SUPPORTED YET;
+-- this table ensures that when an item of a mutually exclusive setting pair
+-- is clicked in the menu it is its counterpart state which is changed
+-- and stored, i.e. the one which IS included in sett_t table, 
+-- while the state of the 2nd member only changes visually in the menu
+local excl_sett_t = {[4]=1,[7]=3}
+
+-- OPTIONAL
+-- associate indices of boolean settings from sett_t (keys)
+-- with menu_t indices or index ranges or non-contiguous sequences
+-- of indices (values) which should be grayed out when a boolean is true,
+-- i.e. 'Item 1' and 'Item 2' (indices 1 and 2 respectively in menu_t) with 'My setting 1',
+-- 'Item 3', 'My setting 3', 'My setting 4' (indices 5-7 in menu_t) with 'My setting 2'
+local grayout_t = {[1]={1,2}, [2]={1,7}} -- here index ranges are used
+
 
 local sett_indices_t = {}
 	for menu_idx, item in ipairs(menu_t) do
@@ -22464,9 +22604,6 @@ local sett_indices_t = {}
 		break end
 		end
 	end
-
-local bitfield = r.GetExtState(scr_cmd_ID, 'SETTINGS')
-bitfield = #bitfield > 0 and bitfield+0 or default_sett_state or 0
 
 -- Extract set bits
 local sett_bools_t = {}
@@ -22478,23 +22615,66 @@ local sett_bools_t = {}
 	-- Checkmark enabled settings in the menu
 	for sett_idx, truth in ipairs(sett_bools_t) do
 		for menu_idx, v in pairs(sett_indices_t) do
-			if v+0 == sett_idx then -- a setting index in the menu has been found
+			if item_idx == sett_idx then -- a setting index in the menu has been found
 			local sett = menu_t[menu_idx]
 			menu_t[menu_idx] = truth and '!'..sett or sett
+			-- OR
+			-- menu_t[menu_idx] = (truth and '!' or '')..sett
 			break end
 		end
+	end	
+	
+	-- Checkmark menu settings which are mutually exclusive
+	-- to the booleans stored in the bitfield
+	if excl_sett_t then
+		for menu_idx, bool_idx in pairs(excl_sett_t) do
+		local sett = menu_t[menu_idx]
+		menu_t[menu_idx] = (not sett_bools_t[bool_idx] and '!' or '')..sett
+		end
 	end
+	
+	-- Gray out items in the menu
+	if grayout_t then
+		for bool_idx, range in pairs(grayout_t) do
+			if sett_bools_t[bool_idx] then -- true
+				for menu_idx=range[1], range[#range] do -- if instead of a range non-continguous sequence is stored in range table, ipairs loop will have to be used
+					if sett_indices_t[menu_idx] ~= bool_idx then -- prevent graying out the very menu item which triggers graying out of other menu items in case its own index is included within the range
+					local menu_item = menu_t[menu_idx]
+						if menu_item:sub(1,1) ~= '#' then -- prevent accrual of hash signs if item was already grayed out in previous cycles
+						local _, lines_cnt = menu_item:gsub('%w|[%s%w]+','')
+							if lines_cnt > 0 then -- menu item which occupies several menu lines
+							menu_item = menu_item:gsub('|','|#',lines_cnt) -- if menu item doesn't start with pipe |, as is the case here, hash # will only be applied to lines other than the 1st
+							end
+							if menu_idx ~= 6 then -- SCRIPT SPECFIC, ADDITIONALLY EXCLUDE CERTAIN MENU INDICES FROM BEING AFFECTED IF THEY FALL WITHIN THE RANGE
+							menu_t[menu_idx] = '#'..menu_item
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	
+	
+	-- OPTIONAL, SCRIPT SPECIFIC IF AN OPTION TO HIDE	
+	-- SETTINGS MENU INTO A SUBMENU IS PRESENT
+	-- collapse settings menu into a submenu
+	if collapse_sett=='1' then -- setting which is stored as extended state
+	menu_t[14] = '<EXPAND SETTINGS MENU||' -- precede table.insert otherwise collapse menu item index will be different
+	table.insert(menu_t, 1, '>'..('S E T T I N G S')..'|') -- inserting SETTINGS submenu title
+	end
+		
 
 local output = Reload_Menu_at_Same_Pos2(table.concat(menu_t), 1) -- keep_menu_open true
   
 	if output == 0 then return
-	elseif sett_indices_t[output] then -- toggle the setting
-	local idx = sett_indices_t[output] -- extract index relevant for sett_t table
+	elseif excl_sett_t and excl_sett_t[output] or sett_indices_t[output] then -- toggle a setting // in this order of priority in case both members of mutually exclusive setting pair are included in sett_t table because in this case sett_indices_t[output] will always be valid and produce false positives
+	local idx = excl_sett_t and excl_sett_t[output] or sett_indices_t[output] -- extract index relevant for sett_t table // same priority logic as in the preceding line
 	sett_bools_t[idx] = not sett_bools_t[idx] -- flip because it's a toggle
 	else -- expand with other menu items if necessary
 	end
   
-	if sett_indices_t[output] then -- this condition will likely need expansion to include indices of other menu items which aren't settings
+	if excl_sett_t and excl_sett_t[output] or sett_indices_t[output] then -- this condition will likely need expansion to include indices of other menu items which aren't settings
 	-- Store new bitfield
 	local bitfield = 0
 		for k, truth in ipairs(sett_bools_t) do
@@ -22503,6 +22683,7 @@ local output = Reload_Menu_at_Same_Pos2(table.concat(menu_t), 1) -- keep_menu_op
 			end
 		end
 	r.SetExtState(scr_cmd_ID, 'SETTINGS', bitfield, false) -- persist false
+	r.SetProjExtState(0, scr_cmd_ID, 'SETTINGS', bitfield)
 	goto RELOAD end
   
 end
@@ -23046,7 +23227,7 @@ end
 -- may contain characters requiring balancing
 function resolve_all_or_restore_apostrophe(fields_t, sep, resolve)
 -- fields_t is table of fields content returned by GetUserInputs_Alt() as 1st return value
--- if sep arg isn't supplied, default to comma
+-- if sep arg isn't supplied, defaults to comma
 -- the function is meant to balance unbalanced perenthesis '(' or ')', quotation marks " and apostrophe '
 -- before content is fed back into GetUserInputs_Alt() on dialogue reload because lack of parenthesis balance
 -- or odd number of quotation marks and apostrophe breaks fields separation
@@ -23056,8 +23237,8 @@ function resolve_all_or_restore_apostrophe(fields_t, sep, resolve)
 -- to balance any unbalanced characters and store the returned result as extended state
 -- so that it can be fed back into the dialogue reliably later on
 -- then followed by another instance of the function in restore mode
--- to restore balanced apostrophe instances to their original form in order to accurately
--- find and replace content in the target text
+-- to restore balanced apostrophe instances 
+-- to their original form for further use,
 -- unbalanced quotation marks and parentheses after resolution trigger a warning message
 -- and reloading of the dialogue to allow the user to resolve the unbalanced characters
 -- as they see fit
@@ -23069,7 +23250,7 @@ function resolve_all_or_restore_apostrophe(fields_t, sep, resolve)
 				for k, char in ipairs({'"',"'"}) do
 				local unbalanced_char = select(2, field:gsub(char,''))%2 > 0 -- if quote char or apostrophe count is odd, they're unbalanced
 					if unbalanced_char then
-						if field_idx > 2 then -- !!! SCRIPT SPECIFIC, CHANGE DEPENDING ON THE ACTUAL DIALOGUE CONFIG specifying indices of fields where aplhabetic content is meaningless and where unbalanced characters can be replaced with + or any other safe character
+						if field_idx > 2 then -- !!! SCRIPT SPECIFIC, CHANGE DEPENDING ON THE ACTUAL DIALOGUE CONFIG OR REMOVE ALTOGETHER specifying indices of fields where aplhabetic content is meaningless and where unbalanced characters can be replaced with + or any other safe character
 						field = '+'
 						else
 						local pt1, pt2 = field:match("(.*"..char..")(.*)") -- isolate pt1 up to the last (odd) char
@@ -23088,7 +23269,7 @@ function resolve_all_or_restore_apostrophe(fields_t, sep, resolve)
 			local maxim = math.max(open_parenth_cnt, clsd_parenth_cnt)
 			local parenth = open_parenth_cnt ~= clsd_parenth_cnt and (minim == open_parenth_cnt and '(' or ')') -- determine type if parenthesis to be added
 				if parenth then -- will be false if open_parenth_cnt and clsd_parenth_cnt are equal, i.e. all instances are balanced
-					if field_idx > 2 then -- in this script fields at indices greater than 2 are boolean therefore there's no point in balancing their characters, it's enough to replace them with one which doesn't require balancing
+					if field_idx > 2 then -- !!! SCRIPT SPECIFIC, CHANGE DEPENDING ON THE ACTUAL DIALOGUE CONFIG OR REMOVE ALTOGETHER // in this script fields at indices greater than 2 are boolean therefore there's no point in balancing their characters, it's enough to replace them with one which doesn't require balancing
 					field = '+'
 					else
 				--	local src_parenth = parenth:byte() == 40 and ')' or '(' -- 40 is ASCII code for left parenthesis, 41 is for right, determine the source parenthesis to be complemented with replacement parenthesis // TOO VERBOSE
@@ -23101,7 +23282,8 @@ function resolve_all_or_restore_apostrophe(fields_t, sep, resolve)
 		fields_t[field_idx] = field
 		end
 		if #unbalanced_char_data > 0 then
-		r.MB('Please resolve unbalanced characters in:\n\n'..unbalanced_char_data:sub(1,-2)..'\n\nThey have been balanced for the settings\nto be properly displayed in the reloaded dialogue.\n\nBut if you leave them as they are, that\'s how\nthe terms will be searched for and/or appear\nafter replacement in the transcript.', 'WARNING',0) -- stripping trailing new line character from unbalanced_char_data
+	-- r.MB('Please resolve unbalanced characters in:\n\n'..unbalanced_char_data:sub(1,-2)..'\n\nThey have been balanced for the settings\nto be properly displayed in the reloaded dialogue.\n\nBut if you leave them as they are, that\'s how\nthe terms will be searched for and/or appear\nafter replacement in the transcript.', 'WARNING',0) -- stripping trailing new line character from unbalanced_char_data	
+	--	r.MB('Please resolve unbalanced characters in:\n\n'..unbalanced_char_data:sub(1,-2)..'\n\nThey have been balanced for the settings\nto be properly displayed in the reloaded dialogue.\n\nBut if you leave them as they are, they will\nbe used in their automatically balanced version.\n\nBalanced apostrophe can be left as they are.\nThese will be restored to single instances automatically.', 'WARNING',0) -- stripping trailing new line character from unbalanced_char_data
 		end
 	return fields_t, unbalanced_char_data -- unbalanced_char_data return value will be used to condition reloading of the dialogue by setting off the 'goto' loop
 	else -- restore apostrophe
@@ -23280,7 +23462,7 @@ end
 local stored_content = r.GetExtState(section, key)
 local output_t = GetUserInputs_Alt(..., stored_content)
 output_t, unbalanced_char_data = resolve_all_or_restore_apostrophe(output_t, sep, 1) -- resolve true // resolve any unbalanced characters input by the user
-r.SetExtState(section, key, table.concat(output_t, sep), false) -- persist false // keep latest search settings during REAPER session to autofill the search dialogue when it's opened
+r.SetExtState(section, key, table.concat(output_t, sep), false) -- persist false // keep latest dialogue content during REAPER session to autofill the dialogue when it's re-opened
 
 	if #unbalanced_char_data > 0 then
 	goto CONTINUE
@@ -26814,7 +26996,7 @@ T R A C K S
 	In_Visible_Tracks_Exist2
 	Get_Last_Touched_Fixed_Item_Lane
 	Get_Index_of_Fixed_Item_Lane_Under_Mouse
-	
+	Insert_New_Track
 
 
 S E N D S / R E C E I V E S
@@ -27363,6 +27545,7 @@ U T I L I T Y
 	Script_Not_Enabled
 	Reminder_Off
 	Show_Menu_Dialogue
+	Esc_Menu_Ops
 	Reload_Menu_at_Same_Pos1
 	Reload_Menu_at_Same_Pos2
 	Reload_Menu_at_Same_Pos_gfx
