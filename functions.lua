@@ -25256,7 +25256,9 @@ function Main_OnCommand_alt(cmdID, context, islistviewcommand, open, close)
 -- if MIDI Editor is initially closed, to be able to execute cmdID
 -- the MIDI item has to be selected and 'open' aergument must be true;
 -- to be able to run Media Explorer actions, SWS/S&M or js_ReaScriptAPI
--- extensions must be installed and Media Explorer must be open
+-- extensions must be installed and Media Explorer must be open,
+-- if only SWS/S&M is installed the function relies on Find_Window_SWS()
+-- function
 
 local cmdID = cmdID and reaper.NamedCommandLookup(cmdID) -- works with numeric command IDs of native actions as well passed as either integer or string
 	if not cmdID or cmdID == 0 then return end
