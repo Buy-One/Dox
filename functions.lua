@@ -3169,7 +3169,7 @@ function Is_MIDI_Ed_Open() -- see MIDIEditor_GetActiveAndVisible() below
 -- THE MIDI EDITOR REMAINS DOCKED AND EVEN BEING INVISIBLE IS VALID SINCE IT WASN'T EXPLICITLY CLOSED
 -- ONLY CLOSURE WITH TAB CLOSE BUTTON MAKES IT TRULY NON-FOCUSED AND INVALID
 -- https://forum.cockos.com/showthread.php?t=278871
-return r.GetToggleCommandStateEx(32060, 1014) ~= -1 -- View: Toggle snap to grid // if closed toggle state isn't returned
+return r.GetToggleCommandStateEx(32060, 1014) ~= -1 -- View: Toggle snap to grid // if closed, toggle state isn't returned
 end
 
 
@@ -3189,7 +3189,7 @@ local dock_pos = r.DockGetPosition(dockermode_idx) -- -1=not found, 0=bottom, 1=
 		-- INSTEAD OF THE LOOP below the following function can be used
 		local ret, val = r.get_config_var_string('dockermode'..dockermode_idx)
 			if val == '32768' then -- OR val ~= '98304' // open floating docker OR not closed floating docker
-			return ME, 4
+			return ME, 4 -- here dock_pos will always be floating i.e. 4
 			end
 		--[[ OR
 		for line in io.lines(r.get_ini_file()) do
@@ -21513,25 +21513,32 @@ function do_in_X_mins(cur_time, duration)
 end
 
 
-function ACT1(comm_ID) -- both string and integer work
+function ACT1(comm_ID) 
+-- both string and integer work
+-- see also Main_OnCommand_alt()
 local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
 local act = comm_ID and comm_ID ~= 0 and r.Main_OnCommand(r.NamedCommandLookup(comm_ID),0)
 end
 
 
-function ACT2(comm_ID, islistviewcommand, midi) -- islistviewcommand, midi are boolean
+function ACT2(comm_ID, islistviewcommand, midi) 
+-- islistviewcommand, midi are boolean
 -- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
 -- e.g. sectionID == 32061
+-- see also Main_OnCommand_alt()
 local act = midi and r.MIDIEditor_LastFocused_OnCommand(r.NamedCommandLookup(comm_ID), islistviewcommand) -- islistviewcommand false
 or not midi and r.Main_OnCommand(r.NamedCommandLookup(comm_ID), 0) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything
 end
 
 
-function ACT3(comm_ID, islistviewcommand, midi) -- islistviewcommand, midi are boolean
+function ACT3(comm_ID, islistviewcommand, midi) 
+-- islistviewcommand, midi are boolean
 -- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
 -- e.g. sectionID == 32061
+-- see also Main_OnCommand_alt()
 local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
-local act = comm_ID and comm_ID ~= 0 and (midi and r.MIDIEditor_LastFocused_OnCommand(comm_ID, islistviewcommand) -- islistviewcommand false
+local act = comm_ID and comm_ID ~= 0 and (midi
+and r.MIDIEditor_LastFocused_OnCommand(comm_ID, islistviewcommand -- islistviewcommand false
 or not midi and r.Main_OnCommand(comm_ID, 0)) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything // only if valid command_ID
 end
 
@@ -21540,6 +21547,7 @@ end
 local ME = r.MIDIEditor_GetActive() -- UNRELIABLE if script is run from the Main section of the action list, see MIDIEditor_GetActiveAndVisible()
 function ACT4(ID, ME) -- supports MIDI Editor actions, get MIDI editor pointer ME and add as argument otherwise can be left out
 -- ID - string or integer
+-- see also Main_OnCommand_alt()
 	if ID then
 	local ID = r.NamedCommandLookup(ID) -- works with srings and integers
 		if ID ~= 0 then -- valid command_ID
@@ -25151,17 +25159,39 @@ end
 
 
 
-function MediaExplorer_OnCommand1(action_cmdID, close_when_done)
+function MediaExplorer_OnCommand1(action_cmdID)
+-- https://forum.cockos.com/showthread.php?p=2863268
+-- this function has to be run from inside
+-- MX section of the Action list or from the Main
+-- section when MX window is already open
+
+	if r.GetToggleCommandStateEx(0,50124) == 0 then return -- MX is closed
+
+local action_cmdID = r.NamedCommandLookup(action_cmdID) -- works with numeric command IDs of native actions as well passed as either integer or string
+
+	if r.BR_Win32_SendMessage then
+	r.BR_Win32_SendMessage(MX, 0x0111, action_cmdID, 0) -- 0x0111 is 'WM_COMMAND'
+	elseif r.JS_WindowMessage_Send then
+	r.JS_WindowMessage_Send(MX, 'WM_COMMAND', action_cmdID, 0, 0, 0)
+	end
+
+end
+
+
+
+function MediaExplorer_OnCommand2(action_cmdID, close_when_done)
 -- https://forum.cockos.com/showthread.php?p=2863268
 -- if the MX is initially closed the triggered action 
 -- is likely to not take effect after MX window opens
 -- because it's slow to become active compared to the speed
 -- of the script execution, therefore defer loop will
 -- have to be employed to wait until it's fully active
--- see defer loop version below MediaExplorer_OnCommand2()
+-- see defer loop version below MediaExplorer_OnCommand3()
 
-local action_cmdID = r.NamedCommandLookup(action_cmdID) -- works with numeric command IDs of native action as well
-local MX = r.OpenMediaExplorer('', false) -- play false
+local action_cmdID = r.NamedCommandLookup(action_cmdID) -- works with numeric command IDs of native actions as well passed as either integer or string
+-- open if closed
+local MX = r.GetToggleCommandStateEx(0,50124) == 0 -- Media explorer: Show/hide media explorer
+and r.OpenMediaExplorer('', false) -- play false
 
 	if MX then
 		if r.BR_Win32_SendMessage then
@@ -25170,7 +25200,7 @@ local MX = r.OpenMediaExplorer('', false) -- play false
 		r.JS_WindowMessage_Send(MX, 'WM_COMMAND', action_cmdID, 0, 0, 0)
 		end
 		if close_when_done then -- Close
-		r.Main_OnCommand(50124,0) -- 'Media explorer: Show/hide media explorer'
+		r.Main_OnCommand(50124,0) -- Media explorer: Show/hide media explorer
 		end
 	end
 
@@ -25183,28 +25213,76 @@ end
 -- (see in this U T I L I T Y section)
 action_cmdID = ''
 close_when_done = true
-function MediaExplorer_OnCommand2()
+function MediaExplorer_OnCommand3()
 -- https://forum.cockos.com/showthread.php?p=2863268
 
-	if not time_init and r.GetToggleCommandState(50124) == 0 then -- Media explorer: Show/hide media explorer // Open
+	if not time_init and r.GetToggleCommandStateEx(0,50124) == 0 then -- Media explorer: Show/hide media explorer // Open
 	r.Main_OnCommand(50124,0) -- 'Media explorer: Show/hide media explorer'
 	time_init = r.time_precise()	
 	elseif time_init and r.time_precise()-time_init >= 0.1 then
 	local MX = r.OpenMediaExplorer('', false) -- play false
-	local action_cmdID = r.NamedCommandLookup(action_cmdID) -- works with numeric command IDs of native actions as well
+	local action_cmdID = r.NamedCommandLookup(action_cmdID) -- works with numeric command IDs of native actions as well passed as either integer or string
 		if r.BR_Win32_SendMessage then
 		r.BR_Win32_SendMessage(MX, 0x0111, action_cmdID, 0) -- 0x0111 is 'WM_COMMAND'
 		elseif r.JS_WindowMessage_Send then
 		r.JS_WindowMessage_Send(MX, 'WM_COMMAND', action_cmdID, 0, 0, 0)			
 		end
 		if close_when_done then -- Close
-		r.Main_OnCommand(50124,0) -- 'Media explorer: Show/hide media explorer'
+		r.Main_OnCommand(50124,0) -- Media explorer: Show/hide media explorer
 		end
 	return
 	end
 	
-r.defer(MediaExplorer_OnCommand2)
+r.defer(MediaExplorer_OnCommand3)
 
+end
+
+
+
+function Main_OnCommand_alt(cmdID, context, islistviewcommand, open, close)
+-- cmdID is action/script command ID retrievable via right click
+-- context menu of the Action list -> Copy action command ID
+-- which must be enclosed within quotes, i.e. 
+-- "40001" or "_SWS_TOGTRACKSEL" or  "_1b3c4aa0a7b870428a1f7ea4f07b3c10";
+-- context is integer: 1 - Arrange, 2 - MIDI Editor, 3 - Media Explorer;
+-- islistviewcommand is boolean to target MIDI Event List Editor
+-- actions when context is 2, i.e. MIDI Editor, if context is not 2
+-- this argument can be ommitted entirely;
+-- 'open' and 'close' are booleans and only relevant when context is 2
+-- i.e. MIDI Editor, if open is true and the MIDI Editor is closed,
+-- it will be first opened, then the cmdID will be executed,
+-- if close is true and MIDI Editor was open or has been opened,
+-- after cmdID execution it will be closed;
+-- if MIDI Editor is initially closed, to be able to execute cmdID
+-- the MIDI item has to be selected and 'open' aergument must be true;
+-- to be able to run Media Explorer actions, SWS/S&M or js_ReaScriptAPI
+-- extensions must be installed and Media Explorer must be open
+
+local cmdID = cmdID and reaper.NamedCommandLookup(cmdID) -- works with numeric command IDs of native actions as well passed as either integer or string
+	if not cmdID or cmdID == 0 then return end
+
+local sect_ID = context == 1 and 0 or context == 2 and 32060
+local midi = context == 2
+local islistviewcommand = midi and islistviewcommand
+
+	if sect_ID then -- Arrange or MIDI Editor
+		if midi and open then reaper.Main_OnCommand(40153, 0) end -- Item: Open in built-in MIDI editor
+	local act = midi and reaper.MIDIEditor_LastFocused_OnCommand(cmdID, islistviewcommand)
+	or not midi and reaper.Main_OnCommand(cmdID, 0) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything
+		if midi and close then
+		local ME = reaper.MIDIEditor_GetActive() -- get active MIDI editor
+		reaper.MIDIEditor_OnCommand(ME, 2) -- File: Close window
+		end		
+	elseif reaper.GetToggleCommandStateEx(0,50124) == 1 then -- Media explorer: Show/hide media explorer // already open
+	local MX = reaper.JS_Window_Find and reaper.JS_Window_Find("Media Explorer", false) 
+	or reaper.BR_Win32_SendMessage and Find_Window_SWS("Media Explorer")
+		if reaper.BR_Win32_SendMessage then
+		reaper.BR_Win32_SendMessage(MX, 0x0111, cmdID, 0) -- 0x0111 is 'WM_COMMAND'
+		elseif reaper.JS_WindowMessage_Send then
+		reaper.JS_WindowMessage_Send(MX, 'WM_COMMAND', cmdID, 0, 0, 0)
+		end
+	end
+	
 end
 
 
@@ -27648,6 +27726,8 @@ U T I L I T Y
 	Get_Media_Explorer_Column_Count
 	MediaExplorer_OnCommand1
 	MediaExplorer_OnCommand2
+	MediaExplorer_OnCommand3
+	Main_OnCommand_alt
 	trackselonmouse
 	generate_custom_action_ID
 	en_de_code_bitfield
