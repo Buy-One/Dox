@@ -242,7 +242,7 @@ function Toggle_Undo_Settings1(undoflags)
 	return true
 	end
 
-	if not undoflags -- and not r.HasExtState(scr_cmdID, 'UNDO FLAGS') 
+	if not undoflags -- and not r.HasExtState(scr_cmdID, 'UNDO FLAGS')
 	then -- enable and optionally store the original value
 	local retval, undoflags = r.get_config_var_string('undomask')
 	undoflags = undoflags+0 -- converting into integer with +0 to accommodate Lua 5.4 where implicit conversion of strings to integers doesn't work in bitwise operations
@@ -316,7 +316,7 @@ local tr = take and r.GetMediaItemTake_Track(take)
 	local SET = r.SetMediaTrackInfo_Value
 	r.PreventUIRefresh(1)
 		if not tr then
-		local SET = r.SetMediaTrackInfo_Value		
+		local SET = r.SetMediaTrackInfo_Value
 		r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false
 		local idx = r.GetNumTracks()-1
 		tr = r.GetTrack(0, idx)
@@ -350,11 +350,11 @@ function force_create_undo_point(scr_cmdID)
 -- which don't affect project, such as toggles, action arming,
 -- acton types exclusive to custom actions which only modify
 -- their behavior, or if identical actions follow each other
--- the undo point is only created for the first one, 
+-- the undo point is only created for the first one,
 -- which makes it difficult to create a complete undo sequence
 -- for the tested custom actions
 -- the solution is in making inconsequential changes in the background
--- so REAPER registers a change to the project, such as setting 
+-- so REAPER registers a change to the project, such as setting
 -- and clearing the label of a background track
 local tr, take = insert_get_delete_bckgrnd_track(scr_cmdID)
 local GETSET = r.GetSetMediaTrackInfo_String
@@ -492,7 +492,7 @@ function Get_Closest_Prev_Whole_Multiple(dividend, int_divisor)
 end
 
 
-function Get_Closest_Multiple_Of_Divisor1(number, divisor) 
+function Get_Closest_Multiple_Of_Divisor1(number, divisor)
 -- number is some number, decimal arguments and arguments < 1 are supported;
 -- the closest meaning the closest to the number, on either side;
 -- math.floor for negative numbers rounds closer to 0, i.e. -4.5 is rounded to 4
@@ -504,7 +504,7 @@ function Get_Closest_Multiple_Of_Divisor1(number, divisor)
 -- return math.floor(num+0.5) -- only numbers > 1 are supported
 	end
 local dec_places = math.abs(number) < 1 and 10^#tostring(number):match('%.(%d+)')
-number = number*(dec_places or 1)	
+number = number*(dec_places or 1)
 return round(number/divisor)*divisor/(dec_places and dec_places or 1)
 end
 
@@ -683,7 +683,7 @@ function dec2hex(dec_int)
 -- https://www.rapidtables.com/convert/number/decimal-to-hex.html algo
 
 	if not dec_int then return end
-	
+
 local dec_int2
 
 	if dec_int > 0xfffffffffffff then  -- 2^52
@@ -691,7 +691,7 @@ local dec_int2
 		if tonumber(_VERSION:match('[%.%d]+')) < 5.3 or math.maxinteger == 0x7fffffff then -- either Lua older than 5.3 or 32 bit system, 0x7fffffff == 2147483647
 		return dec_int -- on a 32 bit system integers above 2^31 Lua encodes as double floating point numbers while in older Lua versions all integers are encoded as double floating point numbers; in all versions of Lua floating point precision limit is 2^53-1 (about 15 - 17 decimal places) after which rounding errors start to occur, so in these two cases no point to convert a number above 2^53-1 (in practical terms above 2^52, because in division and modulo operations employed for conversion into hex this is the limit of accuracy) because it will be fed in with rounding erros from the outset
 		end
-	-- the following assumes that integers up to 2^53-1 are represented natively rather than as floating point numbers, 
+	-- the following assumes that integers up to 2^53-1 are represented natively rather than as floating point numbers,
 	-- which is good for REAPER since native integer representaion is supported in Lua 5.3+
 	-- run by all REAPER versions with Lua support
 	local diff = math.floor(math.log(dec_int)/math.log(2))-52 -- find by how much the input exponent exceeds the Lua max floating point number precision limit which is 53 bit i.e. ~15-17 decimal places, because numbers whose decimal places exceed this limit lose precision and cause wrong calculation result, this workround is needed because the employed conversion method to hex relies on division and modulo operaions which produce decimal numbers for which precision is important; using value 52 instead of 53 because in division and modulo operations the limit of accuracy is 52 bit; formula to calculate exponend of the value by specific base comes from  https://www.gammon.com.au/scripts/doc.php?lua=math.log
@@ -713,7 +713,7 @@ local hex2
 	hex2 = dec2hex(dec_int2)
 	hex = hex2:sub(3)..hex
 	end
-	
+
 return '0x'..hex
 end
 -- for inverse operation: hex 2 dec
@@ -725,7 +725,7 @@ end
 
 function get_integer_length1(int)
 	if not int or not tonumber(int) then return 0 end
-local int = math.abs(tonumber(int)) -- rectify negative	
+local int = math.abs(tonumber(int)) -- rectify negative
 	for i = 0, math.huge do
 		if int == 0 or int >= 10^i and int < 10^(i+1)
 		then return i+1 end
@@ -748,16 +748,16 @@ end
 function un_pack_integers(t, length, packed_int)
 -- ONLY ABLE TO ACCURATELY UNPACK A TOTAL NUMBER OF 16 DIGITS
 -- DUE Lua FLOATING POINT PRECISION LIMIT OF 10^15
--- i.e. 16 single digit integers at length 1, 
--- 8 two digit integers at length 2, 
+-- i.e. 16 single digit integers at length 1,
+-- 8 two digit integers at length 2,
 -- 4 four digit integers at length 4
 -- and a mix of those, however the length used to accommodate
 -- longer integers will affect the limit because shorter integers
--- will use it as well, i.e. at length 2 single digit integers 
+-- will use it as well, i.e. at length 2 single digit integers
 -- will be treated as two digit therefore their total count
 -- which can be packed alongside two digit integers will be reduced
--- to (16 - length of all two digit integers)/2 
--- OR to 8 (the max count of two digit integers) - the total count of 
+-- to (16 - length of all two digit integers)/2
+-- OR to 8 (the max count of two digit integers) - the total count of
 -- two digit integers in array;
 -- 0 cannot be packed;
 -- t is an array containing integers to be packed into a single integer
@@ -776,7 +776,7 @@ function un_pack_integers(t, length, packed_int)
 -- for each next integer, i.e.
 -- a*10^(length*0) + a*10^(length*1) + c*10^(length*2) etc.
 -- length is the fixed component
--- this allows easy unpacking without having to know 
+-- this allows easy unpacking without having to know
 -- the length of original integers as required in other methods
 -- but it comes at the cost of wasting much more space;
 -- the employed method isn't described in the below links, so they're only
@@ -836,7 +836,7 @@ table.sort(array_t, function(a,b) return a < b end) -- make sure that the sequen
 local idx = (#array_t+1)/2 -- adding 1 allows dividing odd length (number of values) without remainder and thus figuring out the center index, e.g. in table 1,2,3 the center index is 2 which will be calculated by dividing 4 (3+1) by 2
 -- if the length (number of values) is even, e.g. 1,2,3,4, dividing 5 (4+1) by 2 will produce 2.5
 -- which in turn will point at two incices 2 and 3 which share the center
-	
+
 	if (#array_t+1)%2 == 0 then -- OR math.floor(idx) == idx // divided without remainder, i.e. odd number sequence
 	val = array_t[idx]
 	else -- even number sequence, calculate between two cenral values
@@ -861,10 +861,10 @@ end
 
 function floats_are_equal(numA, numB)
 -- due to floating point rounding errors and long fractional parts
--- it's impossible to reliably evaluate equality by direct comparison between 
--- two floating point numbers because numbers functionally the same 
--- will differ in minute fraction, 
--- this is always an ussue with notes length, which seems to be related 
+-- it's impossible to reliably evaluate equality by direct comparison between
+-- two floating point numbers because numbers functionally the same
+-- will differ in minute fraction,
+-- this is always an ussue with notes length, which seems to be related
 -- to their measurement in quarter note units, and value in quarter notes
 -- ends up being slightly larger than the value it's supposed to be equal to
 -- so a way to compare them is by converting them into strings, tostring()
@@ -884,7 +884,7 @@ function get_greatest_smallest_value1(want_smallest, field, ...)
 -- field is either integer representing index in an indexed table
 -- or string represending field in an associative array;
 -- to evaluate values in nested tables inside several indexed tables
--- this function must be first applied to nested tables, 
+-- this function must be first applied to nested tables,
 -- then to the resulting values of all tables;
 -- also useful for determining the longest indexed table as well out of several,
 -- to make the function return table pointer along with the value
@@ -905,7 +905,7 @@ function get_greatest_smallest_value2(want_smallest, field, ...)
 -- field is either integer representing index in an indexed table
 -- or string represending field in an associative array;
 -- to evaluate values in nested tables inside several indexed tables
--- this function must be first applied to nested tables, 
+-- this function must be first applied to nested tables,
 -- then to the resulting values of all tables;
 -- also useful for determining the longest indexed table as well out of several,
 -- to make the function return table pointer along with the value
@@ -1096,7 +1096,7 @@ function split_into_lines(input, want_empty_lines)
 local input = input:sub(-1):match('\n') and input..'\n' or input -- OR input:sub(-1) ~= '\n'
 local t = {}
 	for line in input:gmatch('(.-)\n') do -- respects empty lines; '[^\n]+' to skip empty lines
-		if want_empty_lines 
+		if want_empty_lines
 		and #line:gsub(' ','') == 0 -- OR 'and not line:gsub['[^%s]+'] / not line:gsub['%S']'
 		or not want_empty_lines then
 		t[#t+1] = line
@@ -1177,7 +1177,7 @@ function split_lines_by_length(max_len, lines_t)
 			table.insert(list_t, idx+1, collected)
 			end
 		table.remove(list_t, i) -- remove the old non-split entry
-		end		
+		end
 	end
 return lines_t
 end
@@ -1216,7 +1216,7 @@ function collect_captures(source_str, pattern, capture_idx)
 -- the target capture
 local t = {}
 local i = 0
-local source_str = source_str:gsub(pattern, 
+local source_str = source_str:gsub(pattern,
 function(c) i=i+1; t[i] = c end, capture_idx or #source_str)
 return t, t[#t] -- or t[i], the 2nd return value is the caprure at index
 end
@@ -1822,7 +1822,7 @@ function utf8_str_sub(str, st, fin)
 -- st, fin args are identical to stock string.sub
 -- logic is the same as in string.sub,
 -- the only difference is that when st and fin are not supplied
--- or are nil the function returns empry srting 
+-- or are nil the function returns empry srting
 -- instead of throwing an error
 
 local length = #str:gsub('[\128-\191]','') -- length in characters // discard the continuation bytes, if any
@@ -1831,8 +1831,8 @@ local length = #str:gsub('[\128-\191]','') -- length in characters // discard th
 -- by subtracting from length and compare,
 -- adding 1 because the coordinates are supposed to match
 -- character index but the result of subtraction
--- is short of the character index by 1, 
--- e.g. -1 is index of the the last character (first from the end), 
+-- is short of the character index by 1,
+-- e.g. -1 is index of the the last character (first from the end),
 -- so when length is 5, the result of 5+-1 = 4 includes
 -- last (5th) and penultimate (4th) characters as if the index were -2
 -- which is fixed by adding 1 to the result
@@ -1843,17 +1843,17 @@ local fin = fin and (fin < 0 and length+fin+1 or fin)
 
 	local st = st >= 0 and st-1 or length+st -- each cycle reduces str length by 1 character from start, i.e. window/frame start moves rightwards, -1 because positive st coordinate matches the index of a character window/frame starts at, so when st is 2, i.e. the second character, the loop only needs a single cycle to cut off the 1st character and so on; on the other hand when st is negative the calculated value matches exactly the number of cycles required to move the window/frame start to the character, e.g. when st is -2 while length is 5, the calculated value is 5+-2 = 3, -2 is index of the penultimate character which in order to be reached from start character by character requires 3 loop cycles
 		for i=1, st do
-		str = str:match('^[\192-\255].[\128-\191](.+)') or str:match('^[\192-\255]*.[\128-\191](.+)') 
+		str = str:match('^[\192-\255].[\128-\191](.+)') or str:match('^[\192-\255]*.[\128-\191](.+)')
 		or str:match('^[\192-\255]*.[\128-\191]*(.+)') -- accounting for non-ASCII characters so that truncation occurs by character rather than bytes, accommodates all cases whether lead and continuation bytes present or not
 		end
 
 
-	if fin then 
+	if fin then
 	local fin = fin > 0 and length-fin or math.abs(fin)-1 -- each cycle reduces str length by 1 character from end, i.e. window/frame end moves leftwards, -1 because negative fin coordinate matches the index of a character window/frame ends at, so when fin is -2, i.e. the second character from end, the loop only needs a single cycle to cut off the last character and so on; on the other hand when fin is positive the calculated value matches exactly the number of cycles required to move the window/frame end to the character, e.g. when fin is 2 while length is 5, the calculated value is 5-2 = 3, 2 is index of the second character which in order to be reached from end character by character requires 3 loop cycles
 	-- OR
 	-- local fin = math.abs(fin > 0 and fin-length or fin+1) -- converting positive fin value into negative before rectification, and if comes in negative adding 1 before rectification which is equivalent to subtracting 1 after rectification as done above
 		for i=1, fin do
-		str = str:match('(.+)[\192-\255].[\128-\191]') or str:match('(.+)[\192-\255]*.[\128-\191]') 
+		str = str:match('(.+)[\192-\255].[\128-\191]') or str:match('(.+)[\192-\255]*.[\128-\191]')
 		or str:match('(.+)[\192-\255]*.[\128-\191]*') -- accounting for non-ASCII characters so that truncation occurs by character rather than bytes, accommodates all cases whether lead and continuation bytes present or not
 		end
 	end
@@ -2060,15 +2060,15 @@ end
 
 function convert_case_selectively(str, pattern, want_upper)
 -- convert to another case selectively
--- pattern can be literal string or a regular expression 
+-- pattern can be literal string or a regular expression
 -- whose capture WILL NOT BE CONVERTED;
 -- want_upper is boolean, if invalid the string
 -- will be converted to lower case;
--- if pattern targets a word, then to make sure that only 
+-- if pattern targets a word, then to make sure that only
 -- standalone capture is spared it must be enclosed between
 -- spaces on both sides bar start and end of the string, e.g
 -- if not c:match(' '..pattern.' ') and not c:match('^'..pattern..' ') and not c:match(' '..pattern..'$')
-return str:gsub(pattern, function(c) 
+return str:gsub(pattern, function(c)
 if not c:match(pattern) then return c:(want_upper and upper() or lower()) end end)
 end
 
@@ -2111,23 +2111,23 @@ end
 
 
 function embellish_string(str, ornam_code_t, want_spaces)
--- ornam_code_t is a table of integers corresponding to indices of keys 
+-- ornam_code_t is a table of integers corresponding to indices of keys
 -- holding utf-8 char codes in the below tables
 -- want_spaces is boolean to apply the ornament to space char as well;
 -- the description is relevant to ornament display in the menu
 -- 1 - sparse dashed underline (lower under digits)
--- 2/17 - sparse dotted underline; 4/12 - bold dotted underline; 5 - solid underline; 
+-- 2/17 - sparse dotted underline; 4/12 - bold dotted underline; 5 - solid underline;
 -- 6/16 - bold dashed underline; 7 - tilde strikethrough; 8 - dash srtikethrough;
 -- 9 - solid line strikethrough; 10/11 - short/long slash srikethrough;
--- 13 - solid bold overline; 14 - tilde overline (lower above digits); 
+-- 13 - solid bold overline; 14 - tilde overline (lower above digits);
 -- 15 - solid bold underline; 18 - dotted overline which crosses characters at the top;
 
 -- when ornament is applied to spaces its level under/above the line
 -- may differ from that applied to characters when displayed in the menu;
--- the level under/above numerals may also differ from the level under/above 
+-- the level under/above numerals may also differ from the level under/above
 -- alphabetic chars when displayed in the menu;
 -- https://www.charset.org/utf-8
--- the numeric keys aren't necessary,  
+-- the numeric keys aren't necessary,
 -- only included for convenience
 local t = {[1]='\xCC\xA0',[2]='\xCC\xA3',[3]='\xCC\xA4',
 [4]='\xCC\xA5',[5]='\xCC\xB2',[6]='\xCC\xB3',[7]='\xCC\xB4',
@@ -2141,13 +2141,13 @@ local t = {[1]='\204\160',[2]='\204\163',[3]='\204\164',
 [12]='\204\187',[13]='\204\191',[14]='\205\130',[15]='\205\135',
 [16]='\205\154',[17]='\223\178',[18]='\223\179'}
 --]]
-table.sort(ornam_code_t) -- some chars may not mix well if inserted not in ascending order 
+table.sort(ornam_code_t) -- some chars may not mix well if inserted not in ascending order
 -- e.g. 18,5 or 18,1
 local ornam = ''
 	for k, v in ipairs(ornam_code_t) do
 	ornam = ornam..t[v]
 	end
-local str = str:gsub('[\192-\255]*.[\128-\191]*', function(c) return not want_spaces and #c:gsub(' ','') == 0 and c or c..ornam end) -- accounting for non-ASCII characters by including leading and trailing bytes if any, ornamentation characters FOLLOW the target character 
+local str = str:gsub('[\192-\255]*.[\128-\191]*', function(c) return not want_spaces and #c:gsub(' ','') == 0 and c or c..ornam end) -- accounting for non-ASCII characters by including leading and trailing bytes if any, ornamentation characters FOLLOW the target character
 return str
 end
 
@@ -2203,7 +2203,7 @@ local current_line = ""
 			end
 		end
 	end
-	
+
 	if #current_line > 0 then
 	table.insert(lines, current_line)
 	end
@@ -2220,7 +2220,7 @@ function numerate_instances(word, repeats, str)
 -- word is a string, either literal or pattern,
 -- if str arg isn't supplied word must be literal string
 -- since duplicating a pattern makes no sense,
--- if the word arg is a literal string Esc() function 
+-- if the word arg is a literal string Esc() function
 -- may be required;
 -- repeats is integer representing the number
 -- of repetitions of the string passed as word arg;
@@ -2237,7 +2237,7 @@ end
 
 function sanitize_string_for_menu(name, pipe)
 -- stripping leading !, #, < and > and replacing all instances of |
--- so that being menu special characters they don't affect 
+-- so that being menu special characters they don't affect
 -- the way string is displayed in the menu;
 -- pipe argument is a replacement character for pipe
 -- if invalid or empty, underscore is used
@@ -2254,22 +2254,22 @@ function Construct_Roman_Numerals(...)
 -- invalid fin defaults to 4999, unlike with numbers 4, 40, 400,
 -- number 4000 doesn't include V̅ (5000) character (although
 -- the Wikipedia article states that only numbers up to
--- 3999 can be represented using regular notation, which 
+-- 3999 can be represented using regular notation, which
 -- suggests that 4000 must include character for 5000);
 -- if start greater than fin, they're reversed;
--- if only 1 arg is supplied only this supplied 
+-- if only 1 arg is supplied only this supplied
 -- number will be converted;
--- if no argument is supplied 
+-- if no argument is supplied
 -- the range defaults to 1 - 4999;
 -- zero as range start is supported, if supplied explicitly;
 -- the function uses the commonest subtractive notation,
--- i.e. for 4, 9, 40, 90, 400, 900 and their instances 
+-- i.e. for 4, 9, 40, 90, 400, 900 and their instances
 -- https://en.wikipedia.org/wiki/Roman_numerals
 
 local a, b = table.unpack({...})
 local start, fin
 	if a and b then -- two arguments
-	start, fin = a, b	
+	start, fin = a, b
 	else -- one argument
 	start, fin = a, a
 	end
@@ -2284,7 +2284,7 @@ start, fin = start and math.floor(math.abs(start)) or 1, fin and math.floor(math
 	local order = {[1000]='M', [500]='D', [100]='C', [50]='L', [10]='X', [5]='V'}
 	-- OR
 	-- order = {'M', 'D', 'C', 'L', 'X', 'V'} -- if used, must be accessed with order[k] in the loop below
-		
+
 		for k, divisor in ipairs({1000, 500, 100, 50, 10, 5}) do -- divisors correspond to numbers denoted with unique characters in order to catch numbers they're included in; iterating in descending order of divisors to get the greatest possible order of a number and continue to parse it in this way until the order of ones, iteration in ascending order of divisors would give wrong results because most of the numbers would be multiples of 5 (the lowest divisor) either with or without remainder, as if most of them included character 'V' which is false
 		local int = math.modf(i/divisor) -- OR math.floor(i/divisor) // whole part
 			if int > 0 then -- regular numbers, i.e. not 4, 9, 40, 90, 400, 900 and their instances which are fashioned in subtractive format
@@ -2312,7 +2312,7 @@ start, fin = start and math.floor(math.abs(start)) or 1, fin and math.floor(math
 		end
 	return (numeral or '')..('I'):rep(i) -- attach ones, or return ones alone for numbers under 4
 	end
-	
+
 
 	-- A MORE COMPACT CODE
 	local function parse_number(i, numeral)
@@ -2320,10 +2320,10 @@ start, fin = start and math.floor(math.abs(start)) or 1, fin and math.floor(math
 	local order = {[1000]='M', [500]='D', [100]='C', [50]='L', [10]='X', [5]='V'}
 	-- OR
 	-- order = {'M', 'D', 'C', 'L', 'X', 'V'} -- if used, must be accessed with order[k] in the loop below
-		
+
 		for k, divisor in ipairs({1000, 500, 100, 50, 10, 5}) do -- divisors correspond to numbers denoted with unique characters in order to catch numbers they're included in; iterating in descending order of divisors to get the greatest possible order of a number and continue to parse it in this way until the order of ones, iteration in ascending order of divisors would give wrong results because most of the numbers would be multiples of 5 (the lowest divisor) either with or without remainder, as if most of them included character 'V' which is false
 		local int = math.modf(i/divisor) -- OR math.floor(i/divisor) // whole part
-		
+
 			if int > 0 -- regular numbers, i.e. not 4, 9, 40, 90, 400, 900 and their instances which are fashioned in subtractive format
 			-- the following conditions which capture numbers in subtractive notation
 			-- rely on the fact that result of modulo operation
@@ -2347,14 +2347,14 @@ start, fin = start and math.floor(math.abs(start)) or 1, fin and math.floor(math
 		end
 	return (numeral or '')..('I'):rep(i) -- attach ones, or return ones alone for numbers under 4
 	end
-	
+
 local t = {}
 	for i=start,fin do
 	t[i] = i == 0 and 'N' or parse_number(i)
 	end
 return t
 end
--- USE: 
+-- USE:
 -- t = Construct_Roman_Numerals(1,100)
 -- roman_67 = t[67]
 -- t = Construct_Roman_Numerals(67)
@@ -2878,7 +2878,7 @@ function sort_table1(t, start_idx, end_idx, field, descending) -- see version 2 
 -- values must be sorted, to the best of my knowledge the stock table.sort
 -- doesn't allow sorting within range and is unstable, i.e. when sorting by a criterion
 -- which only varies in certain table fields, the entire table ends up being
--- sorted including some fields with values which by dent of being identical 
+-- sorted including some fields with values which by dent of being identical
 -- should not be sorted, so before sorting within range with this function
 -- prepare the table by placing all target fields within that range, e.g.
 --[[
@@ -2895,7 +2895,7 @@ local end_idx = 0
 	end
 ]]
 -- field is a string, name of a field in a nested associative array,
--- or integer of a field index in an indexed nested table, if the table t 
+-- or integer of a field index in an indexed nested table, if the table t
 -- consists of nested arrays,
 -- if field arg is invalid, indexed values in the table t will be sorted, if any;
 -- descending is boolean to sort in descending order;
@@ -2931,7 +2931,7 @@ function sort_table2(t, start_idx, end_idx, field, descending)
 -- values must be sorted, to the best of my knowledge the stock table.sort
 -- doesn't allow sorting within range and is unstable, i.e. when sorting by a criterion
 -- which only varies in certain table fields, the entire table ends up being
--- sorted including some fields with values which by dent of being identical 
+-- sorted including some fields with values which by dent of being identical
 -- should not be sorted, so before sorting within range with this function
 -- prepare the table by placing all target fields within that range, e.g.
 --[[
@@ -2948,7 +2948,7 @@ local end_idx = 0
   end
 ]]
 -- field is a string, name of a field in a nested associative array,
--- or integer of a field index in an indexed nested table, if the table t 
+-- or integer of a field index in an indexed nested table, if the table t
 -- consists of nested arrays,
 -- if field arg is invalid, indexed values in the table t will be sorted, if any;
 -- descending is boolean to sort in descending order;
@@ -3055,13 +3055,13 @@ local s = seen or {}
 local res = {}
 s[obj] = res
 	for k, v in pairs(obj) do
--- OR better to invoke the for loop with 'for k, v in next, obj do', 
+-- OR better to invoke the for loop with 'for k, v in next, obj do',
 -- to avoid triggering a __pairs metamethod. e.g.
 --	for k, v in next obj do
-	res[deep_copy1(k, s)] = deep_copy1(v, s) 
+	res[deep_copy1(k, s)] = deep_copy1(v, s)
 	end
--- set the metatable after copying the data, 
--- otherwise you risk triggering __index and __newindex metamethods, 
+-- set the metatable after copying the data,
+-- otherwise you risk triggering __index and __newindex metamethods,
 -- which will change the semantics.
 return setmetatable(res, getmetatable(obj))
 
@@ -3558,7 +3558,7 @@ end
 local ME = r.MIDIEditor_GetActive()
 local take = r.MIDIEditor_GetTake(ME)
 
-function re_store_sel_MIDI_notes(take, deselect_all, t) 
+function re_store_sel_MIDI_notes(take, deselect_all, t)
 -- store and restore (in the current MIDI channel if Channel filter is enabled)
 -- deselect_all is boolean, only relevant at the storage stage
 
@@ -3577,7 +3577,7 @@ local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take)
 				if note > -1 then sel_note_t[#sel_note_t+1] = i end
 			i = i+1
 			until note == -1
-	]]	
+	]]
 		if deselect_all then
 			for k, note_idx in ipairs(sel_note_t) do
 			r.MIDI_SetNote(take, note_idx, false) -- selectedIn false, the rest is ignored
@@ -3589,7 +3589,7 @@ local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take)
 		r.MIDI_SetNote(take, v, true, false, -1, -1, 0, -1, -1, true) -- noteidx - v, selectedIn - true, mutedIn - false, startppqposIn and endppqposIn both -1, chanIn - 0, velIn -1, noSortIn - true since only one note params are set
 		end
 	end
-	
+
 r.MIDI_Sort(take)
 
 end
@@ -3650,23 +3650,23 @@ function Re_Store_Edit_Cursor_Pos_In_MIDI_Ed(stored_pos)
 -- to the left of the start in item which starts exactly at the project start
 -- the cursor position will be registered as 0
 -- and upon restoration the cursor will be moved to the item start
--- i.e. the project start, because it cannot be moved left past it 
+-- i.e. the project start, because it cannot be moved left past it
 -- into the negative even if manually it can
 
 r.PreventUIRefresh(1)
 
 	if not stored_pos then -- store
-	
+
 	local ACT = r.MIDIEditor_LastFocused_OnCommand
 	local stored_pos = r.GetCursorPosition()
 	ACT(40443, false) -- View: Move edit cursor to mouse cursor // islistviewcommand false
 	local edit_cur_pos = r.GetCursorPosition()
 	return stored_pos
-	
+
 	else -- restore
 
 	r.SetEditCurPos(stored_pos, 0, 0) -- restore edit cursor pos; moveview is 0, seekplay is 0
-	
+
 	end
 
 r.PreventUIRefresh(-1)
@@ -3786,7 +3786,7 @@ local idx, fin, note
 			---]]-----
 		local v = props_t[i+1] -- +1 since table index is 1-based while note count is 0-based; the 1st part of the note will keep the note original index after split and after restoration
 			if v and startppq == v[1] and endppq ~= v[2] and pitch == v[3] then
-			idx, fin, note = i, endppq, pitch 
+			idx, fin, note = i, endppq, pitch
 			end
 			if idx and startppq == fin and pitch == note then -- locate the 2nd part of the split note
 			r.MIDI_DeleteNote(midi_take, i) -- delete the 2nd part
@@ -3985,7 +3985,7 @@ local take_found, channel_bitfield
 			cnt = val and cnt+1 or cnt
 			channel_bitfield = channel_bitfield or cnt == 1 and val
 				if cnt == 7 then -- filter boolean is 7th field
-				return val == '1', get_enabled_channels(channel_bitfield) end 
+				return val == '1', get_enabled_channels(channel_bitfield) end
 			end
 		end
 	end
@@ -4648,27 +4648,27 @@ function Get_MIDI_Ed_Visible_Grid(ME, take)
 -- where insert note actions respect visible grid
 -- when the option 'Snap to visible grid' (first introduced in build 7.36)
 -- is enabled and minimum line spacing setting applies to the MIDI Editor grid
--- so when the line spacing produced by the original grid type is smaller 
--- than the minimum line spacing value, actual (visible) grid resolution 
+-- so when the line spacing produced by the original grid type is smaller
+-- than the minimum line spacing value, actual (visible) grid resolution
 -- can be learned by inserting a note and measuring its length;
 -- IN MIDI EDITOR, FOLDED VISIBLE GRID OF TRIPLET, DOTTED AND SWUNG
 -- DIVISIONS PRODUCES LINE SPACING OF MAINLY STRAIGHT NOTES;
 -- relies on re_store_sel_MIDI_notes();
--- !!! IMPORTANT: 
+-- !!! IMPORTANT:
 -- 1) THE FUNCTION MUST BE INCLUDED WITHIN THE UNDO BLOCK
 -- BECAUSE THE ACTION 'Edit: Insert note at edit cursor' CREATES
--- AN UNDO POINT AND IF PLACED OUTSIDE OF THE UNDO BLOCK, MIDI EVENT 
--- IT TEMPORARILY INSERTS GETS RESTORED WHEN CHANGE PRODUCED 
+-- AN UNDO POINT AND IF PLACED OUTSIDE OF THE UNDO BLOCK, MIDI EVENT
+-- IT TEMPORARILY INSERTS GETS RESTORED WHEN CHANGE PRODUCED
 -- BY THE SCRIPT IS UNDONE
 -- 2) IT MUST BE PRECEDED BY:
---[[ 
+--[[
 local note_div, note_mode = Re_Store_Note_Length_Setting(take) -- store settings
 	if note_mode ~= 'Grid' then
 	r.MIDIEditor_LastFocused_OnCommand(41295, false) -- islistviewcommand false // Set length for next inserted note: grid // ENABLE SO THAT 'Edit: Insert note at edit cursor' ACTION INSERTS NOTE BY GRID, ORIGINAL OR VISIBLE (in bilds 7.37+)
 	end
 ]]
 -- AND FOLLOWED BY:
---[[ 
+--[[
 	if note_mode ~= 'Grid' then
 	Re_Store_Note_Length_Setting(take, note_div, note_mode) -- restore settings
 	end
@@ -4681,14 +4681,14 @@ local note_div, note_mode = Re_Store_Note_Length_Setting(take) -- store settings
 
 -- the function is an alternative to Get_Visible_Grid_Div_Length()
 -- which works reliably for Arrange grid but is not relable in the MIDI Editor
--- becasue MIDI Editor grid when folded doesn't respect mimimum line spacing value 
--- set in the grid settings (never respected before build 7.37 and only partially 
--- respects since) and instead creates greater line spacing which is impossible 
--- to calculate with the said function because the function looks for time value in sec 
--- corresponding to mimimum line spacing value in pixels and cannot guess 
--- by how much actual line spacing of the visible MIDI Editor grid is greater 
+-- becasue MIDI Editor grid when folded doesn't respect mimimum line spacing value
+-- set in the grid settings (never respected before build 7.37 and only partially
+-- respects since) and instead creates greater line spacing which is impossible
+-- to calculate with the said function because the function looks for time value in sec
+-- corresponding to mimimum line spacing value in pixels and cannot guess
+-- by how much actual line spacing of the visible MIDI Editor grid is greater
 -- than the minimum value,
--- that said Get_Visible_Grid_Div_Length() function is still able to give an indication 
+-- that said Get_Visible_Grid_Div_Length() function is still able to give an indication
 -- when the MIDI Editor visible grid doesn't match the grid setting in builds 7.37+
 
 -- SINCE THE FUNCTION IS INTRUSIVE IT MUST BE CONDITIONED
@@ -4701,15 +4701,15 @@ local _7_37 = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.37
 
 	if _7_37 and min_spacing+0 > 0 and grid_div_len*r.GetHZoomLevel() >= min_spacing+0 then return end -- build 7.37+, original grid line spacing in px is NOT smaller than the setting, i.e. visible grid resolution is NOT active, so no need to determine its line spacing
 
--- The routine runs when build is 7.37+, original grid line spacing in px is smaller 
+-- The routine runs when build is 7.37+, original grid line spacing in px is smaller
 -- than min_spacing setting, i.e. visible grid is active
--- or when min_spacing setting is 0 so there's no clear rule determining when the grid 
--- folds to fit the zoom level, so whether there's difference between original 
--- and visible grids will have to be determined using this function return value 
+-- or when min_spacing setting is 0 so there's no clear rule determining when the grid
+-- folds to fit the zoom level, so whether there's difference between original
+-- and visible grids will have to be determined using this function return value
 -- and based on this decision will have to be made which one to opt for.
 -- OR when build is older than 7.37 allowing to get grid line spacing regardles if whether
 -- it matches the original or the visible grid
-	
+
 local sel_notes = re_store_sel_MIDI_notes(take, 1) -- deselect_all true because note insert action doesn't make the note exclusively selected
 local cur_pitch = r.MIDIEditor_GetSetting_int(ME, 'active_note_row') -- store
 local edit_cur_pos = r.GetCursorPosition() -- store
@@ -4722,7 +4722,7 @@ r.PreventUIRefresh(1)
 	if not snap_to_vis_grid then -- toggle to ON, must be enaled for the insert note action to respect visible grid
 	ACT(42473, false) -- islistviewcommand // Options: Snap to visible grid
 	end
-	
+
 r.MIDIEditor_SetSetting_int(ME, 'active_note_row', 0)
 ACT(40036, false) -- islistviewcommand // View: Go to start of file
 ACT(40051, false) -- islistviewcommand // Edit: Insert note at edit cursor // inserts notes at grid resolution even if global Snap is disabled as long as note length setting is Grid
@@ -4733,10 +4733,10 @@ local note_st, note_end, note_idx
 local i = 0
 	repeat
 	local retval, sel, muted, startppqpos, endppqpos, chan, pitch, vel = r.MIDI_GetNote(take, i)
-		if sel then note_st, note_end, note_idx = startppqpos, endppqpos, i break end		
+		if sel then note_st, note_end, note_idx = startppqpos, endppqpos, i break end
 	i=i+1
 	until not retval
-	
+
 -- Restore everything
 	if not snap_to_vis_grid then -- toggle to OFF if was intially OFF
 	ACT(42473, false) -- islistviewcommand // Options: Snap to visible grid
@@ -4773,19 +4773,19 @@ local t = {
 	local vis_QN = QN or sec/(60/r.Master_GetTempo()) -- visible grid division in quarter notes
 		for div, val in pairs(t) do
 		-- due to floating point rounding errors and long fractional parts
-		-- it's impossible to reliably evaluate equality by direct comparison 
+		-- it's impossible to reliably evaluate equality by direct comparison
 		-- between two floating point numbers
 		-- because numbers functionally the same will differ in minute fraction,
-		-- this is always an ussue with notes length, which seems to be related 
+		-- this is always an ussue with notes length, which seems to be related
 		-- to their measurement in ppq per quarter note, and value in quarter notes
 		-- ends up being slightly larger than the value it's supposed to be equal to,
-		-- mainly with triplets whose floating point precision is 18 decimal places		
-		-- i.e. 1/64T: val = 0.041666666666666664 VS vis_QN = 0.041666666666666741, 
+		-- mainly with triplets whose floating point precision is 18 decimal places
+		-- i.e. 1/64T: val = 0.041666666666666664 VS vis_QN = 0.041666666666666741,
 		-- so a way to compare them is by converting them into strings, tostring()
 		-- function automatically rounds off long floating point numbers of up to about
 		-- 15 decimal places which seems enough for reliable comparison because the
 		-- difference is smaller;
-		-- employing this solution for completeness because folded grid only matches 
+		-- employing this solution for completeness because folded grid only matches
 		-- whole notes except when extremely folded in which case it matches 1/2D
 			if tostring(val/vis_QN) == '1.0' -- the fractional part of the quotient of the division is so small that after being rounded by conversion into string all which remains of it is decimal zeros
 	--[[ OR
@@ -4812,7 +4812,7 @@ function Re_Store_Note_Length_Setting(take, note_div, note_mode)
 -- r.SetMediaItemSelected(r.GetMediaItemTake_Item(take), true)
 -- r.Main_OnCommand(40153,0) -- Item: Open in built-in MIDI editor (set default behavior in preferences)
 -- see pros and cons of each method in annotations below
-	
+
 	-- store
 	if not note_div and not note_mode -- IF USING ACTIONS, in this case note_mode will certainly be valid at the restoration stage and assigned command ID 41711 (straight note mode) even if note_div is nil
 	-- if not note_div -- IF USING CHUNK, note_mode can come in as nil if the data was collected from chunk, but note_div will always be valid
@@ -4840,12 +4840,12 @@ function Re_Store_Note_Length_Setting(take, note_div, note_mode)
 	-- and if the pull-up note list is opened, 1/128 becomes automatically selected;
 	-- there's no single action to enable 1 measure dotted unlike with smaller note divisions;
 	-- when triplet 1 whole note and all non-straight types of 2 and 4 measure note
-	-- are manually enabled in the note menu the toggle state of the triplet 
-	-- and dotted actions listed below is set to OFF while the toggle state of the 
+	-- are manually enabled in the note menu the toggle state of the triplet
+	-- and dotted actions listed below is set to OFF while the toggle state of the
 	-- straight action is set to ON,
-	-- when triplet and dotted modes are enabled for 2 and 4 measure notes via action, 
-	-- the mode remains straight, but note notation is shown as a fraction, i.e. 4/3, 
-	-- or a decimal fraction, repeated execution of the triplet or dotted action keeps 
+	-- when triplet and dotted modes are enabled for 2 and 4 measure notes via action,
+	-- the mode remains straight, but note notation is shown as a fraction, i.e. 4/3,
+	-- or a decimal fraction, repeated execution of the triplet or dotted action keeps
 	-- calculating the new fractional note value, while for 1 measure note this is
 	-- only the case with triplet mode set via action, however if set, dotted mode
 	-- action starts to affect it as well;
@@ -4855,12 +4855,12 @@ function Re_Store_Note_Length_Setting(take, note_div, note_mode)
 	}
 	local note_div, note_mode
 		for k, act_ID in ipairs(note_div_sett_t) do
-			if r.GetToggleCommandStateEx(32060, act_ID) == 1 
+			if r.GetToggleCommandStateEx(32060, act_ID) == 1
 			then note_div = act_ID
 			end
 		end
 		for k, act_ID in ipairs(note_mode_sett_t) do
-			if r.GetToggleCommandStateEx(32060, act_ID) == 1 
+			if r.GetToggleCommandStateEx(32060, act_ID) == 1
 			then note_mode = act_ID
 			end
 		end
@@ -4876,15 +4876,15 @@ function Re_Store_Note_Length_Setting(take, note_div, note_mode)
 	--]]
 
 	return note_div, note_mode -- returns action command IDs
-	
+
 	-- restore
-	else 	
-	
+	else
+
 	--[=-[ ALTERNATIVE 1
 	local note_div = note_div or 41710 -- if note_div came in as nil because note was set to 2 or 4 measures, set to 1 because there're no actions for 2 and 4 measure notes
 	local set = note_div and r.MIDIEditor_LastFocused_OnCommand(note_div, false) -- islistviewcommand
 --	local note_mode = not (note_div or note_mode) and 41711 or note_mode -- if note_div came in as nil because note was set to 2 or 4 measures for which note mode (triplet, dotted) isn't supported, or if note_mode came in false because 1 measure note mode was set to triplet which isn't supported, set the mode to 1 measure straight -- OLD
-	-- THE PROBLEM IS THAT WHEN 1 measure dotted IS RESTORED IT MAY END UP DISPLAYED AS 1/1 INSTEAD OF 1	
+	-- THE PROBLEM IS THAT WHEN 1 measure dotted IS RESTORED IT MAY END UP DISPLAYED AS 1/1 INSTEAD OF 1
 	-- and if the drop-down note list is opened 1/128 becomes automatically selected;
 	-- there's no single action to enable 1 measure dotted unlike with smaller note divisions
 	local note_mode = note_div and note_div ~= 41710 and note_mode -- only set mode when note_div var is valid, which excluses 2 and 4 measure note because they cannot be set via actions, OR when note_div is NOT 1 measure because setting dotted mode for 1 measure note results in the note value not being properly displayed in the menu, see above, while for 1 measure, straight explicit mode setting isn't necessary anyway; so for 1,2,4 measure notes only restore 1 straight
@@ -4897,7 +4897,7 @@ function Re_Store_Note_Length_Setting(take, note_div, note_mode)
 		elseif note_div then -- 1,2 and 4 measure settings, use chunk
 		-- TO SET CHUNK TO AN OPEN MIDI ITEM IT MUST BE CLOSED AND RE-OPENED WITH
 		-- r.MIDIEditor_LastFocused_OnCommand(2, false) -- File: Close window BEFORE THE FUNCTION
-		-- AND 
+		-- AND
 		-- r.SelectAllMediaItems(0, false)
 		-- r.SetMediaItemSelected(r.GetMediaItemTake_Item(take), true)
 		-- r.Main_OnCommand(40153,0) -- Item: Open in built-in MIDI editor (set default behavior in preferences)
@@ -5285,14 +5285,14 @@ end
 function Re_Store_Selected_Items2(t, keep_last_selected)
 -- keep_last_selected is boolean relevant for the restoration stage
 -- to add last selected items to the original selection
--- at the restoration stage when evaluating whether any items 
+-- at the restoration stage when evaluating whether any items
 -- were saved into the table, 'if next(t) then' statement is used
 -- because the table isn't indexed and 'if #t > 0 then' won't work
 
 	if not t then
 	local t = {}
 		for i=0, r.CountMediaItems(0)-1 do
-		local item = r.GetMediaItem(0,i) 
+		local item = r.GetMediaItem(0,i)
 			if r.IsMediaItemSelected(item) then
 			t[item] = '' -- dummy entry
 			end
@@ -5725,7 +5725,7 @@ function Cascade_To_Target_Object()
 local x, y = r.GetMousePosition()
 local item, take = r.GetItemFromPoint(x, y, false) -- allow_locked false
 local tr, info = r.GetTrackFromPoint(x, y)
-	if not take and not tr then -- no object under mouse		
+	if not take and not tr then -- no object under mouse
 	tr, take = Is_Selected_Track_Or_Take_Env()
 		if not take and not tr then -- no selected envelope
 		local item = r.GetSelectedMediaItem(0,0)
@@ -6055,7 +6055,7 @@ end
 function Insert_Temp_Track(want_midi_editor, tr_name)
 
 r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
-local temp_tr = r.GetTrack(0,r.CountTracks(0)-1)
+local temp_tr = r.GetTrack(0,r.CountTracks(0)-1) -- or r.GetNumTracks()-1
 local name = tr_name and r.GetSetMediaTrackInfo_String(temp_tr, 'P_NAME', tr_name, true) -- setNewValue true
 r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINMIXER', 0) -- hide in Mixer
 	if not want_midi_editor then
@@ -6087,10 +6087,11 @@ function Insert_Delete_Temp_Track(obj, input_fx, temp_tr)
 	if not temp_tr then
 	r.PreventUIRefresh(1)
 	r.InsertTrackAtIndex(r.GetNumTracks(), false) -- insert new track at end of track list and hide it; action 40702 creates undo point
-	local temp_tr = r.GetTrack(0,r.CountTracks(0)-1)
+	local temp_tr = r.GetTrack(0,r.CountTracks(0)-1) -- or r.GetNumTracks()-1
 	r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINMIXER', 0) -- hide in Mixer
 	r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINTCP', 0) -- hide in Arrange
 
+	--------- SCRIPT SPECIFIC, CAN BE OMMITTED --------
 	local countFX, copyFX = table.unpack(r.ValidatePtr(obj, 'MediaItem_Take*')
 	and {r.TakeFX_GetCount, r.TakeFX_CopyToTrack}
 	or r.ValidatePtr(obj, 'MediaTrack*')
@@ -6104,7 +6105,7 @@ function Insert_Delete_Temp_Track(obj, input_fx, temp_tr)
 		r.PreventUIRefresh(-1)
 		return temp_tr
 		end
-
+	--------- SCRIPT SPECIFIC, CAN BE OMMITTED END --------
 	else
 	r.DeleteTrack(temp_tr)
 	end
@@ -6226,7 +6227,7 @@ function Scroll_Track_To_Top1(tr, env) -- see more versatile v3 below
 -- only if pinned tracks are displayed in the pinned area
 -- i.e. Track: Override/unpin all pinned tracks in TCP option is Off
 local top_Y = 0
-	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
 		for i=0, r.GetNumTracks()-1 do
 		local tr = r.GetTrack(0,i)
 			if r.IsTrackVisible(tr, false) -- mixer false
@@ -6274,7 +6275,7 @@ function Scroll_Track_To_Top2(tr, env) -- see more versatile v3 below
 -- only if pinned tracks are displayed in the pinned area
 -- i.e. Track: Override/unpin all pinned tracks in TCP option is Off
 local top_Y = 0
-	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
 		for i=0, r.GetNumTracks()-1 do
 		local tr = r.GetTrack(0,i)
 			if r.IsTrackVisible(tr, false) -- mixer false
@@ -6310,12 +6311,12 @@ function Scroll_Track_To_Top3(tr, item_Y)
 -- scroll track to any Y coordinate within track, not necessarily to its own Y coordinate
 -- tr is item parent track or track within which the item_Y coordinate is located
 -- item_Y is item I_LASTY attribute or calculated item/take top edge
--- to scroll to track own Y coordinate item_Y must be 0, in which case 
+-- to scroll to track own Y coordinate item_Y must be 0, in which case
 -- pinned tracks height must be taken into account;
 -- IN CERTAIN CASES OF SCROLLING DOWN (dir var is -1) TO THE COORDINATE WITHIN THE TRACK
 -- THE FUNCTIOM MAY NEED TO BE PRECEDED WITH ANOTHER INSTANCE WHERE item_Y arg is 0
--- so that in the 2nd instance the scrolling starts from track Y coordinate being 0 
--- rather than negative because otherwise the condition 'dir > 0 and Y <= item_Y' 
+-- so that in the 2nd instance the scrolling starts from track Y coordinate being 0
+-- rather than negative because otherwise the condition 'dir > 0 and Y <= item_Y'
 -- will prevent scrolling since it becomes true at the very beginning of the loop
 
 local item_Y = item_Y
@@ -6357,7 +6358,7 @@ function Scroll_Closest_Track_To_Top(last_idx)
 -- first find first track which is likely visible, i.e. its TCP Y coordinate is >= top_Y
 -- or Y < top_Y and Y+height > top_Y, to prevent changing the scroll state drastically,
 -- where top_Y is either 0 or pinned tracks combined height (since build 7.46);
--- if within view nothing is found, first matching track (in this case a track with a visible envelope) 
+-- if within view nothing is found, first matching track (in this case a track with a visible envelope)
 -- out of sight at the bottom will be brought into view,
 -- if such track couldn't be found, search is performed again from
 -- the first visible track up in reverse,
@@ -6373,7 +6374,7 @@ local st, fin, dir = table.unpack(not last_idx and {0,tr_cnt-1,1} or {last_idx-1
 -- only if pinned tracks are displayed in the pinned area
 -- i.e. Track: Override/unpin all pinned tracks in TCP option is Off
 local top_Y = 0
-	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
 		for i=0, r.GetNumTracks()-1 do
 		local tr = r.GetTrack(0,i)
 			if r.IsTrackVisible(tr, false) -- mixer false
@@ -6410,7 +6411,7 @@ local top_Y = 0
 			end
 		end
 	end
-	
+
 return Scroll_Closest_Track_To_Top(last_idx) -- if not found after the first visible track, run the loop again from the first visible at last_idx backwards to the tracklist start
 
 end
@@ -6786,7 +6787,7 @@ local path = sys_temp_folder..sys_temp_folder:match('[\\/]')..'temp.RPP'
 r.Main_SaveProjectEx(path, 0) -- options is 0, save but not associate the file with the currently open project tab
 local bitfield
 	for line in io.lines(path) do
-		if line:match('GROUPS_DISABLED') then 
+		if line:match('GROUPS_DISABLED') then
 		bitfield  = line:match('%d+')
 		break
 		elseif line:match('<TRACK ') then return end -- global data have ended
@@ -6802,7 +6803,7 @@ function Is_Track_Group_Disabled2(group_idx)
 -- group_idx is 1-based group index
 -- !!! groups 65 - 128 are only supported since 7.43 due to bug
 -- https://forum.cockos.com/showthread.php?t=301913
--- idea borrowed from OLSHALOM 
+-- idea borrowed from OLSHALOM
 -- https://forum.cockos.com/showpost.php?p=2882448&postcount=1280
 
 local cmd_ID = group_idx < 65 and 42511 or 43278
@@ -6834,7 +6835,7 @@ end
 
 function Is_TrackList_Hidden()
 -- after double click the the divider between it and the Arrange view
--- or by actions 'View: Toggle show TCP area' 
+-- or by actions 'View: Toggle show TCP area'
 -- and 'View: Toggle to alternate TCP area width (alternate is zero by default)'
 -- supported since 7.16
 	for line in io.lines(r.get_ini_file()) do
@@ -7081,7 +7082,7 @@ local sel_tr_cnt = r.CountSelectedTracks2(0, true) -- wantmaster true
 local master_tr = r.GetMasterTrack(0)
 local master_vis = r.GetMasterTrackVisibility()&1 == 1 -- &1 is visibility in TCP
 local last_sel_tr = sel_tr_cnt > 0 and r.GetSelectedTrack2(0, sel_tr_cnt-1, true) -- wantmaster true
-	
+
 	if last_sel_tr == master_tr and not master_vis -- &1 is visibility in TCP, if last selected is the Master this means it's the only one selected and since it's hidden the loop below won't start
 	or last_sel_tr and r.GetMediaTrackInfo_Value(last_sel_tr, 'B_SHOWINTCP') == 0 then -- get last visible selected track
 	last_sel_tr = nil -- reset to be able to fall back on the last visible track in the tracklist
@@ -7091,9 +7092,9 @@ local last_sel_tr = sel_tr_cnt > 0 and r.GetSelectedTrack2(0, sel_tr_cnt-1, true
 			or tr ~= master_tr and r.GetMediaTrackInfo_Value(tr, 'B_SHOWINTCP') == 1) then
 			last_sel_tr = tr break
 			end
-		end		
+		end
 	end
-	
+
 	if not last_sel_tr then -- if no visible selected track was found, opt for the last visible in the tracklist
 		for i=r.GetNumTracks()-1,0,-1 do
 		local tr = r.GetTrack(0,i)
@@ -7107,7 +7108,7 @@ local last_sel_tr_idx = 0
 	if last_sel_tr then -- if no tracks in the project this var will be nil in which case index 0 will be used for the trig track
 	last_sel_tr_idx = r.CSurf_TrackToID(last_sel_tr, false) -- mcpView false // OR r.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER')
 	end
-	
+
 return last_sel_tr, last_sel_tr_idx -- idx is 1-based and is also index for inserting or moving a track after it to be used as is
 
 end
@@ -7151,13 +7152,13 @@ function Get_Last_Touched_Fixed_Item_Lane()
 -- button is clicked
 
 	local function re_store_selected_items(t, keep_last_selected)
-	-- at the restoration stage when evaluating whether any items 
+	-- at the restoration stage when evaluating whether any items
 	-- were saved into the table, 'if next(t) then' statement is used
 	-- because the table isn't indexed and 'if #t > 0 then' won't work
 		if not t then
 		local t = {}
 			for i=0, r.CountMediaItems(0)-1 do
-			local item = r.GetMediaItem(0,i) 
+			local item = r.GetMediaItem(0,i)
 				if r.IsMediaItemSelected(item) then
 				t[item] = '' -- dummy entry
 				end
@@ -7181,7 +7182,7 @@ function Get_Last_Touched_Fixed_Item_Lane()
 
 local trim = r.GetToggleCommandStateEx(0, 41117) == 1 -- Options: Trim content behind media items when editing
 	if trim then act(41117) end -- set to off to prevent overwriting items inder the pasted temporary item
-	
+
 -- store current item pointers
 local t = {}
 	for i=0, r.CountMediaItems(0)-1 do
@@ -7217,12 +7218,13 @@ end
 
 
 function Insert_New_Track(wantDefaults)
--- inertsg after the first selected to mimic 'Track: Insert new track' behavior
+-- inserts after the first selected to mimic 'Track: Insert new track' behavior
 -- otherwise after the last track
+-- wantDefaults is boolean, can be nil
 	if r.InsertTrackAtIndex then
-	local tr = r.GetSelectedTrack(0,0) 
-	local idx = tr and r.CSurf_TrackToID(tr, false) or r.GetNumTracks()-1 -- mcpView false
-	r.InsertTrackAtIndex(idx, wantDefaults)
+	local tr = r.GetSelectedTrack(0,0)
+	local idx = tr and r.CSurf_TrackToID(tr, false) or r.GetNumTracks() -- mcpView false
+	r.InsertTrackAtIndex(idx, not wantDefaults and false or true)
 	else
 	r.Main_OnCommand(40001, 0) -- Track: Insert new track
 	end
@@ -7484,7 +7486,7 @@ end
 
 
 function Get_Set_Track_Snd_Rec_Src_Dest_Channel(tr, send, hw_output, idx, src_ch_idx, src_ch_mode, dest_ch_idx, dest_ch_mode)
--- only deals with audio routings, MIDI hardware output is quieried/configured 
+-- only deals with audio routings, MIDI hardware output is quieried/configured
 -- with Get/SetMediaTrackInfo_Value() 'I_MIDIHWOUT';
 -- send is boolean, if false/nil receive is addressed
 -- hw_output is boolean, if valid send arg is ignored
@@ -7493,7 +7495,7 @@ function Get_Set_Track_Snd_Rec_Src_Dest_Channel(tr, send, hw_output, idx, src_ch
 -- src_ch_mode - false/nil/0 stereo, 1 mono, 2 - 4 channel multi-channel, 3 - 6 channel multi0channel, etc.
 -- DEST CHANNEL MODE IS DETERMINED BY src_ch_mode
 -- because send requires the same number of channels at source and at the destination
--- it's not allowed to route different channel counts, i.e. stereo/mono to multichannel, 
+-- it's not allowed to route different channel counts, i.e. stereo/mono to multichannel,
 -- or one multichannel count to another, BUT IT'S ALLOWED TO MIX TO MONO AT THE DESTINATION
 -- src_ch_idx, src_ch_mode, dest_ch_idx, dest_ch_mode must be ommitted at Get stage, they're irrelevant
 -- if src_ch_mode is false/nil/0 (stereo) src_ch_idx/dest_ch_idx refer to the index of the left channel,
@@ -7508,8 +7510,8 @@ function Get_Set_Track_Snd_Rec_Src_Dest_Channel(tr, send, hw_output, idx, src_ch
 -- if only source or destination channel needs setting;
 -- virtual loopback output index range for dest_ch_idx argument starts at 0-based number 512
 -- (officially supported, named Loopback Output in the output list)
--- and 768 (unofficially supported via reaper.ini key rearoute_loopback=, 
--- named 'Aux Loopback' in the hw outputs list, 512 channels since build 6.69), 
+-- and 768 (unofficially supported via reaper.ini key rearoute_loopback=,
+-- named 'Aux Loopback' in the hw outputs list, 512 channels since build 6.69),
 -- PROVIDED BOTH TYPES ARE ENABLED,
 -- if only one type is enabled, the range start index is 512,
 -- but before creating a send using the supplied index the configured number of outputs
@@ -7605,15 +7607,15 @@ function Audio_Send_Exists(snd_type, src_tr, dest_tr, send_mode, snd_src_ch, snd
 -- 0-based channel index: when the mode is mono it's straghtforward
 -- in stereo mode index is left channel, index+1 is right channel
 -- in multichan mode index is the first channel, index-1+mode*2 is last channel
--- snd_src_ch and snd_dest_ch args are 0-based channel indices, 
+-- snd_src_ch and snd_dest_ch args are 0-based channel indices,
 -- for stereo routing only the left channel index
 -- for multichannel routing only the lowest channel index;
 -- loopback_mode arg is optional, 1 if evaluating rearoute loopback output channels
--- officially supported since REAPER v7, whose count starts from 0-based index of 512, 
--- or 2 if evaluating rearoute loopback channels supported unofficially 
--- in earlier builds via reaper.ini rearoute_loopback= key, since 6.69 supports 512 channels, 
+-- officially supported since REAPER v7, whose count starts from 0-based index of 512,
+-- or 2 if evaluating rearoute loopback channels supported unofficially
+-- in earlier builds via reaper.ini rearoute_loopback= key, since 6.69 supports 512 channels,
 -- whose count starts at 0-based index of 768 IF BOTH TYPES ARE ENABLED,
--- alternatively, to address rearoute outputs enabled via reaper.ini 
+-- alternatively, to address rearoute outputs enabled via reaper.ini
 -- loopback_mode 1 could be used but snd_dest_ch index must start from 256,
 -- i.e. 256 - 0, 257 - 1 etc.,
 -- only applies to snd_dest_ch arg,
@@ -7672,7 +7674,7 @@ function Store_Children_And_Grandchildren(tr)
 local depth = r.GetTrackDepth(tr)
 local t = {}
 	for i = r.CSurf_TrackToID(tr, false), r.CountTracks(0)-1 do -- mcpView false // starting loop from the 1st child
-	local chld_tr = r.GetTrack(0, i)	
+	local chld_tr = r.GetTrack(0, i)
 	--	if r.GetParentTrack(chld_tr) == tr then -- wrong since will be false for grandchildren in nested folders
 		if r.GetTrackDepth(chld_tr) > depth then
 		t[#t+1] = chld_tr
@@ -7803,13 +7805,13 @@ end
 function Get_All_Track_Parents2(start_tr)
 -- VISIBILITY IS NOT EVALUATED
 local parent = r.GetParentTrack(start_tr)
-local parents_t = {}	
+local parents_t = {}
 	repeat
 	parent = r.GetParentTrack(parent)
 		if parent then
 		parents_t[#parents_t+1] = parent
 		end
-	until not parent	
+	until not parent
 return parents_t
 end
 
@@ -7822,7 +7824,7 @@ function get_track_parents(parent)
 	end
 end
 --[[ USE:
-	for parent in get_track_parents(r.GetSelectedTrack(0,0)) do	
+	for parent in get_track_parents(r.GetSelectedTrack(0,0)) do
 
 	end
 ]]
@@ -8376,32 +8378,32 @@ function Is_Valid_Envelope(env, want_state)
 -- HIDDEN PROGRAMMATICALLY IT'S FALSE
 -- THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
 -- i.e. 'not env_chunk:match('\nPT %d')'
--- BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER 
--- THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, 
+-- BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER
+-- THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN,
 -- FUNCTIONS DO RETURN THEIR POINTER,
 -- HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
 -- an open envelope by default has 1 point at position 0
--- in track built-in envelopes without user created points 
+-- in track built-in envelopes without user created points
 -- such point is ignored when the envelope is closed
--- while with user created points it's included 
+-- while with user created points it's included
 -- in the total point count regardless of the visibility
 -- without user created points track enevelope chunk doesn't list any points;
 -- THIS ALSO WORKS FOR TRACK FX ENVELOPES AND ALL TAKE ENVELOPES BOTH VISIBLE AND HIDDEN
 -- because their point count doesn't depend on visibility
 -- and presence of user created points;
 -- IN BUILDS OLDER THAN 7.38 ENVELOPE GUIDs WEREN'T NECESSARILY UNIQUE
--- IN TRACK/TAKE COPIES CREATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME 
--- GUIDs AS IN THE SOURCE TRACK/TAKE, 
+-- IN TRACK/TAKE COPIES CREATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME
+-- GUIDs AS IN THE SOURCE TRACK/TAKE,
 -- IN TAKES THEY ONLY WOULD UPDATE IF COPIED BY CTRL + MOUSE DRAG
 -- bug report https://forum.cockos.com/showthread.php?t=300279
--- IN THOSE BUILDS IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER 
+-- IN THOSE BUILDS IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER
 -- MUST BE USED INSTEAD
 
 	local function get_hidden_built_in_track_env(env)
 	local env_name_t = {
 	-- regular track
-	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='', 
-	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='', 
+	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='',
+	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='',
 	Width='', ['Width (Pre-FX)']='', Mute='', ['Send Mute']='',
 	 -- master track
 	Playrate='', --['Tempo map']='' -- excluding tempo map envelope because when inactive and has no points at all it cannot be opened even though the chunk is there
@@ -8443,8 +8445,8 @@ function Is_Env_Visible(env)
 	local function get_hidden_built_in_track_env(env)
 	local env_name_t = {
 	-- regular track
-	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='', 
-	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='', 
+	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='',
+	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='',
 	Width='', ['Width (Pre-FX)']='', Mute='', ['Send Mute']='',
 	 -- master track
 	Playrate='', --['Tempo map']='' -- excluding tempo map envelope because when inactive and has no points at all it cannot be opened even though the chunk is there
@@ -8474,8 +8476,8 @@ function Set_Env_In_Visible(env, vis) -- can be expanded to armed and active
 	local function get_hidden_built_in_track_env(env)
 	local env_name_t = {
 	-- regular track
-	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='', 
-	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='', 
+	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='',
+	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='',
 	Width='', ['Width (Pre-FX)']='', Mute='', ['Send Mute']='',
 	 -- master track
 	Playrate='', --['Tempo map']='' -- excluding tempo map envelope because when inactive and has no points at all it cannot be opened even though the chunk is there
@@ -8486,15 +8488,15 @@ function Set_Env_In_Visible(env, vis) -- can be expanded to armed and active
 			if not chunk:match('\nPT %d') then return env end
 		end
 	end
-	
+
 	if not env then return end
 	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes in REAPER builds prior to 7.06 // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES MAY BECOME INVALID
-	-- Changes produced with the function GetSetEnvelopeInfo_String() in builds 7.19+ aren't registered so undo point cannot be created, bug report https://forum.cockos.com/showthread.php?t=303814, and setting must be done via a chunk, or with actions 
+	-- Changes produced with the function GetSetEnvelopeInfo_String() in builds 7.19+ aren't registered so undo point cannot be created, bug report https://forum.cockos.com/showthread.php?t=303814, and setting must be done via a chunk, or with actions
 	-- Envelope: Toggle hide/display selected envelope 40884
 	-- Envelope: Toggle bypass for selected envelope 40883
 	-- Envelope: Toggle record arm for selected envelope 40863
 	-- that require selecting envelope which may not be the optimal solution
-	-- this bug should not prevent change from being registered when it includes 
+	-- this bug should not prevent change from being registered when it includes
 	-- data besides envelope attributes
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 		local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
@@ -8515,8 +8517,8 @@ function Is_Env_Bypassed(env)
 	local function get_hidden_built_in_track_env(env)
 	local env_name_t = {
 	-- regular track
-	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='', 
-	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='', 
+	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='',
+	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='',
 	Width='', ['Width (Pre-FX)']='', Mute='', ['Send Mute']='',
 	 -- master track
 	Playrate='', --['Tempo map']='' -- excluding tempo map envelope because when inactive and has no points at all it cannot be opened even though the chunk is there
@@ -8530,11 +8532,11 @@ function Is_Env_Bypassed(env)
 	if r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env) then -- validation of fx envelopes, in REAPER builds before 7.06 fx param envelopes are valid if param modulation was enabled at least once without any actual envelope, such ghost envelopes don't have points // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES MAY BECOME INVALID
 	local retval, env_chunk, is_bypassed
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
-		retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false		
+		retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 		else
 		retval, is_bypassed = r.GetSetEnvelopeInfo_String(env, 'ACTIVE', '', false) -- setNewValue false
 		end
-	return is_bypassed and is_bypassed == '0' or env_chunk and env_chunk:match('\nACT 0 ')	
+	return is_bypassed and is_bypassed == '0' or env_chunk and env_chunk:match('\nACT 0 ')
 	end
 end
 
@@ -8604,8 +8606,8 @@ function Get_Active_Envelopes(obj)
 	local function get_hidden_built_in_track_env(env)
 	local env_name_t = {
 	-- regular track
-	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='', 
-	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='', 
+	Volume='', ['Volume (Pre-FX)']='', ['Trim Volume']='', ['Send Volume']='',
+	Pan='', ['Pan (Pre-FX)']='', ['Pan (Left)']='', ['Pan (Right)']='', ['Send Pan']='',
 	Width='', ['Width (Pre-FX)']='', Mute='', ['Send Mute']='',
 	 -- master track
 	Playrate='', --['Tempo map']='' -- excluding tempo map envelope because when inactive and has no points at all it cannot be opened even though the chunk is there
@@ -8624,7 +8626,7 @@ or tr and {r.CountTrackEnvelopes, r.GetTrackEnvelope})
 local t = {}
 	for i=0, Count_Envs(obj)-1 do
 	local env = GetEnv(obj, i)
-		if 
+		if
 		r.CountEnvelopePoints(env) > 0 or get_hidden_built_in_track_env(env)	then -- validation of fx envelopes in REAPER builds prior to 7.06 when ghost envelopes would be detected for fx parameters for which parameter modulation was enabled at least once // SUCH VALIDATION IS ALWAYS TRUE FOR VALID TRACK FX ENVELOPES AND ALL TAKE ENVELOPES REGARDLESS OF VISIBILITY, FOR VISIBLE BUILT-IN TRACK ENVELOPES REGARDLESS OF PRESENCE OF USER CREATED POINTS AND FOR HIDDEN BUILT-IN TRACK ENVELOPES WHICH HAVE USER CREATED POINTS; FOR TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS HIDDEN PROGRAMMATICALLY IT'S FALSE THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE i.e. 'not env_chunk:match('\nPT %d')', BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, FUNCTIONS DO RETURN THEIR POINTER, HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES MAY BECOME INVALID
 		local ret, name = r.GetEnvelopeName(env)
 		t[#t+1] = {name=name, env=env}
@@ -8649,16 +8651,16 @@ function Get_Env_GUID(env, want_vis)
 
 -- in REAPER builds prior to 7.06 CountTrack/TakeEnvelopes() lists ghost envelopes when fx parameter modulation was enabled at least once without the parameter having an active envelope, hence must be validated with CountEnvelopePoints(env) because in this case there're no points; ValidatePtr(env, 'TrackEnvelope*'), ValidatePtr(env, 'TakeEnvelope*') and ValidatePtr(env, 'Envelope*') on the other hand always return 'true' therefore are useless
 -- SUCH VALIDATION WORKS FOR VISIBLE TRACK BUILT-IN ENVELOPES EVEN WITHOUT USER CREATED POINTS
--- FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS 
+-- FOR HIDDEN TRACK BUILT-IN ENVELOPES WITHOUT USER CREATED POINTS
 -- HIDDEN PROGRAMMATICALLY IT'S FALSE
--- THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE 
+-- THEREFORE THEY MUST BE VALIDATED VIA CHUNK IN WHICH CASE IT LACKS PT (point) ATTRIBUTE
 -- i.e. 'not env_chunk:match('\nPT %d')'
--- BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER 
--- THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN, 
+-- BECAUSE EVEN THOUGH IN THE ENVELOPE MANAGER
+-- THEY'RE NOT MARKED AS ACTIVE WHILE BEING HIDDEN,
 -- FUNCTIONS DO RETURN THEIR POINTER,
 -- HIDDEN VIA THE ENVELOPE MANAGER SUCH ENVELOPES BECOME INVALID
 -- an open envelope by default has 1 point at position 0
--- in track built-in envelopes without user created points 
+-- in track built-in envelopes without user created points
 -- such point is ignored when the envelope is closed
 -- while with user created points it's included in the total point count regardless of the visibility
 -- without user created points track enevelope chunk doesn't list any points;
@@ -8666,11 +8668,11 @@ function Get_Env_GUID(env, want_vis)
 -- because their point count doesn't depend on visibility
 -- and presence of user created points
 -- IN BUILDS OLDER THAN 7.38 ENVELOPE GUIDs WEREN'T NECESSARILY UNIQUE
--- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME 
--- GUIDs AS IN THE SOURCE TRACK/TAKE, 
+-- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME
+-- GUIDs AS IN THE SOURCE TRACK/TAKE,
 -- IN TAKES THEY ONLY WOULD UPDATE IF COPIED BY CTRL + MOUSE DRAG
 -- bug report https://forum.cockos.com/showthread.php?t=300279
--- IN THOSE BUILDS IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER 
+-- IN THOSE BUILDS IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER
 -- MUST BE USED INSTEAD
 
 local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
@@ -8704,11 +8706,11 @@ end
 
 function Get_Vis_Env_GUID(env)
 -- IN BUILDS OLDER THAN 7.38 ENVELOPE GUIDs WEREN'T NECESSARILY UNIQUE
--- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME 
--- GUIDs AS IN THE SOURCE TRACK/TAKE, 
+-- IN TRACK/TAKE COPIES CRATED BY COPY/PASTE ENVELOPES KEPT THE THE SAME
+-- GUIDs AS IN THE SOURCE TRACK/TAKE,
 -- IN TAKES THEY ONLY WOULD UPDATE IF COPIED BY CTRL + MOUSE DRAG
 -- bug report https://forum.cockos.com/showthread.php?t=300279
--- IN THOSE BUILDS IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER 
+-- IN THOSE BUILDS IF UNIQUENESS IS REQUIRED FOR EVALUATION THE POINTER
 -- MUST BE USED INSTEAD
 	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 	local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
@@ -8727,7 +8729,7 @@ function Hidden_Track_Envelopes_Exist(track, want_all)
 -- only when all valid active envelopes are hidden
 -- otherwise when at least one envelope is hidden
 
-	local function is_hidden(env)	
+	local function is_hidden(env)
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19 then
 		local retval, chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
 		return chunk:match('\nVIS 0 ')
@@ -9154,7 +9156,7 @@ function Active_Track_Envelopes_Exist2(want_sel_tracks) -- more efficient
 local TrackCount, GetTrack = table.unpack(want_sel_tracks and {r.CountSelectedTracks, r.GetSelectedTrack}
 or {r.GetNumTracks, r.GetTrack})
 	for i=0, TrackCount(0)-1 do
-	local tr = GetTrack(0,i)	
+	local tr = GetTrack(0,i)
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.06 then
 			if r.CountTrackEnvelopes(tr) > 0 then return true end
 		else
@@ -9257,8 +9259,8 @@ function Insert_AI_with_Unique_Pool_ID(env, item)
 local env = env or r.GetSelectedTrackEnvelope(0)
 local tr = r.GetEnvelopeInfo_Value(env, 'P_TRACK')
 local tr_itm_cnt = tr ~= 0 and r.CountTrackMediaItems(tr)
-	if not env or tr == 0 or tr_itm_cnt == 0 then 
---	reaper.MB('No envelope is selected','',0) 
+	if not env or tr == 0 or tr_itm_cnt == 0 then
+--	reaper.MB('No envelope is selected','',0)
 	return end
 
 local itm_t, sel_exist = {}
@@ -9267,7 +9269,7 @@ local itm_t, sel_exist = {}
 	sel_exist = sel_exist or r.IsMediaItemSelected(item)
 	t[#t+1] = item
 	end
-	
+
 	if sel_exist then -- remove all non-selected
 		for i=#itm_t,1,-1 do
 			if not r.IsMediaItemSelected(itm_t[i]) then
@@ -9275,9 +9277,9 @@ local itm_t, sel_exist = {}
 			end
 		end
 	end
-	
+
 local pool_ID = math.floor(tonumber(os.date('%X'):gsub('[^0-9]',''))) -- time hh:mm:ss; removing all but digits and truncating decimal zeros with math.floor
-	
+
 --r.Undo_BeginBlock2(0)
 	for k, item in ipairs(itm_t) do
 	local item_pos = GetVal(item, 'D_POSITION')
@@ -9291,7 +9293,7 @@ end
 
 
 -- STORE, UNSELECT AND RESTORE SELECTED ITEMS (incl. autom items)
-function Delete_AutomItem(item, env, AI_idx, length, limit, keep_points) 
+function Delete_AutomItem(item, env, AI_idx, length, limit, keep_points)
 -- length and limit are optional;
 -- keep points is boolean;
 -- can be deleted via envelope chunk as well
@@ -9536,7 +9538,6 @@ local func = r.GetSetAutomationItemInfo
 		local env = r.GetTrackEnvelope(tr, i)
 
 local ret, chunk = r.GetEnvelopeStateChunk(env, '', false) -- MONITORING ONLY
---Msg(chunk)
 
 			for i = r.CountAutomationItems(env)-1, 0, -1 do -- backwards because some AIs may need to be deleted
 			local func = r.GetSetAutomationItemInfo
@@ -9825,11 +9826,11 @@ local removed
 		item = nil -- reset
 		else
 		chunk = chunk and chunk..'\n'..line or line
-		end		
+		end
 	end
 
 -- if last track matches the criteria its chunk won't be reset within the loop
--- because line:match('^%s*<TRACK') condition for reset won't be met, so criteria 
+-- because line:match('^%s*<TRACK') condition for reset won't be met, so criteria
 -- var remains true in which case return reassembled right away;
 -- if last track doesn't match the criteria its chunk won't be added to reassembled
 -- within the loop likewise because line:match('^%s*<TRACK') condition won't be met
@@ -9861,7 +9862,7 @@ local t, chunk_start = {}
 		t[#t+1] = line
 		end
 	end
-	
+
 	if want_items then -- weed out item chunks
 	local item
 		for k, line in ipairs(t) do
@@ -9874,7 +9875,7 @@ local t, chunk_start = {}
 			end
 		end
 	end
-	
+
 	if want_envs then -- weed out envelope chunks
 	local env
 		for k, line in ipairs(t) do
@@ -9914,7 +9915,7 @@ local take_chunk, take = {}
 		elseif not take and line and line:match('^NAME') or take then
 		take = 1
 		take_chunk[#take_chunk+1] = line
-		elseif take and line:match('GUID') and not line:match(GUID) then 
+		elseif take and line:match('GUID') and not line:match(GUID) then
 		-- reset, wrong take
 		take_chunk = {}
 		take = nil
@@ -9957,7 +9958,7 @@ local chunk_t = {chunk:match('(NAME[%W].-)'..string.rep('(TAKE[%W].-)', take_cnt
 	local last_take = chunk_t[#chunk_t]
 		if last_take:match('.+>\n>') then -- if last take chunk includes item chunk closure, which it likely will, removed it
 		chunk_t[#chunk_t] = last_take:sub(1,-3)
-		end		
+		end
 	return chunk_t
 	end
 end
@@ -10026,7 +10027,7 @@ end
 
 
 function Parse_Razor_Edit_Data(data)
--- data is a string returned by 
+-- data is a string returned by
 -- r.GetSetMediaTrackInfo_String(tr, 'P_RAZOREDITS', '', false) -- setNewValue false
 local t = {}
 	for st, fin in data:gmatch('([%.%d]+) ([%.%d]+)') do
@@ -10037,7 +10038,7 @@ end
 
 
 function Collect_Raz_Edit_Data(razor_edit)
--- razor_edit is a string returned by 
+-- razor_edit is a string returned by
 -- r.GetSetMediaTrackInfo_String(tr, 'P_RAZOREDITS', '', false) -- setNewValue false
 local t = {env = {}, itm = {} }
 	for area in raz_edit:gmatch('[%d%.]+ [%d%.]+ ".-"') do
@@ -10212,10 +10213,10 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 	--	local fx_num = mon_fx and mon_fx_num + 0x1000000 or fx_num -- mon fx index
 
 	local obj = take or tr -- take is first to prevent false positive because when take is valid track is valid as well
-		
+
 		if obj then
 		local GetFXName, GetFXGUID, GetIOSize, GetNamedConfigParm = table.unpack(take and {r.TakeFX_GetFXName, r.TakeFX_GetFXGUID, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm} or tr and {r.TrackFX_GetFXName, r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm}) -- take is first to prevent false positive because when take valid track valud as well
-		local fx_alias, fx_GUID = select(2, GetFXName(obj, fx_num)), GetFXGUID(obj, fx_num)		
+		local fx_alias, fx_GUID = select(2, GetFXName(obj, fx_num)), GetFXGUID(obj, fx_num)
 		local fx_name, _ = fx_alias
 		-- in builds older than 6.31 fx_name return value will be indentical to fx_alias
 			if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.31 then
@@ -10229,13 +10230,13 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 		end
 
 	else -- supported since v7.0
-	
+
 	local retval, tr_num, itm_num, take_num, fx_num, parm_num = reaper.GetTouchedOrFocusedFX(1) -- 1 last touched mode // parm_num only relevant for querying last touched (mode 0) // supports Monitoring FX and FX inside containers, container itself can also be focused
 	local tr = tr_num > -1 and r.GetTrack(0, tr_num) or retval and r.GetMasterTrack(0) -- Master track is valid when retval is true, tr_num in this case is -1
 	local item = tr and r.GetTrackMediaItem(tr, itm_num)
 	local take = item and r.GetTake(item, take_num)
 	local obj = take or tr -- take is first to prevent false positive because when take is valid track is valid as well
-	
+
 		if obj then
 		local GetFXName, GetFXGUID, GetIOSize, GetNamedConfigParm = table.unpack(take and {r.TakeFX_GetFXName, r.TakeFX_GetFXGUID, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm} or tr and {r.TrackFX_GetFXName, r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm}) -- take is first to prevent false positive because when take valid track valud as well
 		local fx_alias, fx_GUID, is_cont = select(2, GetFXName(obj, fx_num)), GetFXGUID(obj, fx_num), GetIOSize(obj, fx_num) == 8
@@ -10448,19 +10449,19 @@ end
 
 
 
-function Get_FX_Chunk(obj, obj_chunk, fx_idx, take_idx) 
--- obj is track or item pointer; 
+function Get_FX_Chunk(obj, obj_chunk, fx_idx, take_idx)
+-- obj is track or item pointer;
 -- if no take_idx arg is supplied, the active take will be used;
--- for track input FX and Mon FX fx_idx argument must look like 
--- fx_idx+0x1000000 or fx_idx+16777216; 
+-- for track input FX and Mon FX fx_idx argument must look like
+-- fx_idx+0x1000000 or fx_idx+16777216;
 -- relies on Esc() function;
--- since REAPER 7 'WAK 0 0' may be followed by PARALLEL 1 or PARALLEL 2 
--- if 'Run selected FX in parallel with previous FX' 
--- or 'Run selected FX in parallel with previous FX (merge MIDI)' 
+-- since REAPER 7 'WAK 0 0' may be followed by PARALLEL 1 or PARALLEL 2
+-- if 'Run selected FX in parallel with previous FX'
+-- or 'Run selected FX in parallel with previous FX (merge MIDI)'
 -- options are enabled respectively;
--- due to introduction of FX containers in REAPER 7 
--- 'WAK 0 0' and 'PARALLEL X' tokens can be found in FX container chunk 
--- and the function may return incomlete chunk 
+-- due to introduction of FX containers in REAPER 7
+-- 'WAK 0 0' and 'PARALLEL X' tokens can be found in FX container chunk
+-- and the function may return incomlete chunk
 -- not having reached the end of the chain
 
 local track = r.ValidatePtr(obj, 'MediaTrack*')
@@ -10497,7 +10498,7 @@ return prev_fx_GUID and target_fx_GUID and obj_chunk:match(FXCHAINSEC..'\n.-'..E
 ]]
 
 
--- optionally conditioning pattern by fx container type instance 
+-- optionally conditioning pattern by fx container type instance
 -- if only the closing part of fx container chunk must be captured
 -- i.e. from FLOATPOS onwards,
 -- otherwise the captured part will include container portion of the chunk
@@ -10505,7 +10506,7 @@ return prev_fx_GUID and target_fx_GUID and obj_chunk:match(FXCHAINSEC..'\n.-'..E
 -- if all child containers;
 -- the choice depends on the task at hand
 local fx_container = GetIOSize(obj, fx_idx) == 8
-local patt = fx_container and '.+\n(FLOATPOS.-'..Esc(target_fx_GUID)..'.-WAK.-)\n' 
+local patt = fx_container and '.+\n(FLOATPOS.-'..Esc(target_fx_GUID)..'.-WAK.-)\n'
 or '.+\n(BYPASS %d %d[%s%d]*.-'..Esc(target_fx_GUID)..'.-WAK.-)\n' -- in older REAPER versions BYPASS only has 2 flags; originally the capture was ending with 'WAK %d %d', but was changed to accommodate possible expansion of flags in the future
 
 return obj_chunk:match(patt)
@@ -11645,7 +11646,6 @@ r.TakeFX_SetNamedConfigParm, r.TakeFX_GetFXName} or {})
 		if tonumber(fx_idx) then -- fx instance // if container evaluation will be false since the value is table
 	--  DO STUFF TO FX INSTANCES
 	--	local ret, name = GetFXName(obj, fx_idx, '')
-	--	Msg(name, fx_idx)
 		end
 	end
 	-- target containers, ignoring fx instances
@@ -11714,7 +11714,7 @@ local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaIte
 
 	if fx_idx > 0x2000000 and (tr or take) then -- range fx inside containers, or > 33554432
 	local GetConfigParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
-	local t, retval = {}	
+	local t, retval = {}
 		repeat
 		retval, fx_idx = GetConfigParm(obj, fx_idx, 'parent_container')
 			if retval then
@@ -11733,12 +11733,12 @@ function GetSetClear_FX_Parm_Mapping_Across_Containers(obj, fx_idx, parm_idx, pa
 -- only works for container fx;
 -- fx_idx is index of target container fx;
 -- parm_idx is index of the target container fx parameter;
--- parent_cont_t is optional, a table of all parent containers 
+-- parent_cont_t is optional, a table of all parent containers
 -- stored from the outermost to the innermost, comes from Get_FX_All_Parent_Containers()
 -- if empty or invalid it will be created inside this function;
--- set arg: 1 or any valid value apart from 2 - map parameter across all containers (set), 
+-- set arg: 1 or any valid value apart from 2 - map parameter across all containers (set),
 -- 2 - unmap parameter across all containers (clear),
--- integers 1, 2 were opted for because relying on booleans true/false 
+-- integers 1, 2 were opted for because relying on booleans true/false
 -- gets tricky in ternary expression
 -- where false is diffucult to assign reliably due to its being weak value
 -- i.e. expression local mode = a and not b and true or not a and b and false or nil
@@ -11793,10 +11793,10 @@ function Get_Container_Parm_Source_Props(obj, cont_idx, parm_idx)
 -- function is supported since build 7.06
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-local GetIOSize, GetNamedConfigParm, GetNumParams, GetFXName, GetParamName = 
-table.unpack(take and {r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm, 
+local GetIOSize, GetNamedConfigParm, GetNumParams, GetFXName, GetParamName =
+table.unpack(take and {r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm,
 r.TakeFX_GetNumParams, r.TakeFX_GetFXName, r.TakeFX_GetParamName}
-or tr and {r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm, r.TrackFX_GetNumParams, 
+or tr and {r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm, r.TrackFX_GetNumParams,
 r.TrackFX_GetFXName, r.TrackFX_GetParamName}) -- take is first to prevent false positive because when take valid track valud as well
 	if GetIOSize and GetIOSize(obj, cont_idx) ~= 8 then return end -- not container
 
@@ -11820,7 +11820,7 @@ local parm_cnt = GetNumParams(obj, cont_idx)-1 -- -1 to conform to 0-based param
 	-- [container1 name]: [container2 name] ...: [FX instance name]: [param name]
 	-- when fx is deep within container hierarchy, for each container the parameter name is added container name;
 	-- when src_fx_name is not a container name, non-aliased FX instance name is stripped off the plugin type prefix and vendor name
-	local cont_parm_format = (src_fx_name:match('^[ADCJLPSTXVi]+:') and (src_fx_name:match('.-: (.-)%s%(') 
+	local cont_parm_format = (src_fx_name:match('^[ADCJLPSTXVi]+:') and (src_fx_name:match('.-: (.-)%s%(')
 	or src_fx_name:match('.-: (.+)')) or src_fx_name)..': '..src_parm_name
 	return cont_parm_format, src_fx_idx, src_parm_idx, src_fx_name, src_parm_name
 	end
@@ -11832,7 +11832,7 @@ end
 function Get_FX_Parm_Orig_Name_s(obj, fx_idx, parm_idx)
 -- in case it's been aliased by the user
 -- obj is track or take;
--- if parm_idx is valid, returns name of parameter 
+-- if parm_idx is valid, returns name of parameter
 -- at parm_idx, otherwise collects
 -- all parameter names;
 -- works with builds 6.37+ since which original non-aliased
@@ -11891,7 +11891,7 @@ local FX_CountParm, FX_GetParamName, FX_GetParamIdent = table.unpack(take and {r
 		for i=0, FX_CountParm(obj, fx_idx) do
 		local retval, name = FX_GetParamName(obj, fx_idx, i)
 		local retval, ident = table.unpack(_6_37 and {FX_GetParamIdent(obj, fx_idx, i)} or {})
-			if parm_name and name == parm_name 
+			if parm_name and name == parm_name
 			or parm_ident and ident:match(parm_ident) -- without escaping because they're unlikely to include special characters, but worth being watchful
 			then return i end
 		end
@@ -11961,8 +11961,8 @@ end
 
 
 function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, parm_ident_t, TAG)
--- since v7 EnumInstalledFX() can be used to retrieve the name 
--- listed in the FX browser and a unique identifier independent 
+-- since v7 EnumInstalledFX() can be used to retrieve the name
+-- listed in the FX browser and a unique identifier independent
 -- of the name in case changed but the identifier must of course be known in advance
 
 -- the function is based on Get_FX_Parm_Orig_Name_s() above
@@ -11971,7 +11971,7 @@ function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, parm_ident_t, TAG)
 -- fx_name is the original name of the plugin being validated
 -- parm_t is a table indexed by param indices whose fields hold corresponding original param names
 -- e.g. {[4] = 'parm name 4', [12] = 'parm name 12', [23] = 'parm name 23'}
--- parm_ident_t is a table indexed by param indices whose fields hold 
+-- parm_ident_t is a table indexed by param indices whose fields hold
 -- corresponding param string identifiers, supported since build 6.37+
 -- parm_t and parm_ident_t must be of the same length and have the same order of parameters
 -- TAG is a user TAG added to FX name in the FX chain
@@ -12013,10 +12013,10 @@ r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new 
 local temp_track = r.GetTrack(0,r.CountTracks(0)-1)
 r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0) -- hide in Mixer
 r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
--- search for the name of fx parameter at the same index as the one being evaluated 
+-- search for the name of fx parameter at the same index as the one being evaluated
 -- in a fresh instance of the fx on the temp track or its copy if fresh instance could not
 -- be added due to name change by the user in the FX browser,
--- in builds older than 6.37 the evaluation isn't reliable 
+-- in builds older than 6.37 the evaluation isn't reliable
 -- by 100% because some parameter names in the source fx may be aliased
 -- and won't match the expected names
 -- parameter identifiers supported since build 6.37 however are likely to be immutable
@@ -12028,7 +12028,7 @@ local parm_t = parm_t and type(parm_t) == 'table' and #parm_t > 0 and parm_t
 local parm_ident_t = parm_ident_t and type(parm_ident_t) == 'table' and #parm_ident_t > 0 and parm_ident_t
 local name_match = true
 
-	if parm_t or parm_ident_t then	
+	if parm_t or parm_ident_t then
 		for idx, name in pairs(parm_t) do
 		local ident
 		local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, idx, '') -- fx_idx 0
@@ -12063,7 +12063,7 @@ local name_match = true
 					repeat
 					rnd = math.random(1, src_parm_cnt)-1
 					ret, parm_name = GetParamName(obj, fx_idx, rnd, '')
-					until not parm_t[rnd] and not parm_ident_t[rnd] 
+					until not parm_t[rnd] and not parm_ident_t[rnd]
 					and parm_name ~= 'Bypass' and parm_name ~= 'Wet'
 					and (not build_6_37 or parm_name ~= 'Delta')
 				end
@@ -12087,7 +12087,7 @@ local name_match = true
 
 
 --[[ -- THIS IS REDUNDANT SINCE IN BUILDS 6.37+ VALIDATION WILL SUCCEED THROUGH FX_GetNamedConfigParm()
-	  -- WHILE IN OLDER BUILDS FX CANNOT BE RELIABLY LOADED FROM BROWSER WITH FX_AddByName() 
+	  -- WHILE IN OLDER BUILDS FX CANNOT BE RELIABLY LOADED FROM BROWSER WITH FX_AddByName()
 	  -- TO CONTINUE COMPARING THEIR PARAMETERS
 -- if name_match ends up being false there's possibility that the parameters have been aliased
 -- in which case collate parm names in the clean instance of the fx loaded from the fx browser in builds 6.37+
@@ -12142,11 +12142,11 @@ end
 
 function Apply_Video_Proc_Preset(obj, fx_idx, preset, preset_idx) -- used inside Split_Active_Take_Name()
 -- obj is track or take pointer
--- preset is preset name, preset_idx is its index, optional, 
+-- preset is preset name, preset_idx is its index, optional,
 -- either one or the other,
--- if applying by targetting index SetPresetByIndex 
+-- if applying by targetting index SetPresetByIndex
 -- will have to be used (see below)
--- but in builds older than 7.46 it's unreliable 
+-- but in builds older than 7.46 it's unreliable
 -- due to bug https://forum.cockos.com/showthread.php?t=302678
 
 -- in builds older than 7.20 presets don't work if applied via the API
@@ -12156,16 +12156,16 @@ function Apply_Video_Proc_Preset(obj, fx_idx, preset, preset_idx) -- used inside
 -- bug report https://forum.cockos.com/showthread.php?t=293212
 local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.20
 local tr, take = r.ValidatePtr(obj,'MediaTrack*'), r.ValidatePtr(obj,'MediaItem_Take*')
-local SetPresetByName, SetPresetByIndex, GetOpen, GetChainVisible, FX_Show = 
-table.unpack(tr and {r.TrackFX_SetPreset, r.TrackFX_SetPresetByIndex, r.TrackFX_GetOpen, 
-r.TrackFX_GetChainVisible, r.TrackFX_Show} 
-or take and {r.TakeFX_SetPreset, r.TakeFX_SetPresetByIndex, r.TakeFX_GetOpen, 
+local SetPresetByName, SetPresetByIndex, GetOpen, GetChainVisible, FX_Show =
+table.unpack(tr and {r.TrackFX_SetPreset, r.TrackFX_SetPresetByIndex, r.TrackFX_GetOpen,
+r.TrackFX_GetChainVisible, r.TrackFX_Show}
+or take and {r.TakeFX_SetPreset, r.TakeFX_SetPresetByIndex, r.TakeFX_GetOpen,
 r.TakeFX_GetChainVisible, r.TakeFX_Show} or {})
 local Set_Preset = preset and SetPresetByName or preset_idx and SetPresetByIndex
 	if Set_Preset then
 	local preset = preset or preset_idx
 	local was_opened
-	-- only open if not already opened in the fx chain or a floating window 
+	-- only open if not already opened in the fx chain or a floating window
 		if old_build and not r.GetOpen(obj, fx_idx) then
 		FX_Show(obj, fx_idx, 3) -- showFlag 3 show floating window
 		was_opened = 1
@@ -12179,17 +12179,17 @@ end
 
 function Insert_Video_Proc_With_Preset(obj, preset)
 -- obj is track or take pointer,
--- if there're video processor instances insert after the last found, 
+-- if there're video processor instances insert after the last found,
 -- otherwise insert at the top of the chain
 
 local tr, take = r.ValidatePtr(obj,'MediaTrack*'), r.ValidatePtr(obj,'MediaItem_Take*')
-local GetCount, GetIOSize, GetPreset, GetFXName, SetFXName, AddByName, SetPresetByName, 
-SetPresetByIndex, FX_Show, SetNamedConfigParm = 
-table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, r.TrackFX_GetPreset, 
-r.TrackFX_GetFXName, r.TrackFX_SetFXName, r.TrackFX_AddByName, r.TrackFX_SetPreset, 
+local GetCount, GetIOSize, GetPreset, GetFXName, SetFXName, AddByName, SetPresetByName,
+SetPresetByIndex, FX_Show, SetNamedConfigParm =
+table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, r.TrackFX_GetPreset,
+r.TrackFX_GetFXName, r.TrackFX_SetFXName, r.TrackFX_AddByName, r.TrackFX_SetPreset,
 r.TrackFX_SetPresetByIndex, r.TrackFX_Show, r.TrackFX_SetNamedConfigParm}
-or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize,r.TakeFX_GetPreset, r.TakeFX_GetFXName, 
-r.TakeFX_SetFXName, r.TakeFX_AddByName, r.TakeFX_SetPreset, r.TakeFX_SetPresetByIndex, 
+or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize,r.TakeFX_GetPreset, r.TakeFX_GetFXName,
+r.TakeFX_SetFXName, r.TakeFX_AddByName, r.TakeFX_SetPreset, r.TakeFX_SetPresetByIndex,
 r.TakeFX_Show, r.TakeFX_SetNamedConfigParm} or {})
 
 local video_proc_idx
@@ -12255,12 +12255,12 @@ local vid_proc, code = {}
 		vid_proc = 1
 		code[#code+1] = line
 		elseif vid_proc and line:match('FXID') then
-			if not line:match(Esc(fx_GUID)) then 
+			if not line:match(Esc(fx_GUID)) then
 			-- reset, wrong take or wrong video proc instance
 			code = {}
 			vid_proc = nil
 			else break
-			end 
+			end
 		end
 	end
 
@@ -12278,13 +12278,13 @@ function Find_Video_Proc_Instance(take, preset, want_disabled)
 	local plug_type = r.TakeFX_GetIOSize(take, i)
 	local vid_proc = plug_type == 6
 	local ret, name = r.TakeFX_GetFXName(take, i)
-	local ret, presetname = r.TakeFX_GetPreset(take, i, '')		
+	local ret, presetname = r.TakeFX_GetPreset(take, i, '')
 		if vid_proc and presetname == '' then -- will be true after bringing a video proc instance online in builds older than 7.46, in the preset list its name will be replaced with (Customized preset) https://forum.cockos.com/showthread.php?t=303014, so identify the preset by its parameter names and order
 		local parm_names = {'text height', 'y position', 'x position', 'bg pad'} -- THESE WILL BE DIFFERENT FOR A DIFFERENT PRESET
 			for ii=0, r.TakeFX_GetNumParams(take, i)-1 do
 			local retval, parm_name = r.TakeFX_GetParamName(take, i, ii, '')
 				if parm_name == parm_names[ii+1] -- +1 to match 0-based inetator count with 1-based table indexation
-				or parm_name == 'text size' and ii == 0 then -- making allowance for variable name of the first parameter 
+				or parm_name == 'text size' and ii == 0 then -- making allowance for variable name of the first parameter
 				presetname = preset
 				break
 				end
@@ -12293,7 +12293,7 @@ function Find_Video_Proc_Instance(take, preset, want_disabled)
 	local off = r.TakeFX_GetOffline(take, i)
 	local unbypassed = r.TakeFX_GetEnabled(take, i)
 		if vid_proc
-		and presetname == preset 
+		and presetname == preset
 		-- and name == 'Caption' -- script specific
 		and (not want_disabled and not off and unbypassed or (off or not unbypassed) and want_disabled)
 		then
@@ -12850,7 +12850,7 @@ end
 
 
 function Is_Overlapping_In_Lanes(item, want_count)
--- want_count is boolean to return the actual count of items 
+-- want_count is boolean to return the actual count of items
 -- overlapping the source one and including it;
 -- prior to build 6.54 overlapping items lanes could collapse of the track height wasn't sufficient
 -- to accommodate them, since that build items are always displayed in lanes as long as the setting
@@ -12932,7 +12932,7 @@ function get_same_group_items(item, sel_itms_t)
 local group = get_group(item)
 sel_itms_t[item] = {}
 local t = sel_itms_t[item]
-	if group > 0 then -- 0 no group	
+	if group > 0 then -- 0 no group
 		for i=0, r.CountMediaItems(0)-1 do
 		local item = r.GetMediaItem(0,i)
 			if get_group(item) == group and not sel_itms_t[item] then -- store if not already stored as selected
@@ -13070,7 +13070,6 @@ local path = scr_name:match('.+[\\/]')..img_name
 			img_tr = tr
 			break end
 		end
-	--Msg(path)
 		if not img_tr then
 		r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefault false
 		img_tr = r.GetTrack(0,r.GetNumTracks()-1)
@@ -13079,7 +13078,6 @@ local path = scr_name:match('.+[\\/]')..img_name
 	GetSet(img_tr, 'P_NAME', 'Transcribing 2 toolbar layout', true) -- setNewValue true
 	GetSet(img_tr, 'P_EXT:'..img_name, '1', true) -- setNewValue true
 	chunk = chunk:gsub('RESOURCEFN.-\n', 'RESOURCEFN "'..path..'"\n')
-	--Msg(chunk)
 	r.SetItemStateChunk(item, chunk, false) -- isundo false
 	local st_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0) -- isSet false
 	r.SetMediaItemInfo_Value(item, 'D_LENGTH', end_time)
@@ -13114,15 +13112,15 @@ local pcm_src = r.PCM_Source_CreateFromFile(file_path)
 r.SetMediaItemTake_Source(take, pcm_src)
 r.GetSetMediaItemTakeInfo_String(take, 'P_NAME', file_path:match('[^\\/]+$'), true) -- setNewValue true, name after source file
 local Set_Item, Set_Take = r.SetMediaItemInfo_Value, r.SetMediaItemTakeInfo_Value
-	
+
 	for attr, val in pairs(item_props_t) do
 	Set_Item(temp_itm, attr, val)
 	end
-	
+
 	for attr, val in pairs(take_props_t) do
 	Set_Take(take, attr, val)
 	end
-	
+
 -- DO STUFF AND STORE VALUES
 
 r.DeleteTrackMediaItem(temp_tr, temp_itm) -- or the entire track can be deleted if not needed any longer
@@ -13267,11 +13265,11 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 	local max_zoom = not max_zoom and 100 or max_zoom*100 -- ignore in builds prior to 6.76 by assigning 100 so that when track height is divided by 100 and multiplied by 100% nothing changes, otherwise convert to conventional percentage value; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is accurate, otherwise there's ±1 px diviation, because the actual track height in pixels isn't fractional like the one obtained through calculation therefore some part is lost
 
 	-- Get Arrange and window header height
-	-- When track zoom actions are applied the UI jolts, but PreventUIRefresh() is not suitable 
+	-- When track zoom actions are applied the UI jolts, but PreventUIRefresh() is not suitable
 	-- because it blocks the function GetMediaTrackInfo_Value() from getting the return value;
 	-- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled;
 	-- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
-	-- which works like 40113 worked before the change and its use would obviate all the calculations above and below 
+	-- which works like 40113 worked before the change and its use would obviate all the calculations above and below
 	-- but it obviously doesn't cover the interim builds, so leaving the current code;
 	-- since build 7.48 the following toggle zoom actions affect pinned tracks as well,
 	-- introduced in build 7.46, but since their height is being taken into account
@@ -13288,22 +13286,22 @@ local wnd_h_offset = sws and top or 0 -- to add when calculating absolute track 
 		r.Main_OnCommand(40113, 0) -- View: Toggle track zoom to maximum height (i.e. height of the Arrange) [in later builds comment '(limit to 100% of arrange view) has been added' and another action introduced to zoom to maxvzoom value] // selection isn't needed, all are toggled
 		end
 	local tr_height = r.GetMediaTrackInfo_Value(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
-	
+
 	-- if there're visible pinned tracks at the top (introduced in build 7.46), calculate their height because
 	-- their presence affects max track height obtained above
 	local pin_tracks_h = 0
-		if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+		if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
 			for i=0, r.GetNumTracks()-1 do
 			local tr = r.GetTrack(0,i)
 				if r.IsTrackVisible(tr, false) -- mixer false
-				and GetTrackVal(tr, 'B_TCPPIN') == 1 				
+				and GetTrackVal(tr, 'B_TCPPIN') == 1
 				then
 				pin_tracks_h = pin_tracks_h + GetTrackVal(tr, 'I_WNDH') -- incl. envelopes
 				end
 			end
 		end
 
-	pin_tracks_h = pin_tracks_h > 0 and pin_tracks_h+10 or pin_tracks_h -- 10 px is pinned track area separator width	
+	pin_tracks_h = pin_tracks_h > 0 and pin_tracks_h+10 or pin_tracks_h -- 10 px is pinned track area separator width
 	local tr_height = math.floor(tr_height + pin_tracks_h + 0.5) -- round; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is integer, otherwise the calculated Arrange height is fractional because the actual track height in pixels is integer which is not what it looks like after calculation based on percentage (max_zoom) value, which means the value is rounded in REAPER internally because pixels cannot be fractional and the result is ±1 px diviation compared to the Arrange height calculated at percentages by which 100 can be divided without remainder
 	r.SetExtState('WINDOW DIMS','window_dims', wnd_h..';'..tr_height, false) -- persist false
 	r.SetProjExtState(cur_proj, 'WINDOW DIMS', 'window_dims', wnd_h..';'..tr_height)
@@ -13386,11 +13384,11 @@ local track, info = r.GetTrackFromPoint(x, y)
 	local ref_tr_y = r.GetMediaTrackInfo_Value(ref_tr, 'I_TCPY')
 
 	-- Get the data
-	-- When the actions are applied the UI jolts, but PreventUIRefresh() is not suitable 
+	-- When the actions are applied the UI jolts, but PreventUIRefresh() is not suitable
 	-- because it blocks the function GetMediaTrackInfo_Value() from getting the return value;
 	-- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled;
 	-- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
-	-- which works like 40113 worked before the change and its use would obviate all the calculations above and below 
+	-- which works like 40113 worked before the change and its use would obviate all the calculations above and below
 	-- but it obviously doesn't cover the interim builds, so leaving the current code;
 	-- since build 7.48 the following toggle zoom actions affect pinned tracks as well,
 	-- introduced in build 7.46, but since their height is being taken into account
@@ -13398,21 +13396,21 @@ local track, info = r.GetTrackFromPoint(x, y)
 	r.Main_OnCommand(40110, 0) -- View: Toggle track zoom to minimum height
 	r.Main_OnCommand(40113, 0) -- View: Toggle track zoom to maximum height [in later builds comment '(limit to 100% of arrange view) has been added' and another action introduced to zoom to maxvzoom value]
 	local tr_height = r.GetMediaTrackInfo_Value(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
-	
+
 	-- if there're visible pinned tracks at the top (introduced in build 7.46), calculate their height because
 	-- their presence affects max track height obtained above
 	local pin_tracks_h = 0
-		if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+		if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
 			for i=0, r.GetNumTracks()-1 do
 			local tr = r.GetTrack(0,i)
 				if r.IsTrackVisible(tr, false) -- mixer false
-				and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 				
+				and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1
 				then
 				pin_tracks_h = pin_tracks_h + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
 				end
 			end
 		end
-	
+
 	pin_tracks_h = pin_tracks_h > 0 and pin_tracks_h+10 or pin_tracks_h -- 10 px is pinned track area separator width
 	local tr_height = math.floor(tr_height + pin_tracks_h + 0.5) -- round; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is integer, otherwise the calculated Arrange height is fractional because the actual track height in pixels is integer which is not what it looks like after calculation based on percentage (max_zoom) value, which means the value is rounded in REAPER internally because pixels cannot be fractional and the result is ±1 px diviation compared to the Arrange height calculated at percentages by which 100 can be divided without remainder
 	r.Main_OnCommand(40110, 0) -- View: Toggle track zoom to minimum height
@@ -13833,14 +13831,14 @@ local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
 	src = r.GetMediaItemTake_Source(obj) -- won't return accurate pointer for reversed source and source sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
 	src = r.GetMediaSourceParent(src) or src
 	end
-	
+
 	if src then
 	local typ = r.GetMediaSourceType(src, '')
 		for k, v in ipairs({'MIDI', 'RPP', 'EMPTY', 'CLICK', 'LTC', 'VIDEO'}) do
 			if typ:match(v) then
 				if v == 'VIDEO' then -- as of build 7.52 wma and m4a files are recognized as video even though they only contain audio, so need to be validated further https://forum.cockos.com/showthread.php?t=304924
 				local ext = r.GetMediaSourceFileName(src, ''):match('.+%.(.+)$')
-					if ext == 'wma' and ext == 'm4a' then 
+					if ext == 'wma' and ext == 'm4a' then
 					return true
 					end
 				end
@@ -13881,8 +13879,8 @@ r.UpdateItemInProject(r.GetMediaItemTake_Item(take))
 
 	if want_file_deleted then
 	os.remove(old_file_path)
-	end	
-	
+	end
+
 end
 
 
@@ -13893,7 +13891,7 @@ function Get_Take_Src_Props(take)
 
 local src = r.GetMediaItemTake_Source(take)
 ----------------
-local sect, startoffs, length, rev = r.PCM_Source_GetSectionInfo(src) -- if sect is false startoffs is 0	
+local sect, startoffs, length, rev = r.PCM_Source_GetSectionInfo(src) -- if sect is false startoffs is 0
 src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or reversed
 -- OR just
 -- src = r.GetMediaSourceParent(src) or src -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
@@ -13911,7 +13909,7 @@ function Get_Take_Src_Channel_Count(take)
 	if not take then return end
 
 local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
-src = r.GetMediaSourceParent(src) or src 
+src = r.GetMediaSourceParent(src) or src
 return r.GetMediaSourceNumChannels(src)
 
 end
@@ -13975,7 +13973,7 @@ function Is_Take_Source_Trimmed(take)
 local src = r.GetMediaItemTake_Source(take)
 --------------------
 local sect, startoffs, sect_len, rev = r.PCM_Source_GetSectionInfo(src) -- sect is true if 'Section' checkbox is checkmarked in 'Item Properties' (can be checkmarked with action 'Item properties: Loop section of audio item source'); when not sect startoffs is 0 and sect_len is full source length, that's because src pointer stems from a specific take; startoffs and sect_len values are raw, i.e. without accounting for the playrate just as they are displayed in the Item Properties
-src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or 
+src = (sect or rev) and r.GetMediaSourceParent(src) or src -- retrieve original media source if section or
 -- OR just
 -- src = r.GetMediaSourceParent(src) or src -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
 --------------------
@@ -14350,7 +14348,7 @@ local item_h = r.GetMediaItemInfo_Value(item, 'I_LASTH')
 local mode = r.GetMediaTrackInfo_Value(tr, 'I_FREEMODE')
 local FIL = mode == 2 and r.GetMediaTrackInfo_Value(tr, 'C_LANESCOLLAPSED') == 0
 	if FIL then -- FIL mode
-	local FIL_cnt = r.GetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES') 
+	local FIL_cnt = r.GetMediaTrackInfo_Value(tr, 'I_NUMFIXEDLANES')
 	local FIL_idx = r.GetMediaItemInfo_Value(item, 'I_FIXEDLANE')
 	return item_y - item_h * FIL_idx >= 15 -- OR item_y - item_h * (FIL_cnt-1) >= 15 -- in FIL mode the gap may be bigger hence >= 15
 	elseif mode == 0 then -- applies to overlapping items displayed in lanes
@@ -14378,7 +14376,7 @@ function Get_Take_Rank(take, rank_scale_t)
 -- and the number of negative ones as the 2nd, which can be 0
 -- optional, if you want to evaluate whether the
 -- marker rank is within the current default scale;
--- 1st return value is current rank: 
+-- 1st return value is current rank:
 -- 0 no rank, -1 negative rank (only one level is supported)
 -- or positive;
 -- 2nd optional return value is boolean indicating whether
@@ -14405,7 +14403,7 @@ function Get_Set_Take_Marker_Length(take, mrkr_idx, length)
 
 local take_cnt = r.GetNumTakeMarkers(take)
   if take_cnt == 0 or take_cnt-1 < mrkr_idx then return end
-  
+
 local ret, chunk = r.GetItemStateChunk(r.GetMediaItemTake_Item(take), '', false) -- isundo false
 local GetSet = r.GetSetMediaItemTakeInfo_String
 local ret, take_GUID = GetSet(take, 'GUID', '', false) -- setNewValue false
@@ -14425,7 +14423,7 @@ for line in chunk:gmatch('[^\r\n]+') do
 		if line:match('^GUID {') and not line:match(Esc(take_GUID)) then break end -- next take
 	end
 end
-  
+
 	if take_chunk and #take_chunk > 0 then -- SET
 	local take_chunk_init = Esc(table.concat(take_chunk,'\n')) -- store here before it's modified in the loop below
 		for line_idx, line in ipairs(take_chunk) do
@@ -14460,12 +14458,12 @@ end
 
 function Media_Items_Exist2(want_sel_tracks) -- more efficient
 -- want_sel_tracks is boolean to only evaluate selected tracks
-	
+
 	if not want_sel_tracks and r.CountMediaItems(0) > 0 then return true end
 
 	for i=0, r.CountSelectedTracks()-1 do
 	local tr = r.GetSelectedTrack(0,i)
-		if r.GetTrackNumMediaItems(tr) > 0 then 
+		if r.GetTrackNumMediaItems(tr) > 0 then
 		return true
 		end
 	end
@@ -14477,7 +14475,7 @@ end
 function Audio_Take_Exists_In_Selected_Items(want_active_take)
 	for i=0, r.CountSelectedMediaItems(0)-1 do
 	local item = r.GetSelectedMediaItem(0,i)
-		if want_active_take and not r.TakeIsMIDI(r.GetActiveTake(item)) then return true 
+		if want_active_take and not r.TakeIsMIDI(r.GetActiveTake(item)) then return true
 		elseif not want_active_take then
 			for i=0, r.CountTakes(item, i)-1 do
 				if not r.TakeIsMIDI(r.GetTake(item, i)) then return true end
@@ -14495,7 +14493,7 @@ local YPOS = chunk:match('(YPOS.-)\n')
 	if not YPOS then return end -- track lanes aren't enabled
 local Y, ratio = YPOS:match('([%.%d]+) ([%.%d]+)') -- Y is lane relative Y coordinate within track height which is 1, i.e. the height of all preceding lanes, ratio is ratio between track height and single lane height, track height is divided uniformely between lanes
 return Y+ratio / ratio -- Y+ratio is the analysed and preceding lanes combined height within track height
-end 
+end
 
 
 
@@ -14506,7 +14504,7 @@ function Duplicate_Active_Take_Contiguously(sel_item, want_above)
 -- contrary to the stock action which places it at the bottom;
 -- the function must be applied to each selected item separately
 -- because an action is involved which affects all selected items
--- simultaneously, so the function must be preceded and followed 
+-- simultaneously, so the function must be preceded and followed
 -- by storage and restoration of item selection;
 -- the function must be executed within the Undo block
 -- to prevent creation of undo points by actions
@@ -14525,7 +14523,7 @@ local take_cnt = item and r.CountTakes(item)
 -- empty take inserted with 'Item: Add an empty take after the active take' doesn't have a pointer
 -- even though it can be active
 	if not item or not act_take then return end
-	
+
 --r.Undo_BeginBlock()
 
 ACT(40639, 0) -- Take: Duplicate active take // this will be placed at the bottom // ignores empty takes created with 'Item: Add an empty take after the active take'
@@ -14537,7 +14535,7 @@ local new_take_idx = r.GetMediaItemTakeInfo_Value(new_take, 'IP_TAKENUMBER')
 --]]
 
 	if act_take_idx ~= take_cnt-1 or want_above then -- if active take is last and want_above is false, not need to cycle, everything will fall in place, even though cycling would still work
-	
+
 		if not want_above then
 		to_top() -- new take is active, move it to top
 		Activate(act_take) -- activate originally active take so it can be affected by the action
@@ -14548,8 +14546,8 @@ local new_take_idx = r.GetMediaItemTakeInfo_Value(new_take, 'IP_TAKENUMBER')
 		Activate(new_take) -- set duplicate take active
 		to_top() -- move to top, now they're in the expected order relative to each other but at wrong places within the item
 		end
-	
-	-- At this point the index of oringinally active take is 0 
+
+	-- At this point the index of oringinally active take is 0
 	-- and of the new take is 1,
 	-- cycle takes until the originally active take ends up at its original index
 	-- and is immediately followed by the new take
@@ -14574,7 +14572,7 @@ function Move_Active_Take_Within_Item(sel_item, down)
 -- wraps around;
 -- the function must be applied to each selected item separately
 -- because action is involved which affects all selected items
--- simultaneously, so the function must be preceded and followed 
+-- simultaneously, so the function must be preceded and followed
 -- by storage and restoration of item selection;
 -- the function must be executed within the Undo block
 -- to prevent creation of undo points by actions
@@ -14593,7 +14591,7 @@ local take_cnt = item and r.CountTakes(item)
 -- empty take inserted with 'Item: Add an empty take after the active take' doesn't have a pointer
 -- even though it can be active
 	if not item or not act_take then return end
-	
+
 --r.Undo_BeginBlock()
 
 local fin, idx
@@ -14605,7 +14603,7 @@ local fin, idx
 		if act_take_idx+1 < take_cnt then -- if active take is not the bottommost, first move to top the take which follows the active one so the active one replaces its in the take sequence
 		Activate(r.GetTake(item, act_take_idx+1))
 		to_top() -- start out by moving the take which follows the active take, to top lane
-		fin = act_take_idx -- cycle as many times as the active take index because that's how many take exchanges will have to be made to restore the original order of takes above the active one 
+		fin = act_take_idx -- cycle as many times as the active take index because that's how many take exchanges will have to be made to restore the original order of takes above the active one
 		idx = act_take_idx -- use the active take index because when the following take is moved to top above and the active take is moved down one take lane the prevous take assumes active take index, and during cycling the take at the original active take index, i.e. now immediately above it, must be moved up in turn to restore original take order
 		else to_top() -- move the bottommost active take to top in a wrap-round fashion
 		end
@@ -14631,8 +14629,8 @@ function get_active_take_index_via_chunk(item)
 -- with other API functions
 local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
 local cntr = 0
-	for line in chunk:gmatch('[^\n\r]+') do		
-		if line:match('^TAKE$') or line:match('^TAKE ')then cntr = cntr+1 end		
+	for line in chunk:gmatch('[^\n\r]+') do
+		if line:match('^TAKE$') or line:match('^TAKE ')then cntr = cntr+1 end
 		if line:match('^TAKE SEL') or line:match('^TAKE NULL SEL') then return cntr end -- TAKE NULL is attribute of a take inserted with actions 'Item: Add an empty take before/after the active take'
 	end
 return 0 -- if no active take found in the chunk, it must be the topmost because in this case its TAKE attribute isn't listed
@@ -14641,11 +14639,11 @@ end
 
 
 function Convert_Empty_Take_To_Valid_Take(take_idx, item)
--- empty take is either empty item or take inserted with 
+-- empty take is either empty item or take inserted with
 -- actions 'Item: Add an empty take before/after the active take';
--- take_idx is 0-based, index is used because empty takes 
--- don't have a pointer so to set them active 
--- 9 instances of the action 'Take: Set X take active' 
+-- take_idx is 0-based, index is used because empty takes
+-- don't have a pointer so to set them active
+-- 9 instances of the action 'Take: Set X take active'
 -- have to be used, for this reason 9 is the max empty take index
 -- supported by the function;
 -- the fuction takes advantage of the fact that inserting
@@ -14657,7 +14655,7 @@ function Convert_Empty_Take_To_Valid_Take(take_idx, item)
 -- own undo points
 
 	if take_idx > 9 then return end
-	
+
 local ACT = r.Main_OnCommand
 
 -- store active take before setting target take active
@@ -14667,12 +14665,12 @@ local active_take_idx
 	if not active_take then -- active take is an empty take
 	active_take_idx = get_active_take_index_via_chunk(item)
 	end
-	
+
 r.PreventUIRefresh(1)
-	
+
 local sel_empty_takes = r.GetToggleCommandStateEx(0, 41355) == 1 -- Options: Allow selecting empty takes
-	if not sel_empty_takes then ACT(41355, 0) end -- toggle to enable to be able to select empty takes with actions	
-	
+	if not sel_empty_takes then ACT(41355, 0) end -- toggle to enable to be able to select empty takes with actions
+
 -- store for rstoration because it will have to be moved
 -- to intersect with the item for insert take marker action to work
 local cur_pos = r.GetCursorPosition()
@@ -14693,7 +14691,7 @@ local sel_itms = {}
 		sel_itms[#sel_itms+1] = item
 		end
 	end
-	
+
 -- select target item exclusively
 r.SelectAllMediaItems(0, false) -- selected false // deselect all
 r.SetMediaItemSelected(item, true) -- selected true
@@ -14713,24 +14711,24 @@ r.SelectAllMediaItems(0, false) -- selected false // deselect all
 	for k, item in ipairs(sel_itms) do
 	r.SetMediaItemSelected(item, true) -- selected true
 	end
-	
+
 	if not sel_empty_takes then ACT(41355, 0) end -- toggle to disable, restoring original state
-	
+
 r.UpdateItemInProject(item)
 
 r.PreventUIRefresh(-1)
-	
+
 end
 
 
 
 function Get_Set_Take_Channels(take, ch_idx)
 -- valid ch_idx denotes SET mode,
--- ch_idx is a real world mono or stereo channel index 
+-- ch_idx is a real world mono or stereo channel index
 -- in the range of 1-128,
--- can be integer or string for mono channels 
+-- can be integer or string for mono channels
 -- and must be a string for stereo channels in the format '1/2', '2/3' etc.
--- values -2, -1 and 0 in Set mode are used for 
+-- values -2, -1 and 0 in Set mode are used for
 -- and in Get mode are returned for 3 other modes:
 -- normal (stereo or mono), reverse stereo and downmix L+R respectively
 -----------------------------------
@@ -14740,7 +14738,7 @@ function Get_Set_Take_Channels(take, ch_idx)
 -- 5-194 = Mono (3-128), the break point is channel 65
 -- whose index is 131, so mono channel ranges are
 -- 5-66 = 3-64, 131-194 = 65-128;
--- 67-257 = Stereo (1-128), the break point is channel 
+-- 67-257 = Stereo (1-128), the break point is channel
 -- 65/66 whose index is 195, so stereo channel ranges are
 -- 67-130 = 1/2-64/65, 195-257 = 65/66-127/128
 -- Initially REAPER supported up to 64 source media channels
@@ -14751,10 +14749,10 @@ function Get_Set_Take_Channels(take, ch_idx)
 -- at indices above first 128 (mono and stereo) channels,
 -- i.e. mono channel 65 starts at index 129, i.e. after stereo
 -- channel 64, stereo channel 65 starts at index 193, i.e. after
--- mono channel 128, in all cases 2 must be added to the index 
--- because the count starts at 3 and not 1, values 0, 1 and 2 
+-- mono channel 128, in all cases 2 must be added to the index
+-- because the count starts at 3 and not 1, values 0, 1 and 2
 -- are taken by modes normal, reverse and downmix respectively;
--- in Get mode for channel modes normal, reversed stereo 
+-- in Get mode for channel modes normal, reversed stereo
 -- L/R downmix the return value is -2, -1 and 0 respectively
 
 
@@ -14772,16 +14770,16 @@ local ch_cnt = r.GetMediaSourceNumChannels(src)
 	ch_No = ch_No and ch_No-2 -- -2 because channel indexing starts from value 3, preceded by 0 - normal (i.e. stereo), 1 - reverse stereo and 2 - downmix, i.e. 2 meaningful values (excluding 0)
 	return ch_No and (stereo and floor(ch_No)..'/'..floor(ch_No+1) or floor(ch_No)) -- math.floor to strip trailing decimal 0 // for modes normal, reverse stereo and L/R downmix the return value is -2, -1 and 0 respectively
 	end
-	
+
 	local function convert_ch_No_2_ch_idx(ch_No)
-	-- ch_No can be integer or string for mono channels 
+	-- ch_No can be integer or string for mono channels
 	-- and must be a string for stereo channels in the format '1/2'
 	-- mono and stereo channel ranges are 1-128 each;
 	-- ch_No values -2, -1 and 0 denote normal, reverse stereo and L/R dowmix
 	-- channel modes respectively
 	local ch_No = tonumber(ch_No) or ch_No:match('(%d+)/')
 	local stereo
-		if not ch_No or ch_No+0 < -2 and ch_No+0 > 128 then return 
+		if not ch_No or ch_No+0 < -2 and ch_No+0 > 128 then return
 		else
 		stereo = type(ch_No) == 'string'
 		ch_No = tonumber(ch_No)
@@ -14793,11 +14791,9 @@ local ch_cnt = r.GetMediaSourceNumChannels(src)
 
 	if ch_idx then -- set
 	local ch_idx = convert_ch_No_2_ch_idx(ch_idx)
---Msg(ch_idx, 'ch_idx')
 	FUNC(take, parm, ch_idx)
 	r.UpdateItemInProject(r.GetMediaItemTake_Item(take))
 	else -- get
---Msg('GET')
 	local ch = FUNC(take, parm)
 	return convert_ch_idx_2_ch_No(ch)
 	end
@@ -14880,9 +14876,7 @@ local RGB = {}
 local RGB = {r = 0, g = 0, b = 0}
 	for k in pairs(RGB) do -- adds randomization (i think) thanks to pairs which traverses in no particular order // once it picks up a particular order it keeps at it throughout the entire main repeat loop when multiple colors are being set
 	RGB[k] = math.random(1,256)-1 -- seems to produce 2 digit numbers more often than (0,255), but could be my imagination
---Msg(k)
 	end
---Msg(RGB.r); Msg(RGB.g); Msg(RGB.b)
 --]]
 return RGB
 end
@@ -15289,7 +15283,6 @@ end
 for capt in return_captures(str, 'find') do
 -- OR
 -- for capt in return_captures(str, '%a+', 1) do -- with 3d argument to enable pattern '%a+'
-Msg(capt)
 end
 ]]
 
@@ -15326,7 +15319,7 @@ function get_track_parents(parent)
 	end
 end
 --[[ USE:
-	for parent in get_track_parents(r.GetSelectedTrack(0,0)) do	
+	for parent in get_track_parents(r.GetSelectedTrack(0,0)) do
 
 	end
 ]]
@@ -15414,7 +15407,6 @@ function get_region_at_edit_or_mouse_cursor()
 	local _, regionidx = r.GetLastMarkerAndCurRegion(0, cur_pos) -- DOESN'T RETURN REGION INDEX IF THE EDIT CURSOR IS ALIGNED WITH ITS END, seems like a bug https://forums.cockos.com/showthread.php?t=271806; returns -1 if not preceded by any marker/region contrary to the API doc according to which the return value may be NULL
 		if regionidx > -1 then
 		local retval, isrgn, pos, rgnend, name, idx, color = r.EnumProjectMarkers3(0, regionidx) -- markers/regions are returned in the timeline order, if they fully overlap they're returned in the order of their displayed indices
-Msg(name, 'name')
 		return {name=name:match('%s*(.+[%w%p]+)') or name, color=color, pos=pos, rgnend=rgnend} -- trimming leading and trailing spaces from the name
 		end
 	]]
@@ -16103,57 +16095,476 @@ MARKER 2 7.5 "" 1 0 1 R {42CDA6EC-9BD1-4B20-A87C-64986B6FD1E8} 0 -- 1 region not
 MARKER 2 8.5 "" 1
 ]]
 
+
 local err = r.CountProjectMarkers(0) == 0 and 'no markers/regions in the project'
-or tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.53 and 'requires REAPER build 6.53 and lated'-- build since which Main_SaveProjectEx() is supported
+or tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.36 and 'requires REAPER build 7.36 and later'-- build since which marker/region selection state is registered
 
-	if err then	return err end 
+	if err then	return err end
 
-local cur_proj, proj_path = r.EnumProjects(-1) -- returns path even if the project file was deleted while the project is open
+local t = {sel={},hid={}}
+local Get = r.GetRegionOrMarkerInfo_Value
 
--- if, while the tab is open, proj file associated with the open tab was deleted along with the media folder, REAPER will automatically re-create it in the original directory of the project file when any action is performed provided such original directory still exists and a media folder is configured in the project settings or Preferences -> General -> Paths, so if this is gonna be the scenario, prevent that
+	if Get then -- since build 7.62
 
-local proj_path, proj_name = table.unpack(r.file_exists(proj_path) and proj_path:match('(.+[\\/])(.+)%.[RrPp]') or {}) -- extract path and name sans extension, if project without project file the result will be nils
+		for i=0, r.GetNumRegionsOrMarkers(0)-1 do
+		local obj = r.GetRegionOrMarker(0, i, '') -- guidStr is empty string, i.e. getting by index
+		local hid = Get(0, obj, 'B_VISIBLE') == 0 -- either object is hidden or its lane
+		local sel = Get(0, obj, 'B_UISEL') == 1
+		local t_tmp = sel and t.sel or hid and t.hid
+		table.insert(t.tmp, i)
+		end
 
-	if not proj_path then -- project tab without project file or deleted proj file
-	-- use script path for temp project file
-	local info = debug.getinfo(1,'S');
-	proj_path = info.source:match('@(.+[\\/])')
+	else
+
+	local cur_proj, proj_path = r.EnumProjects(-1) -- returns path even if the project file was deleted while the project is open
+
+	-- if, while the tab is open, proj file associated with the open tab was deleted along with the media folder, REAPER will automatically re-create it in the original directory of the project file when any action is performed provided such original directory still exists and a media folder is configured in the project settings or Preferences -> General -> Paths, so if this is gonna be the scenario, prevent that
+
+	local proj_path, proj_name = table.unpack(r.file_exists(proj_path) and proj_path:match('(.+[\\/])(.+)%.[RrPp]') or {}) -- extract path and name sans extension, if project without project file the result will be nils
+
+		if not proj_path then -- project tab without project file or deleted proj file
+		-- use script path for temp project file
+		local info = debug.getinfo(1,'S');
+		proj_path = info.source:match('@(.+[\\/])')
+		end
+
+	local temp_proj_file = proj_path..(r.time_precise()..''):gsub('%.','')..'.RPP' -- making the name unique to reduce likelihood of clash
+	r.Main_SaveProjectEx(0, temp_proj_file, 0) -- works with non-saved projects as well
+
+		if r.file_exists(temp_proj_file) then
+		local count = -1 -- start out from -1 to match 0-based count, i.e. the index of the first is 0
+			for line in io.lines(temp_proj_file) do
+				if line:match('^%s*MARKER ') then
+				count = count+1
+				local matching = line:match(' %d+ [%.%d]+ ["\']*.+["\']* ([24589]+)') -- 8/0 marker selected/not selected, 9/1 region selected/not selected; 24/25 marker/region hidden, supported since 7.36; selection and visibility are mutually exclusive, a hidden marker/region cannot be selected in Arrange, their entry selection in the Region/Marker Manager doesn't affect that; if the name doesn't contain spaces it's not enclosed within quotes unless it contains double quote character in which case the entire name is enclosed within single quotes/apostrohe rather than dounle quotes, i.e. '"TEST"' or 'TEST"'
+				local reg_end = not line:match('%d+ [%.%d]+ ["\']*.+["\']* %d+ (%d+)') -- region end line only has 4 fields
+					if matching and not reg_end then -- excluding region end lines, the complete data will be collected below
+					local t_tmp = #matching == 1 and t.sel or t.hid -- one digit long value refers to selection status, two digit long to visibility
+					t_tmp[#t_tmp+1] = count -- count is equal to time line index, 0-based
+					end
+				elseif count > -1 then break -- marker/region data have been parsed
+				end
+			end
+
+		os.remove(temp_proj_file)
+		end
+
 	end
 
-local temp_proj_file = proj_path..(r.time_precise()..''):gsub('%.','')..'.RPP' -- making the name unique to reduce likelihood of clash
-r.Main_SaveProjectEx(0, temp_proj_file, 0) -- works with non-saved projects as well
+	if #t.sel + #t.hid == 0 then return end
 
-	if r.file_exists(temp_proj_file) then
-	local t = {sel={},hid={}}
-	local count = -1
-		for line in io.lines(temp_proj_file) do
-			if line:match('^%s*MARKER ') then
-			count = count+1
-			local matching = line:match(' %d+ [%.%d]+ ["\']*.+["\']* ([24589]+)') -- 8/0 marker selected/not selected, 9/1 region selected/not selected; 24/25 marker/region hidden, supported since 7.36; selection and visibility are mutually dxclusive, a hidden marker/region cannot be selected in Arrange, their entry selection in the Region/Marker Manager doesn't affect that; if the name doesn't contain spaces it's not enclosed within quotes unless it contains double quote character in which case the entire name is enclosed within single quotes/apostrohe rather than dounle quotes, i.e. '"TEST"' or 'TEST"'
-			local reg_end = not line:match('%d+ [%.%d]+ ["\']*.+["\']* %d+ (%d+)') -- region end line only has 4 fields
-				if matching and not reg_end then -- excluding region end lines, the complete data will be collected below
-				local t_tmp = #matching == 1 and t.sel or t.hid -- one digit long value refers to selection status, two digit long to visibility
-				t_tmp[#t_tmp+1] = count -- count is equal to time line index, 0-based
-				end
-			elseif count > -1 then break -- marker/region data have been parsed
-			end
+	local function get_data(t)
+		for k, index in ipairs(t) do
+		local retval, isrgn, pos, rgnend, name, indexnumber, color = r.EnumProjectMarkers3(0, index)
+		t[k] = {idx=index, erg=isrgn,pos=pos,reg_end=rgnend,name=name,index=indexnumber,color=color}
 		end
-		
-	os.remove(temp_proj_file)
-	
-		if #t.sel + #t.hid == 0 then return end
-		
-		local function get_data(t)
-			for k, index in ipairs(t) do
-			local retval, isrgn, pos, rgnend, name, indexnumber, color = r.EnumProjectMarkers3(0, index)
-			t[k] = {idx=index, erg=isrgn,pos=pos,reg_end=rgnend,name=name,index=indexnumber,color=color}
-			end
-		return t
-		end
-	
-	t.sel, t.hid = get_data(t.sel), get_data(t.hid)
 	return t
-	
+	end
+
+t.sel, t.hid = get_data(t.sel), get_data(t.hid)
+
+return t
+
+end
+
+
+
+function Get_Rgn_Marker_TimeLine_Index(want_mrkr, idx)
+-- getting 0-based ordinal index;
+-- want_mrkr is boolean, if false region index is targeted
+-- idx is user facing index, which however may not be unuque
+-- if changed manually by the user
+
+-- get timeline index
+local i = 0
+	repeat
+	local retval, isrgn, pos, rgnend, name, num = r.EnumProjectMarkers(i)
+		if (want_mrkr and not isrgn or not want_mrkr and isrgn) and num == idx
+		then return i end
+	i=i+1
+	until retval == 0 -- until no more markers/regions
+
+end
+
+
+
+function Get_Populated_Ruler_Lane_Count()
+-- only returns count of lanes occupied
+-- by markers/regions,
+-- doesn't detect empty lanes, hidden lanes
+-- for total count see Get_Ruler_Lane_Count()
+
+	-- only supported since build 7.62
+	if not r.GetRegionOrMarker then return end
+
+local count = 0
+
+	for i=0, r.GetNumRegionsOrMarkers(0)-1 do
+	local obj = r.GetRegionOrMarker(0, i, '') -- guidStr is empty string, i.e. getting by index
+	local lane_idx = r.GetRegionOrMarkerInfo_Value(0, obj, 'I_LANENUMBER')
+	count = lane_idx > count and lane_idx or count
+	end
+
+return count+1 -- +1 because lane index returned by GetRegionOrMarkerInfo_Value is 0-based
+
+end
+
+
+
+
+function Get_Ruler_Lane_Count(want_visible)
+-- since as of build 7.65 lane count isn't accessible via API
+-- the function uses a hack of creating a temp marker
+-- and force moving it to another lane starting from lane
+-- at index 100
+-- if lane at the destination index doesn't exist the marker
+-- is not moved and its original lane index remains the same,
+-- but it's moved as soon as a valid lane index is found
+-- and since the movement is attempted in reverse,
+-- the first lane index associated with successful movement
+-- will be the index of the last available lane
+
+	-- only supported since build 7.62
+	if not r.GetRegionOrMarker then return end
+
+r.PreventUIRefresh(1)
+local index = r.AddProjectMarker(0, false, 0, 0, '', 0xFFFF) -- isrgn false, pos 0, rgnend 0, wantidx 0xFFFF, to be able to easily find it for deletion // insert temp marker
+local obj = r.GetRegionOrMarker(0, 0, '') -- index 0, guidStr empty
+r.SetRegionOrMarkerInfo_Value(0, obj, 'B_HIDDEN', 1) -- hide, although not strictly necessary thanks to PreventUIRefresh()
+local parm = 'I_LANENUMBER'
+local lane_idx_init = r.GetRegionOrMarkerInfo_Value(0, obj, parm)
+local lane_count
+	for i=100,0,-1 do
+	r.SetRegionOrMarkerInfo_Value(0, obj, parm, i)
+	local lane_idx = r.GetRegionOrMarkerInfo_Value(0, obj, parm)
+		if lane_idx ~= lane_idx_init then
+		-- if the very last lane is default for markers, the temp marker will be inserted there
+		-- and during the loop will only be able to move to a lane at a lower index,
+		-- in which case fall back on the original lane index as the heighest
+		lane_count = lane_idx < lane_idx_init and lane_idx_init or lane_idx
+		break
+		end
+	end
+r.DeleteProjectMarker(0, index, false) -- isrgn false // delete temp marker
+--r.UpdateTimeline() -- required for proper UI update after change, but unnecessary due to PreventUIRefresh()
+r.PreventUIRefresh(-1)
+
+-- if there's one lane only the temp marker won't be able to move anywhere
+-- hence fall back on its original lane index
+lane_count = (lane_count or lane_idx_init)+1 -- +1 because lane index returned by GetRegionOrMarkerInfo_Value is 0-based
+
+local t = {}
+	for i=0, lane_count-1 do
+		if want_visible and r.GetSetProjectInfo(0, 'RULER_LANE_HIDDEN:'..i, 0, false) == 0
+		or not want_visible
+		then
+		t[#t+1] = i
+		-- t.count = lane_count -- if storing indices in a non-sequencial array, i.e. t[i] = '', store lane count here to prevent false positive in available lanes evaluation with next(t) when there're no lanes as would be the case if it were stored after lane storage
+		end
+	end
+
+return t
+
+end
+
+
+
+function Get_Visible_Ruler_Lanes(lane_count)
+-- lane_count comes from Get_Ruler_Lane_Count()
+-- alternatively want_visible argument can be used
+-- in Get_Ruler_Lane_Count() itself
+
+	-- only supported since build 7.62
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62 then return end
+
+local t = {}
+	for i=0, lane_count-1 do
+		if r.GetSetProjectInfo(0, 'RULER_LANE_HIDDEN:'..i, 0, false) == 0 -- is_set false // the attribute works without the colon as well
+		then
+		local ret, name = r.GetSetProjectInfo_String(0, 'RULER_LANE_NAME:'..i, '', false) -- is_set false
+		t[#t+1] = {idx = i, name = name}
+		end
+	end
+
+return t
+
+end
+
+
+
+function Get_Lane_Mrkrs_Regns(lane_idx, want_vis)
+-- lane_idx can be chosen from lane_count returned by Get_Ruler_Lane_Count()
+
+local Get = r.GetRegionOrMarkerInfo_Value
+
+	if not Get then return end -- only supported since build 7.62
+
+local t = {}
+	for i=0, r.GetNumRegionsOrMarkers(0)-1 do
+	local obj = r.GetRegionOrMarker(0, i, '') -- guidStr is empty string, i.e. getting by index
+	local vis = want_vis and Get(0, obj, 'B_VISIBLE') == 1 or not want_vis -- visibility covers both object and its lane visibility
+		if vis and Get(0, obj, 'I_LANENUMBER') == lane_idx then
+		local st = Get(0, obj, 'D_STARTPOS')
+		t[#t+1] = {obj=obj, idx=i, st=st}
+		end
+	end
+
+--table.sort(t, function(a,b) return a.st < b.st end) -- sort by object position in ascending order
+
+return t
+
+end
+
+
+function Get_Mrkrs_Regns_Per_Lane(lane_count, want_vis)
+-- lane_count stems from by Get_Ruler_Lane_Count()
+
+local Get = r.GetRegionOrMarkerInfo_Value
+
+	if not Get then return end -- only supported since build 7.62
+
+local t = {}
+	for i=0, lane_count-1 do
+	t[i] ={}
+	end
+
+	for i=0, r.GetNumRegionsOrMarkers(0)-1 do
+	local obj = r.GetRegionOrMarker(0, i, '') -- guidStr is empty string, i.e. getting by index
+	local vis = want_vis and Get(0, obj, 'B_VISIBLE') == 1 or not want_vis -- visibility covers both object and its lane visibility
+		if vis then
+		local lane_idx = Get(0, obj, 'I_LANENUMBER')
+		local st = Get(0, obj, 'D_STARTPOS')
+		table.insert(t[lane_idx], {obj=obj, idx=i, st=st})
+		end
+	end
+
+return t
+
+end
+
+
+
+function Refresh_Ruler_Height()
+-- to use with Ruler Lanes API in cases where lanes order isn't
+-- properly refreshed even despite r.UpdateTimeline()
+-- which could be caused by unnamed lanes
+-- bug report https://forum.cockos.com/showthread.php?t=307633
+-- PreventUIRefresh should not be used here
+-- at the expense of barely noticeable ruler jolts;
+-- relies on Get_Ruler_Lane_Count() function
+
+	-- only supported since build 7.62
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62 then return end
+
+local h = r.GetSetProjectInfo(0, 'RULER_HEIGHT', 0, false) -- isSet false
+r.GetSetProjectInfo(0, 'RULER_HEIGHT', h+1, true) -- isSet true
+r.GetSetProjectInfo(0, 'RULER_HEIGHT', h, true) -- isSet true
+
+end
+
+
+
+function Set_Ruler_Height(ruler_h_init)
+-- ruler_h_init is optional, to only set height
+-- when it wasn't properly updated,
+-- stems from r.GetSetProjectInfo(0, 'RULER_HEIGHT', 0, false) -- isSet false
+-- which must be queried before change is effected
+-- and the function run after r.UpdateTimeline()
+-- which isn't reliable in refreshing ruler height
+
+	-- only supported since build 7.62
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62 then return end
+
+local GetSet = r.GetSetProjectInfo
+local h = GetSet(0, 'RULER_HEIGHT', 0, false) -- isSet false
+
+	if ruler_h_init and h == ruler_h_init or not ruler_h_init then
+
+	local lane_cnt = Get_Ruler_Lane_Count()
+	local collapsed, ref_lane_idx, --hidden -- ONLY USED IN THE INEFFICIENT METHOD OF UNCOLLAPSING BELOW
+
+		-- filter out hidden lanes
+		for i=0, lane_cnt-1 do
+		--[[ -- ONLY USED IN THE INEFFICIENT METHOD OF UNCOLLAPSING BELOW
+			if GetSet(0, 'RULER_LANE_HIDDEN:'..i, 0, false) == 1 then -- is_set false
+			lane_cnt = lane_cnt-1
+			hidden = 1
+			else
+			collapsed = collapsed or GetSet(0, 'RULER_LANE_VISIBLE:'..i, 0, false) == 0
+			ref_lane_idx = i
+			end
+		--]]
+			if GetSet(0, 'RULER_LANE_HIDDEN:'..i, 0, false) == 0 then -- is_set false
+			collapsed = collapsed or GetSet(0, 'RULER_LANE_VISIBLE:'..i, 0, false) == 0
+			ref_lane_idx = i
+			end
+			if collapsed then break end
+		end
+
+		if lane_cnt > 0 and collapsed then
+
+		local i = 0
+		r.PreventUIRefresh(1)
+			repeat
+			h = GetSet(0, 'RULER_HEIGHT', h+1, true) -- isSet true
+			i=i+1
+			until GetSet(0, 'RULER_LANE_VISIBLE:'..ref_lane_idx, 0, false) == 1
+		r.PreventUIRefresh(-1)
+
+	--[[ -- WORKS BUT INEFFICIENT BECAUSE ENDS UP UNCOLLAPSING LANES BY THE AMOUNT GREATER THAN THE MINIMUM REQUIRED FOR THEIR VISIBILITY
+		local amount = (26+(hidden and 4 or 0))*lane_cnt -- when there're hidden lanes 26 px per lane seems insufficient whereas when all are visible 30 px seems a bit excessive
+	--	local h = GetSet(0, 'RULER_HEIGHT', 0, false)-- isSet false
+			if h >= amount then -- when Ruler is fully collapsed its height is 68 px, i.e. greater than the height of 2 lanes 26 or 30 px each, so adjustment by lane height won't be enough in this case
+			amount = h + 6*lane_cnt
+			end
+		GetSet(0, 'RULER_HEIGHT', amount, true) -- isSet true
+	--]]
+		end
+	end
+
+end
+
+
+
+-- WORKS BUT USELESS, BECAUSE THERE'S B_HIDDEN PARAMETER
+-- WHICH ACCURATELY REFLECTS OBJECT VISIBILITY
+function Get_Marker_Region_True_Visibility(arg, lane_count)
+-- visibility determined by its own properties
+-- regardless of its lane visibility via a hack
+-- of temporary moving to a visible lane and evaluating there;
+-- arg is index, GUID or pointer,
+-- if lane_count isn't supplied relies on Get_Ruler_Lane_Count()
+-- when no visible lanes with objects were found
+-- to move the target object to
+
+local Get = r.GetRegionOrMarkerInfo_Value
+
+	if not Get then return end -- only supported since build 7.62
+
+local GetSet, GetSetStr = r.GetSetProjectInfo, r.GetSetProjectInfo_String
+
+local index, GUID = tonumber(arg), type(arg) == 'string'
+local obj = not index and not GUID and arg
+or (index or GUID) and r.GetRegionOrMarker(0, index and arg or -1, GUID and arg or '')
+
+	if not obj then return end
+
+local vis = Get(0, obj, 'B_VISIBLE') == 1
+	if vis then return vis end
+
+--r.PreventUIRefresh(1) -- should not be used because it prevents values update
+
+-- if not vis it could be because its lane is hidden and not object itself
+-- because r.GetRegionOrMarkerInfo_Value returns false in both cases
+local lane_idx = Get(0, obj, 'I_LANENUMBER')
+local lane_vis = GetSet(0, 'RULER_LANE_HIDDEN:'..lane_idx, 0, false) == 0 -- isSet false
+	if lane_vis then return vis -- geuninely hidden because its lane is not so not affected by it
+	else
+--[[ -- unhide the lane and evaluate again
+	  -- TOGGLING UNHIDE HIDDEN LANE DOESN'T WORK DUE TO SLOW WINDOW UPDATE
+	  -- TO REGISTER THE CHANGE, WHICH USUALLY SOLVABLE WITH DEFER FUNCTION THAT
+	  -- WOULD WAIT UNTIL THE UI IS UPDATED AND RETURN ACCURATE VALUES,
+	  -- BUT SINCE THIS FUNCTION IS SUPPOSED TO RUN IN THE MIDDLE OF A SCRIPT
+	  -- THIS SOLUTION IS HIGHLY INCONVENIENT
+	GetSet(0, 'RULER_LANE_HIDDEN:'..lane_idx, 1, true) -- isSet true
+	vis = Get(0, obj, 'B_VISIBLE') == 1
+	GetSet(0, 'RULER_LANE_HIDDEN:'..lane_idx, 0, true) -- isSet true // re-hide the lane
+	return vis
+--]]
+		-- find a non-hidden lane
+		for i=0, r.GetNumRegionsOrMarkers(0)-1 do
+		local obj_tmp = r.GetRegionOrMarker(0, i, '') -- guidStr is empty string, i.e. getting by index
+		local lane_idx_tmp = Get(0, obj_tmp, 'I_LANENUMBER')
+		local lane_vis = GetSet(0, 'RULER_LANE_HIDDEN:'..lane_idx_tmp, 0, false) == 0 -- isSet false
+			if lane_vis then -- isSet false
+			-- move object to visible lane in order to retrieve its true visibility status
+			r.SetRegionOrMarkerInfo_Value(0, obj, 'I_LANENUMBER', lane_idx_tmp)
+			vis = Get(0, obj, 'B_VISIBLE') == 1
+			r.SetRegionOrMarkerInfo_Value(0, obj, 'I_LANENUMBER', lane_idx) -- return to its original lane
+			break end
+		end
+		if vis then return vis end
+	end
+
+-- if the function reached this stage no visible lane with objects on it
+-- was found for evaluation so search for visible empty lane
+-- exact lane count is absolutely necessary in order to evaluate visibility
+-- of existing lanes, because in arbitrary lane count 'RULER_LANE_HIDDEN'
+-- produces false positive for non-existing lane indices, they're all registered
+-- as visible
+local lane_count = lane_count or Get_Ruler_Lane_Count()
+local lane_idx_tmp
+	for i=0, lane_count-1 do
+		if GetSet(0, 'RULER_LANE_HIDDEN:'..i, 0, false) == 0 then -- isSet false
+		lane_idx_tmp = i break end
+	end
+
+-- if empty visible lane wasn't found, search for pre-existing temp lane
+-- and if not found create one
+local dedicated_lane
+	if not lane_idx_tmp then
+	local name = 'script specific, good to delete'
+		for i=0, lane_count-1 do
+		local ret, lane_name = GetSetStr(0, 'RULER_LANE_NAME:'..i, '', false) -- isSet false
+			if lane_name == name then
+			lane_idx_tmp = i
+			dedicated_lane = 1
+			break end
+		end
+	end
+
+	if not lane_idx_tmp then -- if pre-existing temp lane wasn't found, create one
+	lane_idx_tmp = GetSet(0, 'RULER_LANE_ORDER:0', -1, true) -- -1 create, isSet true
+	-- since lanes cannot be deleted with API, name the new lane for the user
+	-- so they know how to handle it once noticed
+	GetSetStr(0, 'RULER_LANE_NAME:'..lane_idx_tmp, 'script specific, good to delete', true) -- isSet true
+	dedicated_lane = 1
+	end
+
+	-- if temp lane is hidden, which is relevant for a pre-exising one
+	-- because newly created lanes are visible by default, unhide it
+	if GetSet(0, 'RULER_LANE_HIDDEN:'..lane_idx_tmp, 0, false) == 1 then -- isSet false
+	GetSet(0, 'RULER_LANE_HIDDEN:'..lane_idx_tmp, 0, true) -- isSet true
+	end
+
+-- move object to visible lane in order to retrieve its true visibility status
+r.SetRegionOrMarkerInfo_Value(0, obj, 'I_LANENUMBER', lane_idx_tmp)
+vis = Get(0, obj, 'B_VISIBLE') == 1
+r.SetRegionOrMarkerInfo_Value(0, obj, 'I_LANENUMBER', lane_idx) -- return to its original lane
+
+	if dedicated_lane then
+	-- hide newly created or pre-existing temp lane since it cannot be deleted with API
+	GetSet(0, 'RULER_LANE_HIDDEN:'..lane_idx_tmp, 1, true) -- isSet true
+	end
+
+--r.PreventUIRefresh(-1)
+
+return vis
+
+end
+
+
+
+function Is_Valid_Marker_Region(arg)
+-- arg is marker/region either pointer or GUID
+
+local Get = r.GetRegionOrMarker
+
+	if not Get then return end -- only supported since build 7.62
+
+	if type(arg) == 'string' then
+	return Get(0, -1, arg) -- invalid object GUID doesn't return pointer
+	else
+	-- using object properties toggle, e.g.
+	-- local val = r.GetRegionOrMarkerInfo_Value(0, obj,'B_UISEL')
+	-- local valid = r.SetRegionOrMarkerInfo_Value(0, obj, 'B_UISEL', val~1) ~= val
+	-- as a validation method won't work because
+	-- the functions don't accept invalid object
+		for i=0, r.GetNumRegionsOrMarkers(0)-1 do
+			if Get(0, i, '') == arg -- guidStr is empty string, i.e. getting by index
+			then return true
+			end
+		end
 	end
 
 end
@@ -17104,7 +17515,6 @@ local left_docker_on
 		-- find if windows/toobars keys assigned the found dockermode in the [REAPERdockpref] section
 		local REAPERdockpref = content:match('REAPERdockpref%](.-)\n%[') -- isolate this section contents
 			for str in REAPERdockpref:gmatch('[^\n\r]*') do
---Msg(str:match('.-=[%-%.%d]*%s'..v..'$'))
 			local key = str:match('.-=[%-%.%d]*%s'..mode..'$') and str:match('^(.-)=')
 			-- determine if windows/toolbars found in the [REAPERdockpref] section are docked and visible in the lefthand docker
 			local sect = key and content:match('(%['..key..'%].-)%[') or (key and content:match('(%['..key..'%].-)$'))
@@ -17122,8 +17532,6 @@ local left_docker_on
 		if left_docker_on == true then break end
 	end
 
---Msg('DOCKER = '..tostring(left_docker_on))
-
 local TCP_width = content:match('leftpanewid=(.-)\n')
 local dockheight_l = content:match('dockheight_l=(.-)\n') -- if left docker is open  https://forums.cockos.com/showpost.php?p=1991096&postcount=11
 
@@ -17131,9 +17539,6 @@ local dockheight_l = content:match('dockheight_l=(.-)\n') -- if left docker is o
 -- https://forum.cockos.com/showthread.php?t=238128
 
 	if left_docker_on then TCP_width = TCP_width + dockheight_l end -- shifted righwards TCP right edge
-
---Msg(dockheight_l)
---Msg(TCP_width)
 
 return TCP_width
 
@@ -17320,7 +17725,6 @@ local foregrnd = ForeGrnd()
 return foregrnd == hwnd
 --]]
 --[[ OR
-Msg(r.JS_Window_GetTitle(hwnd))
 local Focus = r.JS_Window_GetFocus
 local focus = Focus()
 	if focus == hwnd then return true end
@@ -17382,7 +17786,7 @@ function Is_Window_Docked2(wnd_sect_title)
 -- listed as keys in the t table in the function
 -- Move_Window_To_Another_Dock(),
 -- however some window identifiers listed in Move_Window_To_Another_Dock()
--- may differ from window section title required by this function, 
+-- may differ from window section title required by this function,
 -- such as in case of Media Explorer:
 -- 'explorer' and '[reaper_explorer]' respectively
 
@@ -17401,9 +17805,9 @@ end
 
 
 function Is_Wnd_Docked_In_Floating_Docker1(wnd_id)
--- the function determines if floating docker was the LAST docker 
+-- the function determines if floating docker was the LAST docker
 -- the window was docked at and current visibility status of the docker
--- and doesn't determine the state if window itself, 
+-- and doesn't determine the state if window itself,
 -- whether currently docked or not, open or not,
 -- the window docked state info must be gleaned from the window section in reaper.ini
 -- see Is_Window_Docked1() and Is_Window_Docked2()
@@ -17428,11 +17832,11 @@ local ini = r.get_ini_file()
 			end
 		end
 	end
-	
+
 	if dockermode then
 		for line in io.lines(ini) do -- determine dockermode status
 		local status = line:match('^dockermode'..dockermode..'=(%d+)')
-			if status then			
+			if status then
 			return status+0 < 90000 and 1 -- i.e. 32768 or 32770, open floating docker
 			or 2 -- i.e. 98304 or 98306, closed floating docker
 			end
@@ -17480,7 +17884,7 @@ function Move_Window_To_Another_Dock(wnd_id, new_pos, cur_pos)
 -- cur_pos and new_pos args are integer: 0 - bottom, 1 - left, 2 - top, 3 - right, 4 - floating
 -- cur_pos is optional, if passed, docker position will only be changed of the window's current pos matches cur_pos value, otherwise position will be changed regardless of the current one
 -- also to figure out how to toggle midi editor visibility
--- some info on docks 
+-- some info on docks
 -- https://forum.cockos.com/showthread.php?t=207081
 -- https://forum.cockos.com/showpost.php?p=2427144
 -- https://github.com/Buy-One/Dox/blob/main/reaper.ini%20toolbars%20and%20dockers
@@ -17527,13 +17931,13 @@ projbay_6 = 41633, projbay_7 = 41634, --routing = rout,
 regmgr = 40326, explorer = 50124, trackmgr = 40906, grpmgr = 40327,
 envmgr = 42678, bigclock = 40378, video = 50125, perf = 40240, navigator = 40268,
 vkb = 40377, fadeedit = 41827, undo = 40072, fxbrowser = 40271,
-itemprops = 41589, xfadeedit = 41827, phasealign = 43466, midiedit = '', 
-['toolbar:1'] = 41679, ['toolbar:2'] = 41680, ['toolbar:3'] = 41681, 
-['toolbar:4'] = 41682, ['toolbar:5'] = 41683, ['toolbar:6'] = 41684, 
-['toolbar:7'] = 41685, ['toolbar:8'] = 41686, ['toolbar:9'] = 41936, 
-['toolbar:10'] = 41937, ['toolbar:11'] = 41938, ['toolbar:12'] = 41939, 
-['toolbar:13'] = 41940, ['toolbar:14'] = 41941, ['toolbar:15'] = 41942, 
-['toolbar:16'] = 41943, 
+itemprops = 41589, xfadeedit = 41827, phasealign = 43466, midiedit = '',
+['toolbar:1'] = 41679, ['toolbar:2'] = 41680, ['toolbar:3'] = 41681,
+['toolbar:4'] = 41682, ['toolbar:5'] = 41683, ['toolbar:6'] = 41684,
+['toolbar:7'] = 41685, ['toolbar:8'] = 41686, ['toolbar:9'] = 41936,
+['toolbar:10'] = 41937, ['toolbar:11'] = 41938, ['toolbar:12'] = 41939,
+['toolbar:13'] = 41940, ['toolbar:14'] = 41941, ['toolbar:15'] = 41942,
+['toolbar:16'] = 41943,
 ['toolbar:17'] = 42404, -- MX toolbar // toolbars don't work, the numbers in their window titles are likely to not correspond to their section numbers in reaper.ini
 SWSAutoColor = '_SWSAUTOCOLOR_OPEN', -- SWS: Open auto color/icon/layout window ('Auto Color/Icon/Layout')
 ['BR - ContextualToolbars WndPos'] = '_BR_CONTEXTUAL_TOOLBARS_PREF', -- SWS/BR: Contextual toolbars... ('Contextual toolbars')
@@ -17605,14 +18009,14 @@ local set
 		if r.DockGetPosition(i) == new_pos then -- find dockermode associated with the desired position (one of four, 0 - bottom, 1 - left, 2 - top, 3 - right)
 		-- in reaper.ini it's e.g. dockermode5=0, i.e. position 0 - bottom;
 		-- assign the window to dockermode associated with the desired position
-		-- in [REAPERdockpref] section in reaper.ini		
+		-- in [REAPERdockpref] section in reaper.ini
 		r.Dock_UpdateDockID(wnd_id, i)
 		set = 1
 		break end
 	end
-	
+
 	if not set then r.Dock_UpdateDockID(wnd_id, 0) end -- if dockermode associated with the desired position wasn't found, assign to dockermode0, which may already be associated with another window, in which case dock will be split
-	
+
 	--	r.UpdateArrange(), r.DockWindowRefresh() AND r.DockWindowRefreshForHWND(wnd_id) don't work to visually update window position
 	-- must be refreshed for the change to become visible, that is its visibility toggled
 	if commandID ~= 41888 and r.GetToggleCommandStateEx(0,commandID) == 1
@@ -17650,7 +18054,7 @@ local identstr = not position and arg and type(arg) == 'string' and arg
 		end
 	r.DockWindowActivate(action_list) -- activates the attached window tab; if not used or if is used but window gets attached to a not yet visible dock even as the only visible window there, the UI isn't properly redrawn and window graphics remain on the screen, in which case r.DockWindowRefreshForHWND(hwnd), r.DockWindowRefresh() and r.UpdateArrange() don't help
 	end
-	
+
 end
 
 
@@ -17660,7 +18064,7 @@ function Send_Message(hwnd, msg)
 -- JS_WindowMessage_Send also supports message name instead of the code
 -- but not for all message type it seems, i.e. not 'WM_SETFOCUS'
 -- 0x0007 WM_SETFOCUS, 0x0010 WM_CLOSE, these work properly
--- some messages will require non-zero wParam, lParam 
+-- some messages will require non-zero wParam, lParam
 -- (and maybe wParamHighWord, lwParamHighWord for JS_WindowMessage_Send),
 -- consult https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessage
 -- and use search by the message type name
@@ -17789,7 +18193,7 @@ end
 
 
 
-function Get_Child_Windows_JS1(parent_hwnd) 
+function Get_Child_Windows_JS1(parent_hwnd)
 -- !!! the order child windows are listed by JS_Window_ListAllChild()
 -- is not constant, it will be different for each new instance of a window,
 -- neither are child window hexadecimal addresses constant,
@@ -17810,7 +18214,7 @@ end
 
 
 
-function Get_Child_Windows_JS2(parent_name, want_exact)  
+function Get_Child_Windows_JS2(parent_name, want_exact)
 -- !!! the order child windows are listed by JS_Window_ListAllChild()
 -- is not constant, it will be different for each new instance of a window,
 -- neither are child window hexadecimal addresses constant,
@@ -17820,7 +18224,7 @@ function Get_Child_Windows_JS2(parent_name, want_exact)
 -- want_exact is boolean
 
 local parent_wnd = r.JS_Window_Find(parent_name, want_exact)
-	
+
 	if not parent_wnd then return end
 
 local retval, list = r.JS_Window_ListAllChild(parent_hwnd)
@@ -17841,7 +18245,7 @@ function Get_Child_Windows_JS3(parent_hwnd)
 -- because their order is constant
 
 	if not parent_hwnd then return end
-	
+
 local child = r.JS_Window_GetRelated(parent_hwnd, 'CHILD')
 local child_t = {}
 	if child then
@@ -17943,7 +18347,6 @@ local wnd = wnd
 	repeat
 	local parent = r.BR_Win32_GetParent(wnd)
 	local retval, title = r.BR_Win32_GetWindowText(parent)
---Msg('par handle', wnd, 'par title', title)
 		if title:match('REAPER') and
 		(ignore_dock and title ~= 'REAPER_dock' or not ignore_dock)
 		then return wnd -- if REAPER main window, return the previous window
@@ -17964,7 +18367,7 @@ local last
 	hwnd = r.BR_Win32_GetParent(hwnd)
 --retval, text = reaper.BR_Win32_GetWindowText(hwnd)
 --r.ShowConsoleMsg(tostring(text)..'\n')
-		if hwnd == parent_hwnd then return parent_hwnd 
+		if hwnd == parent_hwnd then return parent_hwnd
 		else
 		last = last ~= hwnd and hwnd or last
 		end
@@ -17987,7 +18390,7 @@ local col_cnt = col_cnt or 1 -- only traverse 1st column if arg isn't provided
 local itm_cnt = r.JS_ListView_GetItemCount(list_wnd) -- number of rows
 
 	if itm_cnt == 0 then return end
-	
+
 local row_idx = 0
 	repeat
 	local col_idx, text = 0
@@ -18000,7 +18403,7 @@ local row_idx = 0
 	until row_idx == itm_cnt or not text
 
 end
-	
+
 
 function Traverse_List2(list_wnd, col_cnt)
 -- go over rows for each column
@@ -18016,7 +18419,7 @@ local col_cnt = col_cnt or 1 -- only traverse 1st column if arg isn't provided
 local itm_cnt = r.JS_ListView_GetItemCount(list_wnd) -- number of rows
 
 	if itm_cnt == 0 then return end
-	
+
 local col_idx = 0
 	repeat
 	local row_idx, text = 0
@@ -18219,7 +18622,7 @@ function Scroll_Window(wnd, line_idx)
 		r.BR_Win32_SendMessage(wnd, 0x0115, 6, 0) -- msg 0x0115 WM_VSCROLL, wParam 6 SB_TOP, 7 SB_BOTTOM, 2 SB_PAGEUP, 3 SB_PAGEDOWN, 1 SB_LINEDOWN, 0 SB_LINEUP, lParam 0, https://learn.microsoft.com/en-us/windows/win32/controls/wm-vscroll
 		elseif r.JS_WindowMessage_Send then
 		r.JS_WindowMessage_Send(wnd, 'WM_VSCROLL', 6, 0, 0, 0) -- wParamHighWord and lParamHighWord 0
-		end		
+		end
 		for i=1, line_idx-1 do -- -1 to stop scrolling at the target line and not scroll past it
 			if r.BR_Win32_SendMessage then
 			r.BR_Win32_SendMessage(wnd, 0x0115, 1, 0) -- msg 0x0115 WM_VSCROLL, wParam 1 SB_LINEDOWN scrollbar moves down / 0 SB_LINEUP scrollbar moves up that's how it's supposed to be as per explanation at https://learn.microsoft.com/en-us/windows/win32/controls/wm-vscroll, same as at https://stackoverflow.com/questions/3278439/scrollbar-movement-setscrollpos-and-sendmessage. lParam 0
@@ -18297,7 +18700,7 @@ end
 -- after changing folder, because the window is slow to update
 -- and target file won't be found immediately
 function Scroll_MX_File_List1() -- defer version
--- relies on Get_Media_Explorer_Column_Count(), 
+-- relies on Get_Media_Explorer_Column_Count(),
 -- Traverse_List2() functions
 
 	if r.time_precise() - time_init >= 0.03 then -- waiting 30 ms before scrolling
@@ -18323,7 +18726,7 @@ end
 
 
 function Scroll_MX_File_List2(options, file_name, list_wnd) -- non-defer version
--- relies on Get_Media_Explorer_Column_Count(), 
+-- relies on Get_Media_Explorer_Column_Count(),
 -- Traverse_List2() functions
 -- and those which precede Scroll_MX_File_List1() above
 local file_name = options[3] and file_name or file_name:match('.+[\\/](.+)%.') -- include extension if enabled in 'Show' settings as 'File extension even if file type displayed'
@@ -18341,8 +18744,8 @@ function Get_Focused_Item_In_List(list_wnd)
 -- may be useful in determining the number of items
 -- which need to be hopped over in order to select or scroll to an item with specific index
 -- provided there's a programmatic way to select or scroll to it
--- although as far as scrolling is concerned Scroll_Window() function above 
--- is good enough because it always resets the scroll position 
+-- although as far as scrolling is concerned Scroll_Window() function above
+-- is good enough because it always resets the scroll position
 -- to 0 before scrolling to the target
 
 local focused_itm_idx = r.JS_ListView_GetFocusedItem(list_wnd) -- returnns last focused item index even if it's not currently selected or highlighted, hence needs to be additionally validated with the following function, because if none is visibly selected or highlighted the initial index for scrolling or selection loop must be 0
@@ -18470,21 +18873,21 @@ r.JS_WindowMessage_Post(child_wnd, 'WM_KEYDOWN', 0x0D, 0, 0x001C, 0) -- 0x0100 W
 
 
 function Is_Floating_FX_Window(title)
-return title:match('[2ACDJLPSTUVX]+i?:') or title:match(' %[%d+/%d+%]') 
+return title:match('[2ACDJLPSTUVX]+i?:') or title:match(' %[%d+/%d+%]')
 or title:match(' %- Item') or title:match(' %- Track %d+')
 or title:match(' %- Master Track') or title:match(' %- Monitoring')
 end
 
 
 function Is_FX_Chain_Window(title)
-return title:match('FX: Track') or title:match('FX: Item') 
+return title:match('FX: Track') or title:match('FX: Item')
 or title:match('FX: Master') or title:match('FX: Monitoring')
 end
 
 
 function Is_Window_Fully_Minimized(wnd)
 -- function to minimize fully
--- r.BR_Win32_ShowWindow(wnd, 2) -- 2 SW_SHOWMINIMIZED, only leaves window title bar			
+-- r.BR_Win32_ShowWindow(wnd, 2) -- 2 SW_SHOWMINIMIZED, only leaves window title bar
 local retval, lt, t, rt, b = r.BR_Win32_GetWindowRect(wnd)
 return rt-lt == 160 and b-t == 24
 end
@@ -18732,7 +19135,7 @@ local click, escape = gfx.getchar() == -1, gfx.getchar() == 27
 	if click or escape then -- WITH ESCAPE AND LIKELY ANY KEY PRESS THIS REQUIRES LONG PRESS UNTIL IT'S REGISTERED, HOWEVER IN THE MAIN DEFER FUNCTION THIS FUNCTION RUNS INSIDE gfx.getchar() == 27 CAN BE REGISTERED IMMEDIATELY WITH THE FOLLOWING SYNTAX:
 	-- 'if gfx.getchar() == 27 or gfx.getchar() == -1 then'
 	-- INSIDE THIS FUNCTION HOWEVER EVEN THIS ORDER OF CONDITIONS DOESN'T PRODUCE IMMEDIATE RESPONSE
-	-- the code inside the function doesn't need adjustment, just add the same condition outside of it 
+	-- the code inside the function doesn't need adjustment, just add the same condition outside of it
 	-- in the main defer function
 	-- on top of the condition inside it, i.e.:
 	--[[ if gfx.getchar() == 27 or gfx.getchar() == -1 then -- gfx.getchar() == 27 doesn't work immediately if preceded by gfx.getchar() == -1
@@ -18759,7 +19162,7 @@ function store_or_update_coordinates_after_quitting2(scr_cmdID)
 -- must run inside main defer function
 -- THE STORAGE ROUTINE IN THIS FUNCTION ENSURES THAT
 -- if the window is closed by clicking its close button
--- the window is re-opened at the last location regardless 
+-- the window is re-opened at the last location regardless
 -- of the current mouse cursor position;
 -- if closed by Esc, it's opened with the close button being
 -- directly under the mouse cursor
@@ -18785,6 +19188,89 @@ local mouse_x, mouse_y = r.GetMousePosition() -- coordinates of the mouse cursor
 	end
 
 end
+
+
+
+function Refresh_Ruler_Height()
+-- to use with Ruler Lanes API in cases where lanes order isn't
+-- properly refreshed even despite r.UpdateTimeline()
+-- which could be caused by unnamed lanes
+-- bug report https://forum.cockos.com/showthread.php?t=307633
+-- PreventUIRefresh should not be used here
+-- at the expense of barely noticeable ruler jolts;
+-- relies on Get_Ruler_Lane_Count() function
+
+	-- only supported since build 7.62
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62 then return end
+
+local h = r.GetSetProjectInfo(0, 'RULER_HEIGHT', 0, false) -- isSet false
+r.GetSetProjectInfo(0, 'RULER_HEIGHT', h+1, true) -- isSet true
+r.GetSetProjectInfo(0, 'RULER_HEIGHT', h, true) -- isSet true
+
+end
+
+
+
+function Set_Ruler_Height(ruler_h_init)
+-- ruler_h_init is optional, to only set height
+-- when it wasn't properly updated,
+-- stems from r.GetSetProjectInfo(0, 'RULER_HEIGHT', 0, false) -- isSet false
+-- which must be queried before change is effected
+-- and the function run after r.UpdateTimeline()
+-- which isn't reliable in refreshing ruler height
+
+	-- only supported since build 7.62
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62 then return end
+
+local GetSet = r.GetSetProjectInfo
+local h = GetSet(0, 'RULER_HEIGHT', 0, false) -- isSet false
+
+	if ruler_h_init and h == ruler_h_init or not ruler_h_init then
+
+	local lane_cnt = Get_Ruler_Lane_Count()
+	local collapsed, ref_lane_idx, --hidden -- ONLY USED IN THE INEFFICIENT METHOD OF UNCOLLAPSING BELOW
+
+		-- filter out hidden lanes
+		for i=0, lane_cnt-1 do
+		--[[ -- ONLY USED IN THE INEFFICIENT METHOD OF UNCOLLAPSING BELOW
+			if GetSet(0, 'RULER_LANE_HIDDEN:'..i, 0, false) == 1 then -- is_set false
+			lane_cnt = lane_cnt-1
+			hidden = 1
+			else
+			collapsed = collapsed or GetSet(0, 'RULER_LANE_VISIBLE:'..i, 0, false) == 0
+			ref_lane_idx = i
+			end
+		--]]
+			if GetSet(0, 'RULER_LANE_HIDDEN:'..i, 0, false) == 0 then -- is_set false
+			collapsed = collapsed or GetSet(0, 'RULER_LANE_VISIBLE:'..i, 0, false) == 0
+			ref_lane_idx = i
+			end
+			if collapsed then break end
+		end
+
+		if lane_cnt > 0 and collapsed then
+
+		local i = 0
+		r.PreventUIRefresh(1)
+			repeat
+			h = GetSet(0, 'RULER_HEIGHT', h+1, true) -- isSet true
+			i=i+1
+			until GetSet(0, 'RULER_LANE_VISIBLE:'..ref_lane_idx, 0, false) == 1
+		r.PreventUIRefresh(-1)
+
+	--[[ -- WORKS BUT INEFFICIENT BECAUSE ENDS UP UNCOLLAPSING LANES BY THE AMOUNT GREATER THAN THE MINIMUM REQUIRED FOR THEIR VISIBILITY
+		local amount = (26+(hidden and 4 or 0))*lane_cnt -- when there're hidden lanes 26 px per lane seems insufficient whereas when all are visible 30 px seems a bit excessive
+	--	local h = GetSet(0, 'RULER_HEIGHT', 0, false)-- isSet false
+			if h >= amount then -- when Ruler is fully collapsed its height is 68 px, i.e. greater than the height of 2 lanes 26 or 30 px each, so adjustment by lane height won't be enough in this case
+			amount = h + 6*lane_cnt
+			end
+		GetSet(0, 'RULER_HEIGHT', amount, true) -- isSet true
+	--]]
+		end
+	end
+
+end
+
 
 
 
@@ -18821,7 +19307,7 @@ end
 function find_layout(layout_name, want_mcp)
 -- want_mcp is boolean to search among MCP layouts,
 -- support for transport, EnvCP, master TCP and MCP
--- can be added 
+-- can be added
 local i = 0
 	repeat
 	local retval, name = reaper.ThemeLayout_GetLayout(want_mcp and 'mcp' or 'tcp', i)
@@ -19053,11 +19539,13 @@ function Invalid_Script_Name2(scr_name,...)
 -- check if necessary elements are found in script name, case agnostic
 -- if more than 1 match is needed, run twice or more times with different sets of elements which are supposed to appear in the same name, but elements within each set must not be expected to appear in the same name, that is they must be mutually exclusive
 -- if running twice or more times the error message and Rep() function must be used outside of this function after expression 'if no_elm1 or no_elm2 then'
+-- or run inline, see example attached to Invalid_Script_Name3 below
 
-local t = {...}
-
-	for k, elm in ipairs(t) do
-		if scr_name:lower():match(Esc(elm:lower())) then return end -- at least one match was found
+	if scr_name then
+	local t = {...}
+		for k, elm in ipairs(t) do
+			if scr_name:lower():match(Esc(elm:lower())) then return end -- at least one match was found
+		end
 	end
 
 	local function Rep(n) -- number of repeats, integer
@@ -19077,11 +19565,12 @@ end
 
 function Invalid_Script_Name3(scr_name,...)
 -- check if necessary elements, case agnostic, are found in script name and return the one found
--- only execute once
-local t = {...}
 
-	for k, elm in ipairs(t) do
-		if scr_name:lower():match(Esc(elm:lower())) then return elm end -- at least one match was found
+	if scr_name then
+	local t = {...}
+		for k, elm in ipairs(t) do
+			if scr_name:lower():match(Esc(elm:lower())) then return elm end -- at least one match was found
+		end
 	end
 
 	local function Rep(n) -- number of repeats, integer
@@ -19106,17 +19595,25 @@ local keyword = Invalid_Script_Name3(scr_name, 'right', 'left', 'up', 'down')
 	-- DO STUFF
 	-- ETC.
 	end
-	
+
 -- OR
 	if not Invalid_Script_Name3(scr_name, 'right', 'left', 'up', 'down') then
 	return r.defer(no_undo) end
-	
+
 	if scr_name:match('right') then
 	-- DO STUFF
 	elseif scr_name:match('left') then
 	-- DO STUFF
 	-- ETC.
 	end
+
+-- OR, if not all keywords are expected to occur in the same script name
+-- run the function several times inline with OR operator, i.e.
+
+	if not Invalid_Script_Name(scr_name, 'marker', 'right', 'left')
+	or not Invalid_Script_Name(scr_name, 'region', 'right', 'left')
+	then etc...
+
 ]]
 
 
@@ -19169,7 +19666,7 @@ end
 function File_Exists2(path)
 local f, mess = io.open(path, 'r')
 	if f then f:close()
-	elseif mess and mess:match('No such file or directory') then return 
+	elseif mess and mess:match('No such file or directory') then return
 	end
 return true
 end
@@ -19201,24 +19698,24 @@ function make_file_name_unique(f_path) -- see also resolve_file_name_collision()
 -- BUT AFTER ADDITION OF TIME DATA FILE PATH MAY
 -- EXCEED THE 256 CHARACTER LIMIT SO MUST BE ADDITIONALLY
 -- VALIDATED WITH sanitize_file_path()
-local name, path, ext, sep = f_path:match('.+[\\/](.+)'), f_path:match('(.+)[\\/]'), 
+local name, path, ext, sep = f_path:match('.+[\\/](.+)'), f_path:match('(.+)[\\/]'),
 f_path:match('.+(%..+)$'), f_path:match('[\\/]')
 	if File_Exists2(name, path, ext, sep) then
 	return f_path:sub(1,-#ext-1)..'_'..(os.time()+0)..ext -- OR os.date('%H-%M-%S_%d.%m.%y') instead of (os.time()+0)
-	end 
+	end
 return f_path
 end
 
 
 function resolve_file_name_collision1(f_path) -- see more comprehensive verson below
--- the function is supposed to be used after existence 
--- of a homonymous file at the destination path 
+-- the function is supposed to be used after existence
+-- of a homonymous file at the destination path
 -- has already been ascertained with functions such as File_Exists3();
 -- f_path is the file new path it's supposed to have after
 -- movement/copying;
 -- if the path after file name resolution exceeds 256 char limit
 -- returns false;
--- in case of collision REAPER overwrites namesake files 
+-- in case of collision REAPER overwrites namesake files
 -- unless at the very least their sizes differ
 -- in which case it resolves the collision by appending -001 suffix
 
@@ -19265,8 +19762,8 @@ end
 
 
 function resolve_file_name_collision2(f_path)
--- for preventing collision the function is supposed to be used after existence 
--- of a homonymous file at the destination path 
+-- for preventing collision the function is supposed to be used after existence
+-- of a homonymous file at the destination path
 -- has already been ascertained with functions such as File_Exists3(),
 -- but it can also be used for mere truncation of the file name
 -- due to excessive path length;
@@ -19275,7 +19772,7 @@ function resolve_file_name_collision2(f_path)
 -- another method of resolving file path excessive length
 -- see in sanitize_file_path();
 -- relies on Esc() function;
--- in case of collision REAPER overwrites namesake files 
+-- in case of collision REAPER overwrites namesake files
 -- unless at the very least their sizes differ
 -- in which case it resolves the collision by appending -001 suffix
 
@@ -19324,7 +19821,7 @@ local path, name, ext = f_path:match('(%S.+[\\/])(.+%.)(.+%S)$')
 			local name = name:match('(.+)%(%d+%)') -- exclude number in parenthesis completely, file with such name already exists at the destination path which is why this function is being executed in the first place, so it still should not collide and since inclusion of a number makes its path go over the character limit it needs truncation instead
 			name_len = len(name) -- get length of name without number
 				for i=1, name_len do -- each cycle reduces name length by 1 character
-				name = name:match('(.+)[\192-\255].[\128-\191]') or name:match('(.+)[\192-\255]*.[\128-\191]') 
+				name = name:match('(.+)[\192-\255].[\128-\191]') or name:match('(.+)[\192-\255]*.[\128-\191]')
 				or name:match('(.+)[\192-\255]*.[\128-\191]*') -- accounting for non-ASCII characters so that truncation occurs by character rather than bytes, accommodates all cases whether lead and continuation bytes present or not
 				f_path = path..name..ext
 					if len(f_path) <= 256 and not file_exists(f_path) then break end
@@ -19367,7 +19864,7 @@ local path, name, ext = f_path:match('(%S.+[\\/])(.+)(%..+%S)$')
 		if len(f_path) > 256 then return end -- in case all versions of the truncated file name collided with already existing files, a fairly unlikely scenario, exit to prevent returning the last concatenated f_path, or 'f_path = nil' could be used instead of return
 
 	end
-	
+
 return f_path
 
 end
@@ -19398,7 +19895,7 @@ function move_file_to_another_folder(file_path, folder_path, delete_old)
 local folder_path = folder_path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
 local folder_path = folder_path:match('.+[\\/]$') and folder_path:sub(1,-2) or folder_path -- last separator is removed so the path is properly formatted for io.open()
 local sep = file_path:match('[\\/]')
-local file_path = file_path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$') 
+local file_path = file_path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
 local f = io.open(file_path,'rb')
 local cont = f:read('*a')
 f:close()
@@ -19440,15 +19937,14 @@ local fx_chain_dir = CUSTOM_FX_CHAIN_DIR and Dir_Exists(Validate_Folder_Path(CUS
 ]]
 
 
-function print_or_write_to_file(str, PATH_TO_DUMP_FILE, file_name) 
--- PATH_TO_DUMP_FILE is a directory path; 
+function print_or_write_to_file(str, PATH_TO_DUMP_FILE, file_name)
+-- PATH_TO_DUMP_FILE is a directory path;
 -- uses 2 additional functions Dir_Exists() and open_dir_in_file_browser()
 -- the routine is used in 'List all linked FX parameters in the project.lua'
 
 	if #str <= 16380 then -- print to ReaConsole
 	-- ReaScript console can display maximum of 16,382 (almost 16,384) bytes. Couldn't go any higher. Once this number is exceeded the printed content is cut by 2,052 (a little over 2,048) bytes. And as far as i understand the process is repeated from there on out.
 	-- https://forum.cockos.com/showthread.php?t=216979#5
---Msg(str)
 	else -- dump to a file because ReaScript Console won't display the whole list
 	local dir = Dir_Exists(PATH_TO_DUMP_FILE)
 		if not dir then -- if dir is empty or otherwise invalid dump into the REAPER resource directory
@@ -19459,7 +19955,6 @@ function print_or_write_to_file(str, PATH_TO_DUMP_FILE, file_name)
 	f:close()
 	local f_exists = r.file_exists(dir..file_name)
 		if f_exists then
---Msg(dir:sub(1,-1))
 		local path = (dir == PATH_TO_DUMP_FILE or dir:sub(1,-2) == PATH_TO_DUMP_FILE) and 'designated' -- user dir either with or without the last separator
 		or 'REAPER resource'
 		local space = path == 'designated' and (' '):rep(5) or ''
@@ -19611,11 +20106,11 @@ end
 
 
 -- streamlined
-function get_file_timestamp3(file_name, dir) 
+function get_file_timestamp3(file_name, dir)
 -- both args are strings;
 -- dir MUST NOT end with separator,
 -- if dir isn't provided file arg must be full path;
--- Windows only, special chars in args must either 
+-- Windows only, special chars in args must either
 -- be escaped or the args inclosed in [[]]
 
 local command
@@ -19803,7 +20298,7 @@ end
 function Get_Or_Create_Dummy_Project_File1()
 -- see also Open_Close_Temp_Proj_Tab_Without_Save_Prompt()
 -- since when opened, dummy project reference is added to the 'Recent projects' menu
--- provided the preference at 
+-- provided the preference at
 -- Prefs -> General -> Recent projects list display button -> Add to recent list when loading project is enabled (and it's enabled by default)
 -- it's advised that it be stored in a constant path, because each new path
 -- is a new entry in the menu
@@ -19829,7 +20324,7 @@ end
 function Get_Or_Create_Dummy_Project_File2()
 -- see also Open_Close_Temp_Proj_Tab_Without_Save_Prompt()
 -- since when opened, dummy project reference is added to the 'Recent projects' menu
--- provided the preference at 
+-- provided the preference at
 -- Prefs -> General -> Recent projects list display button -> Add to recent list when loading project is enabled (and it's enabled by default)
 -- it's advised that it be stored in a constant path, because each new path
 -- is a new entry in the menu
@@ -19973,7 +20468,7 @@ end
 
 function Get_CommID_By_Script_Name(scriptName)
 -- https://raw.githubusercontent.com/NablaTools/Nabla/main/Looper%20A/Nabla%20Looper%20A%20-%20Settings.lua
-	
+
 	if type(scriptName)~="string" then
 	error("expects a 'string', got "..type(scriptName),2)
 	end;
@@ -20127,9 +20622,9 @@ local t = {}
 return t
 end
 ]]
--- if the loaded functions need to use local upvalues 
+-- if the loaded functions need to use local upvalues
 -- from the main code which are not passed as arguments
--- to individual functions these must be additonally included 
+-- to individual functions these must be additonally included
 -- inside the returned function
 -- otherwise only global variables from the main code
 -- are accessible to the loaded functions;
@@ -20160,7 +20655,7 @@ local func = ''
 		--[[ OR
 		-- the function may be marked by text signifying its start and end so the loop doesn't accidentally
 		-- capture unrelated content
-		-- the use of lines 'RETURN THIS FUNCTION START/END' typed out in reverse in this loop 
+		-- the use of lines 'RETURN THIS FUNCTION START/END' typed out in reverse in this loop
 		-- ensures that the code capture doesn't start at this exact loop as would likely be the case
 		-- had the lines been typed out normally
 			if line:match(('TRATS NOITCNUF SIHT NRUTER'):reverse()) or #func > 0 then
@@ -20269,11 +20764,11 @@ or lin and {'/','\0'} or mac and {'/',':'}
 	for k, char in ipairs(t) do
 	name = name:gsub(char, '')
 	end
-	
-	if #name:gsub(' ','') == 0 then 
+
+	if #name:gsub(' ','') == 0 then
 	Error_Tooltip('\n\n the file name does not \n\n include valid characters. \n\n', 1, 1) -- caps, spaced true
 	return end
-	
+
 local win_illegal = 'CON,PRN,AUX,NUL,COM1,COM2,COM3,COM4,COM5,COM6,COM7,COM8,COM9,LPT1,LPT2,LPT3,LPT4,LPT5,LPT6,LPT7,LPT8,LPT9'
 	if win then
 		for ill_name in win_illegal:gmatch('[^,]+') do
@@ -20281,16 +20776,16 @@ local win_illegal = 'CON,PRN,AUX,NUL,COM1,COM2,COM3,COM4,COM5,COM6,COM7,COM8,COM
 			then name = '' break end -- illegal names padded with spaces aren't allowed either
 		end
 	end
-	
+
 	if #name > 0 then -- if after the sanitation there're characters left
-	local shorter = #name < orig_len 
+	local shorter = #name < orig_len
 		if shorter then
 		Error_Tooltip('\n\n\t the file name has been \n\n stripped of illegal characters. '
 		..'\n\n\t      please review it \n\n', 1, 1, -100, -280) -- caps, spaced
 		end
 	return name, shorter
 	end
-	
+
 end
 
 
@@ -20519,22 +21014,31 @@ When setting screen_x_start value is ignored
 
 
 function Get_Vis_Arrange_Len_In_Pixels()
-local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
-local len = (end_time-start_time)*r.GetHZoomLevel()-17 -- GetHZoomLevel() returns px/sec // 17 is the vertical scrollbar which is included in the Arrange length in sec but is outside of the visible time line
-return math.floor(len+0.5) -- return rounded since fractional pixel values are invalid
--- OR
--- return len -- if rounding will be done outside of the function after additional calculations
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.62 then -- this may be supported in earlier builds as well, but unclear how far back
+	return r.GetSetProjectInfo(0, 'ARRANGE_W', 0, false) -- is_set false
+	else
+	local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+	local len = (end_time-start_time)*r.GetHZoomLevel()-17 -- GetHZoomLevel() returns px/sec // 17 is the vertical scrollbar which is included in the Arrange length in sec but is outside of the visible time line
+	return math.floor(len+0.5) -- return rounded since fractional pixel values are invalid
+	-- OR
+	-- return len -- if rounding will be done outside of the function after additional calculations
+	end
 end
 
 
 
 function Get_Arrange_Dims()
--- requires SWS or js_ReaScriptAPI extensions
+-- for complete info requires SWS or js_ReaScriptAPI extensions
 local sws, js = r.BR_Win32_FindWindowEx, r.JS_Window_Find
--- OR
--- local sws, js = r.APIExists('BR_Win32_FindWindowEx'), r.APIExists('JS_Window_Find')
+	-- OR
+	-- local sws, js = r.APIExists('BR_Win32_FindWindowEx'), r.APIExists('JS_Window_Find')
 
-	if sws or js then -- if SWS/js_ReaScriptAPI ext is installed
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.62 -- this may be supported in earlier builds as well, but unclear how far back
+	and not sws and not js then
+	local Get = r.GetSetProjectInfo
+	local arrange_h = Get(0, 'ARRANGE_H', 0, false) -- is_set false
+	return arrange_h
+	elseif sws or js then -- if SWS/js_ReaScriptAPI ext is installed
 	-- thanks to Mespotine https://github.com/Ultraschall/ultraschall-lua-api-for-reaper/blob/master/ultraschall_api/misc/misc_docs/Reaper-Windows-ChildIDs.txt
 	local main_wnd = r.GetMainHwnd()
 	-- trackview wnd height includes bottom scroll bar, which is equal to track 100% max height + 17 px, also changes depending on the header height and presence of the bottom docker
@@ -20612,7 +21116,7 @@ local temp_tr
 -- When the actions are applied the UI jolts, but PreventUIRefresh() is not suitable because it blocks the function GetMediaTrackInfo_Value() from getting the return value
 -- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled;
 -- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
--- which works like 40113 worked before the change and its use would obviate all the calculations below 
+-- which works like 40113 worked before the change and its use would obviate all the calculations below
 -- but it obviously doesn't cover the interim builds, so leaving the current code;
 -- since build 7.48 the following toggle zoom actions affect pinned tracks as well,
 -- introduced in build 7.46, but since their height is being taken into account
@@ -20629,18 +21133,18 @@ local tr_h = GetTrackVal(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelop
 -- if there're visible pinned tracks at the top (introduced in build 7.46), calculate their height because
 -- their presence affects max track height obtained above
 local pin_tracks_h = 0
-	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP 
+	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
 		for i=0, r.GetNumTracks()-1 do
 		local tr = r.GetTrack(0,i)
 			if r.IsTrackVisible(tr, false) -- mixer false
-			and GetTrackVal(tr, 'B_TCPPIN') == 1 				
+			and GetTrackVal(tr, 'B_TCPPIN') == 1
 			then
 			pin_tracks_h = pin_tracks_h + GetTrackVal(tr, 'I_WNDH') -- incl. envelopes
 			end
 		end
 	end
 
-pin_tracks_h = pin_tracks_h > 0 and pin_tracks_h+10 or pin_tracks_h -- 10 px is pinned track area separator width	
+pin_tracks_h = pin_tracks_h > 0 and pin_tracks_h+10 or pin_tracks_h -- 10 px is pinned track area separator width
 local tr_h = math.floor(tr_h + pin_tracks_h + 0.5) -- round; if 100 can be divided by the percentage (max_zoom) value without remainder (such as 50, 25, 20) the resulting value is integer, otherwise the calculated Arrange height is fractional because the actual track height in pixels is integer which is not what it looks like after calculation based on percentage (max_zoom) value, which means the value is rounded in REAPER internally because pixels cannot be fractional and the result is ±1 px diviation compared to the Arrange height calculated at percentages by which 100 can be divided without remainder
 local del = temp_tr and r.DeleteTrack(temp_tr) -- delete temp track if one was inserted
 ------------------------------------
@@ -20706,18 +21210,18 @@ end
 
 
 function Get_Visible_Grid_Div_Length(grid_div_len)
--- grid_div_len is value in sec, 
+-- grid_div_len is value in sec,
 -- stems from Grid_Div_Dur_In_Sec()
 -- returns length of visible grid division in sec
 
--- THE FUNCTION IS INCOMPATIBLE WITH MIDI EDITOR VISIBLE GRID 
--- PRODUCING INACCURATE RESULT BECASUE MIDI EDITOR GRID WHEN FOLDED 
--- DOESN'T RESPECT MIMIMUM LINE SPACING VALUE SET IN THE GRID SETTINGS 
--- (never respected before build 7.37 and only partially respects since) 
--- AND INSTEAD CREATES GREATER LINE SPACING WHICH IS IMPOSSIBLE TO CALCULATE 
--- WITH THE FUNCTION BECAUSE THE FUNCTION LOOKS FOR TIME VALUE IN SEC 
--- CORRESPONDING TO MIMIMUM LINE SPACING VALUE IN PIXELS AND CANNOT GUESS 
--- BY HOW MUCH ACTUAL LINE SPACING OF THE VISIBLE MIDI EDITOR GRID IS GREATER 
+-- THE FUNCTION IS INCOMPATIBLE WITH MIDI EDITOR VISIBLE GRID
+-- PRODUCING INACCURATE RESULT BECASUE MIDI EDITOR GRID WHEN FOLDED
+-- DOESN'T RESPECT MIMIMUM LINE SPACING VALUE SET IN THE GRID SETTINGS
+-- (never respected before build 7.37 and only partially respects since)
+-- AND INSTEAD CREATES GREATER LINE SPACING WHICH IS IMPOSSIBLE TO CALCULATE
+-- WITH THE FUNCTION BECAUSE THE FUNCTION LOOKS FOR TIME VALUE IN SEC
+-- CORRESPONDING TO MIMIMUM LINE SPACING VALUE IN PIXELS AND CANNOT GUESS
+-- BY HOW MUCH ACTUAL LINE SPACING OF THE VISIBLE MIDI EDITOR GRID IS GREATER
 -- THAN THE MINIMUM VALUE
 -- THAT SAID IT IS ABLE TO GIVE AN INDICATION WHEN THE MIDI EDITOR VISIBLE GRID
 -- DOESN'T MATCH THE GRID SETTING IN BUILDS 7.37+
@@ -20733,7 +21237,7 @@ local retval, min_spacing = r.get_config_var_string('projgridmin') -- minimum vi
 			pix_per_grid_div = zoom*grid_div_len
 			end
 		return grid_div_len
-		end	
+		end
 	end
 return grid_div_len
 end
@@ -20996,7 +21500,6 @@ function Offset_Shift_Value_To_Land_On_Natural_Keys2(curr_val, shift_by_val, pre
 
 local unit = 1/127 -- normalized value used by Note range start/end parameters in the range of 0-1
 local dest_val = (normalized and math.floor(curr_val/unit + 0.5) or curr_val) + shift_by_val -- convert to conventional 0-based note number to be able to use modulo below
---Msg(dest_val)
 -- offset in case the note ends up being an accidental rather than a natural (white) key
 local offset_val = shift_by_val < 0 and -1 or shift_by_val > 0 and 1 or 0
 local dest_val = (dest_val == 1 or dest_val%12 == 1 or dest_val == 3 or dest_val%12 == 3
@@ -21041,7 +21544,7 @@ if r.set_action_options then r.set_action_options(1|2) end
 -- supported since build 7.03
 -- script flag for auto-relaunching after termination in reaper-kb.ini is 4, e.g. SCR 4, but if changed
 -- directly while REAPER is running the change doesn't take effect, so in builds older than 7.03 user input is required
-if r.set_action_options then r.set_action_options(1) end	
+if r.set_action_options then r.set_action_options(1) end
 
 
 function Msg(param) -- X-Raym's
@@ -21054,25 +21557,38 @@ local Debug = ""
 -- OR
 -- local Debug = not select(2, r.get_action_context()):match('.+[\\/]BuyOne_') and "" -- in public scripts audomatically disabled
 function Msg(param, cap) -- caption second or none
-local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
-	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	if #Debug:gsub(' ','') > 0 then -- OR Debug:match('%S') // declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	local cap = cap and tostring(cap)..' = ' or ''
 	reaper.ShowConsoleMsg(cap..tostring(param)..'\n')
 	end
 end
 
 
 local Debug = ""
-function Msg(cap, param) -- caption always, if not needed can be empty string
-local cap = cap and type(cap) == 'string' and #cap > 0 and cap..' = ' or ''
-	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+function Msg(cap, param) -- caption always, if not needed can be empty string or nil
+	if #Debug:gsub(' ','') > 0 then -- OR Debug:match('%S') // declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	local cap = cap and tostring(cap)
+	cap = cap and #cap > 0 and cap..' = ' or ''
 	reaper.ShowConsoleMsg(cap..tostring(param)..'\n')
 	end
 end
 
 
+
 local Debug = ""
-function Msg(...) -- caption first (must be string otherwise ignored) or none, accepts functions with only one return value	
-	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
+function Msg(...) -- max of two arguments are expected: caption, which is optional, and a value
+	if #Debug:gsub(' ','') > 0 then -- OR Debug:match('%S') // declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	local t = {...}
+	local a, b = t[1] or '', t[2] or ''
+	reaper.ShowConsoleMsg(tostring(a)..(#t == 2 and ' = ' or '')..tostring(b)..'\n')
+	end
+end
+
+
+
+local Debug = ""
+function Msg(...) -- caption first (must be string otherwise ignored) or none, accepts functions with only one return value
+	if #Debug:gsub(' ','') > 0 then -- OR Debug:match('%S') // declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
 	local t = {...}
 		if #t > 1 then
 		local cap, param = table.unpack(t) -- assign arguments to vars
@@ -21081,21 +21597,21 @@ function Msg(...) -- caption first (must be string otherwise ignored) or none, a
 		elseif #t == 1 then
 		displ = tostring(...)..'\n'
 		r.ShowConsoleMsg(displ)
-		end	
+		end
 	end
 end
 
 
 
 local Debug = ""
-function Msg(...) 
+function Msg(...)
 -- accepts either a single arg, or multiple pairs of value and caption
 -- caption must follow value because if value is nil
 -- and the vararg ends with it, it will be ignored
 -- because nil isn't a valid table value, and won't be displayed
 -- so vararg must not be allowed to end with nil when multiple
 -- arguments are passed, i.e. always end with a caption
-	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
+	if #Debug:gsub(' ','') > 0 then -- OR Debug:match('%S') // declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
 	local t = {...} -- constucting table this way, i.e. by packing, allows getting table length even if it contains nils
 --	local str = #t == 1 and tostring(t[1])..'\n' or not t[1] and 'nil\n' or ''
 	local str = #t < 2 and tostring(t[1])..'\n' or '' -- covers cases when table only contains a single nil entry in which case its length is 0 or a single valid entry in which case its length is 1
@@ -21113,7 +21629,7 @@ end
 
 local Debug = ""
 function Msg2(msgbox, ...)
--- msgbox is boolean, if true the input will be displayed 
+-- msgbox is boolean, if true the input will be displayed
 -- in a message box instead of the ReaScript console,
 -- which allows aborting the script with 'Cancel' button
 -- via the following syntax:
@@ -21128,7 +21644,7 @@ function Msg2(msgbox, ...)
 -- because nil isn't a valid table value, and won't be displayed
 -- so vararg must not be allowed to end with nil when multiple
 -- arguments are passed, i.e. always end with a caption
-	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
+	if #Debug:gsub(' ','') > 0 then -- OR Debug:match('%S') // declared outside of the function, allows to only display output when true without the need to comment the function out when not needed, borrowed from spk77
 	local t = {...} -- constucting table this way, i.e. by packing, allows getting table length even if it contains nils
 --	local str = #t == 1 and tostring(t[1])..'\n' or not t[1] and 'nil\n' or ''
 	local str = #t < 2 and tostring(t[1])..'\n' or '' -- covers cases when table only contains a single nil entry in which case its length is 0 or a single valid entry in which case its length is 1
@@ -21165,14 +21681,14 @@ local function form(f, s)
 return string.format(tonumber(s) and f and '%.'..f..'f' or '%s', s)
 end
 
-	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	if #Debug:gsub(' ','') > 0 then -- OR Debug:match('%S') // declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
 	local t = {...} -- constucting table this way, i.e. by packing, allows getting table length even if it contains nils
 --	local str = #t == 1 and form(f, t[1])..'\n' or not t[1] and 'nil\n' or ''
 	local str = #t < 2 and tostring(t[1])..'\n' -- covers cases when table only contains a single nil entry in which case its length is 0 or a single valid entry in which case its length is 1
 		if #t > 1 then -- OR if #str == 0
 			for i=1,#t,2 do
 				if i > #t then break end
-			local val, cap = t[i], t[i+1]		
+			local val, cap = t[i], t[i+1]
 			str = str..form(f, cap)..' = '..form(f, val)..'\n'
 			end
 		end
@@ -21185,12 +21701,12 @@ local Debug = ""
 function Msg4(msgbox, f, ...)
 -- same as Msg(...) above but with argument f which is integer
 -- to modify floating point numbers precision;
--- msgbox is boolean, if true the input will be displayed 
+-- msgbox is boolean, if true the input will be displayed
 -- in a message box instead of the ReaScript console,
 -- which allows aborting the script with 'Cancel' button
 -- via the following syntax:
 -- if Msg2(1, value, 'value') then return end;
--- if msgbox is nil/false or true and 'OK' button is clicked, 
+-- if msgbox is nil/false or true and 'OK' button is clicked,
 -- after the above statement the script execution will continue,
 -- for nil/false underscore _ can be passed,
 -- the message box idea is borrowed from https://forum.cockos.com/showthread.php?t=254149;
@@ -21206,14 +21722,14 @@ local function form(f, s)
 return string.format(tonumber(s) and f and '%.'..f..'f' or '%s', s)
 end
 
-	if #Debug:gsub(' ','') > 0 then -- declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
+	if #Debug:gsub(' ','') > 0 then -- OR Debug:match('%S') // declared outside of the function, allows to only didplay output when true without the need to comment the function out when not needed, borrowed from spk77
 	local t = {...} -- constucting table this way, i.e. by packing, allows getting table length even if it contains nils
 --	local str = #t == 1 and form(f, t[1])..'\n' or not t[1] and 'nil\n' or ''
 	local str = #t < 2 and tostring(t[1])..'\n' -- covers cases when table only contains a single nil entry in which case its length is 0 or a single valid entry in which case its length is 1
 		if #t > 1 then -- OR if #str == 0
 			for i=1,#t,2 do
 				if i > #t then break end
-			local val, cap = t[i], t[i+1]		
+			local val, cap = t[i], t[i+1]
 			str = str..form(f, cap)..' = '..form(f, val)..'\n'
 			end
 		end
@@ -21273,7 +21789,7 @@ os.execute('start "" '..'"C:\\ReascriptLog.txt"')
 local Debug = false
 	if Debug then reaper.ClearConsole() end
 local function Msg(...)
-  if Debug then 
+  if Debug then
     local args = {...}
     for i = 1, #args do
       args[i] = tostring(args[i])
@@ -21287,8 +21803,8 @@ end
 local date = os.date('%H-%M-%S_%d.%m.%y') -- a convenient way to make file names unique and prevent clashes
 
 
-function execute_function_from_table(func) 
--- a way to execute a function stored in a table 
+function execute_function_from_table(func)
+-- a way to execute a function stored in a table
 -- with global arguments already passed, where func is t[n],
 -- i.e. t = {my_function(arg1, arg2, arg3)}
 -- local arguments will produce error
@@ -21332,12 +21848,18 @@ end
 ---- VALIDATE VARIABLES
 
 
-function Validate_Positive_Integer(str, type) -- str is a numeric string, type is a string, script specific to distinguish between 2 modes
+function Validate_Positive_Integer1(str, type) -- str is a numeric string, type is a string, script specific to distinguish between 2 modes
 local default = type and (type:lower() == 'bend' and 12 or type:lower() == 'offset' and 80)
 	if not default then return end
 local str = str:gsub(' ','') -- remove all spaces
 local str = #str == 0 and default or tonumber(str)
 return str and math.abs(str) > default and default or str and math.floor(str)
+end
+
+
+function validate_positive_integer2(int)
+-- int is numeric string
+return tonumber(int) and math.floor(math.abs(int+0))
 end
 
 
@@ -21513,7 +22035,7 @@ function do_in_X_mins(cur_time, duration)
 end
 
 
-function ACT1(comm_ID) 
+function ACT1(comm_ID)
 -- both string and integer work
 -- see also Main_OnCommand_alt()
 local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
@@ -21521,7 +22043,7 @@ local act = comm_ID and comm_ID ~= 0 and r.Main_OnCommand(r.NamedCommandLookup(c
 end
 
 
-function ACT2(comm_ID, islistviewcommand, midi) 
+function ACT2(comm_ID, islistviewcommand, midi)
 -- islistviewcommand, midi are boolean
 -- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
 -- e.g. sectionID == 32061
@@ -21531,7 +22053,7 @@ or not midi and r.Main_OnCommand(r.NamedCommandLookup(comm_ID), 0) -- not midi c
 end
 
 
-function ACT3(comm_ID, islistviewcommand, midi) 
+function ACT3(comm_ID, islistviewcommand, midi)
 -- islistviewcommand, midi are boolean
 -- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
 -- e.g. sectionID == 32061
@@ -21707,7 +22229,7 @@ end
 
 
 function Reload_Menu_at_Same_Pos1(menu, keep_menu_open, left_edge_dist)
--- only useful for looking up the result of a toggle action, 
+-- only useful for looking up the result of a toggle action,
 -- see a more practical example as Reload_Menu_at_Same_Pos2() below
 -- keep_menu_open is boolean
 -- left_edge_dist is integer to only display the menu
@@ -21868,7 +22390,7 @@ function Settings_Management_Menu_And_Help(condition, want_help, want_run)
 -- condition is boolean which triggers menu call,
 -- want_help is boolean if 'About' text needs to be displayed to the user,
 -- want_run is a boolean to create a menu button to execute the script;
--- any user settings not explicitly listed in user_sett table below 
+-- any user settings not explicitly listed in user_sett table below
 -- will be ignored in the menu, i.e. MANAGE_SETTINGS_VIA_MENU setting
 -- if present
 
@@ -21927,7 +22449,7 @@ local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
 	if output == 6 and want_help and #help_t > 0 then -- THE output VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
 	r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'),r.ClearConsole()) -- trimming the first line of user settings section because it's captured by the loop
 	end
-	
+
 	if want_run and output == 7 then -- THE output VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
 	return menu_sett
 	elseif output == 0 then return 1 -- i.e. truth will trigger script abort to prevent activation of the main routine when menu is exited
@@ -21972,8 +22494,8 @@ local menu = #MANAGE_SETTINGS_VIA_MENU:gsub(' ','') > 0 -- only if such setting 
 local user_sett = menu and Settings_Management_Menu_And_Help(condition, want_help, 1) -- want_run true
 
 	if not user_sett then r.defer(no_undo) end
-	
--- initialize here if settings menu is enabled, 
+
+-- initialize here if settings menu is enabled,
 -- otherwise use original variables from USER SETTINGS section
 function validate_sett(sett, menu_sett)
 return #(menu_sett or sett):gsub(' ','') > 0
@@ -21991,7 +22513,7 @@ function Toggle_Settings_From_Menu1(t, menu, scr_path)
 -- t is table containing setting values, setting names and setting menu labels
 -- see example after the function,
 -- in the function instance before the menu loading it includes attributes of all settings,
--- in the function instance triggered by a click on a menu item it only includes 
+-- in the function instance triggered by a click on a menu item it only includes
 -- attributes of a setting which corresponds to the clicked menu item;
 -- scr_path serves as trigger for the routine of toggling the setting directly from the menu
 -- if scr_path arg is absent the menu is updated based on the current
@@ -22015,10 +22537,10 @@ function Toggle_Settings_From_Menu1(t, menu, scr_path)
 	else
 	local sett_name, menu_itm = t[2], t[3]
 	-- toggle from the menu
-	local menu_itm_checked = menu:match('!'..menu_itm) and true or false -- assign booleans for comparison of identical value type 
+	local menu_itm_checked = menu:match('!'..menu_itm) and true or false -- assign booleans for comparison of identical value type
 	-- toggle
 	menu = update_menu_items(menu, not menu_itm_checked, menu_itm) -- 'not' because here if menu item is checked it must be flipped as a result of a toggle and vice versa
-	 
+
 		if sett == menu_itm_checked then
 
 		-- Update the setting within the script
@@ -22037,7 +22559,7 @@ function Toggle_Settings_From_Menu1(t, menu, scr_path)
 			end
 
 			-- update script if settings equal to the original menu item state
-			-- i.e. state before the change of the menu item state      
+			-- i.e. state before the change of the menu item state
 			if sett_line and #sett_line:match('"([^%s]-)"') > 0 == menu_itm_checked then -- basically redundant condition because this was already evaluated as 'sett == menu_itm_checked' above
 			local f = io.open(scr_path,'r')
 			local cont = f:read('*a')
@@ -22053,8 +22575,8 @@ function Toggle_Settings_From_Menu1(t, menu, scr_path)
 
 		t[1] = not t[1] -- invert original setting boolean because it's been toggled
 
-		end 
-	 
+		end
+
 	end
 
 return menu, t[1] -- 2nd return value is the setting after toggling to be used by script functions downstream
@@ -22134,9 +22656,9 @@ local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
 
 function Toggle_Settings_From_Menu2(idx, sett_t, scr_path, exclusive_t)
 -- idx is menu output value, i.e. index of the menu item
--- corresponding to the setting being toggled 
+-- corresponding to the setting being toggled
 -- and to the setting index within the table of settings
--- contructed below from the USER SETTINGS section, 
+-- contructed below from the USER SETTINGS section,
 -- if in the menu settings don't start at index 1
 -- their indices will have to be offset and so idx,
 -- because list of settings retrieved from the USER SETTINGS section
@@ -22144,9 +22666,9 @@ function Toggle_Settings_From_Menu2(idx, sett_t, scr_path, exclusive_t)
 -- sett_t is table of all settings boolean values in the order
 -- they're listed in the USER SETTINGS section;
 -- scr_path comes from get_action_context();
--- exclusive_t is and optional argument, a table of toggle settings 
--- which are mutually exclusive, where keys are indices of the settings 
--- in the menu, offset so that the 1st setting has index 1 to match 
+-- exclusive_t is and optional argument, a table of toggle settings
+-- which are mutually exclusive, where keys are indices of the settings
+-- in the menu, offset so that the 1st setting has index 1 to match
 -- USER SETTING section sequence, and where values are their boolean values;
 -- the function is not designed to work
 -- with menu loaded from extended state
@@ -22162,7 +22684,7 @@ local settings, found = {}
 		elseif line:match('END OF USER SETTINGS') then
 		break
 		end
-	end	
+	end
 
 
 --local sett_new_state = settings[idx]:match('=%s*"(%S)"') and '' or '1' -- toggle
@@ -22176,7 +22698,7 @@ local exclusive_toggle = exclusive_t and exclusive_t[idx] ~= nil and sett_new_st
 			if k ~= idx and exclusive_t[k] then -- only if mutually exclusive setting is true to avoid unnecessary writing to this file
 			exclusive_t[k] = ''
 			end
-		end	
+		end
 	end
 
 -- update
@@ -22196,7 +22718,7 @@ local cont, cnt = cont:gsub(settings[idx], sett_upd, 1)
 			end
 		end
 	end
-	
+
 	if cnt > 0 then -- settings were updated, write to file
 	local f = io.open(scr_path,'w')
 	f:write(cont)
@@ -22302,7 +22824,7 @@ local path = package.path..'my_Multi-line caption aide (for use with Video proce
 local f = io.open(path,'r')
 local values = {sett1, sett2, sett3} -- variable values // not all settings have to be included, only those relevant to the current script
 
-	if f then	
+	if f then
 
 	-- parse main script settings section
 	local sett_t = {}
@@ -22314,7 +22836,7 @@ local values = {sett1, sett2, sett3} -- variable values // not all settings have
 			break
 			end
 		end
-		
+
 	f:close()
 
 	-- not all settings have to be included, only those relevant to the current script
@@ -22329,11 +22851,11 @@ local values = {sett1, sett2, sett3} -- variable values // not all settings have
 				end
 			end
 		end
-	
+
 	end
 
-return table.unpack(values)	
-	
+return table.unpack(values)
+
 end
 --[[ USE:
 sett1, sett2, sett3 = Get_Main_Script_Settings(main_scr_name) -- first load them from the main script
@@ -22431,7 +22953,7 @@ function Menu_With_Toggle_Options1(scr_cmd_ID, sett_t, menu_t, default_sett_stat
 
 ::RELOAD::
 
-local default_sett_state = default_sett_state and #default_sett_state == #sett_t and default_sett_state 
+local default_sett_state = default_sett_state and #default_sett_state == #sett_t and default_sett_state
 or ('0'):rep(#sett_t) -- if invalid or length doesn't match sett_t length default to all Off
 local sett = r.GetExtState(scr_cmd_ID, 'SETTINGS')
 local ret
@@ -22447,15 +22969,16 @@ local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',  sett_t[2]..'|',
 -- OPTIONAL
 -- associate indices of boolean settings from sett_t (values)
 -- with menu_t indices of their mutually exclusive counterparts (keys)
--- i.e. 'My setting 1' with menu index 4 ('My setting 2'), 
+-- i.e. 'My setting 1' with menu index 4 ('My setting 2'),
 -- 'My setting 3' with menu index 7 ('My setting 4');
 -- IF MUTUALLY EXCLUSIVE SETTINGS ARE PAIRS, IT'S ENOUGH THAT ONLY ONE
--- OF MEMBER OF A PAIR IS INCLUDED IN sett_t TABLE, MUTUALLY EXCLUSIVE
+-- MEMBER OF A PAIR IS INCLUDED IN sett_t TABLE, MUTUALLY EXCLUSIVE
 -- SETTINGS WITH GREATER NUMBER OF MEMBERS AREN'T SUPPORTED YET;
 -- this table ensures that when an item of a mutually exclusive setting pair
 -- is clicked in the menu it is its counterpart state which is changed
--- and stored, i.e. the one which IS included in sett_t table, 
--- while the state of the 2nd member only changes visually in the menu
+-- and stored, i.e. the one which IS included in sett_t table,
+-- while the state of the 2nd member only changes visually in the menu;
+-- menu_t table indices are used as keys, sett_t table indices - as values
 local excl_sett_t = {[4]=1,[7]=3}
 
 -- OPTIONAL
@@ -22463,7 +22986,9 @@ local excl_sett_t = {[4]=1,[7]=3}
 -- with menu_t indices or index ranges or non-contiguous sequences
 -- of indices (values) which should be grayed out when a boolean is true,
 -- i.e. 'Item 1' and 'Item 2' (indices 1 and 2 respectively in menu_t) with 'My setting 1',
--- 'Item 3', 'My setting 3', 'My setting 4' (indices 5-7 in menu_t) with 'My setting 2'
+-- 'Item 3', 'My setting 3', 'My setting 4' (indices 5-7 in menu_t) with 'My setting 2';
+-- unlike in excl_sett_t, sett_t table indices are used as keys, 
+-- menu_t table indices - as values
 local grayout_t = {[1]={1,2}, [2]={1,7}} -- here index ranges are used
 
 
@@ -22487,7 +23012,7 @@ local sett_indices_t = {}
 			break end
 		end
 	end
-	
+
 	-- Checkmark menu settings which are mutually exclusive
 	-- to the booleans stored in the bitfield
 	if excl_sett_t then
@@ -22496,8 +23021,8 @@ local sett_indices_t = {}
 		menu_t[menu_idx] = (sett_bools_t[bool_idx] == '1' and '!' or '')..sett
 		end
 	end
-	
-	
+
+
 	-- Gray out items in the menu
 	if grayout_t then
 		for bool_idx, range in pairs(grayout_t) do
@@ -22519,15 +23044,15 @@ local sett_indices_t = {}
 			end
 		end
 	end
-		
-	-- OPTIONAL, SCRIPT SPECIFIC IF AN OPTION TO HIDE	
+
+	-- OPTIONAL, SCRIPT SPECIFIC IF AN OPTION TO HIDE
 	-- SETTINGS MENU INTO A SUBMENU IS PRESENT
 	-- collapse settings menu into a submenu
 	if collapse_sett=='1' then -- setting which is stored as extended state
 	menu_t[14] = '<EXPAND SETTINGS MENU||' -- precede table.insert otherwise collapse menu item index will be different
 	table.insert(menu_t, 1, '>'..('S E T T I N G S')..'|') -- inserting SETTINGS submenu title
-	end	
-		
+	end
+
 
 local output = Reload_Menu_at_Same_Pos2(table.concat(menu_t), 1) -- keep_menu_open true
 
@@ -22538,12 +23063,12 @@ local output = Reload_Menu_at_Same_Pos2(table.concat(menu_t), 1) -- keep_menu_op
 	sett = table.concat(sett_bools_t):gsub('%d', function(c) i=i+1 if i==idx then return math.floor(c+0~1) end end) -- flipping the bit
 	else -- expand with other menu items if necessary
 	end
-	
+
 	elseif excl_sett_t and excl_sett_t[output] or sett_indices_t[output] then -- this condition will likely need expansion to include indices of other menu items which aren't settings
 	r.SetExtState(scr_cmd_ID, 'SETTINGS', sett, false) -- persist false
 	r.SetProjExtState(0, scr_cmd_ID, 'SETTINGS', sett)
 	goto RELOAD end
-	
+
 end
 --[[ USE:
 local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context()
@@ -22555,11 +23080,11 @@ Menu_With_Toggle_Options(named_ID, sett_t, menu_t, default_sett_state)
 
 
 function Menu_With_Toggle_Options2(scr_cmd_ID, sett_t, menu_t, default_sett_state)
--- this version stores enabled settings as a bitfield 
+-- this version stores enabled settings as a bitfield
 -- rather than as a literal base 2 value;
 -- scr_cmd_ID comes from get_action_context()
--- default_sett_state is a bitfield, optional, the format is 
--- e.g. 1|2|4|8|16 etc., i.e. all 5 options are On by default, 
+-- default_sett_state is a bitfield, optional, the format is
+-- e.g. 1|2|4|8|16 etc., i.e. all 5 options are On by default,
 -- 1|4 - options 1 and 3 are On by defaullt,
 -- 2|8|16 - options 2,4 and 5 are On by default
 -- relies on Reload_Menu_at_Same_Pos2() function
@@ -22578,21 +23103,22 @@ bitfield = #bitfield > 0 and bitfield+0 or default_sett_state or 0
 -- POPULATE WITH NAMES OF TOGGLE SETTINGS AS THEY APPEAR IN THE MENU
 local sett_t = sett_t or {'My setting 1', 'My setting 2', 'My setting 3', 'My setting 4'}
 
-local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',  
+local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',
 sett_t[2]..'|', 'Item 3|', sett_t[3]..'|', sett_t[4]..'|'}
 
 -- OPTIONAL
 -- associate indices of boolean settings from sett_t (values)
 -- with menu_t indices of their mutually exclusive counterparts (keys)
--- i.e. 'My setting 1' with menu index 4 ('My setting 2'), 
+-- i.e. 'My setting 1' with menu index 4 ('My setting 2'),
 -- 'My setting 3' with menu index 7 ('My setting 4');
 -- IF MUTUALLY EXCLUSIVE SETTINGS ARE PAIRS, IT'S ENOUGH THAT ONLY ONE
--- OF MEMBER OF A PAIR IS INCLUDED IN sett_t TABLE, MUTUALLY EXCLUSIVE
+-- MEMBER OF A PAIR IS INCLUDED IN sett_t TABLE, MUTUALLY EXCLUSIVE
 -- SETTINGS WITH GREATER NUMBER OF MEMBERS AREN'T SUPPORTED YET;
 -- this table ensures that when an item of a mutually exclusive setting pair
 -- is clicked in the menu it is its counterpart state which is changed
--- and stored, i.e. the one which IS included in sett_t table, 
--- while the state of the 2nd member only changes visually in the menu
+-- and stored, i.e. the one which IS included in sett_t table,
+-- while the state of the 2nd member only changes visually in the menu;
+-- menu_t table indices are used as keys, sett_t table indices - as values
 local excl_sett_t = {[4]=1,[7]=3}
 
 -- OPTIONAL
@@ -22600,7 +23126,9 @@ local excl_sett_t = {[4]=1,[7]=3}
 -- with menu_t indices or index ranges or non-contiguous sequences
 -- of indices (values) which should be grayed out when a boolean is true,
 -- i.e. 'Item 1' and 'Item 2' (indices 1 and 2 respectively in menu_t) with 'My setting 1',
--- 'Item 3', 'My setting 3', 'My setting 4' (indices 5-7 in menu_t) with 'My setting 2'
+-- 'Item 3', 'My setting 3', 'My setting 4' (indices 5-7 in menu_t) with 'My setting 2';
+-- unlike in excl_sett_t, sett_t table indices are used as keys, 
+-- menu_t table indices - as values
 local grayout_t = {[1]={1,2}, [2]={1,7}} -- here index ranges are used
 
 
@@ -22630,8 +23158,8 @@ local sett_bools_t = {}
 			-- menu_t[menu_idx] = (truth and '!' or '')..sett
 			break end
 		end
-	end	
-	
+	end
+
 	-- Checkmark menu settings which are mutually exclusive
 	-- to the booleans stored in the bitfield
 	if excl_sett_t then
@@ -22640,7 +23168,7 @@ local sett_bools_t = {}
 		menu_t[menu_idx] = (not sett_bools_t[bool_idx] and '!' or '')..sett
 		end
 	end
-	
+
 	-- Gray out items in the menu
 	if grayout_t then
 		for bool_idx, range in pairs(grayout_t) do
@@ -22662,26 +23190,26 @@ local sett_bools_t = {}
 			end
 		end
 	end
-	
-	
-	-- OPTIONAL, SCRIPT SPECIFIC IF AN OPTION TO HIDE	
+
+
+	-- OPTIONAL, SCRIPT SPECIFIC IF AN OPTION TO HIDE
 	-- SETTINGS MENU INTO A SUBMENU IS PRESENT
 	-- collapse settings menu into a submenu
 	if collapse_sett=='1' then -- setting which is stored as extended state
 	menu_t[14] = '<EXPAND SETTINGS MENU||' -- precede table.insert otherwise collapse menu item index will be different
 	table.insert(menu_t, 1, '>'..('S E T T I N G S')..'|') -- inserting SETTINGS submenu title
 	end
-		
+
 
 local output = Reload_Menu_at_Same_Pos2(table.concat(menu_t), 1) -- keep_menu_open true
-  
+
 	if output == 0 then return
 	elseif excl_sett_t and excl_sett_t[output] or sett_indices_t[output] then -- toggle a setting // in this order of priority in case both members of mutually exclusive setting pair are included in sett_t table because in this case sett_indices_t[output] will always be valid and produce false positives
 	local idx = excl_sett_t and excl_sett_t[output] or sett_indices_t[output] -- extract index relevant for sett_t table // same priority logic as in the preceding line
 	sett_bools_t[idx] = not sett_bools_t[idx] -- flip because it's a toggle
 	else -- expand with other menu items if necessary
 	end
-  
+
 	if excl_sett_t and excl_sett_t[output] or sett_indices_t[output] then -- this condition will likely need expansion to include indices of other menu items which aren't settings
 	-- Store new bitfield
 	local bitfield = 0
@@ -22693,7 +23221,7 @@ local output = Reload_Menu_at_Same_Pos2(table.concat(menu_t), 1) -- keep_menu_op
 	r.SetExtState(scr_cmd_ID, 'SETTINGS', bitfield, false) -- persist false
 	r.SetProjExtState(0, scr_cmd_ID, 'SETTINGS', bitfield)
 	goto RELOAD end
-  
+
 end
 
 
@@ -22702,7 +23230,7 @@ function Toggle_Option(option, data, output, scr_ID)
 -- toggle in response to menu item click;
 -- option arg is string, one of the options stored as extended state in 0 and 1 format;
 -- data is string, stems from extended state extracted before loading the menu, i.e.
---[[ 
+--[[
 local data = r.GetExtState(scr_ID, 'OPTIONS')
 local option1, option2, option3 = data:match('(%d)(%d)(%d)')
 ]]
@@ -22721,7 +23249,7 @@ end
 function Create_Submenus_Dynamically(t, limit)
 -- meant for creation of a menu with a limited number
 -- of items in the main menu in order to fit within the screen height
--- and placing all items in excess inside submenus 
+-- and placing all items in excess inside submenus
 -- accessible from the main menu;
 -- t is either a table with values to be displayed as menu items
 -- or integer in which case numerals will be used as menu items;
@@ -22731,7 +23259,7 @@ function Create_Submenus_Dynamically(t, limit)
 -- the main menu is shortened by the number of submenus
 -- to accommodate submenu items and prevent exceeding the limit
 -- in the main menu itself;
--- if the limit is smaller than the submenu count, 
+-- if the limit is smaller than the submenu count,
 -- main_menu_cnt var will end up being negative
 -- and submenus will be created from the very first menu item;
 -- one extra submenu over submenu_count value could be added
@@ -22822,13 +23350,13 @@ local message_t, max_len = {}, 0
 		message_t[#message_t+1] = line..'|'
 		end
 	end
-	
+
 -- Center the message
 message_t = center_text(message_t, max_len)
 buttons_t = center_text(buttons_t, max_len)
 
 local title = title or ('PROMPT'):gsub('.','%0    ')
--- title = (' '):rep(math.floor((max_len-#title)/2+#title/2+0.5))..title 
+-- title = (' '):rep(math.floor((max_len-#title)/2+#title/2+0.5))..title
 -- OR better yet ('  '):rep(math.floor((max_len-#title)/2+0.5))..title -- center the title, works for spaced out 'PROMPT', same can be done with the button captions
 local menu = title..'||'..table.concat(message_t)..'||'..table.concat(buttons_t,'|')
 
@@ -22848,12 +23376,12 @@ end
 
 
 
-function Re_Store_Ext_State(section, key, persist, val) 
--- section & key args are strings, 
--- persist is boolean, if false/nil global ext state 
--- is only stored for the duration of REAPER session, 
--- only relevant for storage stage; 
--- presence of val arg is anything which needs storage, 
+function Re_Store_Ext_State(section, key, persist, val)
+-- section & key args are strings,
+-- persist is boolean, if false/nil global ext state
+-- is only stored for the duration of REAPER session,
+-- only relevant for storage stage;
+-- presence of val arg is anything which needs storage,
 -- determines whether the state is loaded or stored
 	if not val then -- load
 	local ret, state = r.GetProjExtState(0, section, key)
@@ -22875,7 +23403,7 @@ end
 local function Wrapper1(func,...) -- see Wrapper_multi_function() below
 -- r.atexit() CAN BE USED WITHOUT THE WRAPPER FUNCTION AS FOLLOWS
 -- r.atexit(function() my_function(arg1, arg2, arg3) end)
--- ARGUMENTS DON'T HAVE TO BE GLOBAL 
+-- ARGUMENTS DON'T HAVE TO BE GLOBAL
 -- AND UPVALUE NAMES DON'T HAVE TO MATCH THE ARGUMENTS
 
 -- wrapper for a 3d function with arguments
@@ -22907,8 +23435,8 @@ r.atexit(Wrapper(My_Function, arg1, arg2, arg3)
 
 local function Wrapper2(...) -- more wordy, see Wrapper_multi_function() below
 -- r.atexit() CAN BE USED WITHOUT THE WRAPPER FUNCTION AS FOLLOWS
--- r.atexit(function() my_function(arg1, arg2, arg3) end) 
--- ARGUMENTS DON'T HAVE TO BE GLOBAL 
+-- r.atexit(function() my_function(arg1, arg2, arg3) end)
+-- ARGUMENTS DON'T HAVE TO BE GLOBAL
 -- AND UPVALUE NAMES DON'T HAVE TO MATCH THE ARGUMENTS
 
 -- to be used with defer() and atexit()
@@ -22923,8 +23451,8 @@ end
 
 function Wrapper_multi_function(...)
 -- r.atexit() CAN BE USED WITHOUT THE WRAPPER FUNCTION AS FOLLOWS
--- r.atexit(function() my_function1(arg1, arg2, arg3) my_function2(arg1, arg2, arg3) end) 
--- ARGUMENTS DON'T HAVE TO BE GLOBAL 
+-- r.atexit(function() my_function1(arg1, arg2, arg3) my_function2(arg1, arg2, arg3) end)
+-- ARGUMENTS DON'T HAVE TO BE GLOBAL
 -- AND UPVALUE NAMES DON'T HAVE TO MATCH THE ARGUMENTS
 
 -- the vararg syntax is as follows:
@@ -22995,7 +23523,7 @@ function Get_Option_Script_Toggle_State(sectionID, scr_name)
 -- the drawback is that its toggle state isn't restored at
 -- REAPER starup unless the script is explicitly run at startup,
 -- so the main use is inside custom actions to modify the main
--- script behavior on demand, setting the desired toggle state 
+-- script behavior on demand, setting the desired toggle state
 -- during custom action execution with the sequence:
 --[[
 Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
@@ -23118,7 +23646,7 @@ local cur_proj, projfn = r.EnumProjects(-1) -- store cur project pointer; return
 					projfn = line:match('^recent%d+=(.+)') break
 					end
 				end
-			end		
+			end
 		end
 		if #projfn == 0 then -- still not found in recently opened, use dummy
 		projfn = Get_Or_Create_Dummy_Project_File()
@@ -23135,12 +23663,12 @@ end
 function Open_Close_Temp_Proj_Tab_Without_Save_Prompt3(path)
 -- creates temp project file, uses it, then deletes it
 -- THE TEMP FILE IS ADDED TO RECENT PROJECTS MENU
--- provided the preference at 
+-- provided the preference at
 -- Prefs -> General -> Recent projects list display button -> Add to recent list when loading project is enabled (and it's enabled by default)
 -- SO WITH FREQUENT USE THE MENU WILL BE INUNDATED WITH TEMP FILES
 -- BECAUSE THEY ALL WILL BE UNIQUE, SO MUCH CLEANER IS TO USE
 -- THE SAME SPECIFIC DUMMY FILE IN EACH FUNCTION CALL
--- for consistency's sake path is the path of the last loaded/saved template 
+-- for consistency's sake path is the path of the last loaded/saved template
 -- stemming from the extended state
 -- if not stored yet, use REAPER own last/current working directory
 local path = path or select(2, r.get_config_var_string('lastcwd'))
@@ -23189,8 +23717,21 @@ return (not OS:match('/') or OS:match('/x')) and 'win'
 or OS:match('OS') and 'mac' or OS:match('linux')
 -- OR
 -- local OS = r.GetOS()
--- return OS:match('Win') or OS:match('OSX') and 'Mac' or 'Other'
+-- return OS:match('/') and not OS:match('linux') or OS:match('OS') and 'Mac' or 'Other'
 end
+
+
+
+function Is_OS(os_name)
+-- os name is either win, mac or lin, letter case is immaterial
+	if not os_name then return end
+local os_name = tostring(os_name):lower()
+local OS = r.GetAppVersion()
+return os_name:match('mac') and OS:match('OS')
+or os_name:match('lin') and OS:match('lin')
+or os_name:match('win') and not OS:match('[OSlinu]+')
+end
+
 
 
 
@@ -23245,7 +23786,7 @@ function resolve_all_or_restore_apostrophe(fields_t, sep, resolve)
 -- to balance any unbalanced characters and store the returned result as extended state
 -- so that it can be fed back into the dialogue reliably later on
 -- then followed by another instance of the function in restore mode
--- to restore balanced apostrophe instances 
+-- to restore balanced apostrophe instances
 -- to their original form for further use,
 -- unbalanced quotation marks and parentheses after resolution trigger a warning message
 -- and reloading of the dialogue to allow the user to resolve the unbalanced characters
@@ -23290,7 +23831,7 @@ function resolve_all_or_restore_apostrophe(fields_t, sep, resolve)
 		fields_t[field_idx] = field
 		end
 		if #unbalanced_char_data > 0 then
-	-- r.MB('Please resolve unbalanced characters in:\n\n'..unbalanced_char_data:sub(1,-2)..'\n\nThey have been balanced for the settings\nto be properly displayed in the reloaded dialogue.\n\nBut if you leave them as they are, that\'s how\nthe terms will be searched for and/or appear\nafter replacement in the transcript.', 'WARNING',0) -- stripping trailing new line character from unbalanced_char_data	
+	-- r.MB('Please resolve unbalanced characters in:\n\n'..unbalanced_char_data:sub(1,-2)..'\n\nThey have been balanced for the settings\nto be properly displayed in the reloaded dialogue.\n\nBut if you leave them as they are, that\'s how\nthe terms will be searched for and/or appear\nafter replacement in the transcript.', 'WARNING',0) -- stripping trailing new line character from unbalanced_char_data
 	--	r.MB('Please resolve unbalanced characters in:\n\n'..unbalanced_char_data:sub(1,-2)..'\n\nThey have been balanced for the settings\nto be properly displayed in the reloaded dialogue.\n\nBut if you leave them as they are, they will\nbe used in their automatically balanced version.\n\nBalanced apostrophe can be left as they are.\nThese will be restored to single instances automatically.', 'WARNING',0) -- stripping trailing new line character from unbalanced_char_data
 		end
 	return fields_t, unbalanced_char_data -- unbalanced_char_data return value will be used to condition reloading of the dialogue by setting off the 'goto' loop
@@ -23306,25 +23847,25 @@ end
 
 
 function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator, comment_field, comment, empty_comm_fields)
--- title string, field_cnt integer which can be smaller or greater 
+-- title string, field_cnt integer which can be smaller or greater
 -- than the number of fields in field_names arg, in which case fields will
--- be subtracted, or added but without names, if 0 <= field_cnt 
--- then field_cnt will be derived from field_names arg 
+-- be subtracted, or added but without names, if 0 <= field_cnt
+-- then field_cnt will be derived from field_names arg
 -- and if field_names is empty but comment_field is enabled
 -- field_cnt will default to 1 to add one field besides the comment field(s),
 -- otherwise the dialogue won't load because field count 0 disables it in the native function
 -- while negative value generates a blank window with buttons, which is prevented here,
 -- field_cnt doesn't account for the comment field,
--- if final field count exceeds the total limit of 16, 
+-- if final field count exceeds the total limit of 16,
 -- it gets clamped to 16 and disables the comment if enabled,
 -- if fields count isn't constant because their appearance is conditional
--- it may prove more relialbe to calculate the field_cnt value in the code 
+-- it may prove more relialbe to calculate the field_cnt value in the code
 -- outside of the function because extra separators which separate fields
 -- whose appearance condition isn't met will affect the internal
 -- calculation;
 -- field_names is table or string comma delimited
--- OR separator delimited IF commas must be used in field names, 
--- because 'separator=' setting applies to field name separation as well, 
+-- OR separator delimited IF commas must be used in field names,
+-- because 'separator=' setting applies to field name separation as well,
 -- OR empty string,
 -- it's safer to use \n or \r or \t or any other control char as a separator
 -- to ensure that the separator has no chance of clashing with the user content
@@ -23335,7 +23876,7 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 -- unbalanced quotes, apostrophes and parenthesis break field separation
 -- SEE ALSO resolve_all_or_restore_apostrophe() above;
 -- the length of field names list should obviously match field_cnt arg
--- it's more reliable to contruct a table of names 
+-- it's more reliable to contruct a table of names
 -- and pass the two vars field_cnt and field_names as #t, t
 -- field_cont is empty string or nil unless they must be initially filled,
 -- to fill out only specific fields precede them with as many separator characters
@@ -23346,22 +23887,22 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 -- separator is a string, character which delimits the fields,
 -- if invalid / empty string, defaults to comma
 -- the function relies on Esc() function if separator character needs escaping,
--- MULTIPLE CHARACTERS CANNOT BE USED AS FIELD SEPARATOR 
+-- MULTIPLE CHARACTERS CANNOT BE USED AS FIELD SEPARATOR
 -- BECAUSE FIELD NAMES LIST OR ITS FORMATTING BREAKS,
 -- Lua string library magic characters are NOT recommended as separators
 -- because if these characters also present in the text fields
--- captures won't work accurately, \n, \r and \t are the safest because 
+-- captures won't work accurately, \n, \r and \t are the safest because
 -- they're not confused with their literal look-alikes;
 -- comment_field is boolean, comment is string to be displayed in the comment field(s),
--- if comment_field is true but comment arg is an empty string 
--- or only contains separators, comment_field arg is ignored 
+-- if comment_field is true but comment arg is an empty string
+-- or only contains separators, comment_field arg is ignored
 -- and no comment field(s) is displayed, UNLESS empty_comm_fields arg is true,
 -- multiple comments must be delimited by the character used as the separator arg
 -- or by comma if separator is the comma,
--- if comment text contains commas, separator arg must be set specifically 
--- to be anything but comma, 
--- if final field count with comment fields hits or exceeds the limit of 16, 
--- comment fields number is reduced, text of any extra comment fields is merged 
+-- if comment text contains commas, separator arg must be set specifically
+-- to be anything but comma,
+-- if final field count with comment fields hits or exceeds the limit of 16,
+-- comment fields number is reduced, text of any extra comment fields is merged
 -- into the last visible comment field if any remains;
 -- empty_comm_fields arg is boolean, allows having empty comment fields
 -- if their intended use is other than comment;
@@ -23372,10 +23913,10 @@ function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator,
 	field_cnt = select(2, field_names:gsub(',',''))+1 -- +1 because last field name isn't followed by a comma and one comma less was captured
 	--	if field_cnt-1 == 0 and not comment_field then return end -- SAME AS THE ABOVE CONDITION
 	end
-	
+
 	if field_cnt >= 16 then
 	field_cnt = 16 -- clamp to the limit supported by the native function
-	comment_field = nil -- disable comment if field count hit the limit, just in case 
+	comment_field = nil -- disable comment if field count hit the limit, just in case
 	end
 
 	local function add_separators(field_cnt, arg, sep)
@@ -23413,8 +23954,8 @@ local comment = comment_field and comment or ''
 local comment_field_cnt = select(2, comment:gsub(sep_esc,''))+1 -- +1 because last comment field isn't followed by the separator so one less will be captured
 local field_cnt = comment_field and field_cnt+comment_field_cnt or field_cnt
 
-	if field_cnt >= 16 then 
-	-- disable some or all comment fields if field count hit the limit after comment fields have been added	
+	if field_cnt >= 16 then
+	-- disable some or all comment fields if field count hit the limit after comment fields have been added
 	comment_field_cnt = field_cnt - 16
 	field_cnt = 16
 	end
@@ -23427,12 +23968,12 @@ local comment_pattern = (sep_esc..'.*'):rep(comment_field_cnt)
 comment = comment_field and output:match('.*('..comment_pattern..')') -- captured with leading separator which separates comment(s) from the main fields
 output = comment_field and output:match('(.*)'..comment_pattern) or output -- strip comment fields content // * operator accommodates single empty field // output capture doesn't include trailing separator
 field_cnt = comment_field and field_cnt-comment_field_cnt or field_cnt -- adjust for the next statement
-	
-	if not ret	
+
+	if not ret
 	--[[
 	-- this condition will need commenting out if empty dialogue
-	-- sumbission is allowed by script design, mainly if there're multiple fields in the dialogue	
-	or (not comment_field and output or output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)) -- if there're comment fields, exclude trailing separator left behind after stripping comment fields content above // * operator accommodates single empty field // -1 because the last field doesn't end with a separator	
+	-- sumbission is allowed by script design, mainly if there're multiple fields in the dialogue
+	or (not comment_field and output or output:gsub('[%s%c]','') == (sep):rep(field_cnt-1)) -- if there're comment fields, exclude trailing separator left behind after stripping comment fields content above // * operator accommodates single empty field // -1 because the last field doesn't end with a separator
 	--]]
 	then return end
 	--[[ OR
@@ -23498,7 +24039,7 @@ function Get_Armed_Action(path, sep)
 -- relies on Esc() function
 -- for full functionality requires build 6.71+ or SWS extension
 
-	-- only run the function if Action list window is open to force deliberate use 
+	-- only run the function if Action list window is open to force deliberate use
 	-- and prevent accidents in case some action is already armed for other purposes
 	if r.GetToggleCommandStateEx(0,40605) == 0 then -- Show action list
 	Error_Tooltip('\n\n the action list is closed \n\n', 1, 1) -- caps, spaced true
@@ -23511,11 +24052,11 @@ function Get_Armed_Action(path, sep)
 	local f_path = f_path:match('^%u:') and f_path or path..sep..'Scripts'..sep..f_path -- full (starts with the drive letter and a colon) or relative file path; in reaper-kb.ini full path is stored when the script resides outside of the 'Scripts' folder of the REAPER instance being used // NOT SURE THE FULL PATH SYNTAX IS VALID ON OSs OTHER THAN WIN
 	return r.file_exists(f_path)
 	end
-	
+
 	local function space(length)
 	return (' '):rep(length)
 	end
-	
+
 local sect_t = {['']=0,['alt']=0,['MIDI Editor']=32060,['MIDI Event List Editor']=32061,
 ['MIDI Inline Editor']=32062,['Media Explorer']=32063}
 
@@ -23523,7 +24064,7 @@ local path = path or r.GetResourcePath()
 local sep = sep or path:match('[\\/]')
 
 	if r.GetToggleCommandStateEx(0,40605) == 1 then -- Show action list // only if Action list window is open to force deliberate use of action notes and prevent accidents in case some action is already armed for other purposes --- THIS CONDITION IS REDUNDANT IF 'the action list is closed' ERROR IS RETURNED ABOVE
-	 
+
 	local cmd, section = r.GetArmedCommand() -- cmd is 0 when no armed action, empty string section is 'Main' section
 	r.ArmCommand(0, section) -- 0 unarm all
 		if cmd > 0 then
@@ -23567,9 +24108,9 @@ local sep = sep or path:match('[\\/]')
 			end
 	--	return name, scr_exists, mess
 		return cmd, name, sect_t[section] or sect_t[section:match('alt')] -- OR sect_t['alt']
-		
+
 		end -- 'if cmd > 0' condition end
-	
+
 	end -- 'if r.GetToggleCommandStateEx(0,40605) == 1' cond. end
 
 end
@@ -23599,11 +24140,11 @@ local cmdID = cmdID:gsub(' ','')
 local named_cmd_ID = cmdID:gsub('_','')
 local err = cmdID == '' and 'the field is empty'
 local invalid = 'invalid action command ID'
-err = err or tonumber(cmdID) and 
+err = err or tonumber(cmdID) and
 (#cmdID > 6 or r.kbd_getTextFromCmd and #r.kbd_getTextFromCmd(cmdID, section_ID) == 0 -- not native action
 or r.CF_GetCommandText and #r.CF_GetCommandText(section_ID, cmdID) == 0)
 and '  '..invalid..'\n\n or the action doesn\'t belong \n\n\t to the Main section'
-or not tonumber(cmdID) and 
+or not tonumber(cmdID) and
 (#named_cmd_ID ~= 32 and #named_cmd_ID ~= 42 and #named_cmd_ID ~= 47 -- neither custom action nor script
 or r.NamedCommandLookup(cmdID) == 0)
 and invalid
@@ -23617,7 +24158,7 @@ end
 
 
 function Is_Non_Native_Action(cmdID)
--- return value nil or false doesn't necessarily mean 
+-- return value nil or false doesn't necessarily mean
 -- that the cmdID belongs to a valid native action
 -- to ascertain that it is see Get_Action_Name() function below
 	if tonumber(cmdID) then
@@ -23639,12 +24180,12 @@ function Get_Action_Name(cmdID, section_ID)
 	local str = str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0'):gsub('\\','%0%0')
 	return str
 	end
-	
+
 	local function script_exists(line, name)
 	-- how paths external to \Scripts folder may look on MacOS
 	-- https://github.com/Buy-One/Samelot_Reaper
 	local f_path = line:match(Esc(name)..' "(.+)"$') or line:match(Esc(name)..' (.+)$') -- path either with or without spaces, in the former case it's enclosed within quotation marks
-	local f_path = f_path:match('^%u:') and f_path or path..sep..'Scripts'..sep..f_path -- full (starts with the drive letter and a colon) or relative file path; in reaper-kb.ini full path is stored when the script resides outside of the 'Scripts' folder of the REAPER instance being used // NOT SURE THE FULL PATH SYNTAX IS VALID ON OSs OTHER THAN WIN	
+	local f_path = f_path:match('^%u:') and f_path or path..sep..'Scripts'..sep..f_path -- full (starts with the drive letter and a colon) or relative file path; in reaper-kb.ini full path is stored when the script resides outside of the 'Scripts' folder of the REAPER instance being used // NOT SURE THE FULL PATH SYNTAX IS VALID ON OSs OTHER THAN WIN
 	return r.file_exists(f_path)
 	end
 
@@ -23682,12 +24223,12 @@ local act_name, mess
 			break end
 		end
 	end
-	
+
 	if mess then
 	Error_Tooltip('\n\n '..mess..' \n\n', 1, 1, 200) -- caps, spaced true, x2 - 200 to move tooltip away from the mouse cursor or menu so it doesn't block the GetUserInputs() dialogue OK button or covered by the reloaded menu
 	return
 	end
-	
+
 return act_name, mess -- mess is optional, returned if isn't used as a condition for error display above
 
 end
@@ -23825,7 +24366,7 @@ function Error_Tooltip3(text, format)
 -- just a tad longer there it must be directly under the mouse
 -- not directly under the mouse the tooltip sticks if mouse is over Arrange
 -- but soon disappears if mouse is in the TCP area but not over the TCP
--- and immediately disappears if the mouse is over the TCP 
+-- and immediately disappears if the mouse is over the TCP
 -- if format is true the text is capitalized and spaced out
 local x, y = r.GetMousePosition()
 -- supporting UTF-8 char
@@ -23888,8 +24429,9 @@ end
 
 
 function Get_Mouse_Or_Edit_Curs_Pos()
--- relies on Get_TCP_MCP_Under_Mouse() to ensure that the mouse cursor is not over TCP
+-- relies on Get_TCP_MCP_Under_Mouse() to ensure that the mouse cursor is not over TCP or MCP
 -- if it is, edit cursor pos is returned
+-- MCP evaluation is supported since 6.36 where GetThingFromPoint was introduced
 
 local edit_curs_pos = r.GetCursorPosition() -- store
 local cur_pos
@@ -23897,7 +24439,9 @@ local cur_pos
 local tr, info = r.GetTrackFromPoint(r.GetMousePosition())
 -- ensuring that mouse cursor is over Arrange allows ignoring mouse position
 -- when the script is run via toolbar button, menu item or from the Action list
-	if tr and not Get_TCP_MCP_Under_Mouse() and info ~= 2 then -- not FX window
+-- because in this case tr var is nil
+	if tr and not Get_TCP_MCP_Under_Mouse() and not Get_TCP_MCP_Under_Mouse(1) -- want_mcp true
+	and info ~= 2 then -- not FX window
 	r.PreventUIRefresh(1)
 	r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping) // more sensitive than with snapping
 	cur_pos = r.GetCursorPosition()
@@ -24011,7 +24555,7 @@ local timestamp = tonumber(r.GetExtState(cmd_ID, 'EXPIRY TIMER'))
 	if not timestamp and not threshold then -- this conditions timer setting
 	r.SetExtState(cmd_ID, 'EXPIRY TIMER', r.time_precise(), false) -- persist false
 	elseif timestamp and threshold and r.time_precise()-timestamp >= threshold then
-	r.DeleteExtState(cmd_ID, 'EXPIRY TIMER', true) -- persist true // clear timer	
+	r.DeleteExtState(cmd_ID, 'EXPIRY TIMER', true) -- persist true // clear timer
 	return true
 	elseif not timestamp and threshold then
 	return true -- this conditions greyed out Undo menu item when the script hasn't been run yet and so the timer hasn't been set
@@ -24064,7 +24608,7 @@ do r.MB('PAUSE','PAUSE',0) return end
 
 
 
-function pause(duration) 
+function pause(duration)
 -- duration is time in seconds
 -- during which the script execution
 -- will pause, REAPER will hang
@@ -24116,6 +24660,8 @@ function REAPER_Ver_Check1(build) -- build is REAPER build number, the function 
 	local mess = '\n\n   THE SCRIPT REQUIRES\n\n  REAPER '..build..' AND ABOVE  \n\n '
 	local mess = mess:gsub('.','%0 ')
 	r.TrackCtl_SetToolTip(mess, x, y+10, true) -- topmost true
+	-- OR
+	-- Error_Tooltip('\n '..mess..' \n', 1, 1) -- caps, spaced true
 	return true
 	end -- 'ReaScript:Run' caption is displayed in the menu bar but no actual undo point is created because Undo_BeginBlock() isn't yet initialized, here and elsewhere
 end
@@ -24140,12 +24686,17 @@ local build = build and tonumber(build)
 local cur_buld = tonumber(r.GetAppVersion():match('[%d%.]+'))
 local later, earlier, current = cur_buld >= build, cur_buld < build, cur_buld == build
 local err = '   the script requires \n\n  '
-local err = not later and err..'reaper '..build..' and later '
-or not earlier and err..'reaper not later than '..build
+local err = want_later and not later and err..'reaper '..build..' and later '
+or want_earlier and not earlier and err..'reaper no later than '..build
+or want_current and not current and 'reaper build '..build
 	if err then
+--[-[
 	local x,y = r.GetMousePosition()
 	err = err:upper():gsub('.','%0 ')
 	r.TrackCtl_SetToolTip(err, x, y+10, true) -- topmost true
+--]]
+	-- OR
+	-- Error_Tooltip('\n\n '..err..' \n\n', 1, 1) -- caps, spaced true
 	return true
 	end -- 'ReaScript:Run' caption is displayed in the menu bar but no actual undo point is created because Undo_BeginBlock() isn't yet initialized, here and elsewhere
 end
@@ -24174,6 +24725,26 @@ end
 
 
 
+function No_Extensions(sws, js)
+-- sws and js are booleans
+local no_sws = sws and not r.BR_Win32_SendMessage and ' SWS/S&M' or ''
+local no_js = js and not r.JS_WindowMessage_Send and 'js_ReaScriptAPI' or ''
+	if sws and #no_sws > 0 or js and #no_js > 0
+	or sws and js and #no_sws > 0 and #no_js > 0
+	then
+	local typ = sws and not js and ' SWS/S&M' or js and not sws and 'js_ReaScript API'
+	or 'SWS/S&M or js_ReaScript API \n\n\t\t'
+	Error_Tooltip('\n\n '..(typ:match('\\n') or typ:match('js') and '\t' or '')
+	..'the script requires \n\n '..typ..' extension \n\n', 1,1) -- caps, spaced true
+	return true
+	end
+end
+-- USE:
+-- if No_Extenssions(sws, js) then
+-- return r.defer(function() do return end end) end -- OR use no_undo() function
+
+
+
 function how_recently_the_project_was_saved()
 local retval, projfn = r.EnumProjects(-1) -- -1 current project; returns empty string if project doesn't have a file and returns path even if the project file and possibly folder was deleted while the project is open
 
@@ -24184,9 +24755,9 @@ local last_save_time
 	for line in io.lines(projfn) do
 		if line:match('REAPER_PROJECT') then last_save_time = line:match('.+ (%d+)') break end -- the integer represents Unix time at the moment the project was last saved https://www.askjf.com/index.php?q=6650s
 	end
-	
+
 	if not proj_file_exists then os.remove(projfn) end -- delete temp proj file
-	
+
 --os.setlocale ('', 'time') -- set, otherwise timestamp doesn't use current locale https://www.gammon.com.au/scripts/doc.php?lua=os.date // doesn't set custom date format
 local diff = os.time() - last_save_time
 return diff, -- seconds
@@ -24195,7 +24766,7 @@ math.floor(diff/3600+0.5), -- hours, rounded
 math.floor(diff/(3600*24)+0.5), -- days, rounded
 os.date('%x %X',last_save_time), -- last save date & time in current locale format
 os.date('%x %X',os.time()) -- current date & time in current locale format
-	
+
 end
 -- USE:
 -- local sec, mins, hrs, days, timestamp_save, timestamp_cur = how_recently_the_project_was_saved()
@@ -25060,7 +25631,7 @@ local found, flags, sorting
 		flags = flags or line:match('flags=(%d+)')
 		sorting = sorting or line:match('sort=(%d+)')
 		elseif flags and sorting then break
-		end	
+		end
 	end
 local flags_t = {
 [1]=1, -- Markers
@@ -25181,7 +25752,7 @@ end
 
 function MediaExplorer_OnCommand2(action_cmdID, close_when_done)
 -- https://forum.cockos.com/showthread.php?p=2863268
--- if the MX is initially closed the triggered action 
+-- if the MX is initially closed the triggered action
 -- is likely to not take effect after MX window opens
 -- because it's slow to become active compared to the speed
 -- of the script execution, therefore defer loop will
@@ -25209,7 +25780,7 @@ end
 
 
 -- these must either be global variables to be recognized inside the defer loop
--- or passed as arguments if the function is run via Wrapper function 
+-- or passed as arguments if the function is run via Wrapper function
 -- (see in this U T I L I T Y section)
 action_cmdID = ''
 close_when_done = true
@@ -25218,21 +25789,21 @@ function MediaExplorer_OnCommand3()
 
 	if not time_init and r.GetToggleCommandStateEx(0,50124) == 0 then -- Media explorer: Show/hide media explorer // Open
 	r.Main_OnCommand(50124,0) -- 'Media explorer: Show/hide media explorer'
-	time_init = r.time_precise()	
+	time_init = r.time_precise()
 	elseif time_init and r.time_precise()-time_init >= 0.1 then
 	local MX = r.OpenMediaExplorer('', false) -- play false
 	local action_cmdID = r.NamedCommandLookup(action_cmdID) -- works with numeric command IDs of native actions as well passed as either integer or string
 		if r.BR_Win32_SendMessage then
 		r.BR_Win32_SendMessage(MX, 0x0111, action_cmdID, 0) -- 0x0111 is 'WM_COMMAND'
 		elseif r.JS_WindowMessage_Send then
-		r.JS_WindowMessage_Send(MX, 'WM_COMMAND', action_cmdID, 0, 0, 0)			
+		r.JS_WindowMessage_Send(MX, 'WM_COMMAND', action_cmdID, 0, 0, 0)
 		end
 		if close_when_done then -- Close
 		r.Main_OnCommand(50124,0) -- Media explorer: Show/hide media explorer
 		end
 	return
 	end
-	
+
 r.defer(MediaExplorer_OnCommand3)
 
 end
@@ -25242,7 +25813,7 @@ end
 function Main_OnCommand_alt(cmdID, context, islistviewcommand, open, close)
 -- cmdID is action/script command ID retrievable via right click
 -- context menu of the Action list -> Copy action command ID
--- which must be enclosed within quotes, i.e. 
+-- which must be enclosed within quotes, i.e.
 -- "40001" or "_SWS_TOGTRACKSEL" or  "_1b3c4aa0a7b870428a1f7ea4f07b3c10";
 -- context is integer: 1 - Arrange, 2 - MIDI Editor, 3 - Media Explorer;
 -- islistviewcommand is boolean to target MIDI Event List Editor
@@ -25260,7 +25831,7 @@ function Main_OnCommand_alt(cmdID, context, islistviewcommand, open, close)
 -- if only SWS/S&M is installed the function relies on Find_Window_SWS()
 -- function
 
-local cmdID = cmdID and reaper.NamedCommandLookup(cmdID) -- works with numeric command IDs of native actions as well passed as either integer or string
+local cmdID = cmdID and r.NamedCommandLookup(cmdID) -- works with numeric command IDs of native actions as well passed as either integer or string
 	if not cmdID or cmdID == 0 then return end
 
 local sect_ID = context == 1 and 0 or context == 2 and 32060
@@ -25268,23 +25839,23 @@ local midi = context == 2
 local islistviewcommand = midi and islistviewcommand
 
 	if sect_ID then -- Arrange or MIDI Editor
-		if midi and open then reaper.Main_OnCommand(40153, 0) end -- Item: Open in built-in MIDI editor
-	local act = midi and reaper.MIDIEditor_LastFocused_OnCommand(cmdID, islistviewcommand)
-	or not midi and reaper.Main_OnCommand(cmdID, 0) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything
+		if midi and open then r.Main_OnCommand(40153, 0) end -- Item: Open in built-in MIDI editor
+	local act = midi and r.MIDIEditor_LastFocused_OnCommand(cmdID, islistviewcommand)
+	or not midi and r.Main_OnCommand(cmdID, 0) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything
 		if midi and close then
-		local ME = reaper.MIDIEditor_GetActive() -- get active MIDI editor
-		reaper.MIDIEditor_OnCommand(ME, 2) -- File: Close window
-		end		
-	elseif reaper.GetToggleCommandStateEx(0,50124) == 1 then -- Media explorer: Show/hide media explorer // already open
-	local MX = reaper.JS_Window_Find and reaper.JS_Window_Find("Media Explorer", false) 
-	or reaper.BR_Win32_SendMessage and Find_Window_SWS("Media Explorer")
-		if reaper.BR_Win32_SendMessage then
-		reaper.BR_Win32_SendMessage(MX, 0x0111, cmdID, 0) -- 0x0111 is 'WM_COMMAND'
-		elseif reaper.JS_WindowMessage_Send then
-		reaper.JS_WindowMessage_Send(MX, 'WM_COMMAND', cmdID, 0, 0, 0)
+		local ME = r.MIDIEditor_GetActive() -- get active MIDI editor
+		r.MIDIEditor_OnCommand(ME, 2) -- File: Close window
+		end
+	elseif r.GetToggleCommandStateEx(0,50124) == 1 then -- Media explorer: Show/hide media explorer // already open
+	local MX = r.JS_Window_Find and r.JS_Window_Find("Media Explorer", false)
+	or r.BR_Win32_SendMessage and Find_Window_SWS("Media Explorer")
+		if r.BR_Win32_SendMessage then
+		r.BR_Win32_SendMessage(MX, 0x0111, cmdID, 0) -- 0x0111 is 'WM_COMMAND'
+		elseif r.JS_WindowMessage_Send then
+		r.JS_WindowMessage_Send(MX, 'WM_COMMAND', cmdID, 0, 0, 0)
 		end
 	end
-	
+
 end
 
 
@@ -25363,8 +25934,8 @@ local sectionIDs_t = {}
 	for i=0,15 do -- Main and Main (alt)
 	sectionIDs_t[#sectionIDs_t+1] = i
 	end
-	
-local non_Main = {100, 32060, 32061, 32062, 32063, 32064}	
+
+local non_Main = {100, 32060, 32061, 32062, 32063, 32064}
 	for k, v in ipairs(non_Main) do
 	sectionIDs_t[#sectionIDs_t+1] = v
 	end
@@ -25375,8 +25946,8 @@ local sect_names = {}
 	sect_names[i] = i==0 and 'Main' or 'Main (alt-'..i..')'
 	end
 
-local sect_names_non_Main = {[100]='Main (alt recording)', [32060]='MIDI Editor', 
-[32061]='MIDI Event List Editor', [32062]='MIDI Inline Editor', 
+local sect_names_non_Main = {[100]='Main (alt recording)', [32060]='MIDI Editor',
+[32061]='MIDI Event List Editor', [32062]='MIDI Inline Editor',
 [32063]='Media Explorer', [32064]='Crossfade Editor'}
 
 	for k, name in pairs(sect_names_non_Main) do
@@ -25398,13 +25969,13 @@ local notes_t = {}
 	for i=65,71 do -- from A to G in ASCII codes
 	notes_t[#notes_t+1] = string.char(i)
 	end
-	
+
 	for i=1,#notes_t do -- move A and B to the end of the table
 	table.insert(notes_t,notes_t[1])
 	table.remove(notes_t,1)
 		if i==2 then break end
-	end	
-	
+	end
+
 	for i = #notes_t,1,-1 do -- add accidentals
 	-- accidentals are added in two variations within the same entry
 	-- separated by slash
@@ -25429,9 +26000,9 @@ local octaves_t = {}
 		for k, note in ipairs(notes_t) do -- associate notes with the octave
 		octaves_t[octave][note] = i+k-1 -- associate note names with MIDI note number // i+k because i changes in steps of 12, -1 because note indexing is 0-based while notes_t indexing is 1-based
 		octaves_t[octave][k] = i+k-1 -- associate note index within octave with MIDI note number, k is the note index within octave // i+k because i changes in steps of 12, -1 because note indexing is 0-based while notes_t indexing is 1-based
-		end	
+		end
 	end
-	
+
 return notes_t, octaves_t
 
 end
@@ -25525,7 +26096,7 @@ function gmem_write_string(index, value) local(offset) (
     offset += 1;
     index += 1;
   );
-  
+
   gmem[index] = 0;
 );
 
@@ -25544,7 +26115,7 @@ function gmem_read_string(index, output) local(offset, buf) (
       index  += 1;
     ) : 0;
   );
-  
+
   strcpy_substr(output, buf, 0, offset); // truncates the output
 );
 
@@ -25561,7 +26132,7 @@ gfx_drawstr(str);
 
 function split_string_at_new_line_charA(str)
 
-/* 
+/*
 IN JESUSONIC PROBABLY ONLY SUPPORTS ASCII, OR IT'S A GFX LIBRARY PROBLEM
 this version ignores clusters of new line characters
 only respecting a single new line character as a line separator
@@ -25611,7 +26182,7 @@ only respecting a single new line character as a line separator
 
 function split_string_at_new_line_charB(str)
 
-/* 
+/*
 IN JESUSONIC PROBABLY ONLY SUPPORTS ASCII, OR IT'S A GFX LIBRARY PROBLEM
 this version doesn't ignore clusters of new line characters
 which results in extra instances being included in actual lines of text
@@ -25744,7 +26315,7 @@ function Audio_Accessor_Noise_Gate()
 
 -- Noise Gate Parameters
 local open_threshold_dB = -40
-local close_threshold_diff_dB = -1 -- difference from open_threshold_dB 
+local close_threshold_diff_dB = -1 -- difference from open_threshold_dB
 local hold_ms = 20
 local ng_floor_dB = 0
 local preopen_ms = 15 -- open earlier than when the gate opens
@@ -25758,7 +26329,7 @@ local ng_floor_linear = 10^(ng_floor_dB/20)
 
 local ScalingMode = reaper.GetEnvelopeScalingMode( env )
 ng_floor_linear = reaper.ScaleToEnvelopeMode( ScalingMode, ng_floor_linear )
-  
+
 -- Create audio accessor
 local audio = reaper.CreateTakeAudioAccessor(take)
 
@@ -25778,17 +26349,17 @@ local buffer = reaper.new_array(samples_per_window)
 local gate_open = false
 local last_gate_open_pos = 0
 local last_gate_close_pos = -1
-  
+
 -- Process audio in windows
 local pos = aa_start
 
 	while pos < aa_end do
 	local ret = reaper.GetAudioAccessorSamples(audio, samplerate, 1, pos, samples_per_window, buffer)
-	 
+
 		if ret ~= 1 then break end
 
 			-- Noise gate logic
-		if peak_value > open_threshold then			
+		if peak_value > open_threshold then
 			if not gate_open and (pos - last_gate_close_pos) > hold_time then
 			-- Open gate
 			reaper.InsertEnvelopePoint(env, pos-0.01-preopen, ng_floor_linear, 5, 0, false, true)
@@ -25830,9 +26401,9 @@ end
 function dec2hex(dec_int)
 -- input arg is a decimal integer
 -- https://www.rapidtables.com/convert/number/decimal-to-hex.html algo
-	
+
 	if not dec_int then return end
-		
+
 local dec_int2
 
 	if dec_int > 0xfffffffffffff then  -- 2^52
@@ -25840,29 +26411,29 @@ local dec_int2
 		if tonumber(_VERSION:match('[%.%d]+')) < 5.3 or math.maxinteger == 0x7fffffff then -- either Lua older than 5.3 or 32 bit system, 0x7fffffff == 2147483647
 		return dec_int -- on a 32 bit system integers above 2^31 Lua encodes as double floating point numbers while in older Lua versions all integers are encoded as double floating point numbers; in all versions of Lua floating point precision limit is 2^53-1 (about 15 - 17 decimal places) after which rounding errors start to occur, so in these two cases no point to convert a number above 2^53-1 (in practical terms above 2^52, because in division and modulo operations employed for conversion into hex this is the limit of accuracy) because it will be fed in with rounding erros from the outset
 		end
-	-- the following assumes that integers up to 2^53-1 are represented natively rather than as floating point numbers, 
+	-- the following assumes that integers up to 2^53-1 are represented natively rather than as floating point numbers,
 	-- which is good for REAPER since native integer representaion is supported in Lua 5.3+
 	-- run by all REAPER versions with Lua support
 	local diff = math.floor(math.log(dec_int)/math.log(2))-52 -- find by how much the input exponent exceeds the Lua max floating point number precision limit which is 53 bit i.e. ~15-17 decimal places, because numbers whose decimal places exceed this limit lose precision and cause wrong calculation result, this workround is needed because the employed conversion method to hex relies on division and modulo operaions which produce decimal numbers for which precision is important; using value 52 instead of 53 because in division and modulo operations the limit of accuracy is 52 bit; formula to calculate exponend of the value by specific base comes from  https://www.gammon.com.au/scripts/doc.php?lua=math.log
 	dec_int, dec_int2 = dec_int >> diff, dec_int >> 52 -- shift the input value right by the difference to only leave bits whose total doesn't affect precision, then shift the input value right by 52 bits to isolate the remaining upper bits, those which have been discarded in shifting right by the difference // this is the correct splitting method for subsequent string concatenaton because it produces parts with different bit width just as would occur in splitting a string for example '256' into '56' and '2', because maintaining original width i.e. '056' and '200' would not allow accurate concatenation resulting in 200056
 	end
-	
+
 local hex = ''
 local t  = {[0]=0,1,2,3,4,5,6,7,8,9,'a','b','c','d','e','f'}
-	repeat	
+	repeat
 	local quotient = math.modf(dec_int/16) -- OR math.floor(dec_int/16)
 	hex = t[dec_int%16]..hex
--- OR 
+-- OR
 -- hex = t[dec_int-16*quotient] and t[dec_int-16*quotient]..hex or hex
 	dec_int = quotient
 	until quotient == 0
-	
+
 	local hex2
 	if dec_int2 then -- if the input number exponent exceeds the Lua floating point number max precision limit, convert the remaining upper bits, those which exceed 52 bits and concatenate the results placing the upper bits conversion result at the front as that's where they're placed in the bitfield
 	hex2 = dec2hex(dec_int2)
 	hex = hex2:sub(3)..hex
-	end	
-	
+	end
+
 return '0x'..hex
 
 end
@@ -26727,7 +27298,7 @@ local proj_media_path = r.GetProjectPath('') -- for unsaved projects returns def
 -- to find out whether the project is saved
 -- local proj, proj_path = r.EnumProjects(-1)
 -- #proj_path > 0
--- OR 
+-- OR
 -- local proj_name = r.GetProjectName(0, '')
 
 --===================================================================================
@@ -26863,7 +27434,7 @@ S T R I N G S
 	multibyte_str_len
 	utf8_len
 	utf8_len2
-	string.len	
+	string.len
 	string.reverse
 	utf8_chars_to_bytes
 	utf8_string_iterator
@@ -26901,7 +27472,7 @@ T A B L E S
 	James_Bradbury_reverse_table
 	filter_table_vals
 	filter_inplace1
-	filter_inplace2	
+	filter_inplace2
 	merge_2_arrays_at_index
 	merge_tables1
 	merge_tables2
@@ -27080,7 +27651,7 @@ T R A C K S
 
 
 S E N D S / R E C E I V E S
-	
+
 	Is_Send_Dest_Track
 	Is_Recv_Src_Track
 	Remove_Track_Receives
@@ -27326,7 +27897,7 @@ I T E M S
 	Is_Item_Looped_In_Arrange
 	Import_Item_To_RS5k
 	Is_Item_Under_Mouse
-	Is_Item_Under_Mouse_Locked	
+	Is_Item_Under_Mouse_Locked
 	Split_Item_Into_Takes_And_Reconstruct
 	Item_Has_Top_Icon_Bar
 	Get_Default_Take_Rank_Scale
@@ -27402,6 +27973,16 @@ M A R K E R S  &  R E G I O N S
 	Get_Mrkrs_Of_Takes_At_Mouse_Or_Edit_Curs
 	Get_Rgn_Mrkr_Mngr_Settings
 	Get_Selected_And_Hidden_Markers_And_Regions
+	Get_Rgn_Marker_TimeLine_Index
+	Get_Populated_Ruler_Lane_Count
+	Get_Ruler_Lane_Count
+	Get_Visible_Ruler_Lanes
+	Get_Lane_Mrkrs_Regns
+	Get_Mrkrs_Regns_Per_Lane
+	Refresh_Ruler_Height
+	Set_Ruler_Height
+	Get_Marker_Region_True_Visibility
+	Is_Valid_Marker_Region
 
 
 G F X
@@ -27432,7 +28013,7 @@ W I N D O W S
 	Re_Store_Windows_Props_By_Names1
 	Re_Store_Windows_Props_By_Names2
 	Re_Store_Windows_Props_By_Names_And_Handles1
-	Re_Store_Windows_Props_By_Names_And_Handles2	
+	Re_Store_Windows_Props_By_Names_And_Handles2
 	Is_Window_Visible1
 	Is_Window_Visible2
 	Exclude_Visible_Windows
@@ -27470,16 +28051,18 @@ W I N D O W S
 	Activate_Context
 	Set_Horiz_Zoom_Level
 	Re_Store_Zoom
-	get_gfx_scale 
+	get_gfx_scale
 	click_pad
 	keep_click_pad_size
 	gfx_mouse_click
 	store_or_update_coordinates_after_quitting1
 	store_or_update_coordinates_after_quitting2
+	Refresh_Ruler_Height
+	Set_Ruler_Height
 
 
 T H E M E
-	
+
 	smandrap_Change_MCP_Width
 	find_layout
 
@@ -27517,7 +28100,7 @@ F I L E S
 	get_file_timestamp1
 	get_file_timestamp2
 	get_file_timestamp3
-	get_file_timestamp4	
+	get_file_timestamp4
 	open_dir_in_file_browser
 	delete_string_from_file
 	Read_Lines
@@ -27543,7 +28126,7 @@ F I L E S
 	(loadfile syntax)
 	(require syntax)
 	load_functions_from_file
-	Parse_ReaBank_File	
+	Parse_ReaBank_File
 	GetUserFileNameForRead_Alt
 	sanitize_file_name1
 	sanitize_file_name2
@@ -27602,7 +28185,8 @@ U T I L I T Y
 	execute_function_from_table
 	Is_Project_Start
 	ProjExtStates_2_Table
-	Validate_Positive_Integer
+	Validate_Positive_Integer1
+	validate_positive_integer2
 	is_set
 	validate_sett
 	validate_multi_line_sett
@@ -27611,7 +28195,7 @@ U T I L I T Y
 	validate_settings3
 	validate_global_var
 	validate local variable (not a function)
-	Validate_All_Global_Settings	
+	Validate_All_Global_Settings
 	validate_output1
 	validate_output2
 	Get_Action_ID
@@ -27642,7 +28226,7 @@ U T I L I T Y
 	Create_Submenus_Dynamically
 	Options_State_Readout
 	ShowMessageBox_Menu
-	Re_Store_Ext_State	
+	Re_Store_Ext_State
 	Wrapper1
 	Wrapper2
 	Wrapper_multi_function
@@ -27657,8 +28241,9 @@ U T I L I T Y
 	Validate_Proj_Tab
 	Is_Win
 	Get_OS
+	Is_OS
 	All_Proj_Change_Cnt
-	Bump_Proj_Change_Cnt	
+	Bump_Proj_Change_Cnt
 	EvaluateTAG
 	is_tbl_or_ptr_or_fnc
 	GetUserInputs_Alt
@@ -27667,7 +28252,7 @@ U T I L I T Y
 	Condition_Action_By_Armed_State
 	Validate_Command_ID
 	Is_Non_Native_Action
-	Get_Action_Name	
+	Get_Action_Name
 	timed_tooltip1
 	timed_tooltip2
 	Error_Tooltip1
@@ -27692,6 +28277,7 @@ U T I L I T Y
 	REAPER_Ver_Check2
 	REAPER_Ver_Check3
 	SWS_Version_Check
+	No_Extensions
 	how_recently_the_project_was_saved
 	Time_Sel_Or_Loop_Exist
 	Is_Ctrl_And_Shift
@@ -27714,7 +28300,7 @@ U T I L I T Y
 	Process_Mouse_Wheel_Direction1
 	Process_Mouse_Wheel_Direction2
 	Process_Mousewheel_Sensitivity
-	Mousewheel_Or_Shortcut	
+	Mousewheel_Or_Shortcut
 	Is_Mousewheel
 	Is_Not_Relative_Mode
 	format_time_given_in_sec
