@@ -316,7 +316,8 @@ ACT 1 0 "6118dd6677009846b7fc81039147accf" "Custom: NickMoritz_Set track/item to
 ACT 1 0 "558843a9158a0c45aeb8d99b4785c2f6" "Custom: NickMoritz_Set track/item to white color" _SWS_WHITEITEM _SWS_WHITETRACK
 ACT 1 0 "1541d3ec0d079446bb775a49478f0070" "Custom: NickMoritz_Zoom out project (full)" 40295 40727
 ACT 1 0 "9ac2d1852d17624f9f0a09147eb00b04" "Custom: nickstomp_Scroll Between Markers with Mousewheel (t=241566)" 2013 40173 2014 40172
-ACT 1 0 "00e45d75c545744faac77ef4175a7498" "Custom: Nudge volume of item under mouse up/down by 1 dB (assign to mouswheel)" _SWS_SAVEALLSELITEMS1 40289 40528 2013 _XENAKIOS_NUDGEITEMVOLDOWN 2014 _XENAKIOS_NUDGEITEMVOLUP _SWS_RESTALLSELITEMS1
+ACT 1 0 "00e45d75c545744faac77ef4175a7498" "Custom: Nudge volume of item under mouse up/down by 1 dB (assign to mouswheel) -- SWS" _SWS_SAVEALLSELITEMS1 40289 40528 2013 _XENAKIOS_NUDGEITEMVOLDOWN 2014 _XENAKIOS_NUDGEITEMVOLUP _SWS_RESTALLSELITEMS1
+ACT 1 0 "c40e8fa8fb3bcd41855a7ff23639a3af" "Custom: Nudge volume of item under mouse up/down by 1 dB (assign to mouswheel)" 40289 40528 2013 41925 2014 41924
 ACT 1 0 "980734aaabc4fc449e717308fa8afe84" "Custom: Online Music Tuition_Line up for mastering vertically aligned items step wise (select uppermost track)" 40421 _SWS_REGIONSFROMITEMS 41174 40285 40421 41205 _SWS_REGIONSFROMITEMS
 ACT 1 0 "36cfb34a9680044294b4113c63417fb9" "Custom: Open last project in new tab" 40859 _SWS_OPENLASTPROJ
 ACT 1 0 "a273a27b21ed4f42b7d42474e5da4cf4" "Custom: Oz - Freeze all midi items on selected track(s) to stereo and keep midi next to audio" 40914 40421 41173 40698 41223 40058 40719 40751 40645
