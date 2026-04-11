@@ -26642,17 +26642,11 @@ local map_t = {}
 	prev = note_idx == 0 and note_idx or note_idx-down
 	local up = nxt < 127 and math.floor((nxt-1 - note_idx)/2) or 127-note_idx -- same logic, math.floor is to transpose up by 1 semitone less than down; if not nxt, cover the entire range from current note up to 127
 	nxt = note_idx == 127 and note_idx or note_idx+up
-	table.insert(map_t, prev)
-	table.insert(map_t, nxt)
+	table.insert(map_t, {root=note_idx, st=prev, fin=nxt})
 	end
 
--- extract start/end pairs for each multi-sample note
--- the start/end note indices can then be converted into plugin control settings
--- such as Note start/end of RS5k
-	for i=1, #map_t, 2 do
-	local st, fin = map_t[i], map_t[i+1]
-	end
-	
+-- the root/start/end note indices can then be converted into plugin control settings
+-- such as Pitch@start, Note start, Note end of RS5k
 return map_t
 
 end
