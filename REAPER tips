@@ -580,11 +580,13 @@ Modifier Key = 1 means no modifier. Different values stand for different Modifie
 
 -- Custom action flags in reaper-kb.ini
 
+
 Bitfield
 
 Consolidate undo points: &1
 Show in Actions menu: &2
 Show as active if all component actions are: Active ~= &16;	Active or Indeterminate &32
+
 
 ACT 0 - Show as active if all component actions are: Active
 Act 1 - Consolidate undo points; Show as active if all component actions are: Active
@@ -1057,9 +1059,11 @@ have their scope limited to a particular custom action they're executed within
 
 Setting CC parameter within one custom action doesn't affect this parameter within another custom action
 so nested actions each can have its own CC parameter which makes simulation of AND and OR operators possible,
-see "IF, IF NOT, AND and OR statements for regular custom actions (conditional custom actions)" paragraph
+see "IF, IF NOT statements, AND and OR operators for regular custom actions (conditional custom actions)" paragraph
 in this document
 
+When action is executed with a click or a shortcut, for the purposes of the abovelisted actions CC parameter is <0,
+not ==0 as could be expected.
 
 
 ============================================================================
@@ -3664,6 +3668,8 @@ https://forum.cockos.com/showthread.php?p=1094403
 
 -- Move multiple markers at once (contiguous)
 
+THIS IS IRRELEVANT SINCE BUILD 7.62 WHERE MULTIPLE MARKERS CAN BE SELECTED AND MOVED AT ONCE BY LEFT MOUSE DRAGGING
+
 1. Create an empty track
 2. Create an empty item which encompasses all markers to be moved
 3. Select the item
@@ -3802,6 +3808,11 @@ https://forum.cockos.com/showthread.php?p=2008003
 ==============================================================
 
 -- IF, IF NOT statements, AND and OR operators for regular custom actions (conditional custom actions)
+
+
+When action is executed with a click or a shortcut, for the purposes of the actions listed below CC parameter is <0,
+not ==0 as could be expected.
+
 
 Actions to be used are named 'Action: Skip next action ...'
 
@@ -5461,7 +5472,7 @@ is greater or smaller than the points current tempo value
 4. Restore the envelope range
 
 
-If points intial tempo values differ, the method is still useful but the points must be dragged all the way up/down one by one
+If points initial tempo values differ, the method is still useful but the points must be dragged all the way up/down one by one
 
 The good thing is that if there're points whose tempo value greater/smaller than the max/min range value which you change the setting to
 
@@ -5599,6 +5610,8 @@ Works with files with embedded BWF chunk. REAPER does write the relevant info in
 3. Run action Item: Move to media source preferred position (BWF start offset)
 
 This works provided the item source is looped (Loop source option is enabled) and its start matches its source start or its source is not looped
+
+Since build 7.46 works for video files with encoded LTC
 
 https://reddit.com/r/Reaper/comments/1iueutr/insert_into_project_at_origin/
 
@@ -6138,18 +6151,114 @@ HOWEVER THE FLAGS CANNOT BE GET AND/OR SET WIITH SNM_GetIntConfigVar/reaper.get_
 
 =============================================================
 
+-- MIDI notes won't snap to grid even if Snap is enabled
 
 
+This may happen if MIDI item left edge was trimmed or extended after which the new left edge was aligned to grid.
+
+To fix that open MIDI item properties (F2) and key in 0 into the 'Start in source:' field even if current value
+
+there is all zeros. Click Apply or OK. The existing notes within the item will shift as a result, but they
+
+can be aligned to the grid afterwards.
 
 
+=============================================================
+
+-- Prevent items on hidden tracks from being affected by Ripple edit (all tracks)
+
+-- and actions:
+
+-- Time selection: Insert empty space at time selection (moving later items)
+
+-- Time selection: Remove contents of time selection (moving later items)
 
 
+Before making Ripple edit or running the actions enable at
+ 
+Preferences -> Editing Behavior -> Media Item Locking
+
+the preferences Locked item ripple editing behavior -> 'Locked items are unaffected by ripple'
+
+and 'Region editing and inserting/removing time affects locked items'
+
+respectively
+
+then temporarily lock all items on the hidden tracks and restore their state once done with the following scripts:
 
 
+-- Script to lock items on hidden tracks and store their state
+	
+	for i=0, reaper.CountTracks(0)-1 do
+	local track = reaper.GetTrack(0,i)
+		if reaper.GetMediaTrackInfo_Value(track, 'B_SHOWINTCP') == 0 then
+		local ret, tr_GUID = reaper.GetSetMediaTrackInfo_String(track, 'GUID', '', false) -- isSet false
+		local item_GUIDs = ''
+			for i=0, reaper.CountTrackMediaItems(track)-1 do
+			local item = reaper.GetTrackMediaItem(track, i)
+			local locked = reaper.GetMediaItemInfo_Value(item, 'C_LOCK')&1 == 1
+				if not locked then
+				reaper.SetMediaItemInfo_Value(item, 'C_LOCK', 1)
+				reaper.UpdateItemInProject(item)
+				local ret, GUID = reaper.GetSetMediaItemInfo_String(item, 'GUID', '', false) -- isSet false
+				item_GUIDs = item_GUIDs..(#item_GUIDs > 0 and ',' or '')..GUID
+				end
+			end
+			if #item_GUIDs > 0 then
+			reaper.SetExtState('TEMPORARILY LOCKED ITEMS', tr_GUID, item_GUIDs, false) -- persist false
+			end
+		end
+	end
+	
+	
+-- Script to restore items state on hidden tracks which was changed with the above script
+
+	for i=0, reaper.CountTracks(0)-1 do
+	local track = reaper.GetTrack(0,i)
+		if reaper.GetMediaTrackInfo_Value(track, 'B_SHOWINTCP') == 0 then
+		local ret, tr_GUID = reaper.GetSetMediaTrackInfo_String(track, 'GUID', '', false) -- isSet false
+		local stored = reaper.GetExtState('TEMPORARILY LOCKED ITEMS', tr_GUID)
+			if #stored > 0 then
+			reaper.DeleteExtState('TEMPORARILY LOCKED ITEMS', tr_GUID, true) -- persist true
+			local items_t = {}
+				for GUID in stored:gmatch('[^,]+') do
+					if GUID then
+					items_t[GUID] = ''
+					end
+				end
+				if next(items_t) then
+					for i=0, reaper.CountTrackMediaItems(track)-1 do
+					local item = reaper.GetTrackMediaItem(track, i)
+					local ret, GUID = reaper.GetSetMediaItemInfo_String(item, 'GUID', '', false) -- isSet false
+						if items_t[GUID] then -- unlock
+						reaper.SetMediaItemInfo_Value(item, 'C_LOCK', 0)
+						end
+					end
+				end
+			end
+		end
+	end
 
 
+=============================================================
 
+-- AI (automation item) automation with take envelopes
 
+Take envelopes cannot read automation items data, so the workaround is to transfer AI automation
+to take envelope by copying and pasting.
+
+1. Insert AI on an empty track.
+2. Right click AI and in the context menu cick 'Delete automation item, preserve points'
+3. Select all points and copy them
+4. Place the edit cursor at the start of item whose take envelope you want to trasfer the AI automation to
+5. Select the target take envelope
+6. Paste with Ctrl+V or via main Edit menu -> Paste
+
+points 4 and 5 are crucial
+
+demo https://stash.reaper.fm/52064/Use%20AI%20automation%20with%20take%20envelopes.gif
+
+=============================================================
 
 
 
