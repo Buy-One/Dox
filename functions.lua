@@ -137,7 +137,7 @@ r.MarkTrackItemsDirty(tr, item)
 end
 
 
-function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, pass, want_chain)
+function RS5k_Force_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, pass, want_chain)
 -- Due to REAPER bug https://forum.cockos.com/showthread.php?t=281778, which was fixed in build 7.01
 -- undo point for all RS5k instances is only created with open FX chain window
 -- to create an undo point for a single instance it suffices to open it in a floating window
@@ -180,16 +180,16 @@ function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last
 end
 -- USE (WORKING WITH A SINGLE RS5k INSTANCE):
 -- Undo_BeginBlock()
--- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, false) -- targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain false
+-- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = RS5k_Force_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, false) -- targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain false
 -- DO STUFF
--- Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- last_sel_idx, last_sel_fx_floats are nil, pass is 2, want_chain false
+-- RS5k_Force_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- last_sel_idx, last_sel_fx_floats are nil, pass is 2, want_chain false
 -- Undo_EndBlock()
 
 -- (WORKING WITH MULTIPLE RS5k INSTANCES):
 -- Undo_BeginBlock()
--- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, true) -- targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain true
+-- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = RS5k_Force_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, true) -- targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain true
 -- DO STUFF
--- Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- targ_fx_idx, targ_fx_floats and nil, last_sel_idx is integer, last_sel_fx_floats is boolean, pass is 2, want_chain true
+-- RS5k_Force_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- targ_fx_idx, targ_fx_floats and nil, last_sel_idx is integer, last_sel_fx_floats is boolean, pass is 2, want_chain true
 -- Undo_EndBlock()
 
 
@@ -365,7 +365,7 @@ end
 
 
 -- see also Force_MIDI_Undo_Point1, Force_MIDI_Undo_Point1 in  M I D I
--- Force_RS5k_Undo_With_Closed_Chain() in FX
+-- RS5k_Force_Undo_With_Closed_Chain() in FX
 
 
 --========================= U N D O  E N D =======================================
@@ -459,10 +459,19 @@ end
 
 
 
-function trim_trail_zero(num)
+function trim_trailing_decimal_zeros1(num) -- in integers, fractional numbers are unaffected
 return math.floor(num) == num and math.floor(num) or num
 end
 
+
+function trim_trailing_decimal_zeros2(num)
+-- in Lua, positive diviser (1 in this case) modulo of a negative number
+-- calculated with modulo operator is still positive,
+-- but math.fmod() produces negative value;
+-- the operator result conforms to formal math, uses floor division
+-- the function result - to common sense, uses truncated division
+return num%1 == 0 and math.floor(num) or num
+end
 
 
 math.randomseed(math.floor(r.time_precise()*1000)) -- seems to facilitate greater randomization at fast rate thanks to milliseconds count; math.floor() because the seeding number must be integer
@@ -680,6 +689,13 @@ end
 
 
 function dec2hex(dec_int)
+-- https://github.com/Onelinerhub/onelinerhub/blob/main/lua/convert-int-to-hex.md
+return string.format("%x", dec_int..'') -- converting number to string
+end
+
+
+
+function dec2hex_2(dec_int)
 -- https://www.rapidtables.com/convert/number/decimal-to-hex.html algo
 
 	if not dec_int then return end
@@ -922,6 +938,50 @@ local index
 	index = value == v and k or index
 	end
 return value, type(t[index]) == 'table' and t[index] -- return value and the table it belongs to if table values were sorted
+end
+
+
+local function linear_interp(a, b, t) -- linear interpolation
+-- start + (stop - start) * t, used to find a value 
+-- at a specific percentage t between two points
+-- t is value within the range 0 - 1
+return a + (b - a) * t
+end
+
+
+local function calc_mean_x_stand_deviation(t)
+-- t is array of values;
+-- Mean the average value of a dataset, 
+-- calculated by summing all data points and dividing 
+-- by the total count;
+-- Standard deviation (SD or Σ or σ (sigma)
+-- measures the dispersion of data points around 
+-- that mean, calculated as the square root of variance, 
+-- where lower values indicate closer clustering
+
+local n = #t
+
+	if n == 0 then return 0, 1 end
+
+local sum = 0
+	for i = 1, n do 
+	sum = sum + t[i] 
+	end
+
+local mean = sum / n
+
+local var = 0 -- variance
+
+	for i = 1, n do
+	local d = t[i] - mean
+	var = var + d * d
+	end
+
+var = var / math.max(1, n)
+local std = math.sqrt(var) -- standard deviation
+
+return mean, std < 1e-12 and 1 or std
+
 end
 
 
@@ -2168,6 +2228,32 @@ return input -- if not literal byte sequence, return as is
 end
 
 
+function bytes2string_2(input)
+local patt = input:match('\\%x+') and '%x+' or '%d+' -- either hexadecimal or decimal (ASCII) byte sequence
+local str
+	for byte in input:gmatch(patt) do
+	str = (str or '')..string.char(byte) -- OR byte:char()
+	end
+return str
+end
+
+
+
+function string2bytes(input)
+return input:gsub('.', function(c) return '\\'..c:byte() end)
+end
+
+
+
+function string2bytes_2(input)
+local byteseq
+	for char in (input):gmatch('.') do
+	byteseq = (byteseq and byteseq..'\\' or '')..char:byte()
+	end
+return byteseq
+end
+
+
 
 function add_zero_padding(max_num)
 -- only supports integers
@@ -2878,18 +2964,18 @@ function sort_table1(t, start_idx, end_idx, field, descending) -- see version 2 
 -- values must be sorted, to the best of my knowledge the stock table.sort
 -- doesn't allow sorting within range and is unstable, i.e. when sorting by a criterion
 -- which only varies in certain table fields, the entire table ends up being
--- sorted including some fields with values which by dent of being identical
+-- sorted including some fields with values which by dint of being identical
 -- should not be sorted, so before sorting within range with this function
 -- prepare the table by placing all target fields within that range, e.g.
 --[[
 local end_idx = 0
 	for i=1, #t do -- not using ipairs to avoid affecting loop sequence when fields are moved within the table
 	local v = t[i]
-		if v == MATCH then -- OR v[field] // MATCH is a variable to campare against in search for a relevant field
+		if v == MATCH then -- OR v[field] // MATCH is a variable to compare against in search for a relevant field
 		-- in this order, to remove from original index i
 		-- before inserting at index 1
 		table.remove(t,i)
-		table.insert(t,1,task)
+		table.insert(t,1,v)
 		end_idx = end_idx+1
 		end
 	end
@@ -2931,18 +3017,18 @@ function sort_table2(t, start_idx, end_idx, field, descending)
 -- values must be sorted, to the best of my knowledge the stock table.sort
 -- doesn't allow sorting within range and is unstable, i.e. when sorting by a criterion
 -- which only varies in certain table fields, the entire table ends up being
--- sorted including some fields with values which by dent of being identical
+-- sorted including some fields with values which by dint of being identical
 -- should not be sorted, so before sorting within range with this function
 -- prepare the table by placing all target fields within that range, e.g.
 --[[
 local end_idx = 0
   for i=1, #t do -- not using ipairs to avoid affecting loop sequence when fields are moved within the table
   local v = t[i]
-    if v == MATCH then -- OR v[field] // MATCH is a variable to campare against in search for a relevant field
+    if v == MATCH then -- OR v[field] // MATCH is a variable to compare against in search for a relevant field
     -- in this order, to remove from original index i
     -- before inserting at index 1
     table.remove(t,i)
-    table.insert(t,1,task)
+    table.insert(t,1,v)
     end_idx = end_idx+1
     end
   end
@@ -2974,6 +3060,12 @@ local result = math.huge*(descending and -1 or 1)
 return start_idx+1 < end_idx and sort_table(t, start_idx+1, end_idx, field, descending) or t
 end
 
+
+
+function sort_ignoring_register(t)
+-- one level table, values are strings
+table.sort(t, function(a,b) return a:lower() < b:lower() end)
+end
 
 
 
@@ -3104,8 +3196,23 @@ return t.n = #t
 end
 
 
--- see also get_greatest_smallest_value
+function remove_duplicates(k, v, t)
+-- t is indexed array
+-- likely inefficient but for relatively short arrays
+-- will do
+	for i=1,#t do
+		if t[i] == v and i~=k then
+		table.remove(t,i)	
+		end
+	end
+local k, v = k+1, t[k+1]
+return v and remove_duplicates(k, v, t) or t
+end
+-- USE:
+-- local t = remove_duplicates(1, t[1], t) -- begin from index 1
 
+
+-- see also get_greatest_smallest_value
 
 
 --=========================== T A B L E S  E N D ==============================
@@ -3467,11 +3574,13 @@ local cur_pitch = r.MIDIEditor_GetSetting_int(ME, 'active_note_row') -- store
 local i = 0
 	repeat
 	local retval, sel, mute, startpos, endpos, chan, pitch, vel = r.MIDI_GetNote(take, i) -- only targets notes in the current MIDI channel if Channel filter is enabled, if looking for genuine false or 0 values must be validated with retval which is only true for notes from current channel // if looking for all notes use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
-	local pos = r.MIDI_GetProjTimeFromPPQPos(take, startpos)
-		if pitch == cur_pitch and not time_st and not loop_st
-		or (time_st and time_end and pos >= time_st and pos < time_end
-		or loop_st and loop_end and pos >= loop_st and pos < loop_end)
-		then return true
+		if retval then
+		local pos = r.MIDI_GetProjTimeFromPPQPos(take, startpos)
+			if pitch == cur_pitch and not time_st and not loop_st
+			or (time_st and time_end and pos >= time_st and pos < time_end
+			or loop_st and loop_end and pos >= loop_st and pos < loop_end)
+			then return true
+			end
 		end
 	i=i+1
 	until not retval
@@ -3485,7 +3594,7 @@ local retval, notecnt, _, _ = r.MIDI_CountEvts(take)
 local i = 0
 	while i < notecnt do
 	local retval, _, _, start_pos_next, _, _, _, _ = r.MIDI_GetNote(take, i) -- only targets notes in the current MIDI channel if Channel filter is enabled, if looking for genuine false or 0 values must be validated with retval which is only true for notes from current channel // if looking for all notes use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
-		if start_pos_next > start_pos then return start_pos_next end
+		if retval and start_pos_next > start_pos then return start_pos_next end
 	i = i+1
 	end
 end
@@ -3497,7 +3606,7 @@ local i = 0
 	while i < notecnt do
 	local retval, _, _, _, end_pos, _, _, _ = reaper.MIDI_GetNote(take, i) -- only targets notes in the current MIDI channel if Channel filter is enabled, if looking for genuine false or 0 values must be validated with retval which is only true for notes from current channel // if looking for all notes use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
 	local retval, _, _, start_pos, _, _, _, _ = reaper.MIDI_GetNote(take, i+1)
-		if end_pos > start_pos and start_pos ~= 0 then return true end -- start_pos ~= 0 to ignore a non-existing note index beyond the note count whose start_pos will be 0
+		if retval and end_pos > start_pos and start_pos ~= 0 then return true end -- start_pos ~= 0 to ignore a non-existing note index beyond the note count whose start_pos will be 0
 	i = i + 1
 	end
 end
@@ -3507,9 +3616,9 @@ function Notes_Overlap_Respected_Chords(take) -- chord notes which start simulta
 local retval, notecnt, _, _ = reaper.MIDI_CountEvts(take)
 local i = 0
 	while i < notecnt do
-	local retval, _, _, start_pos1, end_pos, _, _, _ = reaper.MIDI_GetNote(take, i) -- only targets notes in the current MIDI channel if Channel filter is enabled, if looking for genuine false or 0 values must be validated with retval which is only true for notes from current channel // if looking for all notes use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
-	local retval, _, _, start_pos2, _, _, _, _ = reaper.MIDI_GetNote(take, i+1)
-		if start_pos1 < start_pos2 and end_pos > start_pos and start_pos2 ~= 0 then return true end -- start_pos1 < start_pos2 makes sure that chord notes which start simultanelusly aren't recognized as overlapping, start_pos ~= 0 to ignore a non-existing note index beyond the note count whose start_pos will be 0
+	local retval1, _, _, start_pos1, end_pos, _, _, _ = reaper.MIDI_GetNote(take, i) -- only targets notes in the current MIDI channel if Channel filter is enabled, if looking for genuine false or 0 values must be validated with retval which is only true for notes from current channel // if looking for all notes use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
+	local retval2, _, _, start_pos2, _, _, _, _ = reaper.MIDI_GetNote(take, i+1)
+		if retval1 and retval2 and start_pos1 < start_pos2 and end_pos > start_pos and start_pos2 ~= 0 then return true end -- start_pos1 < start_pos2 makes sure that chord notes which start simultanelusly aren't recognized as overlapping, start_pos ~= 0 to ignore a non-existing note index beyond the note count whose start_pos will be 0
 	i = i + 1
 	end
 end
@@ -3519,9 +3628,9 @@ function Correct_Overlapping_Notes1(take) -- chord notes with start simultaneous
 local retval, notecnt, _, _ = reaper.MIDI_CountEvts(take)
 local i = 0
 	while i < notecnt do
-	local retval, _, _, _, end_pos, _, _, _ = reaper.MIDI_GetNote(take, i) -- only targets notes in the current MIDI channel if Channel filter is enabled, if looking for genuine false or 0 values must be validated with retval which is only true for notes from current channel // if looking for all notes use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
-	local retval, _, _, start_pos, _, _, _, _ = reaper.MIDI_GetNote(take, i+1)
-		if end_pos > start_pos and start_pos ~= 0 then -- start_pos ~= 0 to ignore a non-existing note index beyond the note count whose start_pos will be 0 thereby preventing setting the last note end_pos to 0
+	local retval1, _, _, _, end_pos, _, _, _ = reaper.MIDI_GetNote(take, i) -- only targets notes in the current MIDI channel if Channel filter is enabled, if looking for genuine false or 0 values must be validated with retval which is only true for notes from current channel // if looking for all notes use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
+	local retval2, _, _, start_pos, _, _, _, _ = reaper.MIDI_GetNote(take, i+1)
+		if retval1 and retval2 and end_pos > start_pos and start_pos ~= 0 then -- start_pos ~= 0 to ignore a non-existing note index beyond the note count whose start_pos will be 0 thereby preventing setting the last note end_pos to 0
 		reaper.MIDI_SetNote(take, i, selectedIn, mutedIn, startppqposIn, start_pos, chanIn, pitchIn, velIn, true) -- noSortIn
 		end
 	i = i + 1
@@ -3568,7 +3677,7 @@ local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take)
 	local sel_note_t = {}
 		for i = 0, notecnt-1 do
 		local retval, sel, mute, startpos, endpos, chan, pitch, vel = r.MIDI_GetNote(take, i) -- only targets notes in the current MIDI channel if Channel filter is enabled, if looking for genuine false or 0 values must be validated with retval which is only true for notes from current channel // if looking for all notes use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
-			if sel then sel_note_t[#sel_note_t+1] = i end
+			if retval and sel then sel_note_t[#sel_note_t+1] = i end
 		end
 	--[[ ALTERNATIVE
 		local i = 0
@@ -11276,7 +11385,7 @@ end
 
 
 
-function Enum_RS5k_files(tr, fx_idx)
+function RS5k_Enum_files(tr, fx_idx)
 local i = 0
 	repeat
 	local retval, name = r.TrackFX_GetNamedConfigParm(tr, fx_idx, "FILE"..i)
@@ -11288,7 +11397,7 @@ end
 
 
 
-function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, pass, want_chain)
+function RS5k_Force_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, pass, want_chain)
 -- Due to REAPER bug https://forum.cockos.com/showthread.php?t=281778, which was fixed in build 7.01
 -- undo point for all RS5k instances is only created with open FX chain window
 -- to create an undo point for a single instance it suffices to open it in a floating window
@@ -11331,17 +11440,134 @@ function Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last
 end
 -- USE (WORKING WITH A SINGLE RS5k INSTANCE):
 -- Undo_BeginBlock()
--- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, false) -- targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain false
+-- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = RS5k_Force_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, false) -- targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain false
 -- DO STUFF
--- Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- last_sel_idx, last_sel_fx_floats are nil, pass is 2, want_chain false
+-- RS5k_Force_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- last_sel_idx, last_sel_fx_floats are nil, pass is 2, want_chain false
 -- Undo_EndBlock('',2) -- the flag MUST be 2 (UNDO_STATE_FX), NOT -1 which works only once if the plugin UI is originally open
 
 -- (WORKING WITH MULTIPLE RS5k INSTANCES):
 -- Undo_BeginBlock()
--- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, true) -- targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain true
+-- local last_sel_idx, last_sel_fx_floats, targ_fx_floats = RS5k_Force_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 1, true) -- targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats are nil, pass is 1, want_chain true
 -- DO STUFF
--- Force_RS5k_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- targ_fx_idx, targ_fx_floats and nil, last_sel_idx is integer, last_sel_fx_floats is boolean, pass is 2, want_chain true
+-- RS5k_Force_Undo_With_Closed_Chain(tr, targ_fx_idx, targ_fx_floats, last_sel_idx, last_sel_fx_floats, 2, false) -- targ_fx_idx, targ_fx_floats and nil, last_sel_idx is integer, last_sel_fx_floats is boolean, pass is 2, want_chain true
 -- Undo_EndBlock('',2) -- the flag MUST be 2 (UNDO_STATE_FX), NOT -1 which works only once if the plugin UI is originally open
+
+
+
+function RS5k_Calculate_Sample_Length(tr, fx_idx)
+-- fx_idx is RS5k index in the FX chain
+local ret, file = r.TrackFX_GetNamedConfigParm(tr, 0, 'FILE0')
+local src = r.PCM_Source_CreateFromFile(file)
+local sec, QN = r.GetMediaSourceLength(src) 
+-- OR
+-- local retval, offs, sec, rev = r.PCM_Source_GetSectionInfo(src)
+local spl_st_offset = r.TrackFX_GetParam(tr, 0, 13)
+local spl_end_offset = r.TrackFX_GetParam(tr, 0, 14)
+return sec*spl_end_offset - sec*spl_st_offset
+--[[
+-- OR, source length isn't needed
+local ret, st = r.TrackFX_GetFormattedParamValue(tr, 0, 13)
+local ret, fin = r.TrackFX_GetFormattedParamValue(tr, 0, 14)
+return fin+0 - st+0
+--]]
+end
+
+
+
+function RS5k_Get_Note_Range(tr, idx)
+local start_note = r.TrackFX_GetParam(tr, idx, 3)
+local end_note = r.TrackFX_GetParam(tr, idx, 4)
+local unit = 1/127
+return math.floor(start_note/unit+0.5), math.floor(end_note/unit+0.5)
+--[[
+-- OR, source length isn't needed
+local ret, start_note = r.TrackFX_GetFormattedParamValue(tr, 0, 3)
+local ret, end_note = r.TrackFX_GetFormattedParamValue(tr, 0, 4)
+return start_note+0, start_note+0
+--]]
+end
+
+
+
+function RS5k_Calculate_Sample_Playing_Time_At_Pitch(tr, fx_idx, spl_length, pitch)
+-- spl_length stems from Calculate_RS5k_Sample_Length(), length in sec
+-- if invalid, the function relies on RS5k_Calculate_Sample_Length()
+-- to get it;
+-- fx_idx is RS5k index in track FX chain;
+-- pitch is MIDI note pitch in the range of 1-127, supposed to
+-- fall within range defined by RS5k 'Note start/end:' settings;
+-- the function only makes sense when 'Obey note-offs' option is disabled in RS5k
+
+local spl_length = spl_length or Calculate_RS5k_Sample_Length and Calculate_RS5k_Sample_Length(tr, fx_idx)
+
+	if not spl_length then return end
+	
+local Param = {tr=tr,idx=fx_idx, 
+Get = function(self, parm_idx) return r.TrackFX_GetParam(self.tr, self.idx, parm_idx) end}	
+	
+local unit = 1/127
+local note_st = math.floor(Param:Get(3)/unit+0.5) -- 'Note start:'
+local note_end = math.floor(Param:Get(4)/unit+0.5) -- 'Note end:'
+--[[ -- OR, which obviates conversion from notmalized values to conventional notation
+local Param = r.TrackFX_GetFormattedParamValue
+local note_st = Param(tr, fx_idx, 3, '')
+local note_end = Param(tr, fx_idx, 4, '')
+--]]
+	if pitch < note_st or pitch > note_end then return end	
+
+local ret, mode = r.TrackFX_GetNamedConfigParm(tr, fx_idx, 'MODE')
+
+	if not ret then return end -- in REAPER builds where MODE the parameter isn't supported
+
+-- these calculations apply to all 3 sample playback modes
+local pitch_offset = Param:Get(15) -- range -80 + 80 st;
+local unit = 1/160 -- 160 st is full range between -80 and +80 st, 1 is normalized full range of the parameters
+local pitch_offset = (pitch_offset-0.5)/unit -- 0.5 equals pitch 0, values above it are within the range of 0-80, below -80-0 // in modes other than 'Sample (ignores MIDI note)' it's an offset on top of the offset produced by Pitch@start value towards the value of 'Note start', if negative it offsets Pitch@start value
+--[[ OR, which obviates conversion from notmalized values to conventional notation
+local pitch_offset = r.TrackFX_GetFormattedParamValue(tr, fx_idx, 15, '')
+--]]
+
+-- 'Sample (ignores MIDI note)'
+local semitone_shift = pitch_offset -- if negative the sample plays slower, if positive - faster
+
+	if mode ~= '1' then -- not 'Sample (ignores MIDI note)' mode
+	local pitch_st = Param:Get(5) -- 'Pitch@start:' sett, range -80 + 80 st; relevant for modes 'Freely configurable shifted' and 'Note (semintone shifted)' // THE NOTE NAME INDICATES THE CALCULATED ROOT NOTE AFTER SHIFT TOWARDS THE NOTE AT 'Note start:' SETTING, NOT THE START NOTE AFTER SHIFT, i.e. if 'Note start' is C4 (60), Pitch@start 1 means that the current pitch at C4 is the result of the root note transposition up by 1 st, which makes the root note B3 (59), because 59+1=60; negative Pitch@start value shifts the root note up, i.e. with 'Note start' being C4 Pitch@start value -1 makes the root note C#4 because C#4 (61) - 1 = C4 (60)
+	local pitch_st = math.floor((pitch_st-0.5)/unit+0.5) -- same calculation logic as pitch_offset, values above 0.5 it are within the range of 0-80, below -80-0
+	local pitch_end = Param:Get(6) -- 'Pitch@end:' sett, range -80 + 80 st; relevant for mode 'Freely configurable shifted' // SAME LOGIC APPLIES TO THE END NOTE
+	local pitch_end = math.floor((pitch_end-0.5)/unit+0.5) -- same calculation logic as pitch_offset, values above 0.5 it are within the range of 0-80, below -80-0
+	--[[ -- OR, which obviates conversion from notmalized values to conventional notation
+	local Param = r.TrackFX_GetFormattedParamValue
+	local ret, pitch_st = Param(tr, fx_idx, 5, '')
+	local ret, pitch_end = Param(tr, fx_idx, 6, '')
+	local ret, pitch_offset = Param(tr, fx_idx, 15, '')
+	--]]
+		if mode == '2' then -- 'Note (semintone shifted)'
+		local root_note = note_st - pitch_st
+		semitone_shift = pitch - root_note + pitch_offset -- if negative the sample plays slower, if positive - faster
+		else -- 'Freely configurable shifted'
+		-- in this mode if both Pitch@start and Pitch@end settings are 0 the sample isn't transposed along the entire note range and plays at its original pitch which is equal to 'Sample (ignores MIDI note)' mode
+		-- equal values transpose the sample by the same amount along the entire note range, i.e. it plays at constant but transposed pitch along the entire note range
+		-- different values transpose the sample along the entire note range between 'Note start' and 'Note end' by as many semitones as the their sum, which can be between 1 and 160 semitones in either direction
+		-- with Pitch@start positive or 0 and Pitch@end negative transposition can even be reversed so that pitch rises along note range in the opposite direction from heigher indexed notes to lower indexed
+		local range = note_end - note_st
+		local ratio = (pitch_st - pitch_end)/range -- calculate pitch shift ratio per semitone within the given range
+		semitone_shift = pitch_st + (note_st - pitch) * ratio + pitch_offset -- pitch_st and pitch_offset are added in semitones on top of the pitch shift at the calculated ratio from note_st to pitch
+		end
+	
+	end
+
+local pitch_shift = semitone_shift/12 -- amount of pitch shift in octaves; pitch shift by 1 octave doubles or halves the speed/duration depending on direction
+-- when pitch shift is negative, duration increases otherwise decreases by a factor of 2 per octave
+-- negative exponent (sample pitched down) increases the product, i.e. longer playing time, 
+-- positive - dicreases, i.e. shorter playing time
+local spl_duration = spl_length * 1/2^pitch_shift -- OR 0.5^pitch_shift OR 1/(2^pitch_shift)	
+-- OR
+-- local spl_duration = spl_length / 2^pitch_shift
+
+return spl_duration
+
+end
+
 
 
 
@@ -11961,10 +12187,9 @@ end
 
 
 function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, parm_ident_t, TAG)
--- since v7 EnumInstalledFX() can be used to retrieve the name
+-- since v7 r.EnumInstalledFX() can be used to retrieve the name
 -- listed in the FX browser and a unique identifier independent
 -- of the name in case changed but the identifier must of course be known in advance
-
 -- the function is based on Get_FX_Parm_Orig_Name_s() above
 -- in case it's been aliased by the user;
 -- obj is track or take;
@@ -11973,7 +12198,7 @@ function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, parm_ident_t, TAG)
 -- e.g. {[4] = 'parm name 4', [12] = 'parm name 12', [23] = 'parm name 23'}
 -- parm_ident_t is a table indexed by param indices whose fields hold
 -- corresponding param string identifiers, supported since build 6.37+
--- parm_t and parm_ident_t must be of the same length and have the same order of parameters
+-- parm_t and parm_ident_t must be of the same length and have the same order of parameters;
 -- TAG is a user TAG added to FX name in the FX chain
 -- to mark it as a target for script, optional
 -- works with builds 6.37+
@@ -11987,7 +12212,7 @@ or take and {r.TakeFX_GetFXName, r.TakeFX_GetNamedConfigParm,
 r.TakeFX_CopyToTrack, r.TakeFX_GetNumParams, r.TakeFX_GetParamName} or {})
 -- get name displayed in fx chain
 local retval, fx_chain_name = GetFXName(obj, fx_idx, '')
-fx_chain_name = TAG and fx_chain_name:gsub(TAG,'') or fx_chain_name -- if TAG is supplied removing to be able to evaluate clean name
+fx_chain_name = TAG and fx_chain_name:gsub(TAG,'') or fx_chain_name -- if TAG is supplied removing to be able to evaluate clean name // script specific
 	if fx_chain_name:match(Esc(fx_name)) then return true end -- ignoring fx type prefix
 
 -- if fx chain displayed name doesn't match the user supplied name, meaning was renamed
@@ -12307,6 +12532,7 @@ function Find_Video_Proc_Instance(take, preset, want_disabled)
 end
 
 
+
 function Collect_FX_Parm_Aliases(fx_chunk)
 -- fx_chunk arg stems from Get_FX_Chunk()
 local t = {}
@@ -12319,6 +12545,8 @@ local t = {}
 return t
 end
 
+
+-- see also Import_Item_To_RS5k in  I T E M S
 
 
 --================================================  F X  E N D  ==============================================
@@ -12371,53 +12599,103 @@ r.ShowConsoleMsg('NAME = '..({r.GetSetMediaItemTakeInfo_String(r.GetActiveTake(i
 end
 
 
-function Rename_Item_Take_Src_File1(item, ACT) -- see a more reliable version 2 below
+function Rename_Item_Take_Src_File1(item, new_name, remove_peaks) -- see a more reliable version 2 below
+-- the function doesn't hedge against file name collision,
+-- see resolve_file_name_collision, 3 versions
+-- to incorporate here
 
 local take = r.GetActiveTake(item)
-local old_fn = r.GetMediaSourceFileName(r.GetMediaItemTake_Source(take), '') -- extract file path and name
-
+local src = r.GetMediaItemTake_Source(take)
+local old_fn = r.GetMediaSourceFileName(src, '') -- extract file path and name
 local f_path, f_name = old_fn:match('^(.+[\\/])([^\\/]+)$') -- isolate file path and name
 
-local f_name_new = '...' -- SOME STRING OR MODIFIED f_name
-local new_fn = f_path..f_name_new
-
-ACT(40289) -- Item: Unselect all items
-r.SetMediaItemSelected(item, true)
-ACT(40440) -- Item: Set selected media temporarily offline
+--local f_name_new = '...' -- SOME STRING OR MODIFIED f_name
+local new_fn = f_path..new_name
+local ACT = r.Main_OnCommand
+ACT(40289, 0) -- Item: Unselect all items // OR r.SelectAllMediaItems(0, false) -- selected false
+r.SetMediaItemSelected(item, true) -- selected true
+ACT(40440, 0) -- Item: Set selected media temporarily offline
 os.rename(old_fn, new_fn) -- apply a new name
 local new_src = r.PCM_Source_CreateFromFile(new_fn)
 r.SetMediaItemTake_Source(take, new_src) -- assign the renamed file as a source
-ACT(40439) -- Item: Set selected media online
-local ok, message = #r.GetPeakFileName(f_path..f_name, '') > 0 and os.remove(f_path..f_name..'.reapeaks') -- remove old file name peak file
+local peaks_file = r.GetPeakFileName(f_path..f_name, '')
+local ret, altpeakspath = r.get_config_var_string('altpeakspath') -- alternative peaks path
+
+	if not remove_peaks and #peaks_file > 0 and not peaks_file:match(altpeakspath) then 
+	-- rename peaks file BEFORE setting item online,
+	-- not sure if this matters, but just in case,
+	-- and only if it's stored at the file path, because
+	-- at the alternative path defined at Preferences -> Paths -> Store all peak caches...
+	-- its name is a hash, not human readable so nothong to rename
+	os.rename(old_fn..'.reapeaks', new_fn..'.reapeaks')
+	elseif remove_peaks then
+	os.remove(peaks_file) -- remove old file name peaks file
+	end
+
+-- peaks rebuilding is a must, whether the .reapeaks file
+-- is renamed or deleted or left intact,
+-- if old .reapeaks file is kept, the new one will be created
+-- which matches the file new name
+ACT(40441, 0) -- Peaks: Rebuild peaks for selected items
+ACT(40439, 0) -- Item: Set selected media online
+	
+	if src and not r.ValidatePtr(src, 'PCM_source*') then
+	r.PCM_Source_Destroy(src)
+	end
 
 end
 
 
-function Rename_Item_Take_Src_File2(take)
+function Rename_Item_Take_Src_File2(take, new_name, remove_peaks)
 -- Thanks to cfillion and MPL
 -- https://forum.cockos.com/showthread.php?t=211250 file rename
 -- https://forum.cockos.com/showthread.php?p=1889202 file rename
+-- the function doesn't hedge against file name collision,
+-- see resolve_file_name_collision, 3 versions
+-- to incorporate here
 
 local old_src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
 local old_src = r.GetMediaSourceParent(old_src) or old_src -- in case the item is a section or a reversed source
 
 local old_fn = r.GetMediaSourceFileName(old_src, "") -- extract rendered file path and name
---local rend_file_ext = old_fn:match("%.%w+") -- extract rendered file extension
---local rend_file_path = old_fn:match("^(.+[\\/])") -- extract rendered file path
-local rend_file_path, rend_file_ext = old_fn:match("^(.+[\\/]).+(%.%w)$") -- extract rendered file index and extension
+--local f_ext = old_fn:match("%.%w+") -- extract rendered file extension
+--local f_path = old_fn:match("^(.+[\\/])") -- extract rendered file path
+local f_path, f_ext = old_fn:match("^(.+[\\/]).+(%.%w)$") -- extract rendered file index and extension
 
--- Concatenate a new file name and rename the rendered fil
-local f_name_new = '...' -- CONCATENATE NAME
-local new_fn = f_path..f_name_new
+-- Concatenate a new file name and rename the rendered file
+--local f_name_new = '...' -- CONCATENATE NAME
+local new_fn = f_path..new_name
 
 -- Rename source file and reapply
-
-r.Main_OnCommand(40440,0) -- Item: Set selected media temporarily offline
+local ACT = r.Main_OnCommand
+ACT(40440,0) -- Item: Set selected media temporarily offline
 os.rename(old_fn, new_fn) -- apply a new name
 local new_src = r.PCM_Source_CreateFromFile(new_fn)
 r.SetMediaItemTake_Source(take, new_src) -- assign the renamed file as a source
-r.Main_OnCommand(40439,0) -- Item: Set selected media online
-os.remove(old_fn..'.reapeaks') -- remove old file name peak file
+local peaks_file = r.GetPeakFileName(f_path..f_name, '')
+local ret, altpeakspath = r.get_config_var_string('altpeakspath') -- alternative peaks path
+
+	if not remove_peaks and #peaks_file > 0 and not peaks_file:match(altpeakspath) then 
+	-- rename peaks file BEFORE setting item online,
+	-- not sure if this matters, but just in case,
+	-- and only if it's stored at the file path, because
+	-- at the alternative path defined at Preferences -> Paths -> Store all peak caches...
+	-- its name is a hash, not human readable so nothong to rename
+	os.rename(old_fn..'.reapeaks', new_fn..'.reapeaks')
+	elseif remove_peaks then
+	os.remove(peaks_file) -- remove old file name peaks file
+	end
+	
+-- peaks rebuilding is a must, whether the .reapeaks file
+-- is renamed or deleted or left intact,
+-- if old .reapeaks file is kept, the new one will be created
+-- which matches the file new name
+ACT(40441, 0) -- Peaks: Rebuild peaks for selected items
+ACT(40439,0) -- Item: Set selected media online
+
+	if old_src and not r.ValidatePtr(old_src, 'PCM_source*') then
+	r.PCM_Source_Destroy(old_src)
+	end
 
 end
 
@@ -13851,17 +14129,30 @@ local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
 end
 
 
-function Delete_Take_Src(take)
-ACT(40440) -- Item: Set selected media temporarily offline // if source is removed before take is removed
+
+function Get_Take_Source_File(take)
+	if take and not r.TakeIsMIDI(take) then
+	local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+	src = r.GetMediaSourceParent(src) or src
+	return r.GetMediaSourceFileName(src, '')
+	end
+end
+
+
+
+function Delete_Take_Src_File(take)
+-- only makes sense if one source has to be replaced by another
+ACT(40440) -- Item: Set selected media temporarily offline // if source file is removed before take is removed
 -- Thanks to cfillion and MPL
 -- https://forum.cockos.com/showthread.php?t=211250
 -- https://forum.cockos.com/showthread.php?p=1889202
 local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
 src = r.GetMediaSourceParent(src) or src -- in case the item is a section or a reversed source
 local file_name = r.GetMediaSourceFileName(src, '')
-os.remove(file_name)
-os.remove(file_name..'.reapeaks')
-ACT(40439) -- Item: Set selected media online // if source is removed before take is removed
+os.remove(r.GetPeakFileName(file_name, '')) -- delete peaks file //  using function in case peak files are set to be stored in a separate directory // deleting before the original file because for non-existing files the GetPeakFileName() function returns alternative path specified in Preferences -> Paths -> Store all peak caches... even if not ticked and where the peak file may not exist, so it'll be left behind at its original path
+os.remove(file)
+r.PCM_Source_Destroy(src)
+ACT(40439) -- Item: Set selected media online // if source file is removed before take is removed
 end
 
 
@@ -13878,6 +14169,7 @@ r.PCM_Source_Destroy(old_src)
 r.UpdateItemInProject(r.GetMediaItemTake_Item(take))
 
 	if want_file_deleted then
+	os.remove(r.GetPeakFileName(old_file_path, '')) -- delete peaks file // using function in case peak files are set to be stored in a separate directory // deleting before the original file because for non-existing files the GetPeakFileName() function returns alternative path specified in Preferences -> Paths -> Store all peak caches... even if not ticked and where the peak file may not exist, so it'll be left behind at its original path
 	os.remove(old_file_path)
 	end
 
@@ -14799,6 +15091,157 @@ local ch_cnt = r.GetMediaSourceNumChannels(src)
 	end
 
 end
+
+
+
+function Find_Level_Below_Thresh_In_Take(take, threshold, block_size, time_window, want_rms)
+-- author ChatGPT;
+-- returns project time where the level below threshold
+-- was first detected within take;
+-- threshold is val in dB, if invalid defaults to -60;
+-- block_size and time_window are mutually exclusive
+-- where block_size have priority if both args are valid
+-- block_size: 256 - 1024 more precise but slower
+-- 2048 - 8192 less precise but faster,
+-- if invalid and time_window is invalid as well defaults to 1024,
+-- time_window is value in sec, for meaningful results
+-- must be fraction of a second, about 1/100 i.e. 10/1000
+-- so that the window width is small enough;
+-- want_rms is boolean to detect level in terms of rms
+-- rather than peak;
+-- the function doesn't account for take playrate other than 1,
+-- for startoffset, reversed source and source section;
+
+	if not take then return nil end
+
+local accessor = r.CreateTakeAudioAccessor(take)
+
+	if not accessor then return end
+
+local item = r.GetMediaItemTake_Item(take)
+local start_time = r.GetAudioAccessorStartTime(accessor) -- take source start in sec within take
+local end_time = r.GetAudioAccessorEndTime(accessor) -- take source end in sec within take
+local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+src = r.GetMediaSourceParent(src) or src
+local samplerate = r.GetMediaSourceSampleRate(src)
+local num_channels = r.GetMediaSourceNumChannels(r.GetMediaItemTake_Source(take))
+
+local block_size = block_size or not time_window and 1024
+block_size = block_size or math.floor(time_window * samplerate + 0.5)
+local threshold = threshold and 10^(threshold/20) or 0.001  -- ~ -60dB, 0.0001 ~ -80dB
+local block_spl_cnt = block_size * num_channels
+local buffer = r.new_array(block_spl_cnt)
+
+local t = start_time
+
+	while t < end_time do
+
+	local is_audio = r.GetAudioAccessorSamples(accessor, samplerate, num_channels, t, block_size, buffer) -- return value is only a control flag, at each loop cycle the buffer initialized above is filled with another sample batch starting at t
+
+		if is_audio ~= 1 then t = nil break end
+
+	local max_amp, sum = 0, 0
+
+		-- scan block
+		for i = 1, block_spl_cnt do
+		local v = want_rms and buffer[i] or math.abs(buffer[i])
+			if not want_rms then -- looking for peak below threshold
+				if v > max_amp then max_amp = v end
+			else -- looking for rms below threshold
+			sum = sum + v * v -- more efficient than v^2
+			end
+		end
+
+	local rms = want_rms and math.sqrt(sum / block_spl_cnt) -- OR (sum / block_spl_cnt)^0.5
+	local val = not want_rms and max_amp or rms
+
+		if val < threshold then
+		-- alternatively detection may use both peak and rms for more accuracy e.g.
+		-- if rms < threshold and max_amp < threshold+10^(15/20) -- where 15 is average expected difference between rms and peak
+		break
+		end
+
+	t = t + (block_size / samplerate)
+
+	end
+
+r.DestroyAudioAccessor(accessor)
+
+return t
+
+end
+
+
+
+function Toggle_Take_Offline(take)
+-- relies on Esc() function
+-- toggles any specific take
+
+	if not take or r.TakeIsMIDI(take) then return end
+
+local item = r.GetMediaItemTake_Item(take)
+local ret, take_GUID = r.GetSetMediaItemTakeInfo_String(take, 'GUID', '', false) -- isSet false
+local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
+local src = r.GetMediaItemTake_Source(take)
+src = r.GetMediaSourceParent(src) or src -- in case source is reversed or section
+local file = r.GetMediaSourceFileName(src, '')
+local take_idx = r.GetMediaItemTakeInfo_Value(take, 'IP_TAKENUMBER')
+local nxt_take = r.GetTake(item, take_idx+1)
+local nxt_take_GUID
+	if nxt_take then
+	ret, nxt_take_GUID = r.GetSetMediaItemTakeInfo_String(nxt_take, 'GUID', '', false) -- isSet false
+	end
+nxt_take_GUID = nxt_take_GUID or '' -- used as an anchor to prevent overshooting the target take data
+local online_chunk = chunk:match('GUID '..Esc(take_GUID)..'.-<SOURCE WAVE\nFILE "'..Esc(file)..'".-'..Esc(nxt_take_GUID))
+local offline_chunk = not online_chunk 
+and chunk:match('GUID '..Esc(take_GUID)..'.-<SOURCE _OFFLINE_WAVE\nFILE "'..Esc(file)..'".-'..Esc(nxt_take_GUID))
+
+	if not online_chunk and not offline_chunk then Msg('abort') return end
+	
+local a, b = '<SOURCE WAVE', '<SOURCE _OFFLINE_WAVE'
+	if offline_chunk then
+	a, b = b, a -- flip
+	end
+local take_src_chunk = online_chunk or offline_chunk
+local toggled = take_src_chunk:gsub(a, b, 1):gsub('%%','%%%%')
+take_src_chunk = Esc(take_src_chunk)
+chunk = chunk:gsub(take_src_chunk, toggled)
+r.SetItemStateChunk(item, chunk, false) -- isundo false
+
+end
+
+
+
+function Toggle_Item_Takes_Offline(item, want_all)
+-- since actions are used, either only all inactive takes
+-- or all item takes are toggled
+-- if want_all is true, all item takes are toggled
+-- otherwise only inactive
+
+-- store selected items
+local sel_itms = {}
+	for i=0, r.CountMediaItems(0)-1 do
+	local item = r.GetMediaItem(0,i)
+		if r.IsMediaItemSelected(item) then
+		sel_itms[item] = ''
+		end
+	end
+	
+r.SelectAllMediaItems(0, false) -- selected false // deselect all
+r.SetMediaItemSelected(item, true) -- selected true // select target item because actions only affect selected items
+local ID = want_all and 42356 -- Item: Toggle force media offline
+or 42357 -- Item: Toggle force inactive take media offline
+r.Main_OnCommand(ID, 0)
+r.SetMediaItemSelected(item, false) -- selected false // deselect, if was selected originally the state will be restored in the loop below
+
+	-- restore originally selected items
+	for item in pairs(sel_itms) do
+	r.SetMediaItemSelected(item, true) -- selected true
+	r.UpdateItemInProject(item)
+	end
+
+end
+
 
 
 
@@ -16222,7 +16665,8 @@ function Get_Ruler_Lane_Count(want_visible)
 -- but it's moved as soon as a valid lane index is found
 -- and since the movement is attempted in reverse,
 -- the first lane index associated with successful movement
--- will be the index of the last available lane
+-- will be the index of the last available lane;
+-- alternative function https://forum.cockos.com/showpost.php?p=2928073
 
 	-- only supported since build 7.62
 	if not r.GetRegionOrMarker then return end
@@ -16899,7 +17343,48 @@ Hold your mouse over the target window (the child window), and run this script:
 w = reaper.JS_Window_FromPoint(reaper.GetMousePosition())
 ID = reaper.JS_Window_GetLong(w, "ID")
 https://forum.cockos.com/showthread.php?p=2349444#post2349444
+
+For compatibility with MacOS and Lunix, before window handle is used
+it must be validated with r.ValidatePtr(hwnd, 'HWND')
+because invalid handle will cause REAPER crash
+https://forum.cockos.com/showpost.php?p=2119540
+
 ]]
+
+
+
+function MIDIEditor_GetActiveAndVisible()
+-- solution to the problem described at https://forum.cockos.com/showthread.php?t=278871
+local ME = r.MIDIEditor_GetActive()
+local dockermode_idx, floating = r.DockIsChildOfDock(ME) -- floating is true regardless of the floating docker visibility
+local dock_pos = r.DockGetPosition(dockermode_idx) -- -1=not found, 0=bottom, 1=left, 2=top, 3=right, 4=floating
+-- OR
+-- local floating = dock_pos == 4 -- another way to evaluate if docker is floating
+-- the MIDI Editor is either not docked or docked in an open docker attached to the main window
+	if ME and (dockermode_idx == -1 or dockermode_idx > -1 and not floating
+	and r.GetToggleCommandStateEx(0,40279) == 1) -- View: Show docker
+	then return ME, dock_pos
+-- the MIDI Editor is docked in an open floating docker
+	elseif ME and floating then
+		-- INSTEAD OF THE LOOP below the following function can be used
+		local ret, val = r.get_config_var_string('dockermode'..dockermode_idx)
+			if val == '32768' then -- OR val ~= '98304' // open floating docker OR not closed floating docker
+			return ME, 4 -- here dock_pos will always be floating i.e. 4
+			end
+		--[[ OR
+		for line in io.lines(r.get_ini_file()) do
+			if line:match('dockermode'..dockermode_idx)
+			and line:match('32768') -- open floating docker
+			-- OR
+			-- and not line:match('98304') -- not closed floating docker
+			then return ME, 4 -- here dock_pos will always be floating i.e. 4
+			end
+		end
+		--]]
+	end
+end
+
+
 
 function Loka_Window_At_Mouse(w, h) -- Lokasenna // https://forum.cockos.com/showpost.php?p=1689028&postcount=15
 -- This will open a window centered on the mouse cursor, adjusted to make sure it's all on the screen and clear of the taskbar
@@ -19707,7 +20192,7 @@ return f_path
 end
 
 
-function resolve_file_name_collision1(f_path) -- see more comprehensive verson below
+function resolve_file_name_collision1(f_path) -- see more comprehensive verson 2 below
 -- the function is supposed to be used after existence
 -- of a homonymous file at the destination path
 -- has already been ascertained with functions such as File_Exists3();
@@ -19839,7 +20324,50 @@ end
 
 
 
-function reduce_file_name_length(f_path)
+function resolve_file_name_collision3(f_path)
+-- f_path is the file new path it's supposed to have after
+-- movement/copying/renaming;
+-- the function appends to the file name a numeric suffix
+-- separated from the file name by dash, i.e. '-1',
+-- mimics REAPER's glue actions logic, where
+-- first available numeral is used as a suffix
+-- rather than the count is resumed from the greatest
+-- numeral found in the suffix
+
+local path, f_name = f_path:match('(.+)[\\/]'), f_path:match('.+[\\/](.+)')
+local sep = f_path:match('[\\/]')
+local i, t = 0, {}
+
+	repeat
+	local name = r.EnumerateFiles(path, i)
+		if name then
+		t[name] = ''
+		end
+	i=i+1
+	until not name
+	
+	local function resolve_collision(t, f_name, num)		
+		for name in pairs(t) do
+			if f_name == name then		
+			local name, ext = f_name:match('(.+)(%.%w+)$')
+			name = name:match('(.+)%-%d+') or name -- strip numeric suffix if any, to increment and repace with new
+			local num = num and num+1 or 1
+			name = name..'-'..num..ext
+			f_name = resolve_collision(t, name, num)
+			break end
+		end
+	return f_name
+	end
+
+f_name = resolve_collision(t, f_name)	
+
+return path..sep..f_name
+
+end
+
+
+
+function truncate_file_name(f_path)
 -- to be used when file path exceeds the limit of 256 chars
 -- relies on File_Exists1() function
 
@@ -19872,7 +20400,6 @@ end
 
 
 
-
 function file_status(path)
 -- based on https://www.tutorialspoint.com/lua/index.htm
 -- returned status: readable, writable
@@ -19885,6 +20412,7 @@ local t = {true}
 	end
 return t
 end
+
 
 
 function move_file_to_another_folder(file_path, folder_path, delete_old)
@@ -20658,6 +21186,8 @@ local func = ''
 		-- the use of lines 'RETURN THIS FUNCTION START/END' typed out in reverse in this loop
 		-- ensures that the code capture doesn't start at this exact loop as would likely be the case
 		-- had the lines been typed out normally
+		-- alternative to reversed representation is the string bytecode
+		-- converted in advance outside of the script with string2bytes() or string2bytes_2()
 			if line:match(('TRATS NOITCNUF SIHT NRUTER'):reverse()) or #func > 0 then
 			func = func..(#func > 0 and '\n' or '')..line -- collect target function content
 			elseif line:match(('DNE NOITCNUF SIHT NRUTER'):reverse()) then break
@@ -22043,7 +22573,7 @@ local act = comm_ID and comm_ID ~= 0 and r.Main_OnCommand(r.NamedCommandLookup(c
 end
 
 
-function ACT2(comm_ID, islistviewcommand, midi)
+function ACT2(comm_ID, midi, islistviewcommand)
 -- islistviewcommand, midi are boolean
 -- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
 -- e.g. sectionID == 32061
@@ -22053,14 +22583,14 @@ or not midi and r.Main_OnCommand(r.NamedCommandLookup(comm_ID), 0) -- not midi c
 end
 
 
-function ACT3(comm_ID, islistviewcommand, midi)
+function ACT3(comm_ID, midi, islistviewcommand)
 -- islistviewcommand, midi are boolean
 -- islistviewcommand is based on evaluation of sectionID returned by get_action_context()
 -- e.g. sectionID == 32061
 -- see also Main_OnCommand_alt()
 local comm_ID = comm_ID and r.NamedCommandLookup(comm_ID)
 local act = comm_ID and comm_ID ~= 0 and (midi
-and r.MIDIEditor_LastFocused_OnCommand(comm_ID, islistviewcommand -- islistviewcommand false
+and r.MIDIEditor_LastFocused_OnCommand(comm_ID, islistviewcommand) -- islistviewcommand false
 or not midi and r.Main_OnCommand(comm_ID, 0)) -- not midi cond is required because even if midi var is true the previous expression produces falsehood because the MIDIEditor_LastFocused_OnCommand() function doesn't return anything // only if valid command_ID
 end
 
@@ -22213,8 +22743,8 @@ end
 
 
 function Esc_Menu_Ops(str)
--- useful when user input can change
--- menu content
+-- useful when user input or parsed content 
+-- can affect menu formatting
 	for k, op in ipairs({'!','#','>','<','|'}) do
 		if str:match('^%s*|') or str:match('^%s*'..'\226\157\152') then -- if pipe (Vetcial Line (U+007C) '\124') or Light Vertical Bar (U+2758) '\226\157\152' which is interpreted by REAPER as pipe, replace with Full Width Vertical Line (U+FF5C) '\239\189\156', OR can be replaced with Box Drawings Light Vertical (U+2502) '\226\148\132' or with Hangul character for /i/ (U+3163) '\227\133\163'
 		str = str:gsub('[|\226\157\152]', '\239\189\156', 1)
@@ -22222,6 +22752,23 @@ function Esc_Menu_Ops(str)
 		str = ' '..str -- OR '\r'..str OR '\n'..str // when operator other than pipe is preceeded by space or any other character it's ignored by gfx library, so if it's not the very first character in the string it doesn't need fixing
 		end
 	end
+return str
+end
+
+
+
+function UnEsc_Menu_Ops(str, pipe)
+-- function which reverses the result of Esc_Menu_Ops
+-- by stripping leading space and restoring pipe replaced with
+-- Full Width Vertical Line (U+FF5C) '\239\189\156';
+-- pipe arg is boolean to reinstate the pipe char, 
+-- i.e. Vetcial Line (U+007C) '\124',
+-- if invalid, Light Vertical Bar (U+2758) '\226\157\152'
+-- will be reinstated instead which is also replaced 
+-- with Width Vertical Line inside Esc_Menu_Ops()
+-- because of being interpreted by REAPER as menu 
+-- formatting character
+local str = str:match('%S.*'):gsub('\239\189\156', pipe and '|' or '\226\157\152') 
 return str
 end
 
@@ -22729,7 +23276,7 @@ return sett_new_state == '1'
 
 end
 --[[ USE EXAMPLE:
-local sett_t = {sett1:match('%S') or false, sett2:match('%S') or false, sett2:match('%S') or false, sett3:match('%S') or false, sett4:match('%S') or false} -- maintaining the order of settings in the script USER SETTINGS // false alternative will be needed for Options_State_Readout() which doesn't support nil
+local sett_t = {sett1:match('%S') or false, sett2:match('%S') or false, sett3:match('%S') or false, sett4:match('%S') or false, sett5:match('%S') or false} -- maintaining the order of settings in the script USER SETTINGS // false alternative will be needed for Options_State_Readout() which doesn't support nil as well as for working with the table for other purposes
 ::RELOAD::
 local output = Reload_Menu_at_Same_Pos(menu)
 	if output < 4  then -- all 3 settings are first in the menu, i.e. at indices 1-3, if not, the output value will have to be offset by the number of intervening menu items
@@ -22743,6 +23290,17 @@ local output = Reload_Menu_at_Same_Pos(menu)
 				end
 			end
 		end
+	--[=[
+	-- if all settings aren't allowed to be disabled, prevent disabling the only enabled setting
+	local active
+		for k, sett in ipairs(sett_t) do
+			if sett then active = 1 break end
+		end
+		if not active then -- no enabled settings
+		Error_Tooltip('\n\n all settings cannot be disabled \n\n', 1, 1) -- caps, spaced true
+		sett_t[output] = true -- re-enable what has just been disabled
+		end
+	--]=]
 	goto RELOAD
 	end
 --]]
@@ -23263,7 +23821,13 @@ function Create_Submenus_Dynamically(t, limit)
 -- main_menu_cnt var will end up being negative
 -- and submenus will be created from the very first menu item;
 -- one extra submenu over submenu_count value could be added
--- to accommodate remaining outstanding menu items
+-- to accommodate remaining outstanding menu items;
+-- menu item height is ~22 px, with separators ~26 px
+-- using this info the limit arg value can be auto-calculated
+-- relative to the screen Y axis resolution e.g.
+-- local lt, top, rt, bot = r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true) -- screen dimensions; wantWorkArea is true // https://forum.cockos.com/showthread.php?t=195629#4
+-- local limit = math.floor((bot-28)/26) -- 28 is Windows taskbar
+
 
 local tab = type(t) == 'table'
 local max_cnt = tab and #t or t
@@ -23278,6 +23842,8 @@ local menu, count = '', 0
 	local opening = count == 1 and '>'..k..'-'..(max_cnt-k > limit and k+limit-1 or max_cnt)..'|' or ''
 	local closure = count == limit and '<' or ''
 	menu = menu..(#menu > 0 and '|' or '')..opening..closure..v
+	-- OR to add separator between items in submenus
+	-- menu = menu..(#menu > 0 and (#opening == 0 and '||' or '|') or '')..opening..closure..v
 	end
 return menu
 
@@ -25730,14 +26296,16 @@ end
 
 
 
-function MediaExplorer_OnCommand1(action_cmdID)
+function MediaExplorer_OnCommand1(MX, action_cmdID)
 -- https://forum.cockos.com/showthread.php?p=2863268
 -- this function has to be run from inside
 -- MX section of the Action list or from the Main
--- section when MX window is already open
+-- section when MX window is already open;
 
-	if r.GetToggleCommandStateEx(0,50124) == 0 then return -- MX is closed
+	if r.GetToggleCommandStateEx(0,50124) == 0 then return end -- MX is closed
 
+-- get handle of an already open MX
+local MX = r.OpenMediaExplorer('', false) -- play false
 local action_cmdID = r.NamedCommandLookup(action_cmdID) -- works with numeric command IDs of native actions as well passed as either integer or string
 
 	if r.BR_Win32_SendMessage then
@@ -25757,7 +26325,7 @@ function MediaExplorer_OnCommand2(action_cmdID, close_when_done)
 -- because it's slow to become active compared to the speed
 -- of the script execution, therefore defer loop will
 -- have to be employed to wait until it's fully active
--- see defer loop version below MediaExplorer_OnCommand3()
+-- see defer loop version below MediaExplorer_OnCommand3();
 
 local action_cmdID = r.NamedCommandLookup(action_cmdID) -- works with numeric command IDs of native actions as well passed as either integer or string
 -- open if closed
@@ -25780,6 +26348,7 @@ end
 
 
 -- these must either be global variables to be recognized inside the defer loop
+-- or local but declared before the function declaration
 -- or passed as arguments if the function is run via Wrapper function
 -- (see in this U T I L I T Y section)
 action_cmdID = ''
@@ -26006,6 +26575,89 @@ local octaves_t = {}
 return notes_t, octaves_t
 
 end
+
+
+
+function calculate_note_idx_from_note_name(note)
+-- octave range is -1 onwards
+-- either sharp # or flat b signs can be used in note names
+local note = note:gsub(' ','') -- remove all spaces
+local note, oct = note:match('([A-G#]+)(%-?%d+)')
+	if not note or not oct then return end
+local t = {'C','C#/Db','D','D#/Eb','E','F','F#/Gb','G','G#/Ab','A','A#/Bb','B/Cb'}
+local note_idx
+	for k, n in ipairs(t) do	
+		if n:match(note) then note_idx = k-1 break end -- -1 because MIDI note indices are 0-based
+	end
+return note_idx + (oct+1)*12
+end
+
+
+
+function note_number2note_idx_within_octave(num)
+-- num is integer within the range 0-127
+return num%12 + 1 -- returns 1-based note index within octave
+end
+
+
+
+function Map_Multisample_Across_Keyboard(t)
+-- t is array containing multisample note names
+-- or note indices within the range 0-127;
+-- if it's note names, the function relies on
+-- calculate_note_idx_from_note_name()
+
+local names = not tonumber(t[1])
+local t = t
+	if names then
+	-- convert into indices
+	local dups_t = {}
+		for k, name in ipairs(t) do
+		local idx = calculate_note_idx_from_note_name(name)
+			if idx and not dups_t[idx] then -- excluding possible duplicates in the process
+			t[k] = idx
+			dups_t[idx] = ''
+			end
+		end
+	else -- remove duplicates from the array of indices
+		local function cleanup(k, idx, t)
+			for i=1,#t do
+				if t[i] == idx and i~=k then
+				table.remove(t,i)
+				end
+			end
+		return t[k+1] and cleanup(k+1, t[k+1], t) or t
+		end
+	t = cleanup(1, t[1], t)
+	end
+
+table.sort(t) -- sort in case unordered
+
+local map_t = {}
+
+	for k, note_idx in ipairs(t) do
+	local prev, nxt = t[k-1], t[k+1]
+	prev, nxt = prev or 0, nxt or 127 -- accounting for scenarios where there's only one or two note indices in the array
+	local down = prev > 0 and math.ceil((note_idx-1 - prev)/2) or note_idx -- -1 to exclude note_idx from the calculation of the difference, division by 2 to find middle note, math.ceil is to round the result up in order to transpose down by 1 semitone more than up, see up calculation; if not prev, cover the entire range from 0 up to current note
+	prev = note_idx == 0 and note_idx or note_idx-down
+	local up = nxt < 127 and math.floor((nxt-1 - note_idx)/2) or 127-note_idx -- same logic, math.floor is to transpose up by 1 semitone less than down; if not nxt, cover the entire range from current note up to 127
+	nxt = note_idx == 127 and note_idx or note_idx+up
+	table.insert(map_t, prev)
+	table.insert(map_t, nxt)
+	end
+
+-- extract start/end pairs for each multi-sample note
+-- the start/end note indices can then be converted into plugin control settings
+-- such as Note start/end of RS5k
+	for i=1, #map_t, 2 do
+	local st, fin = map_t[i], map_t[i+1]
+	end
+	
+return map_t
+
+end
+
+
 
 
 function Run_Functions_From_Table(...)
@@ -26399,6 +27051,12 @@ end
 
 
 function dec2hex(dec_int)
+-- https://github.com/Onelinerhub/onelinerhub/blob/main/lua/convert-int-to-hex.md
+return string.format("%x", dec_int..'') -- converting number to string
+end
+
+
+function dec2hex_2(dec_int)
 -- input arg is a decimal integer
 -- https://www.rapidtables.com/convert/number/decimal-to-hex.html algo
 
@@ -27333,7 +27991,7 @@ U N D O
 	undo_block
 	Force_MIDI_Undo_Point1
 	Force_MIDI_Undo_Point2
-	Force_RS5k_Undo_With_Closed_Chain
+	RS5k_Force_Undo_With_Closed_Chain
 	GetUndoSettings
 	Toggle_Undo_Settings1
 	Toggle_Undo_Settings2
@@ -27355,7 +28013,8 @@ M A T H
 	round
 	truncate_decimal
 	truncate
-	trim_trail_zero
+	trim_trailing_decimal_zeros1
+	trim_trailing_decimal_zeros2
 	math.randomseed
 	Get_Closest_Prev_Whole_Multiple
 	Get_Closest_Multiple_Of_Divisor1
@@ -27380,6 +28039,7 @@ M A T H
 	count_bits_in_number
 	hex2dec
 	dec2hex
+	dec2hex_2
 	get_integer_length1
 	get_integer_length2
 	un_pack_integers
@@ -27388,6 +28048,8 @@ M A T H
 	floats_are_equal
 	get_greatest_smallest_value1
 	get_greatest_smallest_value2
+	linear_interp
+	calc_mean_x_stand_deviation
 
 
 S T R I N G S
@@ -27453,6 +28115,9 @@ S T R I N G S
 	construct_table_from_2_lists
 	embellish_string
 	bytes2string
+	bytes2string_2
+	string2bytes
+	string2bytes_2
 	add_zero_padding
 	wrap_text
 	numerate_instances
@@ -27492,6 +28157,7 @@ T A B L E S
 	sort_tableA_by_tableB
 	sort_table1
 	sort_table2
+	sort_ignoring_register
 	is_table_already_sorted1
 	is_table_already_sorted2
 	pack
@@ -27500,6 +28166,7 @@ T A B L E S
 	deep_copy2
 	embed_table_length1
 	embed_table_length2
+	remove_duplicates
 
 
 M I D I
@@ -27810,8 +28477,11 @@ F X
 	TrackFX_GetRecChainVisible1
 	TrackFX_GetRecChainVisible2
 	FX_Exists
-	Enum_RS5k_files
-	Force_RS5k_Undo_With_Closed_Chain
+	RS5k_Enum_files
+	RS5k_Force_Undo_With_Closed_Chain
+	RS5k_Calculate_Sample_Length
+	RS5k_Get_Note_Range
+	RS5k_Calculate_Sample_Playing_Time_At_Pitch
 	Get_FX_Selected_In_FX_Chain
 	Set_FX_Selected_In_FX_Chain
 	GetSet_FX_Selected_In_FX_Chain
@@ -27831,6 +28501,7 @@ F X
 	Insert_Video_Proc_With_Preset
 	Get_Vid_Proc_Instance_Default_Name
 	Find_Video_Proc_Instance
+	Collect_FX_Parm_Aliases
 
 
 I T E M S
@@ -27881,7 +28552,8 @@ I T E M S
 	ApplyNudge scenarios
 	Fades_Exist
 	is_audio_src
-	Delete_Take_Src
+	Get_Take_Source_File
+	Delete_Take_Src_File
 	Replace_Take_Src
 	Get_Take_Src_Props
 	Get_Take_Src_Channel_Count
@@ -27912,6 +28584,9 @@ I T E M S
 	get_active_take_index_via_chunk
 	Convert_Empty_Take_To_Valid_Take
 	Get_Set_Take_Channels
+	Find_Level_Below_Thresh_In_Take
+	Toggle_Take_Offline
+	Toggle_Item_Takes_Offline
 
 
 C O L O R
@@ -28001,7 +28676,8 @@ G F X
 
 
 W I N D O W S
-
+	
+	MIDIEditor_GetActiveAndVisible
 	Loka_Window_At_Mouse
 	Loka_Window_At_Center
 	SWS_wnd_open
@@ -28087,7 +28763,8 @@ F I L E S
 	make_file_name_unique
 	resolve_file_name_collision1
 	resolve_file_name_collision2
-	reduce_file_name_length
+	resolve_file_name_collision3
+	truncate_file_name
 	file_status
 	move_file_to_another_folder
 	Validate_Folder_Path
@@ -28210,6 +28887,7 @@ U T I L I T Y
 	Reminder_Off
 	Show_Menu_Dialogue
 	Esc_Menu_Ops
+	UnEsc_Menu_Ops
 	Reload_Menu_at_Same_Pos1
 	Reload_Menu_at_Same_Pos2
 	Reload_Menu_at_Same_Pos_gfx
@@ -28321,6 +28999,9 @@ U T I L I T Y
 	en_de_code_bitfield
 	Action_list_sections
 	Generate_list_of_notes
+	calculate_note_idx_from_note_name
+	note_number2note_idx_within_octave
+	Map_Multisample_Across_Keyboard
 	Run_Functions_From_Table
 	get_Lua_bitdepth
 	get_system_bitdepth1
@@ -28339,6 +29020,7 @@ C O N V E R S I O N S
 
 	hex2dec
 	dec2hex
+	dec2hex_2
 	char_to_bytes
 	unicode_to_utf8
 	utf8_to_unicode
