@@ -6260,12 +6260,85 @@ demo https://stash.reaper.fm/52064/Use%20AI%20automation%20with%20take%20envelop
 
 =============================================================
 
+-- A script to close all FX chain windows
+
+-- Caveat - empty input/Monitoring FX chain window cannot be closed with it
+
+	
+	-- Close take FX chain windows
+
+	for i=0, reaper.CountMediaItems(0)-1 do
+	local item = reaper.GetMediaItem(0, i)
+		for i=0, reaper.CountTakes(item)-1 do	
+		reaper.TakeFX_Show(reaper.GetTake(item, i), 0, 0)
+		end
+	end
+		
+	-- Close track FX chain windows indcluding the Master track main FX chain,
+	-- input FX chains and Monitoring FX chain of the Master track
+
+	for i=-1, reaper.GetNumTracks()-1 do
+	local track = reaper.GetTrack(0, i) or reaper.GetMasterTrack(0)
+	reaper.TrackFX_Show(track, 0, 0) -- close main FX chain
+	reaper.TrackFX_Show(track, 0x1000000, 0) -- close input/Monitoring FX chain
+	end
+
+		
+	do return reaper.defer(function() do return end end) end
 
 
+=============================================================
+
+-- Snap region start/end to items
+
+Regions don't snap to item edges but they do to time selection.
+
+Shift + double click an item to set time selection to the single item, then drag the region start/end to snap
 
 
+https://reddit.com/r/Reaper/comments/1sq948m/region_snap/
+
+=============================================================
+
+-- REAPER window title format
+
+<name of currently open project> [modified] [proj <index of the currently open tab> / <open project tabs count>] - REAPER <version No.> - Registered to <owner's name> [Licensed for personal/small business use] OR [Commercial license] OR EVALUATION LICENSE
+
+[modified] is only appended to name of a modified project. Project tab index and count info may be absent if a single project tab is open. 
+The owner's name may be disabled in which case only the type of license info remains in which the square brackets may be absent.
+
+=============================================================
+
+-- Script to condition custom actions by take's under mouse being audio
+
+If take under mouse is audio it sets its own toggle state to 1. If its toggle state is 1 the custom action runs, otherwise does not, e.g.
+
+----------------------------
+
+Custom: MY CUSTOM ACTION
+Take is audio.lua -- set the toggle state
+Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+Take is audio.lua -- check the toggle state
+Action: Skip next action if CC parameter <=0/mid
+<SOME ACTION OR SCRIPT>
+
+----------------------------
+
+Code for the 'Take is audio.lua' script
+
+----------------------------
+
+	local is_new_value, scr_name, sect_ID, cmdID, mode, resol, val, contextstr = reaper.get_action_context()
+	local x, y = reaper.GetMousePosition()
+	local item, take = reaper.GetItemFromPoint(x, y, true) -- allow_locked true
+	local state = not take and -1 or reaper.TakeIsMIDI(take) and 0 or 1
+	reaper.SetToggleCommandState(sect_ID, cmdID, state)
+	reaper.defer(function() end)
+
+----------------------------
 
 
+=============================================================
 
 
 
