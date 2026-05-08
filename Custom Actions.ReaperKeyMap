@@ -546,6 +546,8 @@ ACT 1 0 "de72774a0f6f31458ee5e6b6d60cc027" "Custom: Sample slices preview backwa
 ACT 1 0 "6cb89312ae002648958ef2b4022531a4" "Custom: Sample slices preview backward (place cursor at end of item, allows jumping to edit cursor)" 1016 _BR_SAVE_CURSOR_POS_SLOT_1 40634 _BR_RESTORE_CURSOR_POS_SLOT_1 40646 40222 40647 40223 40632 1007
 ACT 1 0 "c6bc8bc34e7d154caa78f67b9599319f" "Custom: Sample slices preview forward (disable whatever loop is currently enabled, place cursor at start of item)" 1016 40632 40647 40222 40647 40223 40632 1007
 ACT 1 0 "029f228f45a4b748bb3e2499ef671ada" "Custom: Sample slices preview forward (place cursor at end of item, allows jumping to edit cursor)" 1016 _BR_SAVE_CURSOR_POS_SLOT_1 40634 _BR_RESTORE_CURSOR_POS_SLOT_1 40647 40222 40647 40223 40632 1007
+ACT 1 0 "55a3769198ce3f4c80f5c2b912c5a06c" "Custom: Sample envelope - Zoom in to edit samples (supported since build 7.70)" 40031 2022 41668 2014 41668
+ACT 1 0 "304ca1edba1bd04095d0db9040cdd32a" "Custom: Sample envelope - Restore zoom and disable sample editing (supported since build 7.70)" 40869 2022 41668 2013 41668
 ACT 1 0 "0960214afde0dd44a84548a5aef9fd2d" "Custom: Save selected item as new file and rename" 41999 40131 _XENAKIOS_RENMTAKEANDSOURCE
 ACT 1 0 "083f4641e0ae064f8a1c3c77e46a82ac" "Custom: Scroll to bottom of track list / Go to end of tracklist (track selection isn't preserved)" 40702 40914 40005 40286 40913 40297
 ACT 1 0 "5052c6d88e2d1a46ae2cb531826c15da" "Custom: Scroll to top of track list / Go to start of tracklist (track selection isn't preserved)" 40297 40939 40913 40297
