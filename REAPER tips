@@ -6439,7 +6439,7 @@ This will toggle which of the windows is expanded to the full size of the docker
 -- Expand/compress distance between items
 
 1. Select all target items
-2. Run action `Razor edit: Enclose media items, including space between items`
+2. Run action 'Razor edit: Enclose media items, including space between items'
 so that the start of the Razor edit area coincides with the start of the first selected item,
 and its end coincides with the end of the last selected item. Otherwise if it precedes the start 
 of the 1st selected item, the item postition will change, and if it succeeds the start of the 1st
