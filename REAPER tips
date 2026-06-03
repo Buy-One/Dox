@@ -6439,17 +6439,21 @@ This will toggle which of the windows is expanded to the full size of the docker
 -- Expand/compress distance between items
 
 1. Select all target items
-2. Run action 'Razor edit: Enclose media items, including space between items'
+2. Run action `Razor edit: Enclose media items, including space between items`
 so that the start of the Razor edit area coincides with the start of the first selected item,
 and its end coincides with the end of the last selected item. Otherwise if it precedes the start 
 of the 1st selected item, the item postition will change, and if it succeeds the start of the 1st
 selected item or precedes the end of the last selected item, the item will be split. The items 
 must be inclosed within the Razor edit area completely, which is ensured by the action.
 3. Grab the edge of the Razor edit area holding down Alt key (default) and drag.
-4. Run the action 'Item properties: Set item rate to 1.0' to restore items playrate
+4. Shift+click the Razor edit area in the space between items to clear the Razor edit area
+and have all the enclosed item selected which is a side effect of the action 'Split media items at area edges'
+mapped by default to Shift+left click in Razor edit area context.
+5. Run the action 'Item properties: Set item rate to 1.0' to restore items playrate
 which will change as a result of the operation
 
 https://www.reddit.com/r/Reaper/comments/1tupudj/how_do_i_stretch_successive_items_across_time/
+
 
 
 =============================================================
