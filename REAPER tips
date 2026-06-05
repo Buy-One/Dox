@@ -6454,11 +6454,32 @@ which will change as a result of the operation
 
 https://www.reddit.com/r/Reaper/comments/1tupudj/how_do_i_stretch_successive_items_across_time/
 
-
-
 =============================================================
 
+-- Select every other note in the MIDI Editor using Filter utility
+(super convoluted)
 
+In the example we select every other 8th note in a sequence of 8th notes which sarts at the start of a measure
+
+1. Set 'Event type:' to Note
+2. Check out 'Note:' checkbox
+3. Set 'Low/High' notes according to the target content
+4. Check out 'Position in measure:' checkbox
+5. Keep the 'Low' drop-down menu opposite of the 'Position in measure:' option empty,
+i.e. the starting point of the notes which will be affected, 1/8 is because the 2nd 8th note 
+in the sequence is at 1/8 within the measure (1 bar) and it meets the 'every other' criterion.
+The 'High' drop down-menu can be left empty.
+6. In 'Reapeat every:' drop down menu select 1/4, this is the step at which
+the note will be targeted. Since we select every OTHER 8th note, the distance 
+between two such notes is 1/4
+7. Click 'Set selection' button
+
+If we wanted to do the reverse, i.e. select every 1st note of each note pair,
+select all target notes keeping the Filter settings the same, and click 'Remove from selection' button,
+OR, without selecting the notes first, in the 'Low' drop-down menu select anything smaller than 1/8, 
+i.e. 1/8T and smaller, keeping 'High' drop-down menu empty and 'Reapeat every:' setting the same as above, i.e. 1/4
+
+=============================================================
 
 
 
