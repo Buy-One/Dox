@@ -6522,9 +6522,59 @@ https://youtu.be/r5seIzlWzuQ?t=394
 
 =============================================================
 
+-- Empty slots in TCP FX list
+
+Since build 7.75 empty slots are allowed between FX inserts both in MCP and TCP.
+
+In TCP the feature is only supported in themes based on v7 default theme or programmed using v7 WALTER syntax.
+
+If it's not enabled by default, in the themes' rtconfig,txt file set tcp.fxparm.visflags variable to  [-1 0 0]
+
+https://forum.cockos.com/showthread.php?p=2948664
 
 
+=============================================================
 
+-- Convert MegaBaby sequencer pattern into MIDI item
+
+
+Create an empty item as long as the entire pattern chain inside the plugin and execute action
+
+or option from the item right click context menu 'Apply track/take FX as new take (MIDI output)'.
+
+The advantage of converting into an empty item is that no new take is created on top of the existing one,
+the original item is converted into a MIDI one.
+
+Make sure that in all plugins downstream of the MegaBaby under `2 in 2 out` button -> I/O -> MIDI Output
+MIDI Output option isn't disabled, otherwise REAPER won't be able to read back MIDI data from the MegaBaby.
+Alternatively they may simply be bypassed before action execution.
+
+
+=============================================================
+
+-- Load plugin always to the same slot in the T/MCP (slots feature is supported since 7.75)
+
+
+1. Load the plugin into an empty FX chain. 
+2. Move it to the desired slot. 
+3. Save this plugin as an FX chain preset. 
+4. Turn the FX chain preset into action via the FX browser by creating a shortcut, just like you'd do with a plugin. 
+5. Now to apply the FX chain use the action, which has been added to the Action list containing the name of the FX chain preset. 
+If another plugin is already present in the target slot, after the FX chain import REAPER will place the included 
+plugin in the next available slot, depending on the number of occupied slots past the original slot of the plugin.
+
+=============================================================
+
+-- Record takes so that all takes play simultaneously
+
+1. Create an empty MIDI item as long as your take(s) is(are) going to be
+2. In the empty MIDI item properties enable Play all takes
+3. Set the loop to this empty MIDI item to be able to record in loops.
+4. Set the recording mode to 'Auto-punch selected items'
+5. Select the empty MIDI idem
+6. Start recording
+
+=============================================================
 
 
 
