@@ -1007,7 +1007,6 @@ return v < min and min or v > max and max or v
 end
 
 
-
 function to_base36(n)
 -- n is integer
 local chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
@@ -1055,7 +1054,7 @@ function space(n) -- number of repeats, integer
 local n = n and tonumber(n) and math.abs(math.floor(n)) or 0
 return string.rep(' ',n)
 -- OR
--- return (' '):rep(n)
+-- return tonumber(n) and (' '):rep(n) or ''
 end
 
 -- same
@@ -1063,7 +1062,7 @@ function Rep(x) -- repeat space x times, to be added to the Message box text
 local x = x and tonumber(x) and math.abs(math.floor(x)) or 0
 return string.rep(' ', x)
 -- OR
--- return (' '):rep(x)
+-- return tonumber(x) and (' '):rep(x) or ''
 end
 
 
@@ -2334,6 +2333,42 @@ return table.concat(lines, "\n")
 end
 
 
+
+function Text_Wrap(text, linewidth)
+-- https://rosettacode.org/wiki/Word_wrap#Lua
+
+	local function splittokens(s) -- split text into words
+	local res = {}
+		for w in s:gmatch("%S+") do
+		res[#res+1] = w
+		end
+	return res
+	end
+
+local linewidth = linewidth or 75
+local spaceleft = linewidth
+local res = {}
+local line = {}
+
+	for _, word in ipairs(splittokens(text)) do
+		if #word + 1 > spaceleft then
+		table.insert(res, table.concat(line, ' '))
+		line = {word}
+		spaceleft = linewidth - #word
+		else
+		table.insert(line, word)
+		spaceleft = spaceleft - (#word + 1)
+		end
+	end
+
+table.insert(res, table.concat(line, ' '))
+return table.concat(res, '\n')
+
+end
+
+
+
+
 function numerate_instances(word, repeats, str)
 -- numerates word intances appending the numeral after the word
 -- in the str argument, if supplied, or if not -
@@ -2480,7 +2515,6 @@ end
 -- roman_67 = t[67]
 -- t = Construct_Roman_Numerals(67)
 -- roman_67 = t[67]
-
 
 
 
@@ -5536,17 +5570,16 @@ function Get_Object_Under_Mouse_Curs() -- used in 'FX presets menu script'
 -- Before build 6.37 no MCP support; when mouse is over the Mixer on the Arrange side the trick to detect track panel doesn't work, because with 'View: Move edit cursor to mouse cursor' the edit cursor does move to the mouse cursor
 
 	local function GetMonFXProps() -- get mon fx accounting for floating window, GetFocusedFX() doesn't detect mon fx in builds prior to 6.20
-
-		local master_tr = r.GetMasterTrack(0)
-		local src_mon_fx_idx = r.TrackFX_GetRecChainVisible(master_tr)
-		local is_mon_fx_float = false -- only relevant if there's need to reopen the fx in floating window
-			if src_mon_fx_idx < 0 then -- fx chain closed or no focused fx -- if this condition is removed floated fx gets priority
-				for i = 0, r.TrackFX_GetRecCount(master_tr) do
-					if r.TrackFX_GetFloatingWindow(master_tr, 0x1000000+i) then
-					src_mon_fx_idx = i; is_mon_fx_float = true break end
-				end
+	local master_tr = r.GetMasterTrack(0)
+	local src_mon_fx_idx = r.TrackFX_GetRecChainVisible(master_tr)
+	local is_mon_fx_float
+		if src_mon_fx_idx < 0 then -- fx chain closed or no focused fx -- if this condition is removed floated fx gets priority
+			for i = 0, r.TrackFX_GetRecCount(master_tr) do
+				if r.TrackFX_GetFloatingWindow(master_tr, 0x1000000+i) then
+				src_mon_fx_idx = i; is_mon_fx_float = true break end
 			end
-		return src_mon_fx_idx, is_mon_fx_float
+		end
+	return src_mon_fx_idx, is_mon_fx_float
 	end
 
 r.PreventUIRefresh(1)
@@ -6000,7 +6033,11 @@ end
 
 function Get_First_Visible_Track(want_scroll_pos, want_arrange, want_selected)
 -- if want_scroll_pos is false will return the very first visible
--- even if out of sight
+-- even if out of sight in the tracklist;
+-- for the Mixer if the size of the MCP visible part
+-- is immaterial, r.GetMixerScroll() can be used
+-- which returns the leftmost MCP whose visible
+-- part is about as narrow as 10 px
 
 local mixer_vis = r.GetToggleCommandState(40078) == 1 -- View: Toggle mixer visible
 
@@ -6014,8 +6051,8 @@ local Get = r.GetMediaTrackInfo_Value
 	local tr = r.GetTrack(0,i)
 	local H_W = Get(tr, H_W)
 	local Y_X = Get(tr, Y_X)
-		if r.IsTrackVisible(tr, mixer_vis) and
-		(not want_selected or want_selected and r.IsTrackSelected(tr))
+		if r.IsTrackVisible(tr, mixer_vis) and r.CSurf_TrackToID(tr, mixer_vis) ~= -1 -- CSurf_TrackToID() ensures that the MCP is not inside a collapsed folder, because if an MCP is in a collapased folder its original I_MCPX value is maintained, simple visibility evaluation with r.IsTrackVisible(tr, true) will result in false positive and a track inside a collapsed folder which precedes the actual first visible MCP will be resurned instead; for tracks in Arrange IsTrackVisible() is enough because unlike for the Mixer it returns false when tracks inside a collapsed folder are hidden as per the preference at Preferences -> Appearance -> Track Control Panels -> Folder collapse button cycles track heights
+		and (not want_selected or want_selected and r.IsTrackSelected(tr))
 		then
 			if not want_scroll_pos or want_scroll_pos
 			and (Y_X >= 0 or Y_X + H_W/2 >= 0) then -- either fully visible or mostly visible, i.e. at least half the height/width is visible
@@ -6362,6 +6399,22 @@ r.CSurf_OnScroll(0, round(topmost_vis_tr_I_TCPY/8))
 
 
 
+function Get_Pinned_Tracks_Height()
+-- track spacers aren't included because they're not supported
+-- in pinned tracks area
+local H = 0
+	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
+		for i=-1, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i) or r.GetMasterTrack(0)
+			if r.IsTrackVisible(tr, false) -- mixer false
+			and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 then
+			H = H + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
+			end
+		end
+	end
+return H > 0 and H+10 or H -- 10 px is pinned track area separator width
+end
+
 
 --[[
 
@@ -6382,24 +6435,30 @@ function Scroll_Track_To_Top1(tr, env) -- see more versatile v3 below
 -- displayed in its own lane needs to be scrolled to
 -- THE FUNCTION MUST NOT BE RUN BETWEEN PreventUIRefresh() FUNCTION
 -- INSTANCES BECAUSE THEY PREVENT GETTING CURRENT TRACK Y COORDINATE
--- FOR FURTHER CALCULATIONS
+-- FOR FURTHER CALCULATIONS	
+
+local GetValue = r.GetMediaTrackInfo_Value
 
 -- calculate height of the pinned tracks (supported since 7.46)
 -- only if pinned tracks are displayed in the pinned area
--- i.e. Track: Override/unpin all pinned tracks in TCP option is Off
+-- i.e. Track: Override/unpin all pinned tracks in TCP option is Off;
+-- track spacers aren't included because they're not supported
+-- in pinned tracks area
 local top_Y = 0
 	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
-		for i=0, r.GetNumTracks()-1 do
-		local tr = r.GetTrack(0,i)
+		if GetValue(tr, 'B_TCPPIN') == 1 then return end -- pinned track cannot be scrolled
+		for i=-1, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i) or r.GetMasterTrack(0)
 			if r.IsTrackVisible(tr, false) -- mixer false
-			and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 then
-			top_Y = top_Y + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
+			and GetValue(tr, 'B_TCPPIN') == 1 then
+			top_Y = top_Y + GetValue(tr, 'I_WNDH') -- incl. envelopes
 			end
 		end
 	top_Y = top_Y > 0 and top_Y+10 or top_Y -- 10 px is pinned track area separator width
 	end
+-- OR 
+-- local top_Y = Get_Pinned_Tracks_Height()
 
-local GetValue = r.GetMediaTrackInfo_Value
 local tr_y = GetValue(tr, 'I_TCPY')
 --local tr_h = GetValue(tr, 'I_TCPH')
 local env_y = env and r.GetEnvelopeInfo_Value(env, 'I_TCPY') or 0 -- the result is the same as with tr_h
@@ -6435,22 +6494,28 @@ function Scroll_Track_To_Top2(tr, env) -- see more versatile v3 below
 -- INSTANCES BECAUSE THEY PREVENT GETTING CURRENT TRACK Y COORDINATE
 -- FOR FURTHER CALCULATIONS
 
+local GetValue = r.GetMediaTrackInfo_Value
+
 -- calculate height of the pinned tracks (supported since 7.46)
 -- only if pinned tracks are displayed in the pinned area
--- i.e. Track: Override/unpin all pinned tracks in TCP option is Off
+-- i.e. Track: Override/unpin all pinned tracks in TCP option is Off;
+-- track spacers aren't included because they're not supported
+-- in pinned tracks area
 local top_Y = 0
 	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
-		for i=0, r.GetNumTracks()-1 do
-		local tr = r.GetTrack(0,i)
+		if GetValue(tr, 'B_TCPPIN') == 1 then return end -- pinned track cannot be scrolled
+		for i=-1, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i) or r.GetMasterTrack(0)
 			if r.IsTrackVisible(tr, false) -- mixer false
-			and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 then
-			top_Y = top_Y + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
+			and GetValue(tr, 'B_TCPPIN') == 1 then
+			top_Y = top_Y + GetValue(tr, 'I_WNDH') -- incl. envelopes
 			end
 		end
 	top_Y = top_Y > 0 and top_Y+10 or top_Y -- 10 px is pinned track area separator width
 	end
+-- OR 
+-- local top_Y = Get_Pinned_Tracks_Height()
 
-local GetValue = r.GetMediaTrackInfo_Value
 local tr_y = GetValue(tr, 'I_TCPY')
 --local tr_h = GetValue(tr, 'I_TCPH')
 local env_y = env and r.GetEnvelopeInfo_Value(env, 'I_TCPY') or 0 -- the result is the same as with tr_h
@@ -6488,24 +6553,27 @@ function Scroll_Track_To_Top3(tr, item_Y)
 -- INSTANCES BECAUSE THEY PREVENT GETTING CURRENT TRACK Y COORDINATE
 -- FOR FURTHER CALCULATIONS
 
+local GetValue = r.GetMediaTrackInfo_Value
 local item_Y = item_Y
 	if item_Y == 0 and r.GetToggleCommandState(43573) == 0 -- Track: Override/unpin all pinned tracks in TCP
 	then
+		if GetValue(tr, 'B_TCPPIN') == 1 then return end -- pinned track cannot be scrolled
 		-- calculate height of the pinned tracks (supported since 7.46)
 		-- only if pinned tracks are displayed in the pinned area
-		-- i.e. Track: Override/unpin all pinned tracks in TCP option is Off
-		for i=0, r.GetNumTracks()-1 do
-		local tr = r.GetTrack(0,i)
+		-- i.e. Track: Override/unpin all pinned tracks in TCP option is Off;
+		-- track spacers aren't included because they're not supported
+		-- in pinned tracks area
+		for i=-1, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i) or r.GetMasterTrack(0)
 			if r.IsTrackVisible(tr, false) -- mixer false
-			and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 then
-			item_Y = item_Y + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
+			and GetValue(tr, 'B_TCPPIN') == 1 then
+			item_Y = item_Y + GetValue(tr, 'I_WNDH') -- incl. envelopes
 			end
 		end
 	item_Y = item_Y > 0 and item_Y+10 or item_Y -- 10 px is pinned track area separator width
 	end
 
 local item_Y = item_Y*-1 -- converting to negative to reliably compare with track Y coordinate in determining the scroll direction, as a result item_Y coordinate will always be smaller than positive track Y coordinate to condition direction +1 (upwards, scrollbar moves down), and will always be greater than negative track Y coordinate to condition scroll direction -1 (downwards, scrollbar moves up)
-local GetValue = r.GetMediaTrackInfo_Value
 local tr_y = GetValue(tr, 'I_TCPY')
 local dir = tr_y < item_Y and -1 or tr_y > item_Y and 1 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
 r.PreventUIRefresh(1)
@@ -6543,29 +6611,34 @@ function Scroll_Closest_Track_To_Top(last_idx)
 local tr_cnt = r.GetNumTracks()
 local last_idx = last_idx
 local st, fin, dir = table.unpack(not last_idx and {0,tr_cnt-1,1} or {last_idx-1,0,-1})
+local GetValue = r.GetMediaTrackInfo_Value
 
 -- calculate height of the pinned tracks (supported since 7.46)
 -- only if pinned tracks are displayed in the pinned area
--- i.e. Track: Override/unpin all pinned tracks in TCP option is Off
+-- i.e. Track: Override/unpin all pinned tracks in TCP option is Off;
+-- track spacers aren't included because they're not supported
+-- in pinned tracks area
 local top_Y = 0
 	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
-		for i=0, r.GetNumTracks()-1 do
-		local tr = r.GetTrack(0,i)
+		for i=-1, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i) or r.GetMasterTrack(0)
 			if r.IsTrackVisible(tr, false) -- mixer false
-			and r.GetMediaTrackInfo_Value(tr, 'B_TCPPIN') == 1 then
-			top_Y = top_Y + r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl. envelopes
+			and GetValue(tr, 'B_TCPPIN') == 1 then
+			top_Y = top_Y + GetValue(tr, 'I_WNDH') -- incl. envelopes
 			end
 		end
 	top_Y = top_Y > 0 and top_Y+10 or top_Y -- 10 px is pinned track area separator width
 	end
+-- OR 
+-- local top_Y = Get_Pinned_Tracks_Height()
 
 	for i=st, fin, dir do
 	local tr = r.GetTrack(0,i)
 	local retval, flags = r.GetTrackState(tr)
 		if flags&512 ~= 512 then -- visible in TCP
-		local Y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
+		local Y = GetValue(tr, 'I_TCPY')
 	--	local H = r.GetMediaTrackInfo_Value(tr, 'I_TCPH') -- excluding envelopes
-		local H = r.GetMediaTrackInfo_Value(tr, 'I_WNDH') -- incl envelopes
+		local H = GetValue(tr, 'I_WNDH') -- incl envelopes
 			if not last_idx and (Y >= top_Y or Y < top_Y and Y+H > top_Y) or last_idx then
 			last_idx = i
 			------------- Script specific condition -----------------
@@ -6592,14 +6665,29 @@ end
 
 
 
-function Scroll_Track_To_Bottom(tr, arrange_h) 
+function Scroll_Track_To_Bottom(tr, arrange_h)
 -- arrange_h is the value returned by Get_Arrange_and_Header_Heights2()/GetSet_Track_Zoom_100_Perc() 
--- or Get_Arrange_Dims() functions;
+-- or Get_Arrange_Dims() functions
+-- or by GetSetProjectInfo(0, 'ARRANGE_H', 0, false) since build 7.62 (by which pinned tracks aren't accounted for)
+-- if invalid, arrange height will be calculated inside
+-- the function in which case it relies on GetSet_Track_Zoom_100_Perc() and Get_Pinned_Tracks_Height() functions;
 -- THE FUNCTION MUST NOT BE RUN BETWEEN PreventUIRefresh() FUNCTION
 -- INSTANCES BECAUSE THEY PREVENT GETTING CURRENT TRACK Y COORDINATE
 -- FOR FURTHER CALCULATIONS
 
-local tr_y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
+local GetValue = r.GetMediaTrackInfo_Value
+
+	if r.GetToggleCommandState(43573) == 0 -- Track: Override/unpin all pinned tracks in TCP 
+	and GetValue(tr, 'B_TCPPIN') == 1 then return end -- pinned track cannot be scrolled
+	
+	if not arrange_h then
+	local old_builds = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62
+	arrange_h = old_builds and GetSet_Track_Zoom_100_Perc()
+	or r.GetSetProjectInfo(0, 'ARRANGE_H', 0, false) -- is_set false, doesn't account for pinned tracks 
+	arrange_h = old_builds and arrange_h or arrange_h-Get_Pinned_Tracks_Height() -- height of the pinned tracks area or 0 if nothing is pinned or the feature isn't supported
+	end
+
+local tr_y = GetValue(tr, 'I_TCPY')
 local dir = tr_y < 0 and -1 or tr_y > 0 and 1 or 0 -- if less than 0 (out of sight above) the scroll must move up to bring the track into view, hence -1 and vice versa
 r.PreventUIRefresh(1)
 local cntr, Y_init = 0 -- to store track Y coordinate between loop cycles and monitor when the stored one equals to the one obtained after scrolling within the loop which will mean the scrolling can't continue due to reaching scroll limit when the track is close to the track list start or is the very first, otherwise the loop will become endless because there'll be no condition for it to stop
@@ -6607,7 +6695,7 @@ local cntr, Y_init = 0 -- to store track Y coordinate between loop cycles and mo
     r.CSurf_OnScroll(0, dir) -- unit is 8 px
 --  local tr = r.GetTrack(0, r.CSurf_TrackToID(tr, false)-3) -- 2nd prev track
     local tr = r.GetTrack(0, r.CSurf_TrackToID(tr, false)-2) -- prev track // otherwise the track list stops at the next track
-    local Y = r.GetMediaTrackInfo_Value(tr, 'I_TCPY') -- mcpView false
+    local Y = GetValue(tr, 'I_TCPY') -- mcpView false
 		if Y ~= Y_init then Y_init = Y -- store
 		else cntr = cntr+1
 		end
@@ -6622,16 +6710,28 @@ end
 function Scroll_Track_Into_View(tr, take, parent_tr_y)
 -- parent_tr_y is original I_TCPY coordinate of the track
 -- before it's affected by the function
--- relies on re_store_sel_trks1() function;
+-- relies on re_store_sel_trks1(), GetSet_Track_Zoom_100_Perc() 
+-- and Get_Pinned_Tracks_Height() functions;
 -- THE FUNCTION MUST NOT BE RUN BETWEEN PreventUIRefresh() FUNCTION
 -- INSTANCES BECAUSE THEY PREVENT GETTING CURRENT TRACK Y COORDINATE
 -- FOR FURTHER CALCULATIONS
 
+local GetValue = r.GetMediaTrackInfo_Value
+
+	if r.GetToggleCommandState(43573) == 0 -- Track: Override/unpin all pinned tracks in TCP 
+	and GetValue(tr, 'B_TCPPIN') == 1 then return end -- pinned track cannot be scrolled
+
 -- scroll track vertically into view if out of sight
 local tr = take and r.GetMediaItemTake_Track(take) or tr
-local tr_h = tr and r.GetMediaTrackInfo_Value(tr, 'I_TCPH')
-local tr_top = tr and r.GetMediaTrackInfo_Value(tr, 'I_TCPY')
-local arrange_h, header_h, wnd_h_offset = Get_Arrange_Dims() -- only returns values if extensions are installed
+local tr_h = tr and GetValue(tr, 'I_TCPH')
+local tr_top = tr and GetValue(tr, 'I_TCPY')
+local arrange_h, header_h, wnd_h_offset = Get_Arrange_Dims() -- only returns values if extensions are installed // doesn't account for pinned tracks, see next
+--[[ -- OR
+local old_builds = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62
+local arrange_h = old_builds and GetSet_Track_Zoom_100_Perc()
+or r.GetSetProjectInfo(0, 'ARRANGE_H', 0, false) -- is_set false, doesn't account for pinned tracks 
+arrange_h = old_builds and arrange_h or arrange_h-Get_Pinned_Tracks_Height() -- height of the pinned tracks area or 0 if nothing is pinned or the feature isn't supported
+--]]
 
 	if tr_h and (parent_tr_y and tr_top ~= parent_tr_y -- track position changed
 	or tr_h / 2 + tr_top < 0 -- fully or mainly out of sight at the top
@@ -6651,15 +6751,20 @@ function Scroll_Visible_Track_Into_View(tr, tr_y_orig, want_middle, want_arrange
 -- want_middle is boolean to scroll to the middle of the tracklist
 -- in Arrange, otherwise to the top
 -- want_arrange is boolean to force the function target Arrange tracklist if the Mixer is open
--- relies on re_store_sel_trks1() function;
+-- relies on re_store_sel_trks1() and Scroll_Track_To_Top2(),
+-- Get_Arrange_Dims() OR GetSet_Track_Zoom_100_Perc() and and Get_Pinned_Tracks_Height() functions;
 -- THE FUNCTION MUST NOT BE RUN BETWEEN PreventUIRefresh() FUNCTION
 -- INSTANCES BECAUSE THEY PREVENT GETTING CURRENT TRACK Y COORDINATE
 -- FOR FURTHER CALCULATIONS
 
 	if not tr then return end
+	
+local Get = r.GetMediaTrackInfo_Value
+
+	if r.GetToggleCommandState(43573) == 0 -- Track: Override/unpin all pinned tracks in TCP 
+	and Get(tr, 'B_TCPPIN') == 1 then return end -- pinned track cannot be scrolled	
 
 local is_Master = tr == r.GetMasterTrack(0)
-local Get = r.GetMediaTrackInfo_Value
 local mixer_vis = not want_arrange and r.GetToggleCommandState(40078) == 1 -- View: Toggle mixer visible
 local PARAM = mixer_vis and 'B_SHOWINMIXER' or 'B_SHOWINTCP'
 local tr_vis = is_Master and r.GetMasterTrackVisibility()&1 == 1 or Get(tr, PARAM) == 1 -- OR 'or r.IsTrackVisible(tr, mixer_vis)'
@@ -6674,7 +6779,13 @@ local tr_vis = is_Master and r.GetMasterTrackVisibility()&1 == 1 or Get(tr, PARA
 			-- scroll track vertically into view if out of sight
 			local tr_h = Get(tr, 'I_TCPH')
 			local tr_y = Get(tr, 'I_TCPY')
-			local arrange_h, header_h, wnd_h_offset = Get_Arrange_Dims() -- only returns values if extensions are installed
+			local arrange_h, header_h, wnd_h_offset = Get_Arrange_Dims() -- only returns values if extensions are installed // doesn't account for pinned tracks, see next
+			--[[ -- OR
+			local old_builds = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62
+			local arrange_h = old_builds and GetSet_Track_Zoom_100_Perc()
+			or r.GetSetProjectInfo(0, 'ARRANGE_H', 0, false) -- is_set false, doesn't account for pinned tracks 
+			arrange_h = old_builds and arrange_h or arrange_h-Get_Pinned_Tracks_Height() -- height of the pinned tracks area or 0 if nothing is pinned or the feature isn't supported
+			--]]
 				if tr_h and
 				(tr_y_orig and tr_y ~= tr_y_orig -- track position changed
 				or tr_y + tr_h/2 < 0) -- fully or mainly out of sight at the top
@@ -6682,7 +6793,7 @@ local tr_vis = is_Master and r.GetMasterTrackVisibility()&1 == 1 or Get(tr, PARA
 				or not arrange_h -- extensions aren't installed, will be scrolled even if sufficiently within view at the bottom
 				then
 					if not want_middle then
-					Scroll_Track_To_Top(tr) -- SCROLL TO TOP
+					Scroll_Track_To_Top2(tr) -- SCROLL TO TOP
 					else
 					-- SCROLL TO THE MIDDLE OF THE TRACKLIST
 					local t = re_store_sel_trks1() -- store
@@ -6697,6 +6808,67 @@ local tr_vis = is_Master and r.GetMasterTrackVisibility()&1 == 1 or Get(tr, PARA
 
 end
 
+
+
+function Scroll_MCP_Into_View(targ_tr, loc, not_shared) 
+-- used in 'Scroll named track into view in the Mixer.lua',
+-- 'Save-Load window set #1-10 with Mixer scroll position_META',
+-- loc is string indicating location of the target track
+-- as a result of thr scroll, 'C/c' = center, 'R/r' - right, otherwise left; 
+-- not_shared is boolean return value of Get_Mixer_Wnd_Dock_State() function
+-- indicating whether Mixer window shares the docker with
+-- other windows in a split docker which will affect its width;
+-- Leftmost track left edge X value in pixels is 0, 
+-- values further to the left (out of sight) are negative, to the right - posititive
+-- Being set with the function SetMixerScroll() 
+-- the leftmost track is always displayed in full 
+-- which may cause the rightmost track be partially shifted 
+-- beyond the Mixer right edge or the Master track 
+-- if it's displayed on the right side 
+-- (because MCPs combined width doesn't fit within the Mixer window); 
+-- this is mitigated by shifting the target track back leftwards 
+-- which is a trade-off and may reveal one or more extra tracks 
+-- on the right, depending on the width of the leftmost track
+
+local sws = r.APIExists('BR_Win32_GetMainHwnd')
+local mixer_hwnd = sws and r.BR_Win32_GetMixerHwnd() -- used outside of BR_Win32_GetWindowRect since it returns two values
+local dimens = sws and {r.BR_Win32_GetWindowRect(mixer_hwnd)} or {r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true)} -- wantWorkArea true
+
+	if #dimens == 5 then table.remove(dimens, 1) end -- remove retval from BR's function
+
+local loc = (not sws and not_shared or sws) and loc or '' -- clamp position to the leftmost if no SWS extension and another window shares docker with the Mixer in the split mode
+
+local pos = loc == 'C' and (dimens[3] - dimens[1])/2 or loc == 'R' and dimens[3] - dimens[1] or 0 -- center or right (accounting for reduced window size) or left
+
+-- Since track layouts may have different width plus some may stop flush at the right edge but others may not a mechanism is employed to shift the position back to the left which may reveal additional tracks on the right depending on MCP widths
+-- When target position is center or right but there're not enough tracks which come before the target track or their comdined width isn't enough to fill up the space between the left edge or the Master track and the target track, the target track will be placed only as far to the right as the conditions permit
+-- When there're too few tracks or their combined MCPs width is too narrow no scrolling will take place
+
+local targ_tr_w = r.GetMediaTrackInfo_Value(targ_tr, 'I_MCPW')
+local master_vis = r.GetToggleCommandState(41209) == 1 -- Mixer: Master track visible
+local master_rt = r.GetToggleCommandState(40389) == 1 -- Mixer: Toggle show master track on right side
+
+local master_w = (master_vis and not master_rt or master_vis and master_rt and loc == 'R') and r.GetMediaTrackInfo_Value(r.GetMasterTrack(0), 'I_MCPW') or 0 -- only account for the Master track when it's on the left side and when on the right side while loc is 'R' since in the latter case it doesn't affect leftmost and central positions
+
+local targ_tr_x = r.GetMediaTrackInfo_Value(targ_tr, 'I_MCPX') + targ_tr_w -- targ_tr X on the right
+local tr, tr_x
+local abs = math.abs
+local i = r.CSurf_TrackToID(targ_tr, false)-2 -- mcpView is false; start looping from the track immediately preceding the target track backwards
+	repeat
+	tr = r.GetTrack(0,i)
+		tr_x = tr and r.GetMediaTrackInfo_Value(tr, 'I_MCPX') or 0
+	i = i - 1
+	until abs(tr_x - targ_tr_x) > pos - master_w or not tr -- accounting for negative X when tracks are beyond Master track on the left side or beyond the left edge and for cases when the target track is at zero point or when there're too few tracks which precede it (not tr)
+
+-- The loop exits with the X coordinate of the target track right edge being greater than the target scroll position; now correct it by bringing it back leftwards to the point immedialtely preceding the target scroll point, especially relevant for target position being rightmost in which case the track goes beyond the right edge of the window
+	if tr and (loc == 'R' and abs(tr_x - targ_tr_x) + master_w - pos > 5 -- targ track right edge X coordinate is greater than the position by 5 px, 5 or less is acceptable since the MCP is mostly visible, and 5 is optimal for MCP strips which are quite narrow
+	or abs(tr_x - targ_tr_x) + master_w - pos > pos - abs(r.GetMediaTrackInfo_Value(r.GetTrack(0,i+2), 'I_MCPX') - targ_tr_x) - master_w) -- only correct if the resulting targ track right X will be closer to the position than the targ track right X obtained after the loop; why +2 see below // works for pos 0
+	then return r.GetTrack(0,i+2) -- return the correcting track to bring the target track back to the left by one track // +2 because the shift is required by 1 track from the current after the loop, but before the loop exits i value gets reduced by 1 which corresponds to the one before the current and -2nd from the target track if position is 0
+	elseif tr then return r.GetTrack(0,i+1)
+	else return r.GetTrack(0,0) -- when there're too few tracks or their MCPs are too narrow to scroll to the central or the rightmost position, scroll to the very 1st track to shift the target track as far as possible
+	end
+
+end
 
 
 
@@ -6828,11 +7000,9 @@ function Get_Track_Minimum_Height2() -- may be different from 24 px in certain t
 -- discussion of the topic https://forum.cockos.com/showthread.php?t=235862
 local tr = r.GetTrack(0,0)
 local H_orig = r.GetMediaTrackInfo_Value(tr, 'I_TCPH')
-Msg(H_orig)
-r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1) -- decrease height // 0 does nothing BUT disables height locked status without clearing the checkmark in the menu https://forum.cockos.com/showthread.php?p=2202082
+r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1) -- decrease height // 0 resets TCP height to last height changed via zoom action 'Zoom vertically' AND temporarily disables height locked status without clearing the checkmark in the menu https://forum.cockos.com/showthread.php?p=2202082
 r.TrackList_AdjustWindows(true) -- isMinor is true // updates TCP only https://forum.cockos.com/showthread.php?t=208275
 local H_min = r.GetMediaTrackInfo_Value(tr, 'I_TCPH') -- store
-Msg(H_min)
 r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', H_orig) -- restore
 r.TrackList_AdjustWindows(true)
 --r.PreventUIRefresh(-1)
@@ -6844,7 +7014,7 @@ end
 function Reverse_Track_Order(tr_t) -- tr_t is a table of track pointers in their current order, must all be adjacent
 local ref_idx = r.CSurf_TrackToID(t[#t], false) -- mcpView false // track which immediately follows the last stored track CSurf_TrackToID() returns 1-based index of the current track which equals 0-based index of the next track
 local decrement = 0
-	for _, tr in ipairs(t) do
+	for _, tr in ipairs(tr_t) do
 	r.SetOnlyTrackSelected(tr)
 	r.ReorderSelectedTracks(ref_idx-decrement, makePrevFolder) -- beforeTrackIdx is ref_idx-decrement
 	decrement = decrement+1 -- at each cycle decrease beforeTrackIdx because each track will have to be placed before the previous and travel less places
@@ -7244,22 +7414,6 @@ return t, menu
 end
 
 
-function Fixed_Lane_Comping_Enabled(tr)
--- not whether fixed item lanes mode is enabled, for which use
--- r.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2
---[[
-FIXEDLANES 9 0 0 0 0 -- Big Lanes (lanes maximized)
-FIXEDLANES 9 0 2 0 0 -- lanes collapsed (imploded) down to one visible lane, option 'Fixed item lanes' is disabled
-FIXEDLANES token is absent if Small Lanes (lanes minimized)
-FIXEDLANES 33 0 0 0 0 -- Small Lanes + Hide Lane Buttons
-FIXEDLANES 41 0 0 0 0 -- Big Lanes + Hide Lane Buttons
-LANESOLO 8 0 0 0 0 0 0 0 -- absent in track with no lanes, same as r.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') ~= 2
-]]
-local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
-return chunk:match('LANEREC [%-%d]+ 0 [%-%d]+') -- in the second string the 2nd flag is -1
-end
-
-
 
 function Get_Last_Sel_or_Last_Track()
 -- only visible tracks are respected
@@ -7315,6 +7469,7 @@ local state = want_visible and 1 or 0
 end
 
 
+
 function In_Visible_Tracks_Exist1(want_visible, want_sel_tracks) -- more efficient
 -- want_visible is boolean to evaluate existence of visible tracks
 -- otherwise invisible;
@@ -7326,6 +7481,31 @@ or {r.GetNumTracks, r.GetTrack})
 	local tr = GetTrack(0,i)
 		if r.GetMediaTrackInfo_Value(tr, 'B_SHOWINTCP') == state then return true end
 	end
+end
+
+
+
+function Is_Track_Within_View_In_TCP(tr)
+-- for builds older than 7.62 relies on GetSet_Track_Zoom_100_Perc() function
+-- for later builds relies on Get_Pinned_Tracks_Height()
+
+local Get = r.GetMediaTrackInfo_Value
+
+	if Get(tr, 'B_SHOWINTCP') == 0 then return end
+	
+local old_builds = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62
+local arrange_h = old_builds and GetSet_Track_Zoom_100_Perc()
+or r.GetSetProjectInfo(0, 'ARRANGE_H', 0, false) -- is_set false, doesn't account for pinned tracks 
+local pinned_h = not old_builds and Get_Pinned_Tracks_Height() -- height of the pinned tracks area or 0 if nothing is pinned or the feature isn't supported
+local y = Get(tr, 'I_TCPY')
+--	local h = Get(tr, 'I_WNDH') -- incl. envelopes
+local h = Get(tr, 'I_TCPH') -- excl. envelopes
+-- local pinned = Get(tr, 'B_TCPPIN') == 1
+
+	if y+h < (old_builds and 0 or pinned_h) or y > arrange_h then return end -- applies to pinned tracks as well, if the pinned track area occupies the entire Arrange height and the target track is placed lower in the list of pinned tracks
+
+return 1
+
 end
 
 
@@ -7391,8 +7571,11 @@ local item = r.GetSelectedMediaItem(0,0) -- the pasted item is exclusively selec
 local lane = r.GetMediaItemInfo_Value(item, 'I_FIXEDLANE')
 r.DeleteTrackMediaItem(tr, item) -- delete pasted item
 re_store_selected_items(sel_itms) -- restore original item selection
+
 	if trim then act(41117) end -- restore On toggle state
+
 return tr, lane
+
 end
 
 
@@ -7401,6 +7584,51 @@ function Get_Index_of_Fixed_Item_Lane_Under_Mouse()
 local tr, info = r.GetTrackFromPoint(r.GetMousePosition())
 return info>>8
 end
+
+
+
+function Fixed_Lane_Comping_Enabled(tr)
+-- not whether fixed item lanes mode is enabled, for which use
+-- r.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') == 2
+--[[
+FIXEDLANES 9 0 0 0 0 -- Big Lanes (lanes maximized)
+FIXEDLANES 9 0 2 0 0 -- lanes collapsed (imploded) down to one visible lane, option 'Fixed item lanes' is disabled
+FIXEDLANES token is absent if Small Lanes (lanes minimized)
+FIXEDLANES 33 0 0 0 0 -- Small Lanes + Hide Lane Buttons
+FIXEDLANES 41 0 0 0 0 -- Big Lanes + Hide Lane Buttons
+LANESOLO 8 0 0 0 0 0 0 0 -- absent in track with no lanes, same as r.GetMediaTrackInfo_Value(tr, 'I_FREEMODE') ~= 2
+]]
+local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
+return chunk:match('LANEREC [%-%d]+ 0 [%-%d]+') -- in the second string the 2nd flag is -1
+end
+
+
+
+function Get_Track_Active_Lane(tr)
+-- in track with uncollapsed lanes gets the exclusively
+-- playing lane, otherwise the only visible lane
+-- which plays exclusively by default, for such only visible lane
+-- play state cannot be disabled;
+-- returns false if no or all lanes play
+-- which only possible with uncollapsed lanes;
+-- C_LANESCOLLAPSED attibute legend:
+-- 0 lanes uncollapsed OR the only lane is uncollapsed and FIL mode is disabled
+-- 1 FIL collapsed OR the only lane is collapsed and and FIL mode is disabled
+-- 2 FIL uncollapsed and FIL mode is disabled
+-- 3 FIL collapsed and FIL mode is disabled
+
+local Get = r.GetMediaTrackInfo_Value
+local lane_cnt = Get(tr, 'I_NUMFIXEDLANES')
+
+	for i=0, lane_cnt-1 do
+		if Get(tr, 'C_LANEPLAYS:'..i) == 1 then
+		return i, Get(tr, 'C_LANESCOLLAPSED'), lane_cnt
+		end
+	end
+
+end
+
+
 
 
 function Insert_New_Track(wantDefaults)
@@ -7477,6 +7705,38 @@ f:write(chunk)
 f:close()
 
 end
+
+
+
+
+function track_TCP_likely_dragged()
+-- mainly makes sense in deferred scripts;
+-- variable y must be upvalue, var x is not used;
+-- doesn't query whether mouse cursor is
+-- exactly over the TCP, so will return
+-- truth if it's over the Arrange and track
+-- is valid as well
+
+	if not r.JS_Mouse_GetState then return end
+	
+local LMB = r.JS_Mouse_GetState(1) -- LMB press
+local tr, info = r.GetTrackFromPoint(r.GetMousePosition())
+tr = tr and info < 1 and tr -- not envelope or FX chain
+local sel = tr and r.IsTrackSelected(tr) -- a dragged track is always selected
+	
+	if LMB == 1 and sel then
+	x, y = r.GetMousePosition()
+	end
+	
+	if y and LMB == 0 then
+	local x, Y = r.GetMousePosition()
+	local dragged = Y ~= y
+	x, y = nil -- reset
+	return dragged
+	end
+
+end
+
 
 
 
@@ -8142,10 +8402,18 @@ function get_last_uncollapsed_parent(child_idx, child_tr, t, tcp)
 end
 
 
-function Find_Last_Uncollapsed_MCP_Parent(targ_tr, GetTrackChunk)
--- returns parent of a collapsed folder (if any) of the target track in order to scroll to it, because child track of a collapsed folder can't be scrolled to
--- r.GetMediaTrackInfo_Value(tr, 'B_SHOWINMIXER') doesn't indicate if it's under collapsed folder, only when it's explicitly hidden, r.CSurf_TrackToID(tr, true) -- mcpView true does returning in this case -1
--- last uncollapsed means that the parent itself isn't collapsed inside the folder it belongs to, unless it's the topmost level parent of the entire folder which cannot be collapsed, this is equal to the parent of the 1st/topmost (sub)folder whose child tracks are collapsed // equals parent of the 1st folder whose tracks are collapsed
+
+function Find_Last_Uncollapsed_MCP_Parent(targ_tr)
+-- used in 'Save-Load window set #1-10 with Mixer scroll position_META.lua'
+-- under the name Find_Parent_Of_1st_Collapsed_Folder()
+-- returns parent of a collapsed folder (if any) of the target track in order to scroll to it, 
+-- because child track of a collapsed folder can't be scrolled to
+-- r.GetMediaTrackInfo_Value(tr, 'B_SHOWINMIXER') doesn't indicate if it's under collapsed folder, 
+-- only when it's explicitly hidden, r.CSurf_TrackToID(tr, true) -- mcpView true does returning in this case -1
+-- last uncollapsed means that the parent itself isn't collapsed inside the folder it belongs to, 
+-- unless it's the topmost level parent of the entire folder which cannot be collapsed, 
+-- this is equal to the parent of the 1st/topmost (sub)folder whose child tracks are collapsed // equals parent of the 1st folder whose tracks are collapsed
+-- relies on GetObjChunk2() function
 
 	if r.GetTrackDepth(targ_tr) == 0 then return targ_tr end -- if target track isn't a child
 
@@ -8177,7 +8445,7 @@ local i = targ_tr_idx-1 -- start from previous track
 	-- Find the leftmost collapsed parent, if any
 	for i = #parents_t, 1, -1 do -- in reverse since parent tracks were stored from right to left; if the table is empty the loop won't start
 	local parent_tr = parents_t[i]
-	local ret, chunk = GetTrackChunk(parent_tr)
+	local ret, chunk = GetObjChunk2(parent_tr)
 		if ret ~= 'err_mess' -- if parent track chunk is larger than 4.194303 Mb and no SWS extension to handle that to find out if it's collapsed
 		and chunk:match('BUSCOMP %d (%d)') == '1' then -- child tracks are collapsed
 		return parent_tr -- as soon as parent with collapsed children is found; since the parents are traversed from the left, first parent with collapsed children means that lower level parents are all collapsed and are unsuitable for selection
@@ -8189,11 +8457,13 @@ return targ_tr -- if no parent track of a collapsed folder was found return orig
 end
 
 
-function Get_Parent_Of_MCP_First_Uncollapsed_Folder1(tr) -- basically the same as the above Find_Last_Uncollapsed_MCP_Parent() with added visibility evaluation, stems from the same script
+function Get_Parent_Of_MCP_First_Uncollapsed_Folder1(tr)
+-- basically the same as the above Find_Last_Uncollapsed_MCP_Parent() 
+-- with added visibility evaluation, stems from the same script
 -- tr argument is a pointer of a track to scroll to, if it happens to be a child of a collapsed folder
 -- return its parent track or first (from the left) uncollapsed parent of a nested folder
 -- (which itself is a parent of collapsed folder), otherwise return tr
--- relies on GetObjChunk() function
+-- relies on GetObjChunk2() function
 
 -- Collect all parents of the found track to then find the first (leftmost) uncollapsed if any
 local parent = r.GetParentTrack(tr)
@@ -8210,7 +8480,7 @@ local parents_t = {}
 	-- Find the leftmost uncollapsed parent, if any ((un)collapsing Mixer tracks must be done via chunk which is too cumbersome and isn't worth the effort for this script)
 	for i = #parents_t, 1, -1 do -- in reverse since parent tracks were stored from right to left; if the table is empty the loop won't start
 	local parent_tr = parents_t[i]
-	local ret, chunk = GetObjChunk(parent_tr)
+	local ret, chunk = GetObjChunk2(parent_tr)
 		if ret ~= 'err_mess' -- if parent track chunk is larger than 4.194303 Mb and no SWS extension to handle that to find out if it's collapsed
 		and chunk:match('BUSCOMP %d (%d)') == '1' then -- collapsed
 		return parent_tr -- as soon as uncollapsed parent is found
@@ -8222,22 +8492,67 @@ return tr
 end
 
 
-function Get_Parent_Of_MCP_First_Uncollapsed_Folder2(tr) -- NO CHUNK IS REQUIRED, ONLY FOR TRACKS 100% VISIBLE IN THE MIXER AS when mcpView is true CSurf_TrackToID() returns -1 for both hidden completely and hidden in a collapsed folder in the Mixer
+
+function Get_Parent_Of_MCP_First_Uncollapsed_Folder2(tr) 
+-- NO CHUNK IS REQUIRED, ONLY FOR TRACKS 100% VISIBLE IN THE MIXER
+-- AS when mcpView is true CSurf_TrackToID() returns -1 for both, hidden completely 
+-- and hidden in a collapsed folder in the Mixer;
+-- in the Mixer child track in a collapsed folder
+-- cannot be visible while its parent is hidden;
+-- doesn't return anything if track isn't a child track (see version 3 next)
 local parent = r.GetParentTrack(tr)
 local tr_vis = r.IsTrackVisible(tr, true) -- mixer true
-	if parent and tr_vis
-	and r.CSurf_TrackToID(tr, true) == -1 -- mcpView true // the function doesn't return index if track is in a collapsed folder in the Mixer
-	then return Get_Parent_Of_MCP_First_Uncollapsed_Folder2(parent) -- recursive
-	elseif parent and tr_vis and r.IsTrackVisible(parent, true) -- mixer true
-	then return parent
+	if parent and tr_vis then
+		if r.CSurf_TrackToID(tr, true) == -1 -- mcpView true // the function doesn't return index if track is inside a collapsed folder in the Mixer, and since tr is certainly visible, this means that it's certainly inside a visible collapsed folder, because in the Mixer child track in a collapsed folder cannot be visible while its parent is itself hidden
+		then return Get_Parent_Of_MCP_First_Uncollapsed_Folder2(parent) -- recursive
+		elseif r.IsTrackVisible(parent, true) -- mixer true
+		then return parent
+		end
 	end
 end
+
+
+
+function Get_Parent_Of_MCP_First_Uncollapsed_Folder3(tr) 
+-- NO CHUNK IS REQUIRED, ONLY FOR TRACKS 100% VISIBLE IN THE MIXER
+-- AS when mcpView is true CSurf_TrackToID() returns -1 for both, hidden completely 
+-- and hidden in a collapsed folder in the Mixer;
+-- in the Mixer child track in a collapsed folder
+-- cannot be visible while its parent is hidden;
+-- returns track if it's not a child track
+local parent = r.GetParentTrack(tr)
+local tr_vis = r.IsTrackVisible(tr, true) -- mixer true
+	if tr_vis then
+		if parent and r.CSurf_TrackToID(tr, true) == -1 -- mcpView true // the function doesn't return index if track is inside a collapsed folder in the Mixer, and since tr is certainly visible, this means that it's certainly inside a visible collapsed folder, because in the Mixer child track in a collapsed folder cannot be visible while its parent is itself hidden
+		then return Get_Parent_Of_MCP_First_Uncollapsed_Folder2(parent) -- recursive
+		else return tr
+		end
+	end
+end
+
+
+
+function get_top_parent(track)
+-- If the track is not inside any folder, returns the track itself
+-- https://reddit.com/r/Reaper/comments/1tub77u/reascript_to_autosuspend_group_routing/
+local current = track
+	while true do
+	local parent = r.GetParentTrack(current)
+		if not parent then
+		return current
+		end
+	current = parent
+	end
+end
+
 
 
 function Is_Collapsed_MCP_Folder(tr)
 -- relies on Get_All_Descendants() function, see below
 -- tr is a parent track pointer
--- can only reliably identify a collapsed MCP folder if at least one child track is not explicitly hidden, for 100% reliability 'BUSCOMP' values from the chunk must be used
+-- can only reliably identify a collapsed MCP folder 
+-- if at least one child track is not explicitly hidden, 
+-- for 100% reliability 'BUSCOMP' values from the chunk must be used
 
 local decs_t = Get_All_Descendants(tr)
 local depth = r.GetTrackDepth(tr)
@@ -8289,6 +8604,33 @@ local desc_t = {}
 
 return desc_t
 
+end
+
+
+
+
+function get_folder_tracks(track)
+-- Collect all tracks of a folder the track is a child of,
+-- finds the top-level parent and returns a list of
+-- [top_parent, child_1, child_2, ...] — the entire hierarchy,
+-- relies on get_top_parent() function
+-- https://reddit.com/r/Reaper/comments/1tub77u/reascript_to_autosuspend_group_routing/
+
+local parent = get_top_parent(track)
+local next_idx = reaper.GetMediaTrackInfo_Value(parent, 'IP_TRACKNUMBER')
+local parent_depth = reaper.GetTrackDepth(parent)
+
+local group_t = { parent }
+
+	-- Walk forward from parent; collect everything deeper than top_depth
+	for i = next_idx, reaper.CountTracks(0)-1 do
+	local t = reaper.GetTrack(0, i)
+		if reaper.GetTrackDepth(t) <= parent_depth then
+		break  -- exited the folder
+		end
+	group_t[#group_t + 1] = t
+	end
+return group_t
 end
 
 
@@ -8618,6 +8960,13 @@ end
 ]]
 
 
+function Visible_Track_Envelopes_Exist(tr)
+-- only applies to envelopes displayed in their own lanes
+local Get = r.GetMediaTrackInfo_Value
+return Get(tr, 'I_WNDH')-Get(tr, 'I_TCPH') > 0
+end
+
+
 function Is_Valid_Envelope(env, want_state)
 -- want_state is boolean to get additional properties: visible, bypassed, armed and GUID
 -- envelope GUID isn't necessarily unique, their GUIDs are retained in track and take copies
@@ -8793,10 +9142,11 @@ end
 
 function Get_Env_State(env, attr)
 -- attr is integer:
--- 1 - visibility, 2 - bypass state, 3 - armed state
+-- 1 - visibility, 2 - bypass state, 3 - armed state, 4 - separate lane
 local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.19
-local attr = attr == 1 and (old_build and 'VIS' or 'VISIBLE') or attr == 2 and (old_build and 'ACT' or 'ACTIVE')
-or attr == 3 and 'ARM' -- same in chunk and as a function attribute
+local attr = attr == 1 and (old_build and 'VIS 1' or 'VISIBLE') or attr == 2 and (old_build and 'ACT 1' or 'ACTIVE')
+or attr == 3 and (old_build and 'ARM 1' or 'ARM') -- same in chunk and as a function attribute
+or attr = 4 and (old_build and 'VIS %d+ 1' or 'SHOWLANE')
 local retval, chunk, state
 	if old_build then
 	retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
@@ -9036,7 +9386,8 @@ end
 
 
 
-function Count_FX_Envelopes() -- NO CONTAINER FX SUPPORT
+function Count_FX_Envelopes() 
+-- NO CONTAINER FX SUPPORT, has to be supplemented with Collect_All_Container_FX_Indices() from the 'F X' section
 
 local env_cnt = 0
 -- Regular tracks
@@ -9416,6 +9767,39 @@ or {r.GetNumTracks, r.GetTrack})
 			end
 		end
 	end
+end
+
+
+
+function Get_EnvCP_Min_Height(sect, env, cond) 
+
+--r.PreventUIRefresh(1) -- prevents collapsing via chunk and hence retrieval of the min height val
+
+--[[-- Attempt to get minimum height through a temporary track, which is inconvenient because to open its envelope with an action it must be selected while curently selected tracks must then be stored and restored afterwards, too much hassle
+r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
+local temp_track = r.GetTrack(0, r.CountTracks(0)-1)
+r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0) -- hide in Mixer
+r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
+r.Main_OnCommand(40406, 0) -- Track: Toggle track volume envelope visible
+]]
+
+local retval, env_chunk = r.GetEnvelopeStateChunk(env, '', false) -- isundo false
+local env_chunk_new = env_chunk:gsub('LANEHEIGHT %d+', 'LANEHEIGHT 1.0') -- passing 1 sets envcp to its minimum (collapsed) height
+r.SetEnvelopeStateChunk(env, env_chunk_new, false) -- isundo false
+local min_height = r.GetEnvelopeInfo_Value(env, 'I_TCPH') -- chunk LANEHEIGHT val corresponds to value of the I_TCPH parameter, NOT of the I_TCPH_USED one
+
+--[[-- TURNED OUT TO BE MISTAKE as if envcp starts out fully collapsed, no minimum uncollapsed height can be fetched, it's equal to fully collapsed
+local env_chunk_new = env_chunk:gsub('LANEHEIGHT %d+', 'LANEHEIGHT 0.0') -- ???? passing 0 sets envcp to its default uncollapsed height
+r.SetEnvelopeStateChunk(env, env_chunk_new, false) -- isundo false
+local def_uncollapsed_height = r.GetEnvelopeInfo_Value(env, 'I_TCPH')
+Msg(def_uncollapsed_height, 'def_uncollapsed_height')
+]]
+
+r.SetEnvelopeStateChunk(env, env_chunk, false) -- isundo false // restore chunk
+--r.PreventUIRefresh(-1)
+-- r.SetExtState(sect, 'envcp_min_h', min_height, false) -- persist false // store, OPTIONAL
+return min_height
+
 end
 
 
@@ -10380,16 +10764,16 @@ showFlag:
 function GetMonFXProps() -- get mon fx accounting for floating window, reaper.GetFocusedFX() doesn't detect mon fx in builds prior to 6.20
 
 -- r.TrackFX_GetOpen(master_tr, integer fx)
-	local master_tr = r.GetMasterTrack(0)
-	local mon_fx_idx = r.TrackFX_GetRecChainVisible(master_tr)
-	local is_mon_fx_float = false -- only relevant for pasting stage to reopen the fx in floating window
-		if mon_fx_idx < 0 then -- fx chain closed or no focused fx -- if this condition is removed floated fx gets priority
-			for i = 0, r.TrackFX_GetRecCount(master_tr) do
-				if r.TrackFX_GetFloatingWindow(master_tr, 0x1000000+i) then
-				mon_fx_idx = i; is_mon_fx_float = true break end
-			end
+local master_tr = r.GetMasterTrack(0)
+local mon_fx_idx = r.TrackFX_GetRecChainVisible(master_tr)
+local is_mon_fx_float
+	if mon_fx_idx < 0 then -- fx chain closed or no focused fx -- if this condition is removed floated fx gets priority
+		for i = 0, r.TrackFX_GetRecCount(master_tr) do
+			if r.TrackFX_GetFloatingWindow(master_tr, 0x1000000+i) then
+			mon_fx_idx = i; is_mon_fx_float = true break end
 		end
-	return mon_fx_idx, is_mon_fx_float -- expected >= 0, true
+	end
+return mon_fx_idx, is_mon_fx_float -- expected >= 0, true
 end
 
 
@@ -10466,7 +10850,7 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 		if obj then
 		local GetFXName, GetFXGUID, GetIOSize, GetNamedConfigParm = table.unpack(take and {r.TakeFX_GetFXName, r.TakeFX_GetFXGUID, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm} or tr and {r.TrackFX_GetFXName, r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm}) -- take is first to prevent false positive because when take valid track valud as well
 		local fx_alias, fx_GUID = select(2, GetFXName(obj, fx_num)), GetFXGUID(obj, fx_num)
-		local fx_name, _ = fx_alias
+		local fx_name = fx_alias
 		-- in builds older than 6.31 fx_name return value will be indentical to fx_alias
 			if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.31 then
 			local ret
@@ -10480,7 +10864,7 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 
 	else -- supported since v7.0
 
-	local retval, tr_num, itm_num, take_num, fx_num, parm_num = reaper.GetTouchedOrFocusedFX(1) -- 1 last touched mode // parm_num only relevant for querying last touched (mode 0) // supports Monitoring FX and FX inside containers, container itself can also be focused
+	local retval, tr_num, itm_num, take_num, fx_num, parm_num = r.GetTouchedOrFocusedFX(1) -- 1 focused mode // parm_num only relevant for querying last touched (mode 0) or if the last focused window is still open, value 1 // supports Monitoring FX and FX inside containers, container itself can also be focused
 	local tr = tr_num > -1 and r.GetTrack(0, tr_num) or retval and r.GetMasterTrack(0) -- Master track is valid when retval is true, tr_num in this case is -1
 	local item = tr and r.GetTrackMediaItem(tr, itm_num)
 	local take = item and r.GetTake(item, take_num)
@@ -11230,9 +11614,9 @@ end
 
 
 
-function Is_TrackFX_Open(obj, fx_index) -- open in the fx chain and in a floating window
-local tr = r.ValidatePtr(obj, 'MediaTrack*')
-local take = r.ValidatePtr(obj, 'MediaItem_Take*')
+function Is_FX_Open(obj, fx_index) -- open in the fx chain and in a floating window
+local validate = r.ValidatePtr
+local tr, take = validate(obj, 'MediaTrack*'), validate(obj, 'MediaItem_Take*')
 local GetCount, GetOpen, GetFloatingWindow = table.unpack(take and {r.TakeFX_GetCount, r.TakeFX_GetOpen, r.TakeFX_GetFloatingWindow} or tr and {r.TrackFX_GetCount, r.TrackFX_GetOpen, r.TrackFX_GetFloatingWindow})
 return GetOpen(obj, fx_index), GetFloatingWindow(obj,fx_index)
 --[[-- not clear why i used this // this is useful when searching if there're ANY fx selected in the chain and/or open in floating window
@@ -11859,7 +12243,6 @@ end
 
 
 
-
 function Get_FX_Selected_In_FX_Chain(obj, input_fx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensive version
 -- input_fx is boolean for use in builds 7.06+ to target input/Monitoring FX chain
 -- doesn't support containers
@@ -12094,38 +12477,6 @@ end
 
 
 
-function Loop_Over_FX_Container_Table(obj, t)
--- obj is track or take, t is the table returned by Collect_All_Container_FX_Indices() above
-
-local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-
--- add functions as necessary depending on the type of fx processing needed
-local FXCount, GetIOSize, GetConfig, SetConfig, GetFXName =
-table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm,
-r.TrackFX_SetNamedConfigParm, r.TrackFX_GetFXName}
-or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm,
-r.TakeFX_SetNamedConfigParm, r.TakeFX_GetFXName} or {})
-
-	-- target fx instances in a chain ignoring containers
-	for k, fx_idx in ipairs(t) do
-		if tonumber(fx_idx) then -- fx instance // if container evaluation will be false since the value is table
-	--  DO STUFF TO FX INSTANCES
-	--	local ret, name = GetFXName(obj, fx_idx, '')
-		end
-	end
-	-- target containers, ignoring fx instances
-	for k, cont in ipairs(t) do
-		if not tonumber(cont) then -- table storing container index and its fx list
-	-- 	DO STUFF TO CONTAINER IF NEEDED USING ITS INDEX AT cont[1]
-		Loop_Over_FX_Container_Table(obj, cont[2]) -- go recursive to loop over container fx, cont[2] is the address of the nested table with container fx indices list, at cont[1] container own index is stored
-		end
-	end
-
-end
-
-
-
-
 function Collect_All_Container_FX_Indices(t, obj, recFX, parent_cntnr_idx, parents_fx_cnt)
 -- t must be nil, obj is track or take, recFX is boolean to target input/Monitoring FX
 -- parent_cntnr_idx, parents_fx_cnt must be nil
@@ -12161,7 +12512,7 @@ local t = t or {} -- add table for the outermost FX chain on the very first run
 		local parents_fx_cnt = (parents_fx_cnt or 1) * (#t+1) -- #t is equal to fx count in the parent container
 		-- the function must not return table, otherwise its structure will be reversed
 		-- starting from the innermost fx chain with no way to get higher
-		-- the table is the same througouht the entire recursive loop anyway
+		-- the table is the same throughout the entire recursive loop anyway
 		Collect_All_Container_FX_Indices(t[i][2], obj, recFX, parent_cntnr_idx, parents_fx_cnt) -- go recursive // t[i][2] is the address of the nested table for collecting container fx indices
 		end
 	end
@@ -12172,8 +12523,42 @@ end
 
 
 
+function Loop_Over_FX_Container_Table(obj, t)
+-- obj is track or take, t is the table returned by Collect_All_Container_FX_Indices() above
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+
+-- add functions as necessary depending on the type of fx processing needed
+local FXCount, GetIOSize, GetConfig, SetConfig, GetFXName =
+table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm,
+r.TrackFX_SetNamedConfigParm, r.TrackFX_GetFXName}
+or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm,
+r.TakeFX_SetNamedConfigParm, r.TakeFX_GetFXName} or {})
+
+	-- target fx instances in a chain ignoring containers
+	for k, fx_idx in ipairs(t) do
+		if tonumber(fx_idx) then -- fx instance // if container evaluation will be false since the value is a table
+	-- DO STUFF TO FX INSTANCES, e.g.
+	--	local ret, name = GetFXName(obj, fx_idx, '')
+		end
+	end
+	-- target containers, ignoring fx instances
+	for k, cont in ipairs(t) do
+		if not tonumber(cont) then -- table storing container index and its fx list
+	-- DO STUFF TO CONTAINER IF NEEDED USING ITS INDEX AT cont[1]
+		Loop_Over_FX_Container_Table(obj, cont[2]) -- go recursive to loop over container fx, cont[2] is the address of the nested table with container fx indices list, at cont[1] container own index is stored
+		end
+	end
+
+end
+
+
+
+
 function Get_FX_All_Parent_Containers(obj, fx_idx)
 -- supported since build 7.06
+-- return table where container indices are listed in ascending order
+-- i.e. from the outermost to the innermost
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 
@@ -12369,8 +12754,9 @@ function Get_FX_Type(obj, fx_idx)
 -- https://forum.cockos.com/showthread.php?t=277103
 local plug_types_t = {[0] = 'DX', [1] = 'LV2', [2] = 'JSFX', [3] = 'VST',
 [4] = '', [5] = 'AU', [6] = 'Video processor', [7] = 'CLAP', [8] = 'Container'}
-local GetIOSize = obj and (r.ValidatePtr(obj, 'MediaItem_Take*') and r.TakeFX_GetIOSize
-or r.ValidatePtr(obj, 'MediaTrack*') and r.TrackFX_GetIOSize)
+local validate = r.ValidatePtr
+local GetIOSize = obj and (validate(obj, 'MediaItem_Take*') and r.TakeFX_GetIOSize
+or validate(obj, 'MediaTrack*') and r.TrackFX_GetIOSize)
 	if GetIOSize then
 	local plug_type, inputPins_cnt, outputPins_cnt = GetIOSize(obj, fx_idx)
 	return plug_types_t[plug_type]
@@ -12378,10 +12764,32 @@ or r.ValidatePtr(obj, 'MediaTrack*') and r.TrackFX_GetIOSize)
 end
 
 
-function Plugin_Is_Instrument(obj, fx_idx)
--- whether FX or instrument
--- doesn't apply to JSFX, because there's no way to determine
--- whether they're FX or instrument
+function Plugin_Is_Instrument(obj, fx_idx, temp_tr, delete_temp_tr)
+-- TrackFX_GetInstrument() IS UNSUITABLE BECAUSE IT DOESN'T QUERY FX AT SPECIFIC INDEX;
+-- all JSFX which don't contain the words reverb or delay in their name, 
+-- are considered instrument because there's no way to reliably determine 
+-- whether they're FX or instrument otherwise;
+-- if there're multiple plugins to evaluate
+-- and there's likelihood of using a temporary track
+-- for the sake of the evaluation (see below)
+-- it's more efficient to create it once and then
+-- re-use until all are done
+-- so temp_tr arg is temporary track pointer
+-- either created outside of this function
+-- or inside it and returned by it for re-use;
+-- delete_temp_tr is boolean to instruct the function
+-- to delete it once all plugins have been evaluated,
+-- unless it's supposed to be deleted outside of this function;
+-- IF THE FUNCTION EXITS BEFORE temp_tr IS RE-USED, ITS POINTER
+-- WON'T BE RETURNED FOR FURTHER REUSE, SO DEVISE A METHOD TO MAINTAIN
+-- ITS VALID POINTER OUTSIDE OF THE FUNCTION, i.e.
+-- local instr, temp = Plugin_Is_Instrument(tr, i, temp_tr)
+-- temp_tr = temp_tr or temp;
+-- MIND THAT IF THE ROUTINE REACHES THE STAGE
+-- OF TEMPORARY TRACK, COPYING AND REMOVING FX
+-- CREATES UNDO POINTS, THEREFORE THE FUNCTION MUST
+-- BE CALLED WTTHING THE UNDO BLOCK TO PREVENT
+-- CREATION OF SEPARATE UNDO POINTS
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 local FXName, ConfigParm, Copy = table.unpack(tr and {r.TrackFX_GetFXName, r.TrackFX_GetNamedConfigParm, r.TrackFX_CopyToTrack} 
@@ -12390,32 +12798,82 @@ or take and {r.TakeFX_GetFXName, r.TakeFX_GetNamedConfigParm, r.TakeFX_CopyToTra
 -- retrieve from the instance name in FX chain
 -- unless renamed
 local ret, name = FXName(obj, fx_idx)
-local prefix = name:match(('^[23ACDLPSTUVXi]+: '))
+local prefix = name:match('^([23ACDLPSTUVXi]+): ')
+local JSFX = name:match('^JS:') and (name:lower():match('delay') or name:lower():match('reverb')) 
+or not name:match('^JS:')
 
-	if prefix then return prefix:match('.+i') end
+	if prefix then return prefix:match('.+i') or not JSFX end
 
 -- retrieve from plugin name in the FX browser, supported since build 6.37
 -- unless renamed there
 local ret, name = ConfigParm(obj, fx_idx, 'original_name')
-prefix = name:match('^[23ACDLPSTUVXi]+: ')
+prefix = name:match('^([23ACDLPSTUVXi]+): ')
+local JSFX = name:match('^JS:') and (name:lower():match('delay') or name:lower():match('reverb')) 
+or not name:match('^JS:')
 
-	if prefix then return prefix:match('.+i') end
+	if prefix then return prefix:match('.+i') or not JSFX end
 
 -- copy to a temporary track and retrieve from chunk
 r.PreventUIRefresh(1)
-r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
-local temp_tr = r.GetTrack(0,r.CountTracks(0)-1)
-r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINMIXER', 0) -- hide in Mixer
-r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINTCP', 0) -- hide in Arrange
-Copy(obj, fx_idx, temp_tr, 0, false) -- isMove false
+local temp_tr = temp_tr
+	if not temp_tr then
+	r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
+	temp_tr = r.GetTrack(0,r.CountTracks(0)-1)
+	r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINMIXER', 0) -- hide in Mixer
+	r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINTCP', 0) -- hide in Arrange
+	end
+r.TrackFX_Delete(temp_tr, 0) -- delete previously evaluated plugin if any
+Copy(obj, fx_idx, temp_tr, 0, false) -- isMove false // COPYING/MOVING FX SEEMS TO NOT RESULT IN AUTO-FLOATING THEIR WINDOWS EVEN IF ENABLED IN THE PREFERENCES
 local ret, chunk = r.GetTrackStateChunk(temp_tr, '', false) -- isundo false
-prefix = chunk:match('.-"([23ACDLPSTUVXi]+:) ') -- within a chunk fx type prefix with plugin name displayed in the FX browser are enclosed within quotes
-r.DeleteTrack(temp_tr)
+prefix = chunk:match('.-"([23ACDLPSTUVX]+i:) ') -- within a chunk fx type prefix with plugin name displayed in the FX browser are enclosed within quotes
+local JSFX = chunk:match('.-<(JS.-)"')
+JSFX = JSFX and (JSFX:lower():match('delay') or JSFX:lower():match('reverb')) or not JSFX
+	if delete_temp_tr and temp_tr then r.DeleteTrack(temp_tr) end
 r.PreventUIRefresh(-1)
 
-return prefix:match('.+i')
+return prefix and prefix:match('.+i') or not JSFX, temp_tr
 
 end
+
+
+
+function FX_Enabled(obj)
+-- obj is track or take, if item obj is assigned active take pointer,
+-- searches for at least one enabled effect plugin,
+-- if obj is take, the function evaluates FX chain in both take and its parent track;
+-- relies on Plugin_Is_Instrument();
+-- MIND THAT IF THE ROUTINE INSIDE Plugin_Is_Instrument()
+-- FUNCTION REACHES THE STAGE OF TEMPORARY TRACK, 
+-- COPYING AND REMOVING FX CREATES UNDO POINTS, 
+-- THEREFORE THE FUNCTION MUST BE CALLED WTTHING THE UNDO BLOCK 
+-- TO PREVENT CREATION OF SEPARATE UNDO POINTS
+
+local valid = r.ValidatePtr
+local tr, take, item = valid(obj, 'MediaTrack*'), valid(obj, 'MediaItem_Take*'), valid(obj, 'MediaItem*')
+local obj = item and r.GetActiveTake(item) or obj
+
+	local function find_active(tr, take, obj)
+	local Count, Unbypassed, Offline = table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetEnabled, r.TrackFX_GetOffline}
+	or take and {r.TakeFX_GetCount, r.TakeFX_GetEnabled, r.TakeFX_GetOffline})
+	local obj, instr, temp_tr = tr or take, true
+		for i=0, Count(obj)-1 do
+			if Unbypassed(obj, i) and not Offline(obj, i) then 
+			local instr
+			instr, temp_tr = Plugin_Is_Instrument(obj, i, temp_tr) -- temp_tr, if created, will be re-used in subsequent cycles
+				if not instr then break end
+			end
+		end
+	local del = temp_tr and r.DeleteTrack(temp_tr)
+	return instr
+	end
+
+local track = take and r.GetMediaItemTake_Track(take)
+-- evaluate in track FX chain
+local active = r.GetMediaTrackInfo_Value(obj or track, 'I_FXEN') ~= 0 and find_active(tr, nil, obj or track)
+return active or take and find_active(nil, take, obj) -- if found return right away, else if take, evaluate in take FX chain
+
+end
+
 
 
 
@@ -12855,6 +13313,43 @@ or take and {r.TakeFX_GetNumParams, r.TakeFX_GetParam})
 	return get(2), get(1) -- wet parameter and delta
 	end
 end
+
+
+
+function Move_FX_At_Index_To_Slot_N(tr, fx_idx, slot_idx)
+-- supported since 7.75;
+-- relies on GetObjChunk()2, Get_FX_Chunk(), Esc();
+-- if the slot at slot_idx is already occupied, the FX which occupies it
+-- it automatically moved by REAPER one slot further,
+-- which is different from the way REAPER handles collision
+-- on FX chain preset import where it's the imported FX 
+-- which is moved further to the first available slot
+
+  if fx_idx >= 0x1000000 then return end -- input or container fx which cannot be shown in the UI
+
+local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
+-- OR
+-- local ret, chunk = GetObjChunk(tr)
+
+	if not ret then return end
+	
+local fx_chunk = Get_FX_Chunk(tr, chunk, fx_idx)
+
+  if not fx_chunk then return end
+  
+local cur_slot = fx_chunk:match('FX_SLOT_HINT %d+')
+
+  if cur_slot and cur_slot+0 == slot_idx then return end
+  
+local fx_chunk_mod = cur_slot and fx_chunk:gsub(cur_slot, 'FX_SLOT_HINT '..slot_idx, 1) 
+or fx_chunk..'\nFX_SLOT_HINT '..slot_idx
+local fx_chunk, fx_chunk_mod = Esc(fx_chunk), fx_chunk_mod:gsub('%%','%%%%') -- escape
+chunk = chunk:gsub(fx_chunk, fx_chunk_mod)
+r.SetTrackStateChunk(tr, chunk, false) -- isundo false
+r.TrackList_AdjustWindows(false) -- update both TCP and MCP
+
+end
+
 
 
 
@@ -13723,7 +14218,7 @@ end
 
 
 
-function Insert_Item_On_Temp_Track(tr_name)
+function Insert_Item_On_Temp_Track1(tr_name)
 
 r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
 local temp_tr = r.GetTrack(0,r.CountTracks(0)-1)
@@ -13736,6 +14231,63 @@ local take = r.AddTakeToMediaItem(temp_itm)
 return temp_tr, temp_itm, take
 
 end
+
+
+
+function Insert_Item_On_Temp_Track2(want_midi_editor, tr_name, file_path, start_offs, length)
+
+r.PreventUIRefresh(1)
+
+r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
+local temp_tr = r.GetTrack(0,r.CountTracks(0)-1)
+local name = tr_name and r.GetSetMediaTrackInfo_String(temp_tr, 'P_NAME', tr_name, true) -- setNewValue true
+r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINMIXER', 0) -- hide in Mixer
+local temp_itm
+	if not want_midi_editor then
+	-- Must not be hidden in Arrange if a temp item on the temp track must be opened
+	-- in the MIDI Editor, otherwise it may end up not being deleted after opening the MIDI Editor,
+	-- it doesn't if the function is run on REAPER starup, may need testing in other scenarios
+	-- r.SetMediaTrackInfo_Value(temp_tr, 'B_SHOWINTCP', 0) -- hide in Arrange -- ITEM ISN'T GLUED IF TRACK IS HIDDEN IN ARRANGE
+		if file_path then -- insert temp item
+	--	r.InsertMedia(file_path, integer mode) -- this function wouldn't be suitable for temporary MIDI item
+		temp_itm = r.AddMediaItemToTrack(temp_tr)
+		end
+	else -- insert temp MIDI item
+	local ACT = reaper.Main_OnCommand
+	ACT(40914, 0) -- Track: Set first selected track as last touched track (to make it the target for temp MIDI item insertion)
+	ACT(40214, 0) -- Insert new MIDI item...
+	ACT(40153, 0) -- Item: Open in built-in MIDI editor (set default behavior in preferences)
+	temp_itm = r.GetSelectedMediaItem(0,0)
+	end
+
+local take = r.AddTakeToMediaItem(temp_itm)
+local pcm_src
+
+	if file_path and not r.TakeIsMIDI(take) then
+	pcm_src = r.PCM_Source_CreateFromFile(file_path)
+	r.SetMediaItemTake_Source(take, pcm_src)
+	r.SetMediaItemTakeInfo_Value(take, 'D_STARTOFFS', start_offs)
+	r.GetSetMediaItemTakeInfo_String(take, 'P_NAME', file_path:match('[^\\/]+$'), true) -- setNewValue true, name after source file so that newly created files bears the name of the original
+	end
+
+local Set_Item = r.SetMediaItemInfo_Value
+Set_Item(temp_itm, 'D_LENGTH', length)
+-- remove fades in case enabled automatically for inserted media
+-- at Prefs -> Project -> Item Fade Defaults
+Set_Item(temp_itm, 'D_FADEINLEN', 0)
+Set_Item(temp_itm, 'D_FADEOUTLEN', 0)
+r.SetMediaItemSelected(temp_itm, true) -- selected true // must be selected for Glue to work
+
+-- DO STUFF
+
+r.DeleteTrack(temp_tr)
+--r.PCM_Source_Destroy(pcm_src) -- after track deletion pcm source becomes invalid so no need to destroy
+
+r.PreventUIRefresh(-1)
+
+end
+
+
 
 
 function Get_Item_Edge_At_Mouse() -- Combined with Get_Item_Track_Segment_At_Mouse() can be used to get 4 item corners at the mouse cursor
@@ -13828,7 +14380,7 @@ function Get_Arrange_and_Header_Heights1()
 -- a very convoluted alternative way is using actions 'Ruler: Set to default/max/min height', then checking toppane value in reaper.ini, checking where transport is located and toggling it temporarily off if on top, checking in reaper.ini for any toolbars/windows docked at the top, temporarily toggling it off, then adding about 90 px to toppane value and subtracting this from the screen or program window height depending on whether SWS extension is installed
 
 local lt_scr, top_scr, rt_scr, bot_scr = r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true) -- true - work area, false - the entire screen // https://forum.cockos.com/showthread.php?t=195629#4
-local sws = r.APIExists('BR_Win32_GetWindowRect')
+local sws = r.APIExists('BR_Win32_GetWindowRect') -- OR SIMPLY r.BR_Win32_GetWindowRect
 local retval, rt, top, lt, bot = table.unpack(sws and {r.BR_Win32_GetWindowRect(r.GetMainHwnd())} or {nil})
 --[[
 local dimens_t = sws and {r.BR_Win32_GetWindowRect(r.GetMainHwnd())}
@@ -13926,7 +14478,7 @@ function Get_Arrange_and_Header_Heights2()
 -- a very convoluted alternative way is using actions 'Ruler: Set to default/max/min height', then checking toppane value in reaper.ini, checking where transport is located and toggling it temporarily off if on top, checking in reaper.ini for any toolbars/windows docked at the top, temporarily toggling it off, then adding about 90 px to toppane value and subtracting this from the screen or propgarm window height depending on whether SWS extension is installed
 
 local lt_scr, top_scr, rt_scr, bot_scr = r.my_getViewport(0, 0, 0, 0, 0, 0, 0, 0, true) -- true - work area, false - the entire screen // https://forum.cockos.com/showthread.php?t=195629#4
-local sws = r.APIExists('BR_Win32_GetWindowRect')
+local sws = r.APIExists('BR_Win32_GetWindowRect') -- OR SIMPLY r.BR_Win32_GetWindowRect
 local retval, rt, top, lt, bot = table.unpack(sws and {r.BR_Win32_GetWindowRect(r.GetMainHwnd())} or {nil})
 
 --[[
@@ -14835,7 +15387,7 @@ local vol = 10^((vol_item_dB + vol_take_dB)/20)
 -- When item is looped only the very first iteration, which can be partial due to trim, is translated into RS5k sample area
 -- Enabling reverse in Item Properties turns item into section even when Section option isn't explicitly checkmarked
 -- After import into RS5k of a reversed item, section or not, trimmed or not, looped or not, the sample region accurately reflects boundaries of the non-reversed source; for original section boundaries to be respected special calculations are required which are pointless because the sample area won't match item playback anyway due to reverse
--- If a non-looped item is untrimmed from the left, start_offset_take value is negative throwing the region start position off in RS5k since RS5k respects the negative offset, so it must be accounted for
+-- If a non-looped item is untrimmed (trimmed out) from the left, start_offset_take value is negative throwing the region start position off in RS5k since RS5k respects the negative offset, so it must be accounted for
 
 -- Start is either Section: (first field) or 'Start in source' value in the Media Item Properties window; len is either Length (under Position) or Section: Length in Media Item Properties window; accounting for left and right edges trim
 local start = start_offset_take >= 0 and start_offset_sect + start_offset_take or start_offset_sect -- accounting for extension or trim of the left edge; when item source is looped item's left (and right for that matter) edge can't be extended beyond source, otherwise extension is ignored
@@ -15407,8 +15959,8 @@ end
 
 
 function Find_Level_Relative_To_Thresh_In_Take(take, threshold, block_size, time_window, want_above, want_rms)
--- author ChatGPT;
--- returns project time where the level below threshold
+-- author ChatGPT with edits;
+-- returns time within take where the level below threshold
 -- was first detected within take;
 -- threshold is val in dB, if invalid defaults to -60;
 -- block_size and time_window are mutually exclusive
@@ -15424,44 +15976,49 @@ function Find_Level_Relative_To_Thresh_In_Take(take, threshold, block_size, time
 -- want_above is boolean to detect average amplitude above threshold, 
 -- not sure how useful this is,
 -- otherwise absolute amplitude below threshold;
--- the function doesn't account for reversed source and source section;
 -- block_size and window may be made conditional on the
 -- source length, the shorter the source the smaller/narrower
 -- they must be for the sake of accuracy
 
-	if not take then return nil end
+	if not take or r.TakeIsMIDI(take) then return end
 
 local accessor = r.CreateTakeAudioAccessor(take)
 
 	if not accessor then return end
 
-local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
-src = r.GetMediaSourceParent(src) or src
+local src = r.GetMediaItemTake_Source(take) -- returns pointer for the source including reversed and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
 local retval, offs, len, rev = r.PCM_Source_GetSectionInfo(src) -- OR r.GetMediaSourceLength(src) to get length
--- accessor start/end times are affected by take start offset and item length respectively
--- so making sure that if take is extended beyond its source
--- any extra space is ignored, only positive start offset 
+-- accessor start/end match item start/end, trimmed or not, looped or not
+-- so making sure that if a non-looped take is extended beyond its source
+-- any extra space is ignored, only positive start offset
 -- and trimmed right item edge are respected
 local startoffs = r.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
 local playrate = r.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
--- start offset value is affected by playrate which is irrelevant
--- for its actual length when item isn't looped, so if it's not
--- calculating its actual length by canceling out playrate
 local item = r.GetMediaItemTake_Item(take)
 local looped = r.GetMediaItemInfo_Value(item, 'B_LOOPSRC') == 1
-startoffs = not looped and startoffs/playrate or startoffs
-local start_time = r.GetAudioAccessorStartTime(accessor)+math.abs(startoffs)
 
--- accessor end time is also affected by playrate
--- so accounting for playrate when ignoring extra length 
--- due to extended right edge
-local end_time = r.GetAudioAccessorEndTime(accessor) -- take source end in sec within take counting from accessor start time; affected by playrate
-end_time = math.min(end_time, len/playrate)
---[[ same as math.min() above
-	if end_time > len/playrate then
-	end_time = len/playrate
-	end
---]]
+-- start offset value is affected by playrate which is irrelevant
+-- for its actual length when take isn't looped, so if it's not,
+-- calculating its actual length by canceling out playrate (dividing by it)
+local st_offset = not looped and startoffs < 0 and startoffs/playrate or 0
+-- offsetting start time by startoffset, relevant when non-looped item left edge 
+-- is extended beyond the take source, otherwise start time remains equal to accessor start time;
+-- accessor's own start time is always 0, i.e. take start
+local start_time = r.GetAudioAccessorStartTime(accessor)+math.abs(st_offset) -- OR -st_offset
+
+local end_time = r.GetAudioAccessorEndTime(accessor) -- equals item end time
+-- if take is extended beyond the source, looped or not, 
+-- end time is source length at current playrate
+-- offset by startoffset value just like the start time,
+-- otherwise it's accessor end time;
+-- looped take startoffs is always positive;
+-- since in looped takes each loop iteration equals either the full source
+-- or a portion thereof, the calculated end time will equal the length
+-- of the remaining portion if startoffs is not 0, i.e. the 1st
+-- loop iteration isn't complete, which provides access to the entire source
+-- length, unless the item right edge is trimmed which is the accessor's end time
+local end_offset = not looped and startoffs > 0 and startoffs/playrate or 0
+end_time = math.min(end_time, len/playrate-end_offset)
 
 local samplerate = r.GetMediaSourceSampleRate(src)
 local num_channels = r.GetMediaSourceNumChannels(src)
@@ -15524,14 +16081,298 @@ r.DestroyAudioAccessor(accessor)
 	-- when startoffs is positive, it's already accounted for in the t value
 	-- when item is looped it's always positive
 	local startoffs = startoffs < 0 and startoffs or 0
-	Msg(r.GetMediaItemInfo_Value(item, 'D_POSITION')+t,'marker')
-	r.AddProjectMarker(0, false, r.GetMediaItemInfo_Value(item, 'D_POSITION')-startoffs+t, 0, '', -1) 
+--	Msg(r.GetMediaItemInfo_Value(item, 'D_POSITION')+t,'marker')
+	local silence_start = r.GetMediaItemInfo_Value(item, 'D_POSITION')-startoffs+t
+	r.AddProjectMarker(0, false, silence_start, 0, '', -1)
+
+--	local length = r.GetMediaItemInfo_Value(item, 'D_LENGTH')
+--	r.SetMediaItemInfo_Value(item, 'D_LENGTH', length-(length-t))
 	end
 --]]
 
--- return time within item, must be added to item start value to calculate project time
--- as shown above under CONTROL
-return t and t < end_time and t -- only return if not outside of source right edge, i.e. no overshoot
+-- return time within item, i.e. relative to item start
+-- must be added to item start value to calculate project time,
+-- (take start offset should be ignored because it's already accounted for
+-- in the return value)
+-- and subtracted from item length for trimming
+-- as shown above under CONTROL bar subtracting the take start offset
+return t and t < end_time and t - (startoffs < 0 and startoffs or 0) -- only return if not outside of source right edge, i.e. no overshoot, accounting for negative start offset which is ignored in t calculation
+
+end
+
+
+
+function Calculate_Take_RMS_Loudness(take, block_size, time_window, gate_dB)
+-- author ChatGPT with edits;
+-- block_size and time_window are mutually exclusive
+-- where block_size have priority if both args are valid
+-- block_size: 256 - 1024 more precise but slower
+-- 2048 - 8192 less precise but faster,
+-- if invalid and time_window is invalid as well defaults to 1024,
+-- time_window is value in sec, for meaningful results
+-- must be fraction of a second, about 1/100 i.e. 10/1000
+-- so that the window width is small enough;
+-- gate_dB is value in dB below which amplitude is considered
+-- silence and so ignored to avoid skewing the calculation 
+-- of overall loudness by inclusion of effective silence, e.g. -60,
+-- the difference between rms and peak is on everage 15 dB;
+-- the function doesn't account for reversed source and source section
+
+	if not take or r.TakeIsMIDI(take) then return end
+
+local accessor = r.CreateTakeAudioAccessor(take)
+
+	if not accessor then return end
+
+local src = r.GetMediaItemTake_Source(take) -- returns pointer for the source including reversed and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+local retval, offs, len, rev = r.PCM_Source_GetSectionInfo(src) -- OR r.GetMediaSourceLength(src) to get length
+-- accessor start/end match item start/end, trimmed or not, looped or not
+-- so making sure that if a non-looped take is extended beyond its source
+-- any extra space is ignored, only positive start offset
+-- and trimmed right item edge are respected
+local startoffs = r.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
+local playrate = r.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
+local item = r.GetMediaItemTake_Item(take)
+local looped = r.GetMediaItemInfo_Value(item, 'B_LOOPSRC') == 1
+
+-- start offset value is affected by playrate which is irrelevant
+-- for its actual length when take isn't looped, so if it's not,
+-- calculating its actual length by canceling out playrate (dividing by it)
+local st_offset = not looped and startoffs < 0 and startoffs/playrate or 0
+-- offsetting start time by startoffset, relevant when non-looped item left edge 
+-- is extended beyond the take source, otherwise start time remains equal to accessor start time;
+-- accessor's own start time is always 0, i.e. take start
+local start_time = r.GetAudioAccessorStartTime(accessor)+math.abs(st_offset) -- OR -st_offset
+
+local end_time = r.GetAudioAccessorEndTime(accessor) -- equals item end time
+-- if take is extended beyond the source, looped or not, 
+-- end time is source length at current playrate
+-- offset by startoffset value just like the start time,
+-- otherwise it's accessor end time;
+-- looped take startoffs is always positive;
+-- since in looped takes each loop iteration equals either the full source
+-- or a portion thereof, the calculated end time will equal the length
+-- of the remaining portion if startoffs is not 0, i.e. the 1st
+-- loop iteration isn't complete, which provides access to the entire source
+-- length, unless the item right edge is trimmed which is the accessor's end time
+local end_offset = not looped and startoffs > 0 and startoffs/playrate or 0
+end_time = math.min(end_time, len/playrate-end_offset)
+
+local gate = gate_dB and tonumber(gate_dB) and 10^(gate_dB/20) or 1e-15
+local samplerate = r.GetMediaSourceSampleRate(src)
+local num_channels = r.GetMediaSourceNumChannels(src)
+local block_size = block_size or not time_window and 1024
+block_size = block_size or math.floor(time_window * samplerate + 0.5)
+local block_spl_cnt = block_size * num_channels
+local buffer = r.new_array(block_spl_cnt)
+
+local t, sum_total, spls_total = start_time, 0, 0
+
+	while t < end_time do
+
+	local is_audio = r.GetAudioAccessorSamples(accessor, samplerate, num_channels, t, block_size, buffer) -- return value is only a control flag, at each loop cycle the buffer initialized above is filled with another sample batch starting at t
+
+		if is_audio ~= 1 then t = nil break end
+
+	local sum = 0
+
+		-- scan block
+		for i = 1, block_spl_cnt do
+		local v = buffer[i]
+		sum = sum + v * v -- more efficient than v^2
+		end		
+
+	local block_rms = math.sqrt(sum/block_spl_cnt) -- OR (sum/block_spl_cnt)^0.5
+	
+		if block_rms > gate then
+		sum_total = sum_total + sum
+		spls_total = spls_total + block_spl_cnt
+		end
+
+	t = t + (block_size/samplerate)
+
+	end
+	
+r.DestroyAudioAccessor(accessor)
+	
+	if spls_total > 0 then -- preventing division by 0 in the next line
+	local rms = math.sqrt(sum_total/spls_total)
+		if rms <= 1e-15 then return -- 1e-15 ~ -300 dB, no meaningful RMS
+		else
+		return 20*math.log(rms, 10)
+		end
+	end
+
+end
+
+
+
+function Get_Audio_Peak_In_Take(take)
+-- in particular useful in finding whether the take source is normalized
+
+	if not take or r.TakeIsMIDI(take) then return end
+
+local accessor = r.CreateTakeAudioAccessor(take)
+
+	if not accessor then return end
+
+local src = r.GetMediaItemTake_Source(take) -- returns pointer for the source including reversed and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+local retval, offs, len, rev = r.PCM_Source_GetSectionInfo(src) -- OR r.GetMediaSourceLength(src) to get length
+-- accessor start/end match item start/end, trimmed or not, looped or not
+-- so making sure that if a non-looped take is extended beyond its source
+-- any extra space is ignored, only positive start offset
+-- and trimmed right item edge are respected
+local startoffs = r.GetMediaItemTakeInfo_Value(take, 'D_STARTOFFS')
+local playrate = r.GetMediaItemTakeInfo_Value(take, 'D_PLAYRATE')
+local item = r.GetMediaItemTake_Item(take)
+local looped = r.GetMediaItemInfo_Value(item, 'B_LOOPSRC') == 1
+
+-- start offset value is affected by playrate which is irrelevant
+-- for its actual length when take isn't looped, so if it's not,
+-- calculating its actual length by canceling out playrate (dividing by it)
+local st_offset = not looped and startoffs < 0 and startoffs/playrate or 0
+-- offsetting start time by startoffset, relevant when non-looped item left edge 
+-- is extended beyond the take source, otherwise start time remains equal to accessor start time;
+-- accessor's own start time is always 0, i.e. take start
+local start_time = r.GetAudioAccessorStartTime(accessor)+math.abs(st_offset) -- OR -st_offset
+
+local end_time = r.GetAudioAccessorEndTime(accessor) -- equals item end time
+-- if take is extended beyond the source, looped or not, 
+-- end time is source length at current playrate
+-- offset by startoffset value just like the start time,
+-- otherwise it's accessor end time;
+-- looped take startoffs is always positive;
+-- since in looped takes each loop iteration equals either the full source
+-- or a portion thereof, the calculated end time will equal the length
+-- of the remaining portion if startoffs is not 0, i.e. the 1st
+-- loop iteration isn't complete, which provides access to the entire source
+-- length, unless the item right edge is trimmed which is the accessor's end time
+local end_offset = not looped and startoffs > 0 and startoffs/playrate or 0
+end_time = math.min(end_time, len/playrate-end_offset)
+
+local samplerate = r.GetMediaSourceSampleRate(src)
+local num_channels = r.GetMediaSourceNumChannels(src)
+local block_size = math.floor(samplerate/1000+0.5) -- samples per ms, matches the sample rate, rounding for r.new_array()
+local block_spl_cnt = block_size * num_channels
+local buffer = r.new_array(block_spl_cnt)
+
+local t, peak, clipped_count, last_peak, is_clipped = start_time, 0, 0
+
+	while t < end_time do
+
+	local is_audio = r.GetAudioAccessorSamples(accessor, samplerate, num_channels, t, block_size, buffer) -- return value is only a control flag, at each loop cycle the buffer initialized above is filled with another sample batch starting at t
+
+		if is_audio ~= 1 then break end
+		
+		-- scan block
+		for i = 1, block_spl_cnt do
+		local v = math.abs(buffer[i])
+		peak = v > peak and v or peak
+		-- count consecutive peak samples which are relatively equal
+		-- in amplitude (not necessarily identical) to identify clipping and flat plateaus
+			if not is_clipped and v >= 0.999
+			and (not last_peak or math.abs(v-last_peak) < 1e-5)
+			then
+			clipped_count = not last_peak and 1 or clipped_count+1		
+			is_clipped = is_clipped or clipped_count >= 8 -- at least 8 consecutive samples are at peak, i.e. the waveform is likely clipped
+			last_peak = v
+			else -- reset
+			last_peak = nil
+			end
+		end
+		
+	t = t + (block_size/samplerate)
+
+	end
+
+r.DestroyAudioAccessor(accessor)
+
+return peak > 0 and math.log(peak, 10)*20, is_clipped
+
+end
+
+
+
+function Audio_Take_Too_Quiet_Or_Loud(take, block_size, gate_dB)
+-- relies on Calculate_Take_RMS_Loudness() and Get_Audio_Peak_In_Take() functions
+-- block_size, gate_dB args are fed into Calculate_Take_RMS_Loudness
+	local function to_dB(val)
+	return 20*math.log(val,10)
+	end
+block_size, gate_dB = block_size or 256, gate_dB or -60
+local parm = 'D_VOL'
+--local vol_tr = r.GetMediaTrackInfo_Value(tr, parm) -- tr level is irrelevant because it's ignored by the actions 'Item: Apply track/take FX to items' and Glue
+local vol_take = take and r.GetMediaItemTakeInfo_Value(take, parm) or 0
+local vol_item = take and r.GetMediaItemInfo_Value(r.GetMediaItemTake_Item(take), parm) or 0
+	-- the actions 'Apply track/take FX as new take' and Glue used by the script print item/take volume as well
+local rms_dB = Calculate_Take_RMS_Loudness(take, block_size, time_window, gate_dB) -- returns nil for silent take
+local peak, clipped
+	if rms_dB then -- only search for peak if not silent
+	peak, clipped = Get_Audio_Peak_In_Take(take) 
+	end
+local vol_take_item = to_dB(vol_take)+to_dB(vol_item)
+return not rms_dB and 0 or rms_dB+vol_take_item < -42 and 1 or peak+vol_take_item > 0 and 2, peak, clipped -- 0 silent, 1 quiet, 2 loud; peak is returned for further normalization if user opts for it after prompt
+end
+
+
+
+function Normalize_Take(take, peak, headroom, vol_item, vol_take)
+-- if take is not supplied, active take of the 1st selected item is targeted,
+-- peak is take source peak amplitude in dB, stems from Get_Audio_Peak_In_Take()
+-- if not supplied, the function relies on Get_Audio_Peak_In_Take(),
+-- headroom is the normalization target level in dB, a negative value,
+-- if not supplied or is positive the take is normalized to -0.3 dB,
+-- vol_item, vol_take are only required if after normalization
+-- the original values need restoration in case normalization
+-- was undertaken before running 'Apply track/take FX as new take'
+-- or Glue actions to ensure reasonable level for the new take;
+-- THE STOCK NORMALIZE ACTIONS IGNORE ITEM VOLUME THEREFORE FOR
+-- THE SAKE OF RENDERING/GLUING TO A NEW TAKE THEY'RE USELESS
+-- BECAUSE VOLUME ITEM IS PRINTED INTO TAKE AS WELL AND IT MAY
+-- BE VERY LOW OR HIGH CAUSING EITHER REDUCTION IN THE RENDERED
+-- TAKE LEVEL OR CLIPPING
+
+
+local item = take and r.GetMediaItemTake_Item(take) or r.GetSelectedMediaItem(0,0)
+local take = take or r.GetActiveTake(item)
+local parm = 'D_VOL'
+
+	if not (vol_item and vol_take) then -- normalize
+	-- https://old.reddit.com/r/Reaper/comments/1srrpo5/make_normalize_action_default_to_03_db/
+	--[[
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.46 then
+		ACT(40936) -- Item properties: Normalize items to +0dB peak (reset to unity if already normalized) // DESPITE THE NAME, ONLY CHANGES TAKE VOLUME VALUE // NORMALIZES TAKE EVEN IF IT'S GAIN IS ALREADY SET TO OR EXCEEDS 0 dB WITH ITEM VOLUME CONTROL
+		else
+	--]]
+		local function to_dB(val)
+		return math.log(val,10)*20
+		end
+	-- store original levels
+	local vol_item = r.GetMediaItemInfo_Value(item, parm)
+	local vol_take = r.GetMediaItemTakeInfo_Value(take, parm)
+	local peak = peak or Get_Audio_Peak_In_Take(take)		
+	--[[ INEFFICIENT
+	local cur_level = peak + to_dB(vol_item) + to_dB(vol_take)
+		if cur_level ~= 0 then -- adjust, normalizing to -0.3 dB
+		cur_level = cur_level*-1 - 0.3
+		r.SetMediaItemTakeInfo_Value(take, parm, vol_take*10^(cur_level/20))
+		end
+	--]]
+	-- reset to unity
+	r.SetMediaItemInfo_Value(item, parm, 1)
+	r.SetMediaItemTakeInfo_Value(take, parm, 1)
+	local headroom = tonumber(headroom) and headroom+0 < 0 and headroom
+	local norm_level = peak*-1 - (headroom and headroom*1 or 0.3) -- flip peak amplitude sign to make it positive so the gain is increased // convert headroom value into genative to conform to the expression
+	-- setting take because after track/take FX are applied with action or glue
+	-- this setting is auto-reset whereas item volume is kept
+	-- which may not be desirable
+	r.SetMediaItemTakeInfo_Value(take, parm, 10^(norm_level/20))
+	return vol_item, vol_take -- to restore if needed
+	else -- restore
+	r.SetMediaItemTakeInfo_Value(take, parm, vol_take)
+	r.SetMediaItemInfo_Value(item, parm, vol_item)
+	r.UpdateItemInProject(item)
+	end
 
 end
 
@@ -15606,6 +16447,65 @@ r.SetMediaItemSelected(item, false) -- selected false // deselect, if was select
 
 end
 
+
+
+function GetSet_Take_PitchShift_Algo(take, algo)
+-- algo is integer corresponding to keys in the table t below
+-- if supplied the algo is set, otherwise got
+local	t = {
+[1]=-65536, -- proj default
+[0]=0, -- SoundTouch
+[2]=2, -- Simple windowed (fast)
+[6]=6, -- Elastique 2.2.8 Pro
+[7]=7, -- ~ Efficient
+[8]=8, -- ~ Soloist
+[9]=9, -- ~ 3.3.3 Pro
+[10]=10, -- ~ Efficient
+[11]=11, -- ~ Soloist
+[13]=13, -- Rubber Band Library
+[14]=14, -- Rrreeeaaa
+[15]=15 -- ReaReaRea
+}
+	if algo and t[algo] then
+	r.SetMediaItemTakeInfo_Value(take, 'I_PITCHMODE', algo == 1 and t[algo] or t[algo]<<16) -- shifter default settings
+	else
+	local shifter = r.GetMediaItemTakeInfo_Value(take, 'I_PITCHMODE')
+	return shifter < 0 and 1 or shifter>>16 -- project default is -65536 so return 1
+	end
+end
+
+
+
+function Item_Lane_Plays(item)
+local Get = r.GetMediaItemInfo_Value
+return Get(item, 'I_FIXEDLANE'), Get(item, 'C_LANEPLAYS') > 0
+end
+
+
+
+function Build_Peak_Files_For_Sel_Items(want_sel_tracks) -- used in Load_Track_Template()
+-- if want_sel_tracks is true rebuilds for all items on selected tracks,
+-- otherwise for the currently selected items;
+-- if rebuilding for items on selected tracks, relies on Re_Store_Selected_Items2() function
+
+	if not r.GetSelectedMediaItem(0,0) and not want_sel_tracks then return end
+
+	if not want_sel_tracks then
+	r.Main_OnCommand(40245, 0) -- Peaks: Build any missing peaks for selected items
+	return end
+	
+local t = Re_Store_Selected_Items2() -- deselects all after storing
+
+		for i=0, r.CountSelectedTracks(0)-1 do
+		local tr = r.GetSelectedTrack(0,i)
+			for i=0, r.CountTrackMediaItems(tr)-1 do
+			r.SetMediaItemSelected(r.GetTrackMediaItem(tr, i), true) -- selected true
+			end
+		end
+
+Re_Store_Selected_Items2(t)
+
+end
 
 
 
@@ -16211,14 +17111,59 @@ end
 --======================= M A R K E R S  &  R E G I O N S ==========================
 
 
---local retval, isrgn, pos, rgnend, name, markID, color = r.EnumProjectMarkers3(0, i)
-function is_region_within_time_sel(start, fin, pos, rgnend)
--- start/fin are of time sel, pos/rgnend are of the region
-local start, fin = r.GetSet_LoopTimeRange(false, false, 0, 0, false) -- isSet, isLoop  false; start, end - 0, allowautoseek false
-local time_sel = start ~= fin
-	if time_sel then
-	return pos >= start and pos <= fin or rgnend >= start and rgnend <= fin
-	end
+
+function collect_regions_as_markers(want_reverse, time_init)
+-- storing regions start and end times separately,
+-- instead of traversing them in the timeline order
+-- based on their start point
+-- which results in ealier regions end points getting
+-- priority over later regions end points even if
+-- later regions end ponints are earlier on the time line 
+-- as is the case with overlapping or enclosed regions,
+-- so instead of looking for the time properties based on
+-- the index, run the function and look for the index based
+-- on the time properties;
+-- want_reverse is boolean, if valid, the table is sorted
+-- in descending order, otherwise in ascending;
+-- time_init is optional, if valid only regions following
+-- or preceding that time position (depending on want_reverse arg)
+-- will be collected
+
+local init_pos = init_pos or not want_reverse and 0 or r.GetProjectLength(0)
+local i, t = 0, {}
+	repeat
+	local retval, isrgn, pos, rgnend, name, num = r.EnumProjectMarkers(i)
+		if retval > 0 and isrgn
+		and (want_reverse and (rgnend <= init_pos or pos <= init_pos)
+		or not want_reverse and (pos >= init_pos or rgnend >= init_pos))
+		then
+		table.insert(t,{idx=i, pos=pos})
+		table.insert(t,{idx=i, pos=rgnend})
+		end
+	i=i+1
+	until retval == 0
+	
+--[[ OR
+local proj_end = r.GetProjectLength(0)
+local init_pos = init_pos or not want_reverse and 0 or proj_end
+local t = {seen={}}
+	repeat
+	local mrkr_idx, reg_idx = r.GetLastMarkerAndCurRegion(0, init_pos)	
+		if reg_idx > -1 and not t.seen[reg_idx] then -- only unique indices
+		local retval, isrgn, pos, rgnend, name, num = r.EnumProjectMarkers(reg_idx)
+		table.insert(t,{idx=reg_idx, pos=pos})
+		table.insert(t,{idx=reg_idx, pos=rgnend})
+		t.seen[reg_idx] = ''
+		end
+	init_pos = init_pos + (not want_reverse and 0.1 or -0.1) -- decrement by 100 ms
+	until not want_reverse and init_pos >= proj_end or init_pos <= 0
+--]]
+	
+table.sort(t, 
+function(a, b) return want_reverse and a.pos > b.pos or not want_reverse and a.pos < b.pos end)
+
+return t
+
 end
 
 
@@ -16263,6 +17208,8 @@ end
 
 
 function GetRegionAtCursor()
+-- including when the cursor is aligned with region end
+-- which is ignore by GetLastMarkerAndCurRegion()
 local cur_pos = r.GetCursorPosition()
 local _, regionidx = r.GetLastMarkerAndCurRegion(0, cur_pos) -- returns -1 if not preceded by any marker/region contrary to the API doc according to which the return value may be NULL
 	if regionidx == -1 then
@@ -16316,13 +17263,28 @@ end
 
 
 
+function Get_Next_Prev_Region(cur_pos, want_next)
+-- want_next is boolean
+local incr = want_next and 0.1 or -0.1
+local i, proj_len = 0, r.GetProjectLength(0)
+	repeat	
+	cur_pos = cur_pos+incr -- increment by 100 ms until a region is found
+	local mrkr_idx, reg_idx = r.GetLastMarkerAndCurRegion(0, cur_pos)
+		if reg_idx > -1 then return reg_idx end
+	i=i+1
+	until reg_idx > -1 or want_next and cur_pos >= proj_len
+	or not want_next and cur_pos <= 0 -- if not found stop at the end/start of the project depending on direction
+end
+
+
+
 
 function Get_Marker_Reg_At_Time_OR_Mouse_Or_EditCursor(time, want_mouse, want_next_prev_reg)
 -- can be used to get marker/region at time or edit/mouse cursor
 -- if time is false/nil
 -- without the need to traverse all of them
--- if want_mouse is true, relies on Get_TCP_MCP_Under_Mouse()
--- if want_next_prev_reg is integer 1 next, -1 prev
+-- if want_mouse is true, relies on Get_TCP_MCP_Under_Mouse(),
+-- want_next_prev_reg is integer, 1 next, -1 prev
 -- to return either next or previous region, if any,
 -- when there's no region at time/cursor
 
@@ -16417,6 +17379,18 @@ function Delete_Marker_Region_At_Time(time, want_region)
 		-- local t = {r.EnumProjectMarkers3(0, idx)}
 		-- r.DeleteProjectMarker(0, t[6], want_region)
 		end
+	end
+end
+
+
+
+--local retval, isrgn, pos, rgnend, name, markID, color = r.EnumProjectMarkers3(0, i)
+function is_region_within_time_sel(start, fin, pos, rgnend)
+-- start/fin are of time sel, pos/rgnend are of the region
+local start, fin = r.GetSet_LoopTimeRange(false, false, 0, 0, false) -- isSet, isLoop  false; start, end - 0, allowautoseek false
+local time_sel = start ~= fin
+	if time_sel then
+	return pos >= start and pos <= fin or rgnend >= start and rgnend <= fin
 	end
 end
 
@@ -17050,36 +18024,42 @@ function Get_Ruler_Lane_Count(want_visible)
 
 	-- only supported since build 7.62
 	if not r.GetRegionOrMarker then return end
-
-r.PreventUIRefresh(1)
-local index = r.AddProjectMarker(0, false, 0, 0, '', 0xFFFF) -- isrgn false, pos 0, rgnend 0, wantidx 0xFFFF, to be able to easily find it for deletion // insert temp marker
-local obj = r.GetRegionOrMarker(0, 0, '') -- index 0, guidStr empty
-r.SetRegionOrMarkerInfo_Value(0, obj, 'B_HIDDEN', 1) -- hide, although not strictly necessary thanks to PreventUIRefresh()
-local parm = 'I_LANENUMBER'
-local lane_idx_init = r.GetRegionOrMarkerInfo_Value(0, obj, parm)
+	
 local lane_count
-	for i=100,0,-1 do
-	r.SetRegionOrMarkerInfo_Value(0, obj, parm, i)
-	local lane_idx = r.GetRegionOrMarkerInfo_Value(0, obj, parm)
-		if lane_idx ~= lane_idx_init then
-		-- if the very last lane is default for markers, the temp marker will be inserted there
-		-- and during the loop will only be able to move to a lane at a lower index,
-		-- in which case fall back on the original lane index as the heighest
-		lane_count = lane_idx < lane_idx_init and lane_idx_init or lane_idx
-		break
+	
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.71 then
+	lane_count = r.GetSetProjectInfo(0, 'RULER_LANE_COUNT', 0, false) -- is_set false
+	else
+	r.PreventUIRefresh(1)
+	local index = r.AddProjectMarker(0, false, 0, 0, '', 0xFFFF) -- isrgn false, pos 0, rgnend 0, wantidx 0xFFFF, to be able to easily find it for deletion // insert temp marker
+	local obj = r.GetRegionOrMarker(0, 0, '') -- index 0, guidStr empty
+	r.SetRegionOrMarkerInfo_Value(0, obj, 'B_HIDDEN', 1) -- hide, although not strictly necessary thanks to PreventUIRefresh()
+	local parm = 'I_LANENUMBER'
+	local lane_idx_init = r.GetRegionOrMarkerInfo_Value(0, obj, parm)
+	local lane_count
+		for i=100,0,-1 do
+		r.SetRegionOrMarkerInfo_Value(0, obj, parm, i)
+		local lane_idx = r.GetRegionOrMarkerInfo_Value(0, obj, parm)
+			if lane_idx ~= lane_idx_init then
+			-- if the very last lane is default for markers, the temp marker will be inserted there
+			-- and during the loop will only be able to move to a lane at a lower index,
+			-- in which case fall back on the original lane index as the heighest
+			lane_count = lane_idx < lane_idx_init and lane_idx_init or lane_idx
+			break
+			end
 		end
+	r.DeleteProjectMarker(0, index, false) -- isrgn false // delete temp marker
+	--r.UpdateTimeline() -- required for proper UI update after change, but unnecessary due to PreventUIRefresh()
+	r.PreventUIRefresh(-1)
+
+	-- if there's one lane only the temp marker won't be able to move anywhere
+	-- hence fall back on its original lane index
+	lane_count = (lane_count or lane_idx_init)+1 -- +1 because lane index returned by GetRegionOrMarkerInfo_Value is 0-based
 	end
-r.DeleteProjectMarker(0, index, false) -- isrgn false // delete temp marker
---r.UpdateTimeline() -- required for proper UI update after change, but unnecessary due to PreventUIRefresh()
-r.PreventUIRefresh(-1)
-
--- if there's one lane only the temp marker won't be able to move anywhere
--- hence fall back on its original lane index
-lane_count = (lane_count or lane_idx_init)+1 -- +1 because lane index returned by GetRegionOrMarkerInfo_Value is 0-based
-
+	
 local t = {}
 	for i=0, lane_count-1 do
-		if want_visible and r.GetSetProjectInfo(0, 'RULER_LANE_HIDDEN:'..i, 0, false) == 0
+		if want_visible and r.GetSetProjectInfo(0, 'RULER_LANE_HIDDEN:'..i, 0, false) == 0 -- is_set false
 		or not want_visible
 		then
 		t[#t+1] = i
@@ -17172,10 +18152,9 @@ function Refresh_Ruler_Height()
 -- to use with Ruler Lanes API in cases where lanes order isn't
 -- properly refreshed even despite r.UpdateTimeline()
 -- which could be caused by unnamed lanes
--- bug report https://forum.cockos.com/showthread.php?t=307633
+-- bug report https://forum.cockos.com/showthread.php?t=307633 (resolved by 7.71 at the latest)
 -- PreventUIRefresh should not be used here
 -- at the expense of barely noticeable ruler jolts;
--- relies on Get_Ruler_Lane_Count() function
 
 	-- only supported since build 7.62
 	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62 then return end
@@ -17194,7 +18173,8 @@ function Set_Ruler_Height(ruler_h_init)
 -- stems from r.GetSetProjectInfo(0, 'RULER_HEIGHT', 0, false) -- isSet false
 -- which must be queried before change is effected
 -- and the function run after r.UpdateTimeline()
--- which isn't reliable in refreshing ruler height
+-- which isn't reliable in refreshing ruler height,
+-- relies on Get_Ruler_Lane_Count()
 
 	-- only supported since build 7.62
 	if tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62 then return end
@@ -17391,6 +18371,21 @@ local Get = r.GetRegionOrMarker
 		end
 	end
 
+end
+
+
+
+function Set_Project_Tempo_And_TimeSig(timepos, bpm, timesig_num, timesig_denom)
+-- https://github.com/reaper-oss/sws/issues/2019#issuecomment-4401975459
+-- only works and makes sense if there're no tempo markers (changes) in the project,
+-- otherwise if placed between existing tempo markers 
+-- causes gradual tempo change between them
+-- and there's no way to programmatically uncheck 'Gradually transition tempo to next marker'
+-- option in the tempo marker dialogue which is auto-activated between adjacent markers 
+	if r.CountTempoTimeSigMarkers(0) == 0 then
+	r.SetTempoTimeSigMarker(0, -1, timepos, -1, -1, bpm, timesig_num, timesig_denom, true) -- ptidx -1 (insert new), measurepos, beatpos -1 (ignore), lineartempo true
+	r.DeleteTempoTimeSigMarker(0, 0)
+	end
 end
 
 
@@ -17950,7 +18945,13 @@ toolbar = {'toolbar', 'wnd_vis', 'dock'} -- Toolbar: Open/close toolbar X ('Tool
 }
 
 
-function Get_Mixer_Wnd_Dock_State(wnd_ident_t, wantDockPos) -- get Mixer dock state WHEN the SWS extension IS NOT INSTALLED to verify whether there're other windows sharing a docker with the Mixer in the split mode and so whether its full window width can be used; returns false if there's a window which shares a docker with the Mixer, otherwise true
+function Get_Mixer_Wnd_Dock_State(wnd_ident_t, wantDockPos) 
+-- get Mixer dock state WHEN the SWS extension IS NOT INSTALLED 
+-- to verify whether there're other windows sharing a docker 
+-- with the Mixer in the split mode and so whether 
+-- its full window width can be used; 
+-- returns false if there's a window which shares a docker with the Mixer, 
+-- otherwise true
 
 -- dockermode of closed docked windows isn't updated, so when the Mixer doesn't share docker with any other windows
 -- in the split mode at a given moment because these windows are closed, to ensure that its full width, obtained with
@@ -18017,6 +19018,7 @@ local mixer_dock_pos = cont:match('dockermode'..mixer_dockermode..'=(%d+)') -- g
 return true
 
 end
+
 
 
 local wnd_ident_t = { -- to be used with Detect_Docker_Pane_Change(), Get_Mixer_Width()
@@ -20372,7 +21374,9 @@ end
 function Invalid_Script_Name1(scr_name,...)
 -- check if necessary elements are found in script name, case agnostic
 -- if more than 1 match is needed run twice or more times with different sets of elements which are supposed to appear in the same name, but elements within each set must not be expected to appear in the same name, that is they must be mutually exclusive
--- if running twice or more times the error message and Rep() function must be used outside of this function after expression 'if no_elm1 or no_elm2 then'
+-- if running twice or more times the error message and Rep() function must be used outside of this function after expression 'if no_elm1 or no_elm2 then';
+-- if elements are patterns or contain patterns Esc() function 
+-- in scr_name:lower():match(Esc(elm:lower())) should not be used
 
 local t = {...}
 
@@ -20419,7 +21423,9 @@ function Invalid_Script_Name2(scr_name,...)
 -- check if necessary elements are found in script name, case agnostic
 -- if more than 1 match is needed, run twice or more times with different sets of elements which are supposed to appear in the same name, but elements within each set must not be expected to appear in the same name, that is they must be mutually exclusive
 -- if running twice or more times the error message and Rep() function must be used outside of this function after expression 'if no_elm1 or no_elm2 then'
--- or run inline, see example attached to Invalid_Script_Name3 below
+-- or run inline, see example attached to Invalid_Script_Name3 below;
+-- if elements are patterns or contain patterns Esc() function 
+-- in scr_name:lower():match(Esc(elm:lower())) should not be used
 
 	if scr_name then
 	local t = {...}
@@ -20444,7 +21450,9 @@ end
 
 
 function Invalid_Script_Name3(scr_name,...)
--- check if necessary elements, case agnostic, are found in script name and return the one found
+-- check if necessary elements, case agnostic, are found in script name and return the one found;
+-- if elements are patterns or contain patterns Esc() function 
+-- in scr_name:lower():match(Esc(elm:lower())) should not be used
 
 	if scr_name then
 	local t = {...}
@@ -20498,6 +21506,7 @@ local keyword = Invalid_Script_Name3(scr_name, 'right', 'left', 'up', 'down')
 
 
 function Dir_Exists1(path) -- see version 2 below
+-- WINDOWS ONLY, see Dir_Exists3() below
 -- check if directory exists, if not returns nil, if yes and no files - empty string
 -- 2nd return value error message, if no match then nil
 -- path is a directory path, not file
@@ -20525,17 +21534,50 @@ end
 
 
 function Dir_Exists2(path) -- short
+-- WINDOWS ONLY, see Dir_Exists3() below
 -- path is a directory path, not file
 local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
-local sep = path:match('[\\/]') or '/' -- extract the separator, if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
-	if not sep then return end -- likely not a string representing a path
+local sep = path:match('[\\/]') or '/' -- extract the separator
+	if not sep then
+		-- if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
+		if path:match('^%u:$') then sep = '/'
+		else return -- likely not a string representing a path
+		end
+	end	
 local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed so the path is properly formatted for io.open()
 local _, mess = io.open(path)
 return #path:gsub('[%c%.]', '') > 0 and mess and mess:match('Permission denied') and path..sep -- dir exists // this one is enough HOWEVER THIS IS ALSO THE RESULT IF THE path var ONLY INCLUDES DOTS, therefore gsub ensures that besides dots there're other characters
 end
 
 
+
+function Dir_Exists3(path)
+-- CROSS-PLATFORM
+local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
+local sep = path:match('[\\/]')
+	if not sep then
+		-- if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
+		if path:match('^%u:$') then sep = '/'
+		else return -- likely not a string representing a path
+		end
+	end
+path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed so the path is properly formatted for io.open() and os.rename()
+local OS = r.GetAppVersion()
+local win = not OS:match('/') or OS:match('/x')
+	if win then
+	local _, mess = io.open(path)
+	return #path:gsub('[%c%.]', '') > 0 and mess and mess:match('Permission denied') and path..sep -- dir exists // this one is enough HOWEVER THIS IS ALSO THE RESULT IF THE path var ONLY INCLUDES DOTS, therefore gsub ensures that besides dots there're other characters
+	else
+	-- on Windows this doesn't work for directories in REAPER but works with external Lua runtimes, in ZeroBrane for example
+	local ok, mess, code = os.rename(path, path)
+	return (ok or code == 13) and path..sep -- 13 is error code for 'exists but permission denied' on some systems
+	end
+end
+
+
+
 function File_Exists1(path)
+-- WINDOWS ONLY, see Fle_Exists3() below
 local f, mess = io.open(path, 'r')
 	if mess and mess:match('No such file or directory') then return
 	else f:close() return true
@@ -20544,6 +21586,7 @@ end
 
 
 function File_Exists2(path)
+-- WINDOWS ONLY, see Fle_Exists3() below
 local f, mess = io.open(path, 'r')
 	if f then f:close()
 	elseif mess and mess:match('No such file or directory') then return
@@ -20552,7 +21595,14 @@ return true
 end
 
 
-function File_Exists3(name, path, ext, sep)
+function File_Exists3(path)
+-- CROSS-PLATFORM
+local ok, mess, code = os.rename(path, path)
+return (ok or code == 13) and path -- 13 is error code for 'exists but permission denied' on some systems
+end
+
+
+function File_Exists4(name, path, ext, sep)
 local sep = sep or path:match('[\\/]')
 local path = path:match('.+[\\/]$') and path or path..sep -- add trailing separator if not included
 return package.searchpath(name, path..'?.'..ext)
@@ -20560,7 +21610,7 @@ end
 
 
 function file_exists_alt(path) -- a fix for the buggy ReaScript API function
--- file_exists() returns true if passed a file name only and a file with the same name
+-- file_exists() returns true if only a file name is passed and the file with the same name
 -- is found in the current working directory
 -- https://forum.cockos.com/showthread.php?t=300386
 -- so must be additionaly validated
@@ -20569,7 +21619,6 @@ function file_exists_alt(path) -- a fix for the buggy ReaScript API function
 	return
 	end
 end
-
 
 
 function make_file_name_unique(f_path) -- see also resolve_file_name_collision() below
@@ -21463,19 +22512,26 @@ end
 
 
 
-function META_Spawn_Scripts(fullpath, scr_name, names_t)
+function META_Spawn_Scripts1(fullpath, scr_name, names_t)
 -- fullpath is get_action_context() return value
 -- scr_name is META script name
 -- names_t is a table containing individual script names
 -- if not supplied or empty the names are searched in the script header
--- names in the header must not have trailing spaces
+-- names in the header must not have trailing spaces;
+-- scripts installation path is requested from the user, see version 2 below
 
-	local function Dir_Exists(path) -- short
-	local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces
-	local sep = path:match('[\\/]') or '/' -- extract the separator, if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
-	local path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed to return 1 (valid)
-	local _, mess = io.open(path)
-	return mess:match('Permission denied') and path..sep -- dir exists // this one is enough
+	local function Dir_Exists(path)
+	local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
+	local sep = path:match('[\\/]')
+		if not sep then
+			-- if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
+			if path:match('^%u:$') then sep = '/'
+			else return -- likely not a string representing a path
+			end
+		end
+	path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed so the path is properly formatted for os.rename()
+	local ok, mess, code = os.rename(path, path)
+	return (ok or code == 13) and path..sep -- 13 is error code for 'exists but permission denied' on some systems
 	end
 
 	local function Esc(str)
@@ -21560,6 +22616,129 @@ USE:
 	if not META_Spawn_Scripts(fullpath, FULL_META_SCRIPT_NAME, names_t) -- fullpath stems from get_action_context()
 	then return r.defer(no_undo) end -- abort if META script but continue if not
 ]]
+
+
+
+function META_Spawn_Scripts2(fullpath, fullpath_init, scr_name, names_t)
+-- META script path is automatically used as installation path for individual scripts
+
+	local function Dir_Exists(path) -- ONLY NEEDED IF SCRIPTS INSTALLATION PATH IS PROVIDED BY THE USER, which is disabled in this function and META script path is used automatically
+	local path = path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
+	local sep = path:match('[\\/]')
+		if not sep then
+			-- if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
+			if path:match('^%u:$') then sep = '/'
+			else return -- likely not a string representing a path
+			end
+		end
+	path = path:match('.+[\\/]$') and path:sub(1,-2) or path -- last separator is removed so the path is properly formatted for os.rename()
+	local ok, mess, code = os.rename(path, path)
+	return (ok or code == 13) and path..sep -- 13 is error code for 'exists but permission denied' on some systems
+	end
+
+	local function Esc(str)
+		if not str then return end -- prevents error
+	-- isolating the 1st return value so that if vars are initialized in a row outside of the function the next var isn't assigned the 2nd return value
+	local str = str:gsub('[%(%)%+%-%[%]%.%^%$%*%?%%]','%%%0')
+	return str
+	end
+	
+	local function script_is_installed(fullpath)
+	local sep = r.GetResourcePath():match('[\\/]')
+		for line in io.lines(r.GetResourcePath()..sep..'reaper-kb.ini') do
+		local path = line and line:match('.-%.lua["%s]*(.-)"?')
+			if path and #path > 0 and fullpath:match(Esc(path)) then -- installed 
+			return true end
+		end
+	end
+
+		if not fullpath:match(Esc(scr_name)) then return true end -- will prevent running the function in individual scripts, but allow their execution to continue if the META script isn't functional (doesn't include a menu), if it is - other means of management are employed in the main routine
+
+local names_t, content = names_t
+
+	if not names_t or #names_t == 0 then -- if names table isn't supplied search names list in the header
+	-- load this script
+	local this_script = io.open(fullpath, 'r')
+	content = this_script:read('*a')
+	this_script:close()
+	names_t, found = {}
+		for line in content:gmatch('[^\n\r]+') do
+			if line and line:match('Provides:') then found = 1 end
+			if found and line:match('%.lua') then
+			names_t[#names_t+1] = line:match('.+[/](.+[%w])') or line:match('BuyOne.+[%w]') -- in case the new script name line includes a subfolder path, the subfolder won't be created, trimming trailing spaces if any because they invalidate file path
+			elseif found and #names_t > 0 then
+			break -- the list has ended
+			end
+		end
+	end
+
+	if names_t and #names_t > 0 then
+	
+--[[ GETTING PATH FROM THE USER INPUT
+
+	r.MB('              This meta script will spawn '..#names_t
+	..'\n\n     individual scripts included in the package'
+	..'\n\n     after you supply a path to the directory\n\n\t    they will be placed in'
+	..'\n\n\twhich can be temporary.\n\n           After that the spawned scripts'
+	..'\n\n will have to be imported into the Action list.','META',0)
+	
+	local ret, output -- to be able to autofill the dialogue with last entry on RELOAD
+	
+	::RETRY::
+	ret, output = r.GetUserInputs('Scripts destination folder', 1,
+	'Full path to the dest. folder, extrawidth=200', output or '')
+
+		if not ret or #output:gsub('[%s%c]','') == 0 then return end -- must be aborted outside of the function
+
+	local path = Dir_Exists(output) -- validate user supplied path
+		if not path then Error_Tooltip('\n\n invalid path \n\n', 1, 1) -- caps, spaced true
+		goto RETRY end
+	]]	
+	
+		-- load this script if wasn't loaded above to parse the header for file names list
+		if not content then
+		local this_script = io.open(fullpath, 'r')
+		content = this_script:read('*a')
+		this_script:close()
+		end
+
+	local path = fullpath:match('(.+[\\/])') -- WHEN NOT GETTING PATH FROM USER INPUT, USE META SCRIPT PATH
+		
+		------------------------------------------------------------------------------------
+		-- spawn scripts
+		-- NO USER SETTINGS
+		for k, scr_name in ipairs(names_t) do	
+		local new_script = io.open(path..scr_name, 'w') -- create new file
+	--	content = content:gsub('ReaScript name:.-\n', 'ReaScript name: '..scr_name..'\n', 1) -- replace script name in the About tag // commented out to keep META script original name in the header so user can find it later and re-generate individual scripts if needed
+		new_script:write(content)
+		new_script:close()
+		end
+		-- THERE'RE USER SETTINGS OR THE META SCRIPT IS ALSO FUNCTIONAL SO FILES AREN'T UNNECESSARILY CREATED WHEN IT RUNS
+		for k, scr_name in ipairs(names_t) do
+			if not r.file_exists(path..scr_name) then -- only spawn if doesn't already exist, this is meant to prevent accidental overwriting of custom USER SETTINGS in individial scripts OR writing to disk each time META script is run if it's equipped with a menu // if spawned script update is required it must be done via installer script, or manually by copy and paste, or by deleting it and running this script
+			local new_script = io.open(path..scr_name, 'w') -- create new file
+			content = content:gsub('ReaScript name:.-\n', 'ReaScript name: '..scr_name..'\n', 1) -- replace script name in the About tag  // commented out to keep META script original name in the header so user can find it later and re-generate individual scripts if needed
+			new_script:write(content)
+			new_script:close()
+			end
+		end
+		--------------------------------------------------------------------------------------
+		
+		-- CONDITION BY THE SCRIPT BEING INSTALLED TO OTHERWISE ALLOW SPAWNING SCRIPTS WITH INSTALLER SCRIPT VIA dofile() WITHOUT INSTALLATION ONLY FOR THE SAKE OF SETTINGS TRANSFER WHICH IS SUPPOSED TO BE DONE WHILE THE SCRIPT IS IN A TEMP FOLDER, get_action_context() alone is useless as a condition since when this script is executed via dofile() from the installer script the function returns props of the latter
+	--	if script_is_installed(fullpath) then -- install individual scripts
+	-- OR, which is more efficient, in the scenario described above this condition will be false
+		if fullpath_init:match('.+[\\/](.+)') == scr_name then -- install individual scripts
+			for _, sectID in ipairs{0,32060,32061,32062,32063} do -- Main, MIDI Ed, MIDI Evnt List, Media Ex, Inline MIDI Ed // per script list
+				for k, scr_name in ipairs(names_t) do
+				local result = r.AddRemoveReaScript(true, sectID, path..scr_name, true) -- add, commit true // doesn't affect the props of an already installed script if attempts to install it again, so is safe
+				end
+			end
+		end
+		
+	end
+
+end
+
 
 
 
@@ -22141,7 +23320,10 @@ end
 
 
 function Get_Arrange_Dims()
--- for complete info requires SWS or js_ReaScriptAPI extensions
+-- to account for pinned tracks since build 7.46 use Get_Pinned_Tracks_Height()
+-- for complete info requires SWS or js_ReaScriptAPI extensions;
+-- see Get_Arrange_Height()
+
 local sws, js = r.BR_Win32_FindWindowEx, r.JS_Window_Find
 	-- OR
 	-- local sws, js = r.APIExists('BR_Win32_FindWindowEx'), r.APIExists('JS_Window_Find')
@@ -22149,7 +23331,7 @@ local sws, js = r.BR_Win32_FindWindowEx, r.JS_Window_Find
 	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.62 -- this may be supported in earlier builds as well, but unclear how far back
 	and not sws and not js then
 	local Get = r.GetSetProjectInfo
-	local arrange_h = Get(0, 'ARRANGE_H', 0, false) -- is_set false
+	local arrange_h = Get(0, 'ARRANGE_H', 0, false) -- is_set false // doesn't account for pinned tracks, introduced in build 7.46
 	return arrange_h
 	elseif sws or js then -- if SWS/js_ReaScriptAPI ext is installed
 	-- thanks to Mespotine https://github.com/Ultraschall/ultraschall-lua-api-for-reaper/blob/master/ultraschall_api/misc/misc_docs/Reaper-Windows-ChildIDs.txt
@@ -22162,7 +23344,7 @@ local sws, js = r.BR_Win32_FindWindowEx, r.JS_Window_Find
 	local retval, lt2, top2, rt2, bot2 = table.unpack(sws and {r.BR_Win32_GetWindowRect(main_wnd)} or js and {r.JS_Window_GetRect(main_wnd)})
 	local top2 = top2 == -4 and 0 or top2 -- top2 can be negative (-4) if window is maximized
 	local arrange_h, header_h, wnd_h_offset = bot1-top1-17, top1-top2, top2 -- arrange_h tends to be 1 px smaller than the one obtained via calculations following 'View: Toggle track zoom to maximum height' when extensions aren't installed, using 16 px instead of 17 fixes the discrepancy; header_h is distance between arrange and program window top; wnd_h_offset is a coordinate of the program window top which is equal to its distance from the screen top (Y coordinate 0) when shrunk // !!!! MAY NOT WORK ON MAC since there Y axis starts at the bottom
-	return arrange_h, header_h, wnd_h_offset
+	return arrange_h, header_h, wnd_h_offset -- no account for pinned tracks, introduced in build 7.46
 	end
 end
 
@@ -22194,15 +23376,30 @@ local max_zoom = not max_zoom and 100 or math.floor(max_zoom*100+0.5) -- ignore 
 local act = r.Main_OnCommand
 local GetTrackVal = r.GetMediaTrackInfo_Value
 
-local scroll_to_tr = r.GetTrack(0,0) -- track (any) to scroll back to in order to restore scroll state after track heights restoration
-local scroll_to_tr_y = GetTrackVal(scroll_to_tr, 'I_TCPY')
+local pinned_tracks = r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
+
+-- select track (any) to scroll back to in order to restore scroll state after track heights restoration
+local scroll_to_tr
+	if pinned_tracks then -- search among non-pinned tracks because those cannot be scrolled
+		for i=0, r.GetNumTracks()-1 do
+		local tr = r.GetTrack(0,i)
+			if GetTrackVal(tr, 'B_TCPPIN') == 0 then
+			scroll_to_tr = tr break
+			end
+		end
+	else -- pinned tracks state is overridden, so any one will do
+	scroll_to_tr = r.GetTrack(0,0)
+	end
+
+local scroll_to_tr_y = scroll_to_tr and GetTrackVal(scroll_to_tr, 'I_TCPY')
 
 -- Store track heights and get reference track
 -- to scroll back to in order to restore scroll state after track heights restoration
 -- since ref_tr is also used to get Arrange height, look for one with fixed lanes disabled (in v7)
 -- because in these 100% height is allocated to just one lane
 -- rather than to the entire TCP, so if there're more than one,
--- the I_TCPH value will be equal 100 * lane count
+-- the I_TCPH value will be equal 100 * lane count;
+-- pinned reference track is not allowed because these cannot be zoomed in with the action
 local v7 = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7
 local t, ref_tr = {} -- ref_tr is used to get Arrange height
 	for i=0, r.CountTracks(0)-1 do
@@ -22210,15 +23407,15 @@ local t, ref_tr = {} -- ref_tr is used to get Arrange height
 	local TCP_H = GetTrackVal(tr, 'I_TCPH')
 	t[#t+1] = TCP_H
 		-- in version 7 look for track with multi-lanes disabled or collapsed
-		if v7 and ( GetTrackVal(tr,'I_NUMFIXEDLANES') == 1
-		or GetTrackVal(tr,'C_LANESCOLLAPSED') == 1 )
+		if v7 and GetTrackVal(tr, 'B_TCPPIN') == 0 
+		and ( GetTrackVal(tr,'I_NUMFIXEDLANES') == 1 or GetTrackVal(tr,'C_LANESCOLLAPSED') == 1)
 		or not v7 then
 		ref_tr = ref_tr or tr -- once found keep the value
 		end
 	end
 
 local temp_tr
-	if not ref_tr then -- possible in version 7 if all tracks have fixed lanes enabled, may be false if optional targ_t doesn't have fixed lanes enabled
+	if not ref_tr then -- possible in version 7 if all tracks have fixed lanes enabled, and since build 7.62 if there's no non-pinned tracks, may be kept false without creation of the temp track if optional targ_tr doesn't have fixed lanes enabled and is not pinned
 	-- insert new track
 	r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefault false
 	ref_tr = r.GetTrack(0,r.GetNumTracks()-1)
@@ -22227,26 +23424,21 @@ local temp_tr
 
 -- Get the data
 -- When the actions are applied the UI jolts, but PreventUIRefresh() is not suitable because it blocks the function GetMediaTrackInfo_Value() from getting the return value
--- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled;
--- in v7 action 'View: Toggle track zoom to maximum height (limit to 100% of arrange view)' was introduced
--- which works like 40113 worked before the change and its use would obviate all the calculations below
--- but it obviously doesn't cover the interim builds, so leaving the current code;
--- since build 7.48 the following toggle zoom actions affect pinned tracks as well,
--- introduced in build 7.46, but since their height is being taken into account
--- the calculation must still be accurate
-act(40110, 0) -- View: Toggle track zoom to minimum height
-act(40113, 0) -- View: Toggle track zoom to maximum height [in later builds comment '(limit to 100% of arrange view) has been added' and another action introduced to zoom to maxvzoom value]
+-- toggle to minimum and to maximum height are mutually exclusive // selection isn't needed, all are toggled
+-- bar pinned tracks, introduced in build 7.46, by the action 40113;
+act(40110, 0) -- View: Toggle track zoom to minimum height // affects pinned tracks as well
+act(40113, 0) -- View: Toggle track zoom to maximum height [in later builds comment '(limit to 100% of arrange view)' has been added and another action introduced to zoom to maxvzoom value] // the action doesn't affect pinned tracks
 ------------------------------------
 -- The following is only relevant for a few builds starting from 6.76
 -- in which action 40113 was zooming in to maxvzoom value rather than 100%
 local retval, max_zoom = r.get_config_var_string('maxvzoom')-- min value is 0.125 (13%) which is roughly 1/8th, max is 8 (800%)
 max_zoom = retval and max_zoom*100 or 100 -- ignore in builds prior to 6.76 by assigning 100 so that when track height is divided by 100 and multiplied by 100% nothing changes, otherwise convert to conventional percentage value
-local tr_h = GetTrackVal(ref_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
+local tr_h = GetTrackVal(ref_tr or targ_tr, 'I_TCPH')/max_zoom*100 -- not including envelopes, action 40113 doesn't take envs into account; calculating track height as if it were zoomed out to the entire Arrange height by taking into account 'Maximum vertical zoom' setting at Preferences -> Editing behavior
 
 -- if there're visible pinned tracks at the top (introduced in build 7.46), calculate their height because
 -- their presence affects max track height obtained above
 local pin_tracks_h = 0
-	if r.GetToggleCommandState(43573) == 0 then -- Track: Override/unpin all pinned tracks in TCP
+	if pinned_tracks then
 		for i=0, r.GetNumTracks()-1 do
 		local tr = r.GetTrack(0,i)
 			if r.IsTrackVisible(tr, false) -- mixer false
@@ -22279,19 +23471,32 @@ local del = temp_tr and r.DeleteTrack(temp_tr) -- delete temp track if one was i
 r.TrackList_AdjustWindows(true) -- isMinor is true // updates TCP only https://forum.cockos.com/showthread.php?t=208275
 
 -- Restore scroll position or scroll the zoomed-in targ_tr to top
-r.PreventUIRefresh(1)
-r.CSurf_OnScroll(0, -1000) -- scroll all the way up as a preliminary measure to simplify scroll pos restoration because in this case you only have to scroll in one direction so no need for extra conditions
-local Y_init = 0
-	repeat -- restore track scroll
-	r.CSurf_OnScroll(0, 1) -- 1 vert scroll unit is 8 px
-	local Y = GetTrackVal(scroll_to_tr, 'I_TCPY')
-		if Y ~= Y_init then Y_init = Y else break end -- when the track list is scrolled all the way down and the script scrolls up the loop tends to become endless because for some reason the 1st track whose Y coord is used as a reference can't reach its original pos, this happens regardless of the preliminary scroll direction above, therefore exit loop if it's got stuck, i.e. Y value hasn't changed in the next cycle; this doesn't affect the actual scrolling result, tracks end up where they should // unlike track size value, track Y coordinate accessibility for monitoring isn't affected by PreventUIRefresh()
-	until Y <= scroll_to_tr_y
-r.PreventUIRefresh(-1)
+	if scroll_to_tr then
+	r.PreventUIRefresh(1)
+	r.CSurf_OnScroll(0, -1000) -- scroll all the way up as a preliminary measure to simplify scroll pos restoration because in this case you only have to scroll in one direction so no need for extra conditions
+	local Y_init = 0
+		repeat -- restore track scroll
+		r.CSurf_OnScroll(0, 1) -- 1 vert scroll unit is 8 px
+		local Y = GetTrackVal(scroll_to_tr, 'I_TCPY')
+			if Y ~= Y_init then Y_init = Y else break end -- when the track list is scrolled all the way down and the script scrolls up the loop tends to become endless because for some reason the 1st track whose Y coord is used as a reference can't reach its original pos, this happens regardless of the preliminary scroll direction above, therefore exit loop if it's got stuck, i.e. Y value hasn't changed in the next cycle; this doesn't affect the actual scrolling result, tracks end up where they should // unlike track size value, track Y coordinate accessibility for monitoring isn't affected by PreventUIRefresh()
+		until Y <= scroll_to_tr_y
+	r.PreventUIRefresh(-1)
+	end
 
 return tr_h
 
 end
+
+
+
+function Get_Arrange_Height()
+-- relies on GetSet_Track_Zoom_100_Perc() and Get_Pinned_Tracks_Height()
+local old_builds = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.62
+local arrange_h = old_builds and GetSet_Track_Zoom_100_Perc() -- accounts for pinned tracks
+or r.GetSetProjectInfo(0, 'ARRANGE_H', 0, false) -- is_set false, doesn't account for pinned tracks 
+return arrange_h-(old_builds and 0 or Get_Pinned_Tracks_Height()) -- height of the pinned tracks area or 0 if nothing is pinned or the feature isn't supported
+end
+
 
 
 
@@ -22437,6 +23642,27 @@ Top_area_h -- OPTIONAL, can be changed on a case by case basis, see above
 end
 
 
+
+function mouse_pos2time_1()
+-- https://old.reddit.com/r/Reaper/comments/1tupudj/how_do_i_stretch_successive_items_across_time/
+local x = r.GetMousePosition()
+-- Convert current screen X position to arrange-view time.
+return r.GetSet_ArrangeView2(0, false, x, x+1, 0, 0) -- isSet false
+end
+
+
+function mouse_pos2time_2()
+local curs_pos = r.GetCursorPosition() -- store current edit curs pos
+r.PreventUIRefresh(1)
+r.Main_OnCommand(40514,0) -- View: Move edit cursor to mouse cursor (no snapping) // more sensitive than with snapping // works along the entire screen Y axis outside of the TCP regardless of whether the program window is under the mouse
+local mouse_pos = r.GetCursorPosition()
+r.SetEditCurPos(curs_pos, false, false) -- moveview, seekplay false // restore orig. edit curs pos
+r.PreventUIRefresh(1)
+return mouse_pos
+end
+
+
+
 function pixel_to_sec(val) -- converts interval in pixels to interval in seconds, val can be either integer or decimal number
 return val/r.GetHZoomLevel()
 end
@@ -22536,6 +23762,8 @@ function Adjust_Velocity_By_dB(vel, dB)
 -- only relevant for plugins using normalized scale (0..1) for gain interpolation
 -- first or all ReaPlugs (RS5k, ReaSynth)
 -- https://dobrian.github.io/cmp/topics/linear-mapping-and-interpolation/1.IntroductionToLinearInterpolation&LinearMapping.html
+-- the function doesn't account for 'Min volume' other than -Inf
+-- and 'Velocity minimum' other than 1;
 -- Thanks to Justin
 -- https://www.askjf.com/index.php?q=6883s
 -- ReaPlugs velocity to amplitude
@@ -22553,7 +23781,8 @@ gain_db = log10(sc)*20; // convert scale to dB
 -- vel is current velocity
 -- dB is negative or positive value to increase/reduce the current value by
 -- thus the entire velocity range only covers dynamic range of 42 dB from -42 to 0 dB (7 velocity ranges 6 dB each)
--- the accuracy confirmed with ReaSynth and RS5k against 'Loudness Meter' JSFX output
+-- the accuracy confirmed with ReaSynth and RS5k against 'Loudness Meter' JSFX output,
+-- all lower values are clamped to the lowest supported gain
 
 local vel_to_dB = math.log(vel/127,10)*20 -- vel/127 calculates the scale or the percentage of the full scale taken up by the current value or their ratio, which is the same as (vel - min val) / (max val - min val), formula for calculation of linear interpolation, (vel - 0) / (127 - 0)
 local new_dB_val = vel_to_dB + dB
@@ -22561,7 +23790,7 @@ local dB_to_vel = 10^(new_dB_val/20)*127
 local target_vel = math.floor(dB_to_vel+0.5) -- round since velocity cannot be fractional
 -- return accounting for NaN (not a number) and infinity, resulting from division by 0
 -- which can be represented as -1.#IND and +/-1.#INF and is not equal to itself,
--- so as long as a value is equal to itself it's valid
+-- so as long as a value is equal to itself it's valid (the rule may not work)
 -- https://stackoverflow.com/questions/19107302/in-lua-what-is-inf-and-ind
 -- https://stackoverflow.com/questions/37753694/lua-check-if-a-number-value-is-nan
 return target_vel == target_vel and target_vel or 0
@@ -23890,6 +25119,7 @@ local output = Reload_Menu_at_Same_Pos(menu)
 
 
 
+
 function Toggle_Setting_From_Menu(sett_name, scr_path)
 -- sett_name is a string;
 -- scr_path comes from get_action_context();
@@ -24651,7 +25881,11 @@ end
 
 
 local _, scr_name, sect_ID, cmd_ID, _,_,_ = r.get_action_context()
-function Re_Set_Toggle_State(sect_ID, cmd_ID, toggle_state) -- in deferred scripts can be used to set the toggle state on start and then with r.atexit and At_Exit_Wrapper() to reset it on script termination
+function Re_Set_Toggle_State(sect_ID, cmd_ID, toggle_state) -- in deferred scripts can be used to set the toggle state on start and then with r.atexit and At_Exit_Wrapper() or without the wrapper to reset it on script termination
+-- also see https://github.com/ReaTeam/ReaScripts-Templates/blob/master/Templates/X-Raym_Background%20script.lua
+-- but in X-Raym's template get_action_context() isn't used also outside of the function
+-- it's been noticed that if it is, then inside a function it won't return proper values
+-- so my version accounts for this issue
 r.SetToggleCommandState(sect_ID, cmd_ID, toggle_state)
 r.RefreshToolbar(cmd_ID)
 end
@@ -24997,7 +26231,48 @@ end
 
 
 
-function GetUserInputs_Alt(title, field_cnt, field_names, field_cont, separator, comment_field, comment, empty_comm_fields)
+function GetUserInputs_Alt1(title, field_cnt, field_names, field_cont, comment_field, comment) -- see a more comprehensive version 2 below
+-- title string, field_cnt integer, field_names string comma delimited
+-- the length of field names list should obviously match field_cnt arg
+-- it's more reliable to contruct a table of names and pass the two vars as #t, t
+-- field_cont empty string unless they must be initially filled
+-- to fill out only specific fields precede them with as many commas
+-- as the number of fields which must stay empty
+-- in which case it's a comma delimited list
+-- comment_field is boolean, comment is string to be displayed in the comment field
+
+	if field_cnt == 0 then return end
+
+	local function add_commas(field_cnt, field_prop)
+	-- add delimiting commas when they're fewer than field_cnt
+	-- due to lacking field names or field content
+	local _, comma_cnt = field_prop:gsub(',','')
+	return comma_cnt == field_cnt-1 and field_prop
+	or comma_cnt < field_cnt-1 and field_prop..(','):rep(field_cnt-1-comma_cnt)
+	end
+
+local field_names = type(field_names) == 'table' and table.concat(field_names,',') or field_names
+field_names = add_commas(field_cnt, field_names)
+local field_cont = add_commas(field_cnt, field_cont)
+local comment = comment_field and #comment > 0 and comment or ''
+local field_cnt = #comment > 0 and field_cnt+1 or field_cnt
+field_names = #comment > 0 and field_names..',Comment:' or field_names
+field_cont = #comment > 0 and field_cont..','..comment or field_cont
+local ret, output = r.GetUserInputs(title, field_cnt, field_names..',extrawidth=150', field_cont)
+output = #comment > 0 and output:match('(.+,)') or output -- exclude comment field keeping delimiter (comma) to simplify captures in the loop below
+field_cnt = #comment > 0 and field_cnt-1 or field_cnt -- adjust for the next statement
+	if not ret or (field_cnt > 1 and #output:gsub(' ','') == (','):rep(field_cnt-1)
+	or #output:gsub(' ','') == 0) then return end
+local t = {}
+	for s in output:gmatch('(.-),') do
+		if s then t[#t+1] = s end
+	end
+return t, output:match('(.+),') or output -- remove hanging comma if there was a comment field, to simplify re-filling the dialogue in case of reload, when there's a comment the comma will be added with it
+end
+
+
+
+function GetUserInputs_Alt2(title, field_cnt, field_names, field_cont, separator, comment_field, comment, empty_comm_fields)
 -- title string, field_cnt integer which can be smaller or greater
 -- than the number of fields in field_names arg, in which case fields will
 -- be subtracted, or added but without names, if 0 <= field_cnt
@@ -27248,6 +28523,16 @@ local map_t = {}
 	nxt = shared_range and (note_idx == 127 and note_idx or note_idx+up) or k==#t and nxt -- when shared_range is false, in the last cycle select 127 which will be assigned to nxt var above to fill up the range from the last sample up
 	table.insert(map_t, {root=note_idx, lokey=prev, hikey=nxt or note_idx}) -- if shared_range arg is true, nxt will be false until the last cycle of the loop
 	end
+	
+	
+--[[ -- CONTROL
+	for i=1, #map_t, 1 do
+	local root, st, fin = map_t[i].root, map_t[i].lokey, map_t[i].hikey
+Msg(root, 'root')
+Msg(st, 'st')
+Msg(fin,'fin')
+	end
+--]]
 
 -- the root/start/end note indices can then be converted into plugin control settings
 -- such as Pitch@start, Note start, Note end of RS5k
@@ -27456,7 +28741,7 @@ return fx
 end
 -- USE:
 -- local fx = FX_Select_Function_Type1(track or take)
--- fx.AddByName() fx.CopyToTake() etc.
+-- fx.AddByName(take, name, instantiate) fx.CopyToTake(tr, fx_idx1, take, fx_idx2, false) etc.
 
 
 
@@ -27477,7 +28762,7 @@ function FX_Select_Function_Type2()
 local t = {'AddByName','CopyToTake','CopyToTrack','Delete','EndParamEdit','FormatParamValue','FormatParamValueNormalized','GetChainVisible','GetCount','GetEnabled','GetEQ','GetEQBandEnabled','GetEQParam',tr and 'GetFXEnvelope' or take 'GetEnvelope','GetFloatingWindow','GetFXGUID','GetFXName','GetIOSize','GetNamedConfigParm','GetNumParams','GetOffline','GetOpen','GetParam','GetParameterStepSizes','GetParamEx','GetParamFromIdent','GetParamIdent','GetParamName','GetParamNormalized','GetParamSectionName','GetPinMappings','GetPreset','GetPresetIndex','GetRecChainVisible','GetRecCount','GetUserPresetFilename','NavigatePresets','SetEnabled','SetEQBandEnabled','SetEQParam','SetNamedConfigParm','SetOffline','SetOpen','SetParam','SetParamNormalized','SetPinMappings','SetPreset','SetPresetByIndex','Show'
 }
 
---[[ -- SEE USAGE INTHE LOOP BELOW
+--[[ -- SEE USAGE IN THE LOOP BELOW
 	local function sel(name)
 	-- the function has to be returned as anonymous so that it's not executed during table construction,
 	-- data passed as the 'name' argument being an upvalue will be stored inside the returned function
@@ -27495,7 +28780,7 @@ local t = {'AddByName','CopyToTake','CopyToTrack','Delete','EndParamEdit','Forma
 
 local fx = {}
 	for k, name in ipairs(t) do
-	fx[name] = 	function(...) 
+	fx[name] = 	function(...)
 					-- the 'name' var is stored inside the function and contcatenated on the fly 
 					-- the moment the stored function is executed
 					-- i.e. fx.AddByName(),
@@ -27516,7 +28801,7 @@ return fx
 end
 -- USE:
 -- fx = FX_Select_Function_Type2() -- run once at the beginning of the script
--- fx.AddByName() fx.CopyToTake() etc.
+-- fx.AddByName(tr or take, name, instantiate) fx.CopyToTake(tr or take, fx_idx1, take, fx_idx2, false) etc.
 
 
 
@@ -27524,7 +28809,7 @@ function Obj_Select_Function_Type()
 -- to target functions geared towards item, track, take or envelope;
 -- after execution, the functions can be accessed
 -- with the syntax obj[function_name] or obj.function_name
--- using function names listed in the table t below
+-- using function names used as keys in the table t below
 -- including the commented out;
 -- obviously both arguments and return values remain 
 -- as required by the ReaScript API;
@@ -27613,6 +28898,38 @@ end
 -- USE:
 -- obj = Obj_Select_Function_Type() -- run once at the beginning of the script
 -- obj.Count(1, 0), obj.Get(2, 0, 0), obj.GetHost(item) etc.
+
+
+
+function set_loop_direction(st, fin, condition)
+-- condition being true sets descending loop order (i.e. in reverse);
+-- returns start, end and direction
+return table.unpack(not condition and {st, fin, 1} or {fin, st, -1})
+-- OR
+-- local a, b = not condition and math.min or math.max, not condition and math.max or math.min
+-- return a(st, fin), b(st, fin), b(1, -1)
+--[[ -- OR
+a, b = math.min, math.max
+	if condition then a, b = b, a end
+return a(st, fin), b(st, fin), b(1, -1)
+--]]
+end
+
+
+
+function is_key_down(vk_code)
+-- https://old.reddit.com/r/Reaper/comments/1tupudj/how_do_i_stretch_successive_items_across_time/
+-- https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes
+local state = reaper.JS_VKeys_GetState(0.1)
+return state and state:byte(vk_code) ~= 0
+end
+
+
+
+function mouse_cursor_moved(x, y)
+local a, b = r.GetMousePosition()
+return x and a ~= x or y and b ~= y
+end
 
 
 
@@ -28029,6 +29346,21 @@ return '0x'..hex
 end
 -- for inverse operation: hex 2 dec
 -- dec = tonumber(hex:match('0x(%x+)'), 16) -- OR hex:sub(3) // hex string sans 0x
+
+
+
+function hexToBinary(hex)
+-- https://www.youtube.com/watch?v=VjHX4tYL3PM
+local str = ""
+hex = hex:gsub("%s+", "") -- Remove spaces
+	if (#hex % 2 ~= 0) then return nil end
+	for pair in hex:gmatch("..") do
+	  local num = tonumber(pair, 16)
+	  if num then str = str .. string.char(num) end
+	end
+return str
+end
+
 
 
 function char_to_bytes(char)
@@ -28572,10 +29904,15 @@ tr == r.GetMasterTrack(0)
 -- Functions to get track index
 
 
-reaper.CSurf_TrackToID(track, boolean mcpView) -- if mcpView is true returns -1 if the track is inside a collapsed MCP folder or explicitly hidden in the Mixer, doesn't depend on the track state in Arrange
+reaper.CSurf_TrackToID(track, mcpView) -- if mcpView is true returns -1 if the track is inside a collapsed MCP folder or explicitly hidden in the Mixer, doesn't depend on the track state in Arrange
 
 reaper.GetMediaTrackInfo_Value(tr, 'IP_TRACKNUMBER')
 
+-- in CSurf_TrackToID() mcpView arg being true only makes sense when the option 'Auto-arrange tracks in Mixer'
+-- is disabled, because only in this case track order specific to the Mixer matters
+-- the argument value may be fashioned by evaluating the option state, i.e.
+-- reaper.CSurf_TrackToID(track, reaper.GetToggleCommandStateEx(0, 41146) == 0) -- Mixer: Toggle autoarrange
+-- if true the returned index will pertain to tracklist order in the Mixer
 
 --===================================================================================
 
@@ -28589,9 +29926,13 @@ reaper.GetTrack(0, idx)
 
 -- store selected track pointer irrespective of its selection
 
-tr = reaper.CSurf_TrackToID(r.GetSelectedTrack(0,0), false) -- false is mcpView
+tr = reaper.CSurf_TrackFromID(idx, false) -- false is mcpView
 tr = reaper.GetTrack(0, tr-1)
 
+-- in CSurf_TrackToID() mcpView arg being true only makes sense when the option 'Auto-arrange tracks in Mixer'
+-- is disabled, because only in this case track order specific to the Mixer matters
+-- the argument value may be fashioned by evaluating the option state, i.e.
+-- reaper.CSurf_TrackToID(track, reaper.GetToggleCommandStateEx(0, 41146) == 0) -- Mixer: Toggle autoarrange
 
 --===================================================================================
 
@@ -28642,6 +29983,16 @@ reaper.SetTrackColor(tr, r.ColorToNative(r,g,b)|0x100000)
 
 -- Functions to get track visibility
 
+-- When a folder parent track is hidden with actions / Track Manager, its children
+-- get auto-hidden as well, but can be unhidden individually UNLESS the track is a child 
+-- in a collapsed folder in the Mixer or in Arrange provided hidden state
+-- is enabled in Preferences -> Appearance -> Track Control Panels -> Folder collapse button cycles track heights:;
+-- with the API (un)hiding is always individual OTHER THAN in the above scenarios of collapsed folder;
+-- when a parent track of a collapsed folder is hidden via the API
+-- its children tracks become visibly hidden as well but their programmatic 
+-- visibility status doesn't change, so the API will indicate their visibiliy 
+-- unless hidden explicitly
+
 local ret, flags = r.GetTrackState(tr)
 local TCP_vis = flags&512 ~= 512 -- 512 is hidden from TCP
 local MCP_vis = flags&1024 ~= 1024 -- 1024 is hidden from MCP
@@ -28654,6 +30005,9 @@ local MCP_vis = r.IsTrackVisible(tr, true) -- mixer true
 -- not for the Master track
 local TCP_vis = r.GetMediaTrackInfo_Value(tr, 'B_SHOWINTCP') -- returns 1 if true, 0 is false
 local MCP_vis = r.GetMediaTrackInfo_Value(tr, 'B_SHOWINMIXER') -- returns 1 if true, 0 is false
+
+-- in the Mixer either hidden or inside a collapsed folder
+r.CSurf_TrackToID(tr, true) == -1
 
 -- to change visiblity
 
@@ -28707,8 +30061,13 @@ reaper.SelectAllMediaItems(0, true)
 
 r.GetParentTrack(tr)
 
-local idx = r.GetMediaTrackInfo_Value(tr, 'P_PARTRACK') -- returns track index
-local parent = r.CSurf_TrackFromID(idx, false) -- mpcview false
+local parent = r.GetMediaTrackInfo_Value(tr, 'P_PARTRACK') -- returns numeric pointer
+local parent = r.CSurf_TrackFromID(idx, false) -- mpcView false
+
+-- in CSurf_TrackToID() mcpView arg being true only makes sense when the option 'Auto-arrange tracks in Mixer'
+-- is disabled, because only in this case track order specific to the Mixer matters
+-- the argument value may be fashioned by evaluating the option state, i.e.
+-- reaper.CSurf_TrackToID(track, reaper.GetToggleCommandStateEx(0, 41146) == 0) -- Mixer: Toggle autoarrange
 
 --===================================================================================
 
@@ -28907,6 +30266,18 @@ local proj_media_path = r.GetProjectPath('') -- for unsaved projects returns def
 
 --===================================================================================
 
+-- Functions to get track envelope by name
+
+r.GetMediaTrackInfo_Value(tr, 'P_ENV:<VOLENV')
+r.GetTrackEnvelopeByName(tr, 'VOLENV')
+-- VOLENV, VOLENV2, VOLENV3, PANENV, PANENV2, DUALPANENVL, DUALPANENV,
+-- DUALPANENVL2, DUALPANENV2, WIDTHENV, WIDTHENV2, MUTEENV,
+-- AUXVOLENV, AUXPANENV, AUXMUTEENV, TEMPOENVEX, MASTERVOLENV,
+-- MASTERPANENV, MASTERVOLENV2, MASTERPANENV2, MASTERVOLENV3,
+-- MASTERWIDTHENV, MASTERWIDTHENV2, MASTERPLAYSPEEDENV
+
+--===================================================================================
+
 -- As yet undocumented track parameter P_BUFSTATS
 
 reaper.GetSetMediaTrackInfo_String(tr,"P_BUFSTATS","",false)
@@ -28919,7 +30290,7 @@ reaper.GetSetMediaTrackInfo_String(tr,"P_BUFSTATS","",false)
 
 -- Schwa: You should always call PreventUIRefresh(1) to initiate and PreventUIRefresh(-1) to end
 
--- https://forum.cockos.com/showthread.
+-- https://forum.cockos.com/showthread.php?p=2297817
 
 --===================================================================================
 
@@ -29069,9 +30440,10 @@ S T R I N G S
 	string2bytes_2
 	add_zero_padding
 	wrap_text
+	Text_Wrap
 	numerate_instances
 	sanitize_string_for_menu
-	Construct_Roman_Numerals
+	Construct_Roman_Numerals	
 
 
 T A B L E S
@@ -29234,12 +30606,14 @@ T R A C K S
 	Insert_Delete_Temp_Track
 	insert_get_delete_bckgrnd_track
 	Get_Vis_TCP_Tracklist_Length_px_X_Topmost_Track
+	Get_Pinned_Tracks_Height
 	Scroll_Track_To_Top1
 	Scroll_Track_To_Top2
 	Scroll_Track_To_Top3
 	Scroll_Track_To_Bottom
 	Scroll_Track_Into_View
 	Scroll_Visible_Track_Into_View
+	Scroll_MCP_Into_View
 	Un_Collapse_All_Tracks_Temporarily
 	Create_Buss_Track
 	Find_And_Get_New_Tracks
@@ -29258,14 +30632,17 @@ T R A C K S
 	Get_Track_MIDI_Note_Names
 	GetTrackState
 	GetTrackTree
-	Fixed_Lane_Comping_Enabled
 	Get_Last_Sel_or_Last_Track
 	In_Visible_Tracks_Exist1
 	In_Visible_Tracks_Exist2
+	Is_Track_Within_View_In_TCP
 	Get_Last_Touched_Fixed_Item_Lane
 	Get_Index_of_Fixed_Item_Lane_Under_Mouse
+	Fixed_Lane_Comping_Enabled
+	Get_Track_Active_Lane
 	Insert_New_Track
 	Create_Track_Template
+	track_TCP_likely_dragged
 
 
 S E N D S / R E C E I V E S
@@ -29301,7 +30678,10 @@ F O L D E R S
 	Find_Last_Uncollapsed_MCP_Parent
 	Get_Parent_Of_MCP_First_Uncollapsed_Folder1
 	Get_Parent_Of_MCP_First_Uncollapsed_Folder2
+	Get_Parent_Of_MCP_First_Uncollapsed_Folder3
+	get_top_parent
 	Get_All_Descendants
+	get_folder_tracks
 	Get_All_Relatives
 	Is_TCP_MCP_Collapsed
 	Dismantle_FolderOrSubfolder
@@ -29319,6 +30699,7 @@ F O L D E R S
 
 E N V E L O P E S
 
+	Visible_Track_Envelopes_Exist
 	Is_Valid_Envelope
 	Is_Env_Visible
 	Set_Env_In_Visible
@@ -29349,6 +30730,7 @@ E N V E L O P E S
 	Check_env_scaling
 	Active_Track_Envelopes_Exist1
 	Active_Track_Envelopes_Exist2
+	Get_EnvCP_Min_Height
 
 
 A U T O M A T I O N  I T E M S
@@ -29417,7 +30799,7 @@ F X
 	GetLastTouchedFX1
 	GetLastTouchedFX2
 	Collect_FX_Output_Data
-	Is_TrackFX_Open
+	Is_FX_Open
 	Count_FX
 	Get_FX_Env_Src_Parameter	
 	Check_FX_In_Focused_FX_Chain
@@ -29434,7 +30816,7 @@ F X
 	RS5k_Force_Undo_With_Closed_Chain
 	RS5k_Calculate_Sample_Length
 	RS5k_Get_Note_Range
-	RS5k_Calculate_Sample_Playing_Time_At_Pitch
+	RS5k_Calculate_Sample_Playing_Time_At_Pitch	
 	Get_FX_Selected_In_FX_Chain
 	Set_FX_Selected_In_FX_Chain
 	GetSet_FX_Selected_In_FX_Chain	
@@ -29448,6 +30830,7 @@ F X
 	Get_FX_Parm_By_Name_Or_Ident
 	Get_FX_Type
 	Plugin_Is_Instrument
+	FX_Enabled
 	Is_Same_Plugin
 	Validate_FX_Identity
 	Get_Open
@@ -29457,6 +30840,7 @@ F X
 	Find_Video_Proc_Instance
 	Collect_FX_Parm_Aliases
 	Get_FX_Wet_Delta_Params
+	Move_FX_At_Index_To_Slot_N
 
 
 I T E M S
@@ -29492,7 +30876,8 @@ I T E M S
 	Insert_Empty_Item_To_Display_Text2
 	Insert_Image
 	Insert_Temp_Item
-	Insert_Item_On_Temp_Track
+	Insert_Item_On_Temp_Track1
+	Insert_Item_On_Temp_Track2
 	Get_Item_Edge_At_Mouse
 	Get_Sel_Items_St_And_End
 	Is_Same_Items_Track
@@ -29540,8 +30925,15 @@ I T E M S
 	Convert_Empty_Take_To_Valid_Take
 	Get_Set_Take_Channels
 	Find_Level_Relative_To_Thresh_In_Take
+	Calculate_Take_RMS_Loudness
+	Get_Audio_Peak_In_Take
+	Audio_Take_Too_Quiet_Or_Loud
+	Normalize_Take
 	Toggle_Take_Offline
 	Toggle_Item_Takes_Offline
+	GetSet_Take_PitchShift_Algo
+	Item_Lane_Plays
+	Build_Peak_Files_For_Sel_Items
 
 
 C O L O R
@@ -29580,13 +30972,15 @@ C L O S U R E S
 
 M A R K E R S  &  R E G I O N S
 
-	is_region_within_time_sel
+	collect_regions_as_markers
 	get_region_at_edit_or_mouse_cursor
 	GetRegionAtCursor
 	Get_Marker_Reg_At_Mouse_Or_EditCursor
+	Get_Next_Prev_Region
 	Get_Marker_Reg_At_Time_OR_Mouse_Or_EditCursor
 	Get_Marker_Region_At_Time
 	Delete_Marker_Region_At_Time
+	is_region_within_time_sel
 	Get_Marker_Reg_In_Time_Sel
 	Remove_All_Proj_Markers
 	Store_Delete_Restore_Proj_Markers
@@ -29614,6 +31008,7 @@ M A R K E R S  &  R E G I O N S
 	Set_Ruler_Height
 	Get_Marker_Region_True_Visibility
 	Is_Valid_Marker_Region
+	Set_Project_Tempo_And_TimeSig
 
 
 G F X
@@ -29713,9 +31108,11 @@ F I L E S
 	Invalid_Script_Name3
 	Dir_Exists1
 	Dir_Exists2
+	Dir_Exists3
 	File_Exists1
 	File_Exists2
 	File_Exists3
+	File_Exists4
 	file_exists_alt
 	make_file_name_unique
 	create_unique_time_based_ID
@@ -29753,7 +31150,8 @@ F I L E S
 	Get_File_Cont
 	Get_Or_Create_Dummy_Project_File1
 	Get_Or_Create_Dummy_Project_File2
-	META_Spawn_Scripts
+	META_Spawn_Scripts1
+	META_Spawn_Scripts2
 	GetActionCommandIDByFilename
 	Get_CommID_By_Script_Name
 	Get_Set_Script_Cont
@@ -29785,6 +31183,7 @@ M E A S U R E M E N T S / C A L C U L A T I O N S
 	Get_Vis_Arrange_Len_In_Pixels
 	Get_Arrange_Dims
 	GetSet_Track_Zoom_100_Perc
+	Get_Arrange_Height
 	Get_Proj_Len_In_Px
 	Beat_To_Pixels
 	Grid_Div_Dur_In_Sec
@@ -29796,6 +31195,8 @@ M E A S U R E M E N T S / C A L C U L A T I O N S
 	frames2ms
 	frames2sec
 	time_pos_to_pixels
+	mouse_pos2time_1
+	mouse_pos2time_2
 	pixel_to_sec
 	Horiz_Scroll_Distance
 	Get_Screen_Dims
@@ -29886,7 +31287,8 @@ U T I L I T Y
 	Bump_Proj_Change_Cnt
 	EvaluateTAG
 	is_tbl_or_ptr_or_fnc
-	GetUserInputs_Alt
+	GetUserInputs_Alt1
+	GetUserInputs_Alt2
 	Get_Type_Of_Action
 	Get_Armed_Action
 	Condition_Action_By_Armed_State
@@ -29970,6 +31372,9 @@ U T I L I T Y
 	FX_Select_Function_Type1
 	FX_Select_Function_Type2
 	Obj_Select_Function_Type
+	set_loop_direction
+	is_key_down
+	mouse_cursor_moved
 	get_Lua_bitdepth
 	get_system_bitdepth1
 	get_system_bitdepth2
