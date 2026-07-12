@@ -2031,7 +2031,7 @@ local line = ''
 --Msg(line:gsub('\n',''))
 		else break end
 	until not line
--- return STAFF
+-- return STUFF
 end
 
 
@@ -11168,6 +11168,54 @@ end
 
 
 
+function Get_FX_Container_Chunk(obj, cont_idx)
+-- supported since 7.06;
+-- relies on GetObjChunk2() and Esc();
+-- the retured chunk ends with the GUID of container at cont_idx
+-- which is short of the full chunk which also includes 
+-- WAK and optional attributes such as PARALLEL
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+local GetGUID, GetParm = table.unpack(take and {r.TakeFX_GetFXGUID, r.TakeFX_GetNamedConfigParm} 
+or {r.TrackFX_GetFXGUID, r.TrackFX_GetNamedConfigParm})
+local ret, chunk = GetObjChunk2(obj)
+
+	if ret == 'err_mess' then return end
+
+local GUID_start = GetGUID(obj, cont_idx) -- container GUID
+local ret, idx = GetParm(obj, cont_idx, 'container_item.0') -- get index of the 1st fx inside container
+	
+	if not ret then return end -- OR idx == '' // container is empty
+	
+local GUID_end = GetGUID(obj, idx) -- GUID of the first fx inside the container
+
+local t = {}
+	for line in chunk:gmatch('[^\n\r]+') do
+		if line then t[#t+1] = line end
+	end
+	
+-- extract container chunk parsing from its GUID backwards
+-- while counting other GUIDs which the loop comes across
+-- until the GUID of the first fx inside the container is found
+local fx_counter, cont_chunk, found = 0, ''
+	for i=#t,1,-1 do
+	local line  = t[i]
+		if line:match(Esc(GUID_start)) then found = 1
+		cont_chunk = line
+		elseif found then
+		cont_chunk = line..'\n'..cont_chunk
+			if line:match(Esc(GUID_end)) then found = 2 
+			elseif found == 2 and line:match('<CONTAINER') then break
+			end
+		end
+	end
+
+return cont_chunk
+
+end
+
+
+
 function Exclude_FX_Containers_From_Chunk(chunk)
 -- leaves behind last lines not enclosed within closures
 --[[
@@ -11614,6 +11662,15 @@ end
 
 
 
+function Is_FX_Chain_Open(obj)
+local validate = r.ValidatePtr
+local tr, take = validate(obj, 'MediaTrack*'), validate(obj, 'MediaItem_Take*')
+local Open = take and r.TakeFX_GetChainVisible or tr and r.TrackFX_GetChainVisible
+return Open(obj) ~= -1
+end
+
+
+
 function Is_FX_Open(obj, fx_index) -- open in the fx chain and in a floating window
 local validate = r.ValidatePtr
 local tr, take = validate(obj, 'MediaTrack*'), validate(obj, 'MediaItem_Take*')
@@ -11691,7 +11748,7 @@ end
 
 
 
-function Check_FX_In_Focused_FX_Chain(take, track, fx_idx) -- whether any plugin contains presets
+function Check_Presets_In_FX_In_Focused_FX_Chain(take, track, fx_idx) -- whether any plugin contains presets
 -- take is evaluated first because if take is true track is true as well
 -- fx_idx is used to condition targeting input/Monitoring fx since their index format is different
 local GetCount, GetPresetIndex, GetFXName = table.unpack(take and {r.TakeFX_GetCount, r.TakeFX_GetPresetIndex, r.TakeFX_GetFXName} or track and {fx_idx < 16777216 and r.TrackFX_GetCount or r.TrackFX_GetRecCount, r.TrackFX_GetPresetIndex, r.TrackFX_GetFXName} or {})
@@ -13350,6 +13407,35 @@ r.TrackList_AdjustWindows(false) -- update both TCP and MCP
 
 end
 
+
+
+function Get_FX_Selected_In_Container(obj, cont_idx)
+-- find the FX currently selected in the open innermost container
+-- because as of build 7.77 there's no API to get index 
+-- of FX inside a container whose UI is displayed in the FX chain;
+-- relies on Get_FX_Container_Chunk()
+
+local chunk = Get_FX_Container_Chunk(obj, cont_idx)
+
+	if not chunk then return end
+
+-- get simple index of the fx currently selected in the container
+local sel_fx = chunk:match('SHOW (%d+)') -- since SHOW value is 1-based, 0 means container is empty; LASTSEL attribute isn't suitable because it lists 0 both when container is empty and when the 1st fx is last selected
+
+	if sel_fx == '0' then return end -- empty container
+
+sel_fx = sel_fx-1 -- convert to 0-based
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+GetParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
+local ret, sel_fx_idx = GetParm(obj, cont_idx, 'container_item.'..sel_fx) -- get continer based index of the selected fx, i.e. with added 0x200000
+
+	-- verify if it's a nested container
+	if Get_FX_Type(obj, sel_fx_idx) ~= 'Container' then return sel_fx_idx
+	else -- if nested container
+	return Get_FX_Selected_In_Container(obj, sel_fx_idx) -- go recursive
+	end
+
+end
 
 
 
@@ -27998,26 +28084,36 @@ local sett_flags, sort_flag
 			if sett_flags and sort_flag then break end
 		end
 	end
-sett_flags = tonumber(sett_flags)
-local t = {}
-	-- the power values are arranged in the order of settings reflected in the list below
-	for k,  power in ipairs({0,1,7,8,10,9,6,2,5}) do
-	local bit = 2^power
-	-- some flags are set when the setting is disabled
-	-- therefore inequality must be evaluated rather than equality
-		if power == 0 or power == 7 or power == 9 or power == 5 then
-		t[k] = sett_flags&bit == bit
-		else -- flags which are set when the setting is disabled
-		-- but since we're collecting truth when a setting is enabled
-		-- what's evaluated is inequality, which will be true when a setting is enabled
-		t[k] = sett_flags&bit ~= bit
+	
+	if not sett_flags and not sort_flag then return end -- 'flags' and 'sort' keys are absent in reaper.ini if the manager has never been used, i.e. usually in the fresh install	
+	
+local t
+
+	if sett_flags then
+	t = {}
+		sett_flags = tonumber(sett_flags)
+		-- the power values are arranged in the order of settings reflected in the list below
+		for k,  power in ipairs({0,1,7,12,8,10,9,6,2,5}) do
+		local bit = 2^power
+		-- some flags are set when the setting is disabled
+		-- therefore inequality must be evaluated rather than equality
+			if power == 0 or power == 7 or power == 9 or power == 5 then
+			t[k] = sett_flags&bit == bit
+			else -- flags which are set when the setting is disabled
+			-- but since we're collecting truth when a setting is enabled
+			-- what's evaluated is inequality, which will be true when a setting is enabled
+			t[k] = sett_flags&bit ~= bit
+			end
 		end
 	end
+
 --[[ the order or the settings in the table, follows the order in Manager from top to bottom:
 'flags' key
 Markers: 1 - unchecked false, checked true
 Regions: 2 - unchecked true, checked false
 Take markers: 128 - unchecked false, checked true
+Selected items only: 2048 - unchecked false, checked true // only makes sense when 'Take markers' is enabled
+Visible lanes only: 4096 - unchecked false, checked true
 List markers, regions and take markers separately: 256 - unchecked true, checked false
 Only display visible take markers in active takes: 1024 - unchecked true, checked false
 Add/remove child tracks to render list when adding/removing folder parent: 512 - unchecked false, checked true
@@ -28043,7 +28139,9 @@ sort flag
 22 - render track list ascending
 23 - info descending
 ]]
+
 return t, sort_flag -- in the table the setting is true if enabled and false if disabled
+
 end
 
 
@@ -28059,6 +28157,9 @@ local found, flags, sorting
 		elseif flags and sorting then break
 		end
 	end
+	
+	if not flags and not sorting then return end -- 'flags' and 'sort' keys are absent in reaper.ini if the manager has never been used, i.e. usually in the fresh install
+	
 local flags_t = {
 [1]=1, -- Markers
 [2]=2, -- Regions
@@ -28069,19 +28170,26 @@ local flags_t = {
 [7]=256, -- List markers, regions and take markers separately
 [8]=512, -- Add/remove child tracks to render list when adding/removing folder parent
 [9]=1024 -- Only display visible take markers in active takes
+[10]=2048 -- Selected items only // only makes sense when 'Take markers' is enabled
+[11]=4096 -- Visible lanes only
 }
-	for k, bit in ipairs(flags_t) do
-	-- bits 1, 32, 128, 512 are set when the setting is enabled
-	-- the rest are set when the corresponding setting is disabled
-	local exp = math.log(bit)/math.log(2)
-	flags_t[k] = (exp == 0 or exp > 1 and exp%2 ~= 0) and (flags+0)&bit == bit -- exp 0,5,7,9
-	or (exp==1 or exp > 0 and exp%2 == 0) and (flags+0)&bit ~= bit -- exp 1,2,6,8,10
+	if flags then
+		for k, bit in ipairs(flags_t) do
+		-- bits 1, 32, 128, 512, 2048, 4096 are set when the setting is enabled
+		-- the rest are set when the corresponding setting is disabled
+		local exp = math.log(bit)/math.log(2) -- exponent, i.e. power to which 2 must be raised to get bit value
+		flags_t[k] = (exp == 0 or exp > 1 and exp%2 ~= 0) and (flags+0)&bit == bit -- exp 0,5,7,9,11,12
+		or (exp==1 or exp > 0 and exp%2 == 0) and (flags+0)&bit ~= bit -- exp 1,2,6,8,10
+		end
 	end
+
 local sort_t = {[0]='col desc',[1]='index asc',[2]='name asc',[3]='start asc',
 [4]='end asc',[5]='len asc',[6]='rend track list desc',[7]='info desc',
 [16]='col asc',[17]='index desc',[18]='name desc',[19]='start desc',
 [20]='end desc',[21]='len desc',[22]='rend track list asc',[23]='info asc'}
-return flags_t, sort_t[sorting+0]
+
+return flags_t, sorting and sort_t[sorting+0]
+
 end
 
 
@@ -30788,6 +30896,7 @@ F X
 	Retrieve_Orig_Plugin_Names
 	Get_FX_Chain_Chunk
 	Get_FX_Chunk
+	Get_FX_Container_Chunk
 	Exclude_FX_Containers_From_Chunk
 	Create_FX_Chain_Preset
 	Apply_FX_Chain
@@ -30799,10 +30908,11 @@ F X
 	GetLastTouchedFX1
 	GetLastTouchedFX2
 	Collect_FX_Output_Data
+	Is_FX_Chain_Open
 	Is_FX_Open
 	Count_FX
-	Get_FX_Env_Src_Parameter	
-	Check_FX_In_Focused_FX_Chain
+	Get_FX_Env_Src_Parameter
+	Check_Presets_In_FX_In_Focused_FX_Chain
 	Check_If_FX_Selected_In_FX_Browser1
 	Check_If_FX_Selected_In_FX_Browser2
 	Check_Selected_FX
@@ -30841,6 +30951,7 @@ F X
 	Collect_FX_Parm_Aliases
 	Get_FX_Wet_Delta_Params
 	Move_FX_At_Index_To_Slot_N
+	Get_FX_Selected_In_Container
 
 
 I T E M S
@@ -30995,8 +31106,7 @@ M A R K E R S  &  R E G I O N S
 	Get_Action_Marker_Data
 	Get_Last_Proj_Mrkr_Pos
 	Fix_Overlapping_Regions
-	Get_Mrkrs_Of_Takes_At_Mouse_Or_Edit_Curs
-	Get_Rgn_Mrkr_Mngr_Settings
+	Get_Mrkrs_Of_Takes_At_Mouse_Or_Edit_Curs	
 	Get_Selected_And_Hidden_Markers_And_Regions
 	Get_Rgn_Marker_TimeLine_Index
 	Get_Populated_Ruler_Lane_Count
