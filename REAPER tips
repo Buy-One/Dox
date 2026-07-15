@@ -6824,23 +6824,25 @@ plugin in the next available slot, depending on the number of occupied slots pas
 -- Attach lyric or any text to a MIDI note event (make the lyric/text display within the note event AND have an associated Notation marker)
 
 
-1. Right click a note in the Piano roll
+1. In the MIDI Editor enable the option View -> Piano roll notes -> Show notation text on notes
 
-2. From the context menu select Notation -> Text/Custom -> Enter text
+2. Right click a note in the Piano roll
 
-3. Write your lyric there for that particular piano note and click OK
+3. From the context menu select Notation -> Text/Custom -> Enter text
+
+4. Write your lyric there for that particular piano note and click OK
 
 The lyric will display within the note event.
 
-4. Select 'Notation Events' from the pop-up MIDI message types menu at the bottom left hand side of the Piano Roll 
+5. Select 'Notation Events' from the pop-up MIDI message types menu at the bottom left hand side of the Piano Roll 
 
-5. Under the note you will see the Notation marker with the lyric which will follow the note when it's moved.
+6. Under the note you will see the Notation marker with the lyric which will follow the note when it's moved.
 
 The advantage of Notation events over Text events is that the latter don't follow the note when it's moved.
 
 
 https://reddit.com/r/Reaper/comments/fyguqt/write_text_into_piano_notes_in_midi_items/
-
+https://www.youtube.com/watch?v=hmckBiE5Qws
 
 =============================================================
 
