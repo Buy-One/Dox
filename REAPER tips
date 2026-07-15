@@ -3798,6 +3798,9 @@ since build 7.40
 https://forum.cockos.com/showthread.php?t=301174
 
 
+5. Since build 7.77 value at key default_media_path= can override default media path
+
+
 ==============================================================
 
 -- Scope of actions 'Item: Propagate to (all) similarly-named items/active takes (on track)'
