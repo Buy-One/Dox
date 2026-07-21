@@ -6536,14 +6536,30 @@ then temporarily lock all items on the hidden tracks and restore their state onc
 Take envelopes cannot read automation items data, so the workaround is to transfer AI automation
 to take envelope by copying and pasting.
 
-1. Insert AI on an empty track.
-2. Right click AI and in the context menu cick 'Delete automation item, preserve points'
-3. Select all points and copy them
-4. Place the edit cursor at the start of item whose take envelope you want to trasfer the AI automation to
-5. Select the target take envelope
-6. Paste with Ctrl+V or via main Edit menu -> Paste
+Saving
 
-points 4 and 5 are crucial
+1. Activate envelope on an empty track
+2. Create an AI whose length equals item's length
+3. Select all take envelope points and copy them
+4. Place the edit cursor exactly at the start of the AI
+5. Select the AI
+6. Paste
+7. Save as a preset
+
+Point 4 and 5 is crucial
+
+
+Loading
+
+1. Activate envelope on an empty track
+2. Add AI preset to the activated envelope
+3. Right click AI and in the context menu click Delete automation item, preserve points
+4. Select all points and copy them
+5. Place the edit cursor at the start of item whose take envelope you want to transfer the AI automation to
+6. Select the target take envelope
+7. Paste
+
+Points 5 and 6 are crucial
 
 demo https://stash.reaper.fm/52064/Use%20AI%20automation%20with%20take%20envelopes.gif
 
