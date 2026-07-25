@@ -7137,7 +7137,8 @@ function Is_Track_Group_Disabled1(group_idx) -- see a more efficient version bel
 
 -- save temporary project file
 -- if project media directory is configured, a media folder will also be created
--- at the temporary path
+-- at the temporary path in all builds older than 7.77
+-- since which folder is only created when media files need to be written
 local sys_temp_folder = os.getenv('TEMP')
 local path = sys_temp_folder..sys_temp_folder:match('[\\/]')..'temp.RPP'
 r.Main_SaveProjectEx(path, 0) -- options is 0, save but not associate the file with the currently open project tab
@@ -9804,6 +9805,63 @@ end
 
 
 
+function Match_Target_AI_Env_Point_Spacing_To_Src_Take_Env(src_take, AI_idx, AI_env) -- after pasting
+-- take env points are always pasted to an AI envelope at playrate 1
+-- disregarding take envelope source take playrate and the AI's own playrate
+-- so to replicate point spacing after pasting their positions must be adjusted
+-- if playrate of the take envelope source take is other than 1;
+-- when envelopes are pasted between AIs, point spacing is always preserved
+-- regardless of the source and the target AI playrates, so point positions
+-- don't need adjustment
+	
+local playrate = r.GetMediaItemTakeInfo_Value(src_take, 'D_PLAYRATE')
+	
+	if playrate ~= 1 then	
+	local GetAI_Info = r.GetSetAutomationItemInfo
+	-- target AI properties
+	local st = GetAI_Info(AI_env, AI_idx, 'D_POSITION', 0, false)
+	local length = GetAI_Info(AI_env, AI_idx, 'D_LENGTH', 0, false)
+		for i = 1, r.CountEnvelopePointsEx(AI_env, AI_idx)-2 do -- excluding 1st and last points which in AI are anchors // the loop direction doesn't matter because the points aren't sorted during the loop, otherwise for playrates < 1 it would have to be run in reverse because the points would be moved forward so the first to move would have to be the last (penultimate in this case) point
+		local ret, pos = r.GetEnvelopePointEx(AI_env, AI_idx, i)
+		pos = pos - st -- convert to pos within AI because AI envelope points position is counted from the project start
+		local pos_percentage = length/100*pos -- or 100/(length/pos) // calculate point position percentage relative to the AI end to then be able to calculate corresponding playrate percentage because full playrate value, i.e. 100%, only applies at the AI end
+		local rate_at_pos = playrate/100*pos_percentage -- calculate the amount of playrate which correponds to the position percentage within the target AI // TARGET AI OWN PLAYRATE DOESN'T MATTER
+		playrate = playrate + (playrate < 1 and rate_at_pos or rate_at_pos*-1) -- since full playrate value, i.e. 100%, only applies at the end of the AI, the closer the point to its start the closer the playrate is to 1, so calculate the playrate which applies at specific point by adding rate_at_pos value to or subtracting from the known playrate depending on the rate value relative to 1, thereby bringing it closer to 1
+		r.SetEnvelopePointEx(AI_env, AI_idx, i, st+pos/playrate, nil, nil, nil, nil, true) -- noSortIn true
+		end
+	r.Envelope_SortPointsEx(AI_env, AI_idx)
+	end
+
+end
+
+
+
+function Match_Target_Take_Env_Point_Spacing_To_Src_Env(src_take, target_take, target_env) -- after pasting
+-- when points are pasted between take envelopes
+-- playrates of both source and target takes affect the point spacing
+-- so in order to reproduce the original points spacing
+-- of the source envelope in the target envelope point positions
+-- need adjustment;
+-- the method is also applicable to adjutment of spacing of points
+-- pasted from an AI envelope with the only difference that AI
+-- own playrate is immaterial because to take envelope AI envelope points 
+-- are always pasted at playrate 1, so src_playrate var must default to 1
+
+local playrate = r.GetMediaItemTakeInfo_Value(target_take, 'D_PLAYRATE')
+local src_playrate = r.GetMediaItemTakeInfo_Value(src_take, 'D_PLAYRATE')
+playrate = playrate/src_playrate
+	for i=0, r.CountEnvelopePoints(target_env)-1 do -- the loop direction doesn't matter because the points aren't sorted during the loop, otherwise for playrate < 1 it would have to be run in reverse because the points would be moved forward so the first to move would have to be the last point
+	local ret, pos, val, shape, tension, sel = r.GetEnvelopePoint(target_env, i)	
+	r.SetEnvelopePoint(target_env, i, pos*playrate, nil, nil, nil, nil, true) -- noSortIn true
+	end
+r.Envelope_SortPoints(target_env)
+r.UpdateItemInProject(r.GetMediaItemTake_Item(target_take))
+
+end
+
+
+
+
 --============================ E N V E L O P E S   E N D ==================================
 
 
@@ -11176,12 +11234,12 @@ function Get_FX_Container_Chunk(obj, cont_idx)
 -- WAK and optional attributes such as PARALLEL
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-local GetGUID, GetParm = table.unpack(take and {r.TakeFX_GetFXGUID, r.TakeFX_GetNamedConfigParm} 
-or {r.TrackFX_GetFXGUID, r.TrackFX_GetNamedConfigParm})
-local ret, chunk = GetObjChunk2(obj)
+local ret, chunk = GetObjChunk2(take and r.GetMediaItemTake_Item(obj) or obj)
 
 	if ret == 'err_mess' then return end
 
+local GetGUID, GetParm = table.unpack(take and {r.TakeFX_GetFXGUID, r.TakeFX_GetNamedConfigParm} 
+or {r.TrackFX_GetFXGUID, r.TrackFX_GetNamedConfigParm})
 local GUID_start = GetGUID(obj, cont_idx) -- container GUID
 local ret, idx = GetParm(obj, cont_idx, 'container_item.0') -- get index of the 1st fx inside container
 	
@@ -13374,7 +13432,7 @@ end
 
 
 function Move_FX_At_Index_To_Slot_N(tr, fx_idx, slot_idx)
--- supported since 7.75;
+-- supported since 7.75, ReaScript API only allows getting the slot but not setting one;
 -- relies on GetObjChunk()2, Get_FX_Chunk(), Esc();
 -- if the slot at slot_idx is already occupied, the FX which occupies it
 -- it automatically moved by REAPER one slot further,
@@ -13411,7 +13469,7 @@ end
 
 function Get_FX_Selected_In_Container(obj, cont_idx)
 -- find the FX currently selected in the open innermost container
--- because as of build 7.77 there's no API to get index 
+-- because as of build 7.77 there's no API to get or set index 
 -- of FX inside a container whose UI is displayed in the FX chain;
 -- relies on Get_FX_Container_Chunk()
 
@@ -13420,7 +13478,7 @@ local chunk = Get_FX_Container_Chunk(obj, cont_idx)
 	if not chunk then return end
 
 -- get simple index of the fx currently selected in the container
-local sel_fx = chunk:match('SHOW (%d+)') -- since SHOW value is 1-based, 0 means container is empty; LASTSEL attribute isn't suitable because it lists 0 both when container is empty and when the 1st fx is last selected
+local sel_fx = chunk:match('SHOW (%d+)') -- since SHOW value is 1-based, 0 means container is empty; LASTSEL attribute isn't suitable because it lists 0 both when container is empty and when the 1st fx is selected
 
 	if sel_fx == '0' then return end -- empty container
 
@@ -18006,7 +18064,10 @@ local Get = r.GetRegionOrMarkerInfo_Value
 	local proj_path, proj_name = table.unpack(r.file_exists(proj_path) and proj_path:match('(.+[\\/])(.+)%.[RrPp]') or {}) -- extract path and name sans extension, if project without project file the result will be nils
 
 		if not proj_path then -- project tab without project file or deleted proj file
-		-- use script path for temp project file
+		-- use script path for temp project file,
+		-- if user has media path configured in the project settings by default
+		-- the media folder will be auto-created at the script path in all builds
+		-- older than 7.77 since which folder is only created when media files need to be written
 		local info = debug.getinfo(1,'S');
 		proj_path = info.source:match('@(.+[\\/])')
 		end
@@ -27006,12 +27067,18 @@ function Get_Tooltip_Settings()
 -- r.get_config_var_string() can be used instead of io.open()
 -- which is preferbale because the key is always present in the RAM
 -- Preferences -> Appearance - Appearance settings - Tooltips:
+
+--[[ INEFFICIENT
 local f = io.open(r.get_ini_file(),'r')
 local cont = f:read('*a')
 f:close()
 local val = cont:match('tooltips=(.-)\n')
 local delay = cont:match('tooltipdelay=(.-)\n') -- likely in ms
-local val, delay = tonumber(val), tonumber(delay)
+--]]
+local ret, val = r.get_config_var_string('tooltips')
+local ret, delay = r.get_config_var_string('tooltipdelay') -- likely in ms
+
+local val, delay = tonumber(val), tonumber(delay) -- OR val+0, delay+0
 local UI, itm_env, env_hov
 -- Thanks to Mespotine
 -- https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
@@ -27020,6 +27087,115 @@ local UI, itm_env, env_hov
 	end
 return UI, itm_env, env_hov, delay
 end
+
+
+
+function Un_Set_MW_Config_Flags(TCP, focused_fx, all_faders, TCP_faders) -- TCP and focused_fx are booleans, all_faders, TCP_faders are for restoration
+-- Preferences -> Editing behavior -> Mouse
+-- 'Ignore mousewheel on all faders'
+-- 'Ignore mousewheel on track panel faders'
+-- Thanks to Mespotine
+-- https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
+	if not all_faders and not TCP_faders then -- clear flags
+	local MW_mode = r.SNM_GetIntConfigVar('mousewheelmode', 0)
+	local all_faders, TCP_faders = MW_mode&2 == 2, MW_mode&4 == 4
+-- https://stackoverflow.com/questions/63158929/how-can-i-clear-multiple-bits-at-once-in-c
+	local MW_mode_new = all_faders and TCP_faders and TCP and MW_mode&~2&~4 -- or MW_mode&~(2|4)
+	or all_faders and focused_fx and MW_mode&~2 or TCP_faders and TCP and MW_mode&~4
+	local unset = MW_mode_new and r.SNM_SetIntConfigVar('mousewheelmode', MW_mode_new)
+	return all_faders, TCP_faders
+	else -- re-enable flags
+	local MW_mode = r.SNM_GetIntConfigVar('mousewheelmode', 0)
+	local MW_mode_new = all_faders and TCP_faders and TCP and MW_mode|2|4
+	or all_faders and focused_fx and MW_mode|2 or TCP_faders and TCP and MW_mode|4
+	local unset = MW_mode_new and r.SNM_SetIntConfigVar('mousewheelmode', MW_mode_new)
+	end
+end
+
+
+function Get_Mousewheel_Mode()
+-- Preferences -> Editing behavior -> Mouse
+-- 'Ignore mousewheel on all faders'
+-- 'Ignore mousewheel on track panel faders'
+-- Thanks to Mespotine
+-- https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
+-- get_config_var_string() can be used instead of io.open()
+local f = io.open(r.get_ini_file(),'r')
+local cont = f:read('*a')
+f:close()
+local val = cont:match('mousewheelmode=(%d+)\n')
+local all_faders, TCP_faders = val+0&2 == 2, val+0&4 == 4 -- +0 is accommodating for Lua 5.4 where implicit conversion of strings to integers doesn't work in bitwise operations
+return all_faders, TCP_faders
+end
+
+
+
+function trackselonmouse()
+-- 'trackselonmouse' key of the preference at
+-- Prefs -> Editing behavior -> Mouse -> Mouse click/edit in arrange view: Selects track... Sets target track for insert/paste...
+-- 9 only 'Selects track' is enabled, both in reaper.ini and with get_config_var_string()
+-- 0 only 'Sets target track for insert/paste' is enabled, both in reaper.ini and with get_config_var_string()
+-- 8 none is enabled, both in reaper.ini and with get_config_var_string()
+-- doesn't exist in reaper.ini if both 'Selects track' and 'Sets target track for insert/paste' are enabled
+-- but is equal to 1 when retrieved with get_config_var_string()
+local ret, int = reaper.get_config_var_string('trackselonmouse')
+reaper.ShowConsoleMsg(tostring(ret)..'\n')
+reaper.ShowConsoleMsg(int..'\n')
+local respect = #RESPECT:gsub(' ','') > 0
+return respect and (int == '1' or int == '9') or not respect
+end
+
+
+
+
+function re_store_config_var(key, bit, val)
+-- https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html#fxfloat_focus
+-- requires either build 7.74 or sws extension
+-- key is string represnting reaper.ini key;
+-- bit is integer, the bit in the bitfield which matches the target preference
+-- see https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
+-- BUT NOT ALL VALUES ARE BITFIELDS,
+-- and the function assumes that when the bit is set the preference is enabled
+-- which is not always the case and for preferences which work in reverse
+-- the expression 'cur_val+0&bit == bit' will have to be replaced with 'cur_val+0&bit ~= bit';
+-- val is the original value assosiated with the key
+-- which is returned at the storage stage and restored at the restoration stage;
+-- arg val must be nil in the storage stage while bit arg may be nil at the restoration stage
+
+	if not key or type(key) ~= 'string' then return end
+
+local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.74 -- where set_config_var_string() isn't supported
+	if old_build and not r.SNM_SetIntConfigVar then return end -- in older builds values can only be set with SWS extension API
+
+--local key = 'fxfloat_focus', 65536
+local set = old_build and {r.SNM_SetIntConfigVar, key, val} 
+or {r.set_config_var_string, key, val, not val and 0 or 1} -- persist arg in set_config_var_string() depends on the stage, at the storage stage it's 0 so he value is not written into reaper.ini, otherwise 1 for the restored value to be written, OR PROBABLY since at the storage stage it's not written it will be preserved anyway so at the restoration stage 0 can be ued as well
+
+local ret, cur_val = r.get_config_var_string(key)
+
+	if not cur_val or #cur_val == 0 then return end
+
+local upd_val
+
+	if not val then -- get to store
+	local bit_set = cur_val+0&bit == bit
+		if not bit_set then
+		upd_val = cur_val+0 | bit
+		end
+	end
+	
+	if upd_val or val then -- store or restore
+	set[3] = val or upd_val -- update with the calculated value if val arg is nil, i.e. storage stage
+	set[1](table.unpack(set, 2)) -- ubpack starting from index 2
+	end
+	if not val and upd_val then -- OR 'if upd_val' // only return at the storage stage provided the setting 
+	return cur_val+0 
+	end
+
+end
+
+
+
 
 
 -- for keeping user stored parameter a limited amount of time, e.g. when two script runs must follow each other in close succession so that if the follow-up execution isn't performed within specific time frame, the value is invalid for the next run
@@ -27678,44 +27854,6 @@ return t
 
 end
 
-
-function Un_Set_MW_Config_Flags(TCP, focused_fx, all_faders, TCP_faders) -- TCP and focused_fx are booleans, all_faders, TCP_faders are for restoration
--- Preferences -> Editing behavior -> Mouse
--- 'Ignore mousewheel on all faders'
--- 'Ignore mousewheel on track panel faders'
--- Thanks to Mespotine
--- https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
-	if not all_faders and not TCP_faders then -- clear flags
-	local MW_mode = r.SNM_GetIntConfigVar('mousewheelmode', 0)
-	local all_faders, TCP_faders = MW_mode&2 == 2, MW_mode&4 == 4
--- https://stackoverflow.com/questions/63158929/how-can-i-clear-multiple-bits-at-once-in-c
-	local MW_mode_new = all_faders and TCP_faders and TCP and MW_mode&~2&~4 -- or MW_mode&~(2|4)
-	or all_faders and focused_fx and MW_mode&~2 or TCP_faders and TCP and MW_mode&~4
-	local unset = MW_mode_new and r.SNM_SetIntConfigVar('mousewheelmode', MW_mode_new)
-	return all_faders, TCP_faders
-	else -- re-enable flags
-	local MW_mode = r.SNM_GetIntConfigVar('mousewheelmode', 0)
-	local MW_mode_new = all_faders and TCP_faders and TCP and MW_mode|2|4
-	or all_faders and focused_fx and MW_mode|2 or TCP_faders and TCP and MW_mode|4
-	local unset = MW_mode_new and r.SNM_SetIntConfigVar('mousewheelmode', MW_mode_new)
-	end
-end
-
-
-function Get_Mousewheel_Mode()
--- Preferences -> Editing behavior -> Mouse
--- 'Ignore mousewheel on all faders'
--- 'Ignore mousewheel on track panel faders'
--- Thanks to Mespotine
--- https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
--- get_config_var_string() can be used instead of io.open()
-local f = io.open(r.get_ini_file(),'r')
-local cont = f:read('*a')
-f:close()
-local val = cont:match('mousewheelmode=(%d+)\n')
-local all_faders, TCP_faders = val+0&2 == 2, val+0&4 == 4 -- +0 is accommodating for Lua 5.4 where implicit conversion of strings to integers doesn't work in bitwise operations
-return all_faders, TCP_faders
-end
 
 
 -- Can be used in defer functions to prevent script activity in project tabs other than the one it was launched under
@@ -28393,24 +28531,6 @@ local islistviewcommand = midi and islistviewcommand
 		end
 	end
 
-end
-
-
-
-
-function trackselonmouse()
--- 'trackselonmouse' key of the preference at
--- Prefs -> Editing behavior -> Mouse -> Mouse click/edit in arrange view: Selects track... Sets target track for insert/paste...
--- 9 only 'Selects track' is enabled, both in reaper.ini and with get_config_var_string()
--- 0 only 'Sets target track for insert/paste' is enabled, both in reaper.ini and with get_config_var_string()
--- 8 none is enabled, both in reaper.ini and with get_config_var_string()
--- doesn't exist in reaper.ini if both 'Selects track' and 'Sets target track for insert/paste' are enabled
--- but is equal to 1 when retrieved with get_config_var_string()
-local ret, int = reaper.get_config_var_string('trackselonmouse')
-reaper.ShowConsoleMsg(tostring(ret)..'\n')
-reaper.ShowConsoleMsg(int..'\n')
-local respect = #RESPECT:gsub(' ','') > 0
-return respect and (int == '1' or int == '9') or not respect
 end
 
 
@@ -30839,6 +30959,8 @@ E N V E L O P E S
 	Active_Track_Envelopes_Exist1
 	Active_Track_Envelopes_Exist2
 	Get_EnvCP_Min_Height
+	Match_Target_AI_Env_Point_Spacing_To_Src_Take_Env
+	Match_Target_Take_Env_Point_Spacing_To_Src_Env
 
 
 A U T O M A T I O N  I T E M S
@@ -31203,6 +31325,8 @@ T H E M E
 	smandrap_Change_MCP_Width
 	find_layout
 
+
+
 F I L E S
 
 	ClearEnumCache
@@ -31417,6 +31541,10 @@ U T I L I T Y
 	Get_Mouse_TimeLine_Pos
 	isMouseInArrangeView
 	Get_Tooltip_Settings
+	Un_Set_MW_Config_Flags
+	Get_Mousewheel_Mode
+	trackselonmouse
+	re_store_config_var
 	Keep_ExtState_For_X_Mins1
 	Keep_ExtState_For_X_Mins2
 	ExtState_Expiry_Timer
@@ -31439,9 +31567,7 @@ U T I L I T Y
 	Is_Mouse_Over_Arrange3
 	Get_Cursor_Contexts
 	GetRulerTimeUnit
-	GetTransportTimeUnit
-	Un_Set_MW_Config_Flags
-	Get_Mousewheel_Mode
+	GetTransportTimeUnit	
 	RUN1
 	RUN2
 	Link_To_New_Project
@@ -31468,7 +31594,6 @@ U T I L I T Y
 	MediaExplorer_OnCommand2
 	MediaExplorer_OnCommand3
 	Main_OnCommand_alt
-	trackselonmouse
 	generate_custom_action_ID
 	en_de_code_bitfield
 	Action_list_sections
