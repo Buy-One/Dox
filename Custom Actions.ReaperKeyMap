@@ -259,8 +259,10 @@ ACT 1 0 "3302e6c6e63e0549bdc130c1454408c5" "Custom: Loops energy inflation with 
 ACT 1 0 "ac3f2f3737c8d5438c11cd81356b3f14" "Custom: Madrix_bounce in place (select track & item) -- multiple item selection creates one item" 40209 40131 41173 40535
 ACT 1 0 "4cd1cfc9d544c24eab87891eb2fce239" "Custom: Mardix_Acceleration 1/32 (select item and track, mainly for drums)" 40290 40775 40932 40001 40118 40719 _XENAKIOS_SELFIRSTITEMSOFTRACKS 40720 _XENAKIOS_REMOVMUTEDITEMS 41295 41295 41295 41295 41295 41295 41295 40421 41295 40421 41295 40718 40117 40005 40776 40635 _BR_PLAY_MOUSECURSOR
 ACT 1 0 "23b90dd63bfac14ca2b7e8bf16d5d186" "Custom: Mardix_Acceleration 1/32 and play (select item and track, mainly for drums) (all native actions)" 40290 40775 40932 40001 40118 40719 41173 41666 40289 40417 40720 40699 40421 40006 42398 41295 41295 41295 41295 41295 41295 41295 40421 41295 40421 41295 40718 40117 40005 40776 40630 40635 1007
-ACT 1 0 "ae530ade3f07cd43be6798c67aeb0e1f" "Custom: Mardix_All folders collapse (SWS)" _SWS_SELALLPARENTS _SWS_COLLAPSE 40297
-ACT 1 0 "b6e70b1dc526f444afc0c8da70a7b475" "Custom: Mardix_All folders uncollapse (SWS)" _SWS_SELALLPARENTS _SWS_UNCOLLAPSE 40297
+ACT 1 0 "ae530ade3f07cd43be6798c67aeb0e1f" "Custom: Mardix_All top level folders collapse (SWS)" _SWS_SELALLPARENTS _SWS_COLLAPSE 40297
+ACT 1 0 "b6e70b1dc526f444afc0c8da70a7b475" "Custom: Mardix_All top level folders uncollapse (SWS)" _SWS_SELALLPARENTS _SWS_UNCOLLAPSE 40297
+ACT 1 0 "7c6479d0772b074cab4ad013bfd55d49" "Custom: Mardix_All folders collapse (SWS)" _WOL_SELTREXCFOLDPAR _SWS_TOGTRACKSEL _SWS_COLLAPSE 40297
+ACT 1 0 "66c56af748c9804997ecb0f7f9bcb6fd" "Custom: Mardix_All folders uncollapse (SWS)" _WOL_SELTREXCFOLDPAR _SWS_TOGTRACKSEL _SWS_UNCOLLAPSE 40297
 ACT 1 0 "4f44843a302cf845b75b70fca26f816a" "Custom: Mardix_Commit item edit to new file without FX (select item)" 41999 40131
 ACT 1 0 "dcdb7f2bec640c40bf3376543f43c236" "Custom: Mardix_Duplicate all items in folder (select folder, place edit cursor)" 40289 _SWS_SELCHILDREN 40698 _XENAKIOS_SELFIRSTOFSELTRAX 42398 40286
 ACT 1 0 "eca85a6596aae84786813615f6e5507c" "Custom: Mardix_Folder freeze" 41223 _SWS_MUTECHILDREN _SWS_SELCHILDREN2 40535 40421 40688 _SWS_COLLAPSE
