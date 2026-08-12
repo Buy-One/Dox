@@ -3715,6 +3715,7 @@ https://forum.cockos.com/showthread.php?p=1094403
 -- Move multiple markers at once (contiguous)
 
 THIS IS IRRELEVANT SINCE BUILD 7.62 WHERE MULTIPLE MARKERS CAN BE SELECTED AND MOVED AT ONCE BY LEFT MOUSE DRAGGING
+OR BY HAVING RIPPLE EDIT ALL TRACKS + RIPPLE EDIT ALL AFFECTS REGIONS/MARKERS ENABLED AND MOVING A DUMMY ITEM TO EFFECT MARKERS MOVEMENT
 
 1. Create an empty track
 2. Create an empty item which encompasses all markers to be moved
