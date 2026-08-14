@@ -6632,4 +6632,17 @@ https://forum.cockos.com/showthread.php?t=310445
 
 =============================================================
 
+-- Video processor: prevent video processor instances on higher numbered tracks affecting video items on lower numbered tracks
+
+Basically override video processing hierarchy.
+
+
+On a track whose video processor instances scope you wish to limit to the current track
+insert a built-in preset titled 'Basic helpers: Apply track FX only where track has video items'
+placing it last in the chain.
+
+
+https://youtu.be/mrqPG9z1OGc?t=595
+
+=============================================================
 
