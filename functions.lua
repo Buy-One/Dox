@@ -137,6 +137,7 @@ end
 
 
 function Force_MIDI_Undo_Point2(take) -- may or may not work, the above version is more reliable
+-- https://forum.cockos.com/showpost.php?p=1925555
 local item = r.GetMediaItemTake_Item(take)
 local tr = r.GetMediaItemTrack(item)
 r.MarkTrackItemsDirty(tr, item)
@@ -902,34 +903,38 @@ end
 
 
 function get_greatest_smallest_value1(want_smallest, field, ...)
--- if vararg is a list of tables, nested tables aren't supported;
+-- if vararg is a list of tables, nested tables aren't supported
+-- OR variables containing numbers;
 -- field is either integer representing index in an indexed table
--- or string represending field in an associative array;
+-- or string represending field in an associative array,
+-- can be nil if variables are passed instead of tables;
 -- to evaluate values in nested tables inside several indexed tables
 -- this function must be first applied to nested tables,
 -- then to the resulting values of all tables;
--- also useful for determining the longest indexed table as well out of several,
+-- also useful for determining the longest indexed table out of several,
 -- to make the function return table pointer along with the value
 -- embed the table length in its field, see embed_table_length functions
 local t = {...}
-Msg(t,'t')
 	local function select_source(s,field)
 	return field and type(s) == 'table' and s[field] or s
 	end
 table.sort(t, function(a,b) local a, b = select_source(a,field), select_source(b,field)
 return want_smallest and a < b or not want_smallest and a > b end)
-local tbl = type(t[1]) == 'table'
+local tbl = type(t[1]) == 'table' -- 1 because due to sorting the target field will end up at index 1
 return field and tbl and t[1][field] or t[1], field and tbl and t[1] -- return value and the table it belongs to if table values were sorted
 end
 
+
 function get_greatest_smallest_value2(want_smallest, field, ...)
--- if vararg is a list of tables, nested tables aren't supported;
+-- if vararg is a list of tables, nested tables aren't supported
+-- OR variables containing numbers;
 -- field is either integer representing index in an indexed table
--- or string represending field in an associative array;
+-- or string represending field in an associative array,
+-- can be nil if variables are passed instead of tables;
 -- to evaluate values in nested tables inside several indexed tables
 -- this function must be first applied to nested tables,
 -- then to the resulting values of all tables;
--- also useful for determining the longest indexed table as well out of several,
+-- also useful for determining the longest indexed table out of several,
 -- to make the function return table pointer along with the value
 -- embed the table length in its field, see embed_table_length functions
 local t = {...}
@@ -945,6 +950,8 @@ local index
 	end
 return value, type(t[index]) == 'table' and t[index] -- return value and the table it belongs to if table values were sorted
 end
+
+
 
 
 local function linear_interp(a, b, t) -- linear interpolation
@@ -1018,6 +1025,39 @@ local s = ''
 	until n == 0
 return s
 end
+
+
+
+function encode_bools_into_integer(int, ...)
+-- max supported int value is 256, i.e. first byte;
+-- vararg is list of boolean variables, i.e. true or false
+local incr = 0
+	for k, bool in ipairs{...} do
+		if bool then
+		int = int + 2^(8+incr) -- or int|2^(8+incr)
+		end
+	incr = incr+1
+	end
+return int
+end
+
+
+function decode_bools_from_integer(int, ...)
+-- int is value returned from encode_bools_into_integer;
+-- vararg is list of boolean variables, i.e. true or false;
+-- to extract the original integer all booleans must be uncluded 
+local incr = 0
+local bools_t = {}
+	for k, bool in ipairs{...} do
+	local bit = 2^(8+incr)
+	bools_t[#bools_t+1] = int&bit == bit -- evaluate before sutracting from integer
+	int = int ~ bit -- or int|2^(8+incr)
+	incr = incr+1
+	end
+return int, bools_t -- or table.unpack(bools_t)
+end
+
+
 
 
 --================================ M A T H  E N D ===================================
@@ -2769,7 +2809,10 @@ end
 
 
 function shuffle_array(t, places, backward)
--- places is integer, backward is boolean
+-- changes order of entries within a portion of the array limited by places arg;
+-- places is integer, number of consequitive placed from the beginning of the array
+-- or from its end if backward arg is true, 
+-- backward is boolean,
 -- number of places backward = #t - places forward and vice versa,
 -- the results will be identical
 
@@ -2785,7 +2828,7 @@ local i = 0
 		last = t[#t]
 		i = i+1
 		until i == places
-	else
+	else -- backward
 	local first = t[1] -- store to assign to the last field
 		repeat
 			for i = 1, #t do
@@ -2799,13 +2842,26 @@ local i = 0
 end
 
 
-function Randomize_Array(t)
+function Randomize_Array1(t)
+-- there's greater chance of some values remaining at their original indices
 math.randomseed(math.floor(r.time_precise()*1000)) -- math.floor() because the seeding number must be integer; seems to facilitate greater randomization at fast rate thanks to milliseconds count, not necessary in this script though
 	for k, v in ipairs(t) do
 	local r = math.random(1, #t)
 	t[r], t[k] = t[k], t[r]
 	end
 end
+
+
+function Randomize_Array2(t)
+-- https://gist.github.com/Uradamus/10323382
+-- Fisher-Yates algo, provides for a better chance of value ending up at an index different from the original
+math.randomseed(math.floor(r.time_precise()*1000)) -- math.floor() because the seeding number must be integer; seems to facilitate greater randomization at fast rate thanks to milliseconds count, not necessary in this script though
+	for i=#t, 2, -1 do
+	local r = math.random(i)
+	t[r], t[i] = t[i], t[r]
+	end
+end
+
 
 
 -- local t = {'Bb1','E3','D2','B4','F#5','G#1','Db2','C4','A5','B3','Eb3','G1'}
@@ -5398,9 +5454,10 @@ function re_store_sel_trks1(t)
 	elseif t --and #t > 0
 	then
 	r.PreventUIRefresh(1)
---	r.Main_OnCommand(40297,0) -- Track: Unselect all tracks
 	-- deselect all tracks, this ensures that if none was selected originally
 	-- none will end up selected because re-selection loop below won't start
+	--	r.Main_OnCommand(40297,0) -- Track: Unselect all tracks
+	-- OR
 	local master = r.GetMasterTrack(0)
 	r.SetOnlyTrackSelected(master) -- select master
 	r.SetTrackSelected(master, 0) -- immediately deselect
@@ -10877,12 +10934,17 @@ local fx_name, _ = fx_alias
 		end
 	end
 
-return retval, src_track_num-1, tr, src_item_num, item, take_num, take, fx_num, fx_alias, fx_name, fx_GUID -- src_track_num = -1 means Master;
+return retval, src_track_num-1, tr, src_item_num, item, take_num, take, fx_num, fx_alias, fx_name, fx_GUID, fx_num >= 0x1000000 -- src_track_num = -1 means Master;
 
 end
 
 
 function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in builds prior to 6.20
+-- DUE TO REASCRIPT API BEHAVIOR DOESN'T RETURN TRUTH IMMEDIATELY AFTER IMPORT
+-- OF A TRACK TEMPLATE OF AN FX CHAIN PRESET SAVED WITH OPEN FX WINDOWS;
+-- IN THIS SCENARIO, IF UI OF THE FX SELECTED IN THE OPEN FX CHAIN 
+-- IS DISPLAYED IN A FLOATING WINDOW, CLICKING THE FX CHAIN WINDOW 
+-- DOESN'T MAKE THE FX LAST FOCUSED AND THE FUNCTION STILL RETURNS FALSE
 
 	if not r.GetTouchedOrFocusedFX then -- older than 7.0
 
@@ -10906,7 +10968,8 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 	local obj = take or tr -- take is first to prevent false positive because when take is valid track is valid as well
 
 		if obj then
-		local GetFXName, GetFXGUID, GetIOSize, GetNamedConfigParm = table.unpack(take and {r.TakeFX_GetFXName, r.TakeFX_GetFXGUID, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm} or tr and {r.TrackFX_GetFXName, r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm}) -- take is first to prevent false positive because when take valid track valud as well
+		local GetFXName, GetFXGUID, GetIOSize, GetNamedConfigParm, GetEnabled, GetOffline = table.unpack(take and {r.TakeFX_GetFXName, r.TakeFX_GetFXGUID, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm, r.TakeFX_GetEnabled, r.TakeFX_GetOffline} 
+		or tr and {r.TrackFX_GetFXName, r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm, r.TrackFX_GetEnabled, r.TrackFX_GetOffline}) -- take is first to prevent false positive because when take valid track valud as well
 		local fx_alias, fx_GUID = select(2, GetFXName(obj, fx_num)), GetFXGUID(obj, fx_num)
 		local fx_name = fx_alias
 		-- in builds older than 6.31 fx_name return value will be indentical to fx_alias
@@ -10916,8 +10979,12 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 			fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
 			or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name -- if Video processor
 			end
+			
+		local bypassed = not GetEnabled(obj, fx_num)
+		local offline = GetOffline(obj, fx_num)
+		local input_fx = fx_num >= 0x1000000
 
-		return retval, tr_num-1, tr, itm_num, item, take_num, take, fx_num, mon_fx_num >= 0, fx_alias, fx_name, fx_GUID -- tr_num = -1 means Master;
+		return retval, tr_num-1, tr, itm_num, item, take_num, take, fx_num, mon_fx_num >= 0, fx_alias, fx_name, fx_GUID, 	 bypassed, offline, input_fx -- tr_num = -1 means Master;
 		end
 
 	else -- supported since v7.0
@@ -10929,22 +10996,26 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 	local obj = take or tr -- take is first to prevent false positive because when take is valid track is valid as well
 
 		if obj then
-		local GetFXName, GetFXGUID, GetIOSize, GetNamedConfigParm = table.unpack(take and {r.TakeFX_GetFXName, r.TakeFX_GetFXGUID, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm} or tr and {r.TrackFX_GetFXName, r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm}) -- take is first to prevent false positive because when take valid track valud as well
+		local GetFXName, GetFXGUID, GetIOSize, GetNamedConfigParm, GetEnabled, GetOffline = table.unpack(take and {r.TakeFX_GetFXName, r.TakeFX_GetFXGUID, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm, r.TakeFX_GetEnabled, r.TakeFX_GetOffline} 
+		or tr and {r.TrackFX_GetFXName, r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm, r.TrackFX_GetEnabled, r.TrackFX_GetOffline}) -- take is first to prevent false positive because when take valid track valud as well
 		local fx_alias, fx_GUID, is_cont = select(2, GetFXName(obj, fx_num)), GetFXGUID(obj, fx_num), GetIOSize(obj, fx_num) == 8
 		local ret, fx_name = GetNamedConfigParm(obj, fx_num, 'fx_name')
 		fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
 		or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name -- if Video processor or Container
 
-		local input_fx, cont_fx = tr and r.TrackFX_GetRecChainVisible(tr) ~= -1, fx_num >= 33554432 -- or fx_num >= 0x2000000 // fx_num >= 0x1000000 or fx_num >= 16777216 for input_fx gives false positives if fx is inside a container in main fx chain hence chain visibility evaluatiion
+		local input_fx = fx_num >= 0x1000000 and fx_num <= 0x2000000 or fx_num-0x2000000 >= 0x1000000 -- or 16777216 instead of 0x1000000 and 33554432 instead of 0x2000000 // TrackFX_GetRecChainVisible() gives false positives because it's valid regardless of the window being focused
+		local cont_fx = fx_num >= 33554432 -- or fx_num >= 0x2000000
 		local mon_fx = retval and tr_num == -1 and input_fx
+		local bypassed = not GetEnabled(obj, fx_num)
+		local offline = GetOffline(obj, fx_num)
 
-		return retval, tr_num, tr, itm_num, item, take_num, take, fx_num, mon_fx, fx_alias, fx_name, fx_GUID, input_fx, cont_fx, is_cont -- tr_num = -1 means Master
+		return retval, tr_num, tr, itm_num, item, take_num, take, fx_num, mon_fx, fx_alias, fx_name, fx_GUID, bypassed, offline, input_fx, cont_fx, is_cont -- tr_num = -1 means Master
 		end
 	end
 
 end
 -- USE:
--- local retval, tr_num, tr, itm_num, item, take_num, take, fx_num, mon_fx, fx_alias, fx_name, fx_GUID, is_input_fx, is_cont_fx, is_cont = GetFocusedFX2()
+-- local retval, tr_num, tr, itm_num, item, take_num, take, fx_num, mon_fx, fx_alias, fx_name, fx_GUID, bypassed, offline, is_input_fx, is_cont_fx, is_cont = GetFocusedFX2()
 -- if retval == 0 and not mon_fx then return end -- no focused FX -- in versions older than 7.0;
 -- not retval or not fx_name means no focused
 
@@ -11310,7 +11381,11 @@ function Create_FX_Chain_Preset(obj, f_name, path, want_input)
 -- want_input is boolean to save input fx chain,
 -- obviously only applies to tracks;
 -- for takes relies on Esc()
--- and create_unique_time_based_ID()
+-- and create_unique_time_based_ID();
+-- the function keeps FX GUIDs while REAPER native save FX chain preset function
+-- excludes it them from the chunk,
+-- not sure if it matters for applying, REAPER may
+-- generate new GUIDs for imported FX instances anyway 
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 local GetChunk = tr and r.GetTrackStateChunk or take and r.GetItemStateChunk
@@ -12592,8 +12667,10 @@ end
 
 
 
-function Collect_All_Container_FX_Indices(t, obj, recFX, parent_cntnr_idx, parents_fx_cnt)
--- t must be nil, obj is track or take, recFX is boolean to target input/Monitoring FX
+function Collect_All_Container_FX_Indices(obj, t, recFX, parent_cntnr_idx, parents_fx_cnt)
+-- creates table containing indices of fx inside containers in nested tables
+-- following container hierarchy;
+-- obj is track or take, t must be nil, recFX is boolean to target input/Monitoring FX,
 -- parent_cntnr_idx, parents_fx_cnt must be nil
 -- fx indices from the outermost fx chain (the object main fx chain) are of course stored as well
 -- see Loop_Over_FX_Container_Table() next
@@ -12601,7 +12678,7 @@ function Collect_All_Container_FX_Indices(t, obj, recFX, parent_cntnr_idx, paren
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 
 local FXCount, GetIOSize, GetConfig = table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize,
-r.TrackFX_GetNamedConfigParm} or take and {r.TakeFX_GetCount, r.TrackFX_GetIOSize,
+r.TrackFX_GetNamedConfigParm} or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize,
 r.TakeFX_GetNamedConfigParm} or {})
 
 local fx_cnt = not parent_cntnr_idx and (recFX and r.TrackFX_GetRecCount(obj) or FXCount(obj))
@@ -12620,15 +12697,15 @@ local t = t or {} -- add table for the outermost FX chain on the very first run
 	-- and if found go recursive to collect fx instances inside them
 	for i, fx_idx in ipairs(t) do
 	local container = GetIOSize(obj, fx_idx) == 8
-	local retval, cont_fx_cnt = r.TrackFX_GetNamedConfigParm(obj, fx_idx, 'container_count') -- retval true even if container is empty
-		if container and cont_fx_cnt+0 > 0 then
+	local retval, cont_fx_cnt = GetConfig(obj, fx_idx, 'container_count') -- retval true even if container is empty
+		if container and cont_fx_cnt+0 > 0 then -- non-empty container
 		t[i] = {fx_idx, {}} -- replace container index with a nested table containing its index and another nested table to collect indices of fx inside it
 		local parent_cntnr_idx = parent_cntnr_idx and fx_idx or 0x2000000+fx_idx+1
 		local parents_fx_cnt = (parents_fx_cnt or 1) * (#t+1) -- #t is equal to fx count in the parent container
 		-- the function must not return table, otherwise its structure will be reversed
 		-- starting from the innermost fx chain with no way to get higher
 		-- the table is the same throughout the entire recursive loop anyway
-		Collect_All_Container_FX_Indices(t[i][2], obj, recFX, parent_cntnr_idx, parents_fx_cnt) -- go recursive // t[i][2] is the address of the nested table for collecting container fx indices
+		Collect_All_Container_FX_Indices(obj, t[i][2], recFX, parent_cntnr_idx, parents_fx_cnt) -- go recursive // t[i][2] is the address of the nested table for collecting container fx indices
 		end
 	end
 
@@ -12644,11 +12721,11 @@ function Loop_Over_FX_Container_Table(obj, t)
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 
 -- add functions as necessary depending on the type of fx processing needed
-local FXCount, GetIOSize, GetConfig, SetConfig, GetFXName =
+local FXCount, GetIOSize, GetConfig, SetConfig, GetFXName, Show =
 table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm,
-r.TrackFX_SetNamedConfigParm, r.TrackFX_GetFXName}
+r.TrackFX_SetNamedConfigParm, r.TrackFX_GetFXName, r.TrackFX_Show}
 or take and {r.TakeFX_GetCount, r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm,
-r.TakeFX_SetNamedConfigParm, r.TakeFX_GetFXName} or {})
+r.TakeFX_SetNamedConfigParm, r.TakeFX_GetFXName, r.TakeFX_Show} or {})
 
 	-- target fx instances in a chain ignoring containers
 	for k, fx_idx in ipairs(t) do
@@ -12672,10 +12749,8 @@ end
 
 function Get_FX_All_Parent_Containers(obj, fx_idx)
 -- supported since build 7.06
--- return table where container indices are listed in ascending order
+-- returns table where container indices are listed in ascending order
 -- i.e. from the outermost to the innermost
-
-local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 
 	if fx_idx > 0x2000000 and (tr or take) then -- range fx inside containers, or > 33554432
 	local GetConfigParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
@@ -12690,6 +12765,7 @@ local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaIte
 	end
 
 end
+
 
 
 
@@ -12794,6 +12870,181 @@ end
 
 
 
+
+function Get_FX_Shown_In_Container(obj, cont_idx)
+-- find the FX currently shown in the open innermost container
+-- because as of build 7.77 there's no API to get or set index 
+-- of FX inside a container whose UI is displayed in the FX chain;
+-- relies on Get_FX_Container_Chunk()
+
+local chunk = Get_FX_Container_Chunk(obj, cont_idx)
+
+	if not chunk then return end
+
+-- get simple index of the fx currently shown inside the container
+local sel_fx = chunk:match('SHOW (%d+)') -- since SHOW value is 1-based, 0 means container is empty, the fx chain is closed or no UI is shown because the container itself or one of its parent containers are not selected in the chain
+
+	if sel_fx == '0' then return end
+
+sel_fx = sel_fx-1 -- convert to 0-based
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+GetParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
+local ret, sel_fx_idx = GetParm(obj, cont_idx, 'container_item.'..sel_fx) -- get continer based index of the selected fx, i.e. with added 0x200000
+
+	-- verify if it's a nested container
+	if Get_FX_Type(obj, sel_fx_idx) ~= 'Container' then return sel_fx_idx+0 -- fx, return its container based index converting it to integer because GetParm() return value is a string
+	else -- if nested container which cannot be displayed due to lack of a UI
+	return Get_FX_Shown_In_Container(obj, sel_fx_idx)+0 -- go recursive until a plugin is reached
+	end
+
+end
+
+
+
+function Concat_Container_FX_Wnd_Title(obj, obj_name, tr_idx, fx_idx, fx_name, fx_bypassed, input_fx)
+-- can then be searched among main REAPER window sibling windows;
+-- the title pattern of a floating window of fx inside container or child container (without angle brackets and NOT ALL CAPS):
+-- <BYPASSED -><FX INSTANCE NAME> - <PARENT CONTAINER NAME [BYPASSED]> / <NEXT CONTAINER NAME> / <OUTERMOST CONTAINER NAME> / TRACK <INDEX> <"NAME"> or ITEM <"NAME"> [BYPASSED] [<1-BASED FX INDEX>/<TOTAL FX COUNT INSIDE CONTAINER>]
+-- 'BYPASSED -' precedes target fx name if it's bypassed, [BYPASSED] follows name of any bypassed parent container
+-- if track, track name in quotes follows track index if track name isn't empty;
+-- if master track, 'Master Track' appendage appears instead of Track <index>;
+-- if monitoring fx, 'Monitoring' appendage appears instead of 'Master Track';
+-- if take fx, instead of Track <index> 'Item' with optional take name is added in quotes if take name isn't empty;
+-- total count of fx inside container and 1-based index of the current fx are only listed if there're more than 1 fx inside the container;
+-- if input fx chain, '(input fx chain)' appendage is tucked between track index and the concluding part in the square brackets if any, doesn't apply to Monitoring chain;
+-- if track main fx chain, Master Track chain or Monitoring chain and the chain is bypassed '[BYPASSED]' indicator is tucked between regular track index, 'Master Track' or 'Monitoring' titles and the concluding part in the square brackets if any
+
+	if fx_idx < 0x2000000 then return end -- not fx inside container
+	
+	local function concat_wnd_title(obj, obj_name, tr_idx, fx_idx, fx_name, fx_bypassed, input_fx, take, tr)
+	local master = r.GetMasterTrack(0) == obj
+	local chain_bypassed = master and input_fx and r.GetToggleCommandStateEx(0, 41884) == 1 -- Monitoring FX: Toggle bypass
+	or tr and r.GetMediaTrackInfo_Value(obj, 'I_FXEN') == 0
+	local t = Get_FX_All_Parent_Container_Names(obj, fx_idx) -- regarding take precendence see comment above
+	local fx_idx_reg, cont_fx_cnt = Get_Regular_Cont_FX_Index(obj, fx_idx)
+	return (fx_bypassed and 'BYPASSED %- ' or '')..Esc(fx_name)..' %- '
+--	..t and table.concat(t, ' / ')..' / ' -- escaping dashes 
+	..(t and table.concat(t, ' / ')..' / ' or '') -- escaping dashes // t will be nil when the parent container happens to be the outermost
+	..(master and (not input_fx and 'Master Track' or 'Monitoring') or tr and 'Track '..tr_idx+1 or take and 'Item')
+	..((master or #obj_name == 0 and '') or ' "'..Esc(obj_name)..'"')
+	..(not master and not take and input_fx and ' %(input FX chain%)' or '')
+	..(chain_bypassed and ' %[BYPASSED%]' or '')
+--	..(cont_fx_cnt > 1 and ' %['..fx_idx_reg..'/'..cont_fx_cnt..'%]' or '')	
+	..(cont_fx_cnt and cont_fx_cnt > 1 and ' %['..fx_idx_reg..'/'..cont_fx_cnt..'%]' or '') -- cont_fx_cnt will be nil when the parent container happens to be the outermost
+	end
+	
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+
+-- since when fx inside a container is focused it's impossible to determine 
+-- whether it's focused in its own floating window or inside its parent container floating window
+-- retrieve parent container data to concatenate its title as well and then evaluate both
+local GetConfigParm, GetFXName, GetEnabled = table.unpack(take and {r.TakeFX_GetNamedConfigParm, r.TakeFX_GetFXName, r.TakeFX_GetEnabled} 
+or tr and {r.TrackFX_GetNamedConfigParm, r.TrackFX_GetFXName, r.TrackFX_GetEnabled})
+
+local ret, parent_cont_idx = GetConfigParm(obj, fx_idx, 'parent_container')
+parent_cont_idx = parent_cont_idx+0 -- convert into integer from string
+local ret, parent_cont_name = GetFXName(obj, parent_cont_idx)
+local parent_cont_bypassed = not GetEnabled(obj, parent_cont_idx)
+
+-- returns titles of fx window and its parent container window
+return concat_wnd_title(obj, obj_name, tr_idx, fx_idx, fx_name, fx_bypassed, input_fx, take, tr), concat_wnd_title(obj, obj_name, tr_idx, parent_cont_idx, parent_cont_name, parent_cont_bypassed, input_fx, take, tr)
+
+
+end
+
+
+
+
+function Collect_All_FX_Indices(t, obj, recFX, parent_cntnr_idx, parents_fx_cnt)
+-- t must be nil, obj is track or take, recFX is boolean to target input/Monitoring FX
+-- parent_cntnr_idx, parents_fx_cnt must be nil
+-- fx indices from the outermost fx chain (the object main fx chain) are of course stored as well
+-- see Loop_Over_FX_Container_Table() next
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+
+local FXCount, GetIOSize, GetConfig = table.unpack(tr and {r.TrackFX_GetCount, r.TrackFX_GetIOSize,
+r.TrackFX_GetNamedConfigParm} or take and {r.TakeFX_GetCount, r.TrackFX_GetIOSize,
+r.TakeFX_GetNamedConfigParm} or {})
+
+local fx_cnt = not parent_cntnr_idx and (recFX and r.TrackFX_GetRecCount(obj) or FXCount(obj))
+fx_cnt = fx_cnt or ({GetConfig(obj, parent_cntnr_idx, 'container_count')})[2]
+
+local t = t or {} -- add table for the outermost FX chain on the very first run
+
+	-- collect all fx instances in a chain, including containers
+	for i = 0, fx_cnt-1 do
+	local i = not parent_cntnr_idx and recFX and i+0x1000000 or i
+	i = parent_cntnr_idx and (i+1)*parents_fx_cnt+parent_cntnr_idx or i
+	t[#t+1] = i
+	end
+
+	-- search for containers in the fx chain data stored above
+	-- and if found go recursive to collect fx instances inside them
+	for i, fx_idx in ipairs(t) do
+	local container = GetIOSize(obj, fx_idx) == 8
+	local retval, cont_fx_cnt = r.TrackFX_GetNamedConfigParm(obj, fx_idx, 'container_count') -- retval true even if container is empty
+		if container and cont_fx_cnt+0 > 0 then
+		t[i] = {fx_idx, {}} -- replace container index with a nested table containing its index and another nested table to collect indices of fx inside it
+		local parent_cntnr_idx = parent_cntnr_idx and fx_idx or 0x2000000+fx_idx+1
+		local parents_fx_cnt = (parents_fx_cnt or 1) * (#t+1) -- #t is equal to fx count in the parent container
+		-- the function must not return table, otherwise its structure will be reversed
+		-- starting from the innermost fx chain with no way to get higher
+		-- the table is the same throughout the entire recursive loop anyway
+		Collect_All_Container_FX_Indices(t[i][2], obj, recFX, parent_cntnr_idx, parents_fx_cnt) -- go recursive // t[i][2] is the address of the nested table for collecting container fx indices
+		end
+	end
+
+return t
+
+end
+
+
+
+
+function Get_Regular_Cont_FX_Index(obj, fx_idx)
+-- rerieve regular 0-based index of fx inside container
+-- supported since build 7.06
+
+local fx_idx = fx_idx and fx_idx+0 -- convert to integer just in case
+
+	if fx_idx < 0x2000000 then return fx_idx end -- not fx inside container
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+GetConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
+local ret, parent_cont_idx = GetConfigParm(obj, fx_idx, 'parent_container')
+local ret, cont_fx_cnt = GetConfigParm(obj, parent_cont_idx+0, 'container_count')
+
+	for i=0, cont_fx_cnt-1 do
+	local ret, idx = GetConfigParm(obj, parent_cont_idx+0, 'container_item.'..i)
+		if idx+0 == fx_idx then return i end
+	end
+	
+--[[
+-- this only works for the very first container, due to the use GetFXCount(),
+-- for child containers the fx count must reference the fx count in the chain the parent container belongs to
+-- to be able to account for the index of the parent container
+local input_fx = fx_idx-0x2000000 >= 0x1000000
+local GetFXCount = take and r.TakeFX_GetCount or tr and (input_fx and r.TrackFX_GetRecCount or r.TrackFX_GetCount)
+local fx_cnt = GetFXCount(obj)
+
+	-- the calculation is based in the formula
+	-- 0x2000000 + 3*(TrackFX_GetCount(tr)+1) + 2
+	-- where 3 is 1-based fx index and 2 is 1-based index of the parent container in the chain it belongs to
+	for i=1, 100 do -- outermost container indices // 100 is a provisional count of fx in the chain the parent container is a part of, if it's main chain fx_cnt-1 could be used
+	local a = fx_idx-0x2000000-i -- subtractig i as possible parent container index
+		for i=1, 100 do -- indices of fx in the current container //  100 is a provisional count of fx inside the container the target fx belongs to
+			if a/i == fx_cnt+1 then return i end -- dividing by i as possible index of the target fx
+		end
+	end
+--]]
+
+end
+
+
+
+
+
 function Get_FX_Parm_Orig_Name_s(obj, fx_idx, parm_idx)
 -- in case it's been aliased by the user
 -- obj is track or take;
@@ -12881,6 +13132,7 @@ end
 
 function Plugin_Is_Instrument(obj, fx_idx, temp_tr, delete_temp_tr)
 -- TrackFX_GetInstrument() IS UNSUITABLE BECAUSE IT DOESN'T QUERY FX AT SPECIFIC INDEX;
+-- ALTERNATIVE IS GetNamedConfigParm(obj, fx_idx, 'is_instrument') SUPPORTED SINCE 7.40;
 -- all JSFX which don't contain the words reverb or delay in their name, 
 -- are considered instrument because there's no way to reliably determine 
 -- whether they're FX or instrument otherwise;
@@ -12907,8 +13159,15 @@ function Plugin_Is_Instrument(obj, fx_idx, temp_tr, delete_temp_tr)
 -- CREATION OF SEPARATE UNDO POINTS
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-local FXName, ConfigParm, Copy = table.unpack(tr and {r.TrackFX_GetFXName, r.TrackFX_GetNamedConfigParm, r.TrackFX_CopyToTrack} 
+local FXName, ConfigParm, Copy = table.unpack(tr and {r.TrackFX_GetFXName, r.TrackFX_GetNamedConfigParm, r.TrackFX_CopyToTrack}
 or take and {r.TakeFX_GetFXName, r.TakeFX_GetNamedConfigParm, r.TakeFX_CopyToTrack})
+
+	-- THIS OPTION DOESN'T ALLOW DESIGNATING CERTAIN JSFX AS INSTRUMENT
+	-- OR EXCLUDING ONLY CERTAIN JSFX AS EFFECTS
+	-- AS ATTEMPTED IN THE REST OF THE FUNCTION with 
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.40 then
+	return ConfigParm(obj, fx_idx, 'is_instrument')
+	end
 
 -- retrieve from the instance name in FX chain
 -- unless renamed
@@ -13070,17 +13329,17 @@ function Validate_FX_Identity(obj, fx_idx, fx_name, parm_t, parm_ident_t, TAG)
 -- relies on Esc() function
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-local GetFXName, GetConfig, CopyFX, GetParmCount, GetParamName =
+local GetFXName, GetConfig, CopyFX, GetParmCount, GetParamName, GetParamIdent =
 table.unpack(tr and {r.TrackFX_GetFXName, r.TrackFX_GetNamedConfigParm,
-r.TrackFX_CopyToTrack, r.TrackFX_GetNumParams, r.TrackFX_GetParamName}
+r.TrackFX_CopyToTrack, r.TrackFX_GetNumParams, r.TrackFX_GetParamName, r.TrackFX_GetParamIdent}
 or take and {r.TakeFX_GetFXName, r.TakeFX_GetNamedConfigParm,
-r.TakeFX_CopyToTrack, r.TakeFX_GetNumParams, r.TakeFX_GetParamName} or {})
+r.TakeFX_CopyToTrack, r.TakeFX_GetNumParams, r.TakeFX_GetParamName, r.TakeFX_GetParamIdent} or {})
 -- get name displayed in fx chain
 local retval, fx_chain_name = GetFXName(obj, fx_idx, '')
 fx_chain_name = TAG and fx_chain_name:gsub(TAG,'') or fx_chain_name -- if TAG is supplied removing to be able to evaluate clean name // script specific
 	if fx_chain_name:match(Esc(fx_name)) then return true end -- ignoring fx type prefix
 
--- if fx chain displayed name doesn't match the user supplied name, meaning was renamed
+-- if fx chain displayed name doesn't match the user supplied name, meaning it was renamed
 -- get fx browser displayed name in builds which support this option
 
 local build_6_37 = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.37
@@ -13095,82 +13354,83 @@ local retval, orig_fx_name
 	end
 
 -- if validation by the original name failed or wasn't supported
--- validate using parameter names
+-- validate using parameter names and identifiers
 
--- add temp track and copy the fx instance to it
+local validated
+	if build_6_37 and parm_ident_t then
+		for idx, ident in pairs(parm_ident_t) do
+		local retval, parm_ident = GetParamIdent(obj, fx_idx, idx)
+			if not parm_ident:match(Esc(ident)) then return end -- using string.match because returned identifiers incluse param index, i.e. 1:_identifier, while the table fed as argument doesn't
+		end
+	validated = 1
+	end	
+	if validated then return true
+	elseif parm_t then
+		for idx, name in pairs(parm_t) do
+		local retval, parm_name = GetParamName(obj, fx_idx, idx, '')
+			if name ~= parm_name then return end
+		end
+	validated = 1
+	end
+	
+	if validated then return true end
+
+-- if validation by parameter identifiers cound't be performed 
+-- due to build being older than 6.37
+-- and validation by parameter names failed due to their aliasing
+-- add fresh fx instance by name to a temp track and compare names of random parameters
+-- collected from the source fx to those of the fresh fx instance on the temp track,
+-- in builds older than 6.37 the evaluation isn't reliable
+-- by 100% because some parameter names in the source fx may be aliased
+-- and won't match the expected names
 r.PreventUIRefresh(1)
 r.InsertTrackAtIndex(r.GetNumTracks(), false) -- wantDefaults false; insert new track at end of track list and hide it; action 40702 'Track: Insert new track at end of track list' creates undo point hence unsuitable
 local temp_track = r.GetTrack(0,r.CountTracks(0)-1)
 r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0) -- hide in Mixer
 r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
--- search for the name of fx parameter at the same index as the one being evaluated
--- in a fresh instance of the fx on the temp track or its copy if fresh instance could not
--- be added due to name change by the user in the FX browser,
--- in builds older than 6.37 the evaluation isn't reliable
--- by 100% because some parameter names in the source fx may be aliased
--- and won't match the expected names
--- parameter identifiers supported since build 6.37 however are likely to be immutable
-r.TrackFX_AddByName(temp_track, fx_name, false, 1) -- recFX false, instantiate 1 (or -1000) to insert
-	if r.TrackFX_GetCount(temp_track) == 0 then -- copy source fx if insertion of a fresh one failed
-	CopyFX(obj, fx_idx, temp_track, 0, false) -- is_move false
-	end
-local parm_t = parm_t and type(parm_t) == 'table' and #parm_t > 0 and parm_t
-local parm_ident_t = parm_ident_t and type(parm_ident_t) == 'table' and #parm_ident_t > 0 and parm_ident_t
-local name_match = true
+CopyFX(obj, fx_idx, temp_track, 0, false) -- is_move false
 
-	if parm_t or parm_ident_t then
-		for idx, name in pairs(parm_t) do
+validated = 1
+
+local src_parm_cnt = GetParmCount(obj, fx_idx)
+local tmp_parm_cnt = r.TrackFX_GetNumParams(temp_track, 0) -- 0 temp fx index
+
+	if src_parm_cnt ~= tmp_parm_cnt then
+	validated = nil
+	else
+	parm_t, parm_ident_t = {}, {}
+	math.randomseed(math.floor(r.time_precise()*1000))
+	local count = src_parm_cnt > 5 and 6 or src_parm_cnt -- look for 6 param names as long as the param count allows that, 6 is more reliable than 3 or 4 because random number may repeat which will reduce the number of options
+		for i=1, count do
+		-- collect parameter data from the source fx
 		local ident
-		local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, idx, '') -- fx_idx 0
+		local rnd = math.random(1, src_parm_cnt)-1 -- math.random range must start from 1
+		local ret, parm_name = GetParamName(obj, fx_idx, rnd, '')
 			if build_6_37 then
-			retval, ident = r.TrackFX_GetParamIdent(temp_track, 0, idx)
+			ret, ident = r.TrackFX_GetParamIdent(obj, fx_idx, rnd)
 			end
-			if partm_t and name ~= parm_name
-			or parm_ident_t and not ident:match(Esc(parm_ident_t[idx])) -- using string.match because returned identifiers incluse param index, i.e. 1:_identifier, while the table fed as argument doesn't
-			then
+		local stock = parm_name == 'Bypass' or parm_name == 'Wet' or build_6_37 and parm_name == 'Delta' -- excluding 3 stock parameters because they're not unique to a plugin
+			if parm_t[rnd] or parm_ident_t[rnd] or stock then -- prevent storing the same param several times if math.random generates the same number, and storing stock params
+				repeat
+				rnd = math.random(1, src_parm_cnt)-1
+				ret, parm_name = GetParamName(obj, fx_idx, rnd, '')
+				until not parm_t[rnd] and not parm_ident_t[rnd]
+				and parm_name ~= 'Bypass' and parm_name ~= 'Wet'
+				and (not build_6_37 or parm_name ~= 'Delta')
+			end
+		parm_t[rnd], parm_ident_t[rnd] = parm_name, ident -- store
+		end
+		-- compare collected parameter data with temp fx parameters
+		for parm_idx, name in pairs(parm_t) do
+		local ident
+		local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, parm_idx, '') -- fx_idx 0
+			if build_6_37 then
+			retval, ident = r.TrackFX_GetParamIdent(temp_track, 0, parm_idx)
+			end
+			if name ~= parm_name or parm_ident_t[parm_idx] and parm_ident_t[parm_idx] ~= ident then
 			-- break rather than return to allow deletion of the temp track
 			-- before returning the value
-			name_match = false break
-			end
-		end
-	else -- compare names and identifiers of up to 6 random parameters
-	local src_parm_cnt = GetParmCount(obj, fx_idx)
-	local tmp_parm_cnt = r.TrackFX_GetNumParams(temp_track, 0) -- 0 temp fx index
-		if src_parm_cnt == tmp_parm_cnt then
-		parm_t, parm_ident_t = {}, {}
-		math.randomseed(math.floor(r.time_precise()*1000))
-		local count = src_parm_cnt > 5 and 6 or src_parm_cnt -- look for 6 param names as long as the param count allows that, 6 is more reliable than 3 or 4 because random number may repeat which will reduce the number of options
-			for i=1, count do
-			-- collect parameter data from the source fx
-			local ident
-			local rnd = math.random(1, src_parm_cnt)-1 -- math.random range must start from 1
-			local ret, parm_name = GetParamName(obj, fx_idx, rnd, '')
-				if build_6_37 then
-				ret, ident = r.TrackFX_GetParamIdent(obj, fx_idx, rnd)
-				end
-			local stock = parm_name == 'Bypass' or parm_name == 'Wet' or build_6_37 and parm_name == 'Delta' -- excluding 3 stock parameters because they're not unique to a plugin
-				if parm_t[rnd] or parm_ident_t[rnd] or stock then -- prevent storing the same param several times if math.random generates the same number, and storing stock params
-					repeat
-					rnd = math.random(1, src_parm_cnt)-1
-					ret, parm_name = GetParamName(obj, fx_idx, rnd, '')
-					until not parm_t[rnd] and not parm_ident_t[rnd]
-					and parm_name ~= 'Bypass' and parm_name ~= 'Wet'
-					and (not build_6_37 or parm_name ~= 'Delta')
-				end
-			parm_t[rnd], parm_ident_t[rnd] = parm_name, ident -- store
-			end
-			-- compare collected parameter data with temp fx parameters
-			for parm_idx, name in pairs(parm_t) do
-			local ident
-			local retval, parm_name = r.TrackFX_GetParamName(temp_track, 0, parm_idx, '') -- fx_idx 0
-				if build_6_37 then
-				retval, ident = r.TrackFX_GetParamIdent(temp_track, 0, parm_idx)
-				end
-				if name ~= parm_name or parm_ident_t[parm_idx] and parm_ident_t[parm_idx] ~= ident then
-				-- break rather than return to allow deletion of the temp track
-				-- before returning the value
-				name_match = false break
-				end
+			validated = nil break
 			end
 		end
 	end
@@ -13208,7 +13468,7 @@ local name_match = true
 r.DeleteTrack(temp_track)
 r.PreventUIRefresh(-1)
 
-return name_match
+return validated
 
 end
 
@@ -13435,16 +13695,16 @@ function Move_FX_At_Index_To_Slot_N(tr, fx_idx, slot_idx)
 -- supported since 7.75, ReaScript API only allows getting the slot but not setting one;
 -- relies on GetObjChunk()2, Get_FX_Chunk(), Esc();
 -- if the slot at slot_idx is already occupied, the FX which occupies it
--- it automatically moved by REAPER one slot further,
+-- is automatically moved by REAPER one slot further,
 -- which is different from the way REAPER handles collision
 -- on FX chain preset import where it's the imported FX 
 -- which is moved further to the first available slot
 
-  if fx_idx >= 0x1000000 then return end -- input or container fx which cannot be shown in the UI
+  if fx_idx >= 0x1000000 then return end -- input or container fx which cannot be shown in the TCP/MCP
 
 local ret, chunk = r.GetTrackStateChunk(tr, '', false) -- isundo false
 -- OR
--- local ret, chunk = GetObjChunk(tr)
+-- local ret, chunk = GetObjChunk2(tr)
 
 	if not ret then return end
 	
@@ -13467,30 +13727,204 @@ end
 
 
 
-function Get_FX_Selected_In_Container(obj, cont_idx)
--- find the FX currently selected in the open innermost container
--- because as of build 7.77 there's no API to get or set index 
--- of FX inside a container whose UI is displayed in the FX chain;
--- relies on Get_FX_Container_Chunk()
+function Close_All_FX_Windows()
+-- relies on Collect_All_Container_FX_Indices(), Get_FX_Type() and Loop_Over_FX_Container_Table()
+-- to address floating windows of fx inside containers,
+-- inside Loop_Over_FX_Container_Table() 'DO STUFF' lines must be replaced with
+-- 'if GetOpen(obj, fx_idx) then Show(obj, fx_idx, 2) end' for regular fx (1st loop)
+-- and 'if GetOpen(obj, cont[1]) then Show(obj, cont[1], 2) end' for conainers in the 2nd loop;
+-- docked fx chain windows are also closed
 
-local chunk = Get_FX_Container_Chunk(obj, cont_idx)
+	for tr_idx=-1, r.CountTracks(0)-1 do -- start from -1 to accommodate master track
+	local tr = r.GetTrack(0,tr_idx) or r.GetMasterTrack(0)
+	local chain_vis_idx = r.TrackFX_GetChainVisible(tr)
+		if chain_vis_idx ~= -1 then r.TrackFX_Show(tr, chain_vis_idx, 0) end
+		for i=0, r.TrackFX_GetCount(tr)-1 do	
+		local floating = r.TrackFX_GetFloatingWindow(tr, i)
+			if floating then r.TrackFX_Show(tr, i, 2) end
+			if Get_FX_Type(tr, i) == 'Container' then			
+			local t = Collect_All_Container_FX_Indices(tr)
+			Loop_Over_FX_Container_Table(tr, t) -- since with container fx it's impossble to query whether UI is open in a floating window due to API limitation, closing them straight just in case they're open
+			end
+		end
+	local chain_vis_idx = r.TrackFX_GetRecChainVisible(tr)
+		if chain_vis_idx ~= -1 then r.TrackFX_Show(tr, chain_vis_idx+0x1000000, 0) end -- for input fx the designated function returns regular	index hence adding 0x1000000
+		for i=0, r.TrackFX_GetRecCount(tr)-1 do
+		local i = i+0x1000000
+		local floating = r.TrackFX_GetFloatingWindow(tr, i)
+			if floating then r.TrackFX_Show(tr, i, 2) end
+			if Get_FX_Type(tr, i) == 'Container' then			
+			local t = Collect_All_Container_FX_Indices(tr)
+			Loop_Over_FX_Container_Table(tr, t, 1) -- since with container fx it's impossble to query whether UI is open in a floating window due to API limitation, closing them straight just in case they're open // recFX true
+			end
+		end
+		for i=0, r.CountTrackMediaItems(tr)-1 do
+		local item = r.GetTrackMediaItem(tr, i)
+			for i=0, r.CountTakes(item)-1 do
+			local take = r.GetTake(item, i)
+				if take then
+				local chain_vis_idx = r.TakeFX_GetChainVisible(take)
+					if chain_vis_idx ~= -1 then r.TakeFX_Show(take, chain_vis_idx, 0) end
+					for i=0, r.TakeFX_GetCount(take)-1 do
+					local floating = r.TakeFX_GetFloatingWindow(take, i)
+						if floating then r.TakeFX_Show(take, i, 2) end
+						if Get_FX_Type(take, i) == 'Container' then
+						local t = Collect_All_Container_FX_Indices(take)
+						Loop_Over_FX_Container_Table(take, t) -- since with container fx it's impossble to query whether UI is open in a floating window due to API limitation, closing them straight just in case they're open
+						end
+					end
+				end
+			end
+		end
+	end
 
-	if not chunk then return end
+end
+end
 
--- get simple index of the fx currently selected in the container
-local sel_fx = chunk:match('SHOW (%d+)') -- since SHOW value is 1-based, 0 means container is empty; LASTSEL attribute isn't suitable because it lists 0 both when container is empty and when the 1st fx is selected
 
-	if sel_fx == '0' then return end -- empty container
 
-sel_fx = sel_fx-1 -- convert to 0-based
-local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-GetParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
-local ret, sel_fx_idx = GetParm(obj, cont_idx, 'container_item.'..sel_fx) -- get continer based index of the selected fx, i.e. with added 0x200000
 
-	-- verify if it's a nested container
-	if Get_FX_Type(obj, sel_fx_idx) ~= 'Container' then return sel_fx_idx
-	else -- if nested container
-	return Get_FX_Selected_In_Container(obj, sel_fx_idx) -- go recursive
+function FX_AddByName_Alt(obj, fx_name, recFX, instantiate, cont_idx, no_float)
+-- addresses the problem of auto-floated fx windows when added via API
+-- with the preference 
+-- Preferences -> Plugins -> Auto-float UI for FX created via FX browser (old name Auto-float newly created FX windows)
+-- enabled,
+-- FR https://forum.cockos.com/showthread.php?t=308359;
+-- no_float is boolean, other arguments are the same as in the native FX_AddByName;
+-- cont_idx if FX has to be added to a container;
+-- if no_float is true relies on re_store_config_var()
+
+local validate = r.ValidatePtr
+local tr, take = validate(obj, 'MediaTrack*'), validate(obj, 'MediaItem_Take*')
+local GetParm, Add, Show = table.unpack(take and {r.TakeFX_GetNamedConfigParm, r.TakeFX_AddByName, r.TakeFX_Show} 
+or tr and {r.TrackFX_GetNamedConfigParm, r.TrackFX_AddByName, r.TrackFX_Show})
+
+	if cont_idx then
+	-- when new fx are added to container the index of the first fx there
+	-- is used as a reference value relative to which target index should be calculated;
+	-- but the step between the values varies depending on the container depth:
+	-- in depth 1 container it's 3, i.e. each next instantiate value must be increased by 3, unless its -1
+	-- which instructs the function to insert fx at the end of the chain
+	-- therefore the entire fx count inside the container has to be muitiplied by 3,
+	-- in depth 2 container it's 12, in depth 3 it's probably 48, etc.
+	-- therefore the only sure way to insert an fx inside a container is to use -1000
+	-- as the instantiate value, which adds it at the top position inside the container,
+	-- it can be moved afterwards to another, known, index with FX_CopyToTrack and FX_CopyToTake
+	local ret
+	ret, idx_init = GetParm(obj, cont_idx, 'container_item.0') -- index of the first position inside the container
+--	ret, cont_cnt = GetParm(obj, cont_idx, 'container_count')
+	instantiate = -1000 - idx_init
+	end
+	
+local fxfloat_focus = no_float and re_store_config_var('fxfloat_focus', 4, 1) -- bit 4, disable true because fx UI is autofloated when the preference is enabled, so it must be disabled	
+
+local fx_idx = Add(obj, fx_name, recFX, instantiate)
+
+	if fxfloat_focus then -- restore
+	fxfloat_focus = re_store_config_var('fxfloat_focus', 4, disable, fxfloat_focus) -- bit and disable args are irrelevant
+	elseif no_float then -- if the preference couldn't be temporarily updated or it's already disabled
+	Show(obj, fx_idx, 2) -- 2 hide floating window // if the preference is disabled to begin with, the function re_store_config_var() will have no effect and won't return anything
+	end
+
+end
+
+
+
+function FX_GetOpen_Alt(obj, fx_idx)
+-- the function addresses the limitation of the native API
+-- where FX_GetFloatingWindow() functions don't recognize
+-- floating windows of container fx and so don't allow determining
+-- whether fuch fx are open in a floating window;
+-- returns two boolean values indicating
+-- fx instance being open (active) in the fx chain
+-- and open in a floating window respectively;
+-- supports fx inside containers since build 7.06;
+-- since in querying whether fx inside a container is open in a floating window
+-- the function requires toggling fx windows off and on,
+-- the preference of undo point creation when closing fx windows may need to be 
+-- temporary disabled with
+--[[
+local fxfloat_focus = re_store_config_var('fxfloat_focus', disable, 65536) -- bit 65536, disable false because the preference must be enabled to prevent undo point creation // store original pref value and disable creation of undo point when fx windows are toggled // will only run if build is 7.74 or sws extension is installed
+-- MAIN FUNCTION
+re_store_config_var('fxfloat_focus', 65536, disable, fxfloat_focus) -- restore original pref value, arg 2 and 3 are irrelevant here // will only run if build is 7.74 or sws extension is installed
+--]]
+
+	local function get_fx_all_parent_containers(obj, fx_idx)
+	-- supported since build 7.06
+	-- returns table where container indices are listed in ascending order
+	-- i.e. from the outermost to the innermost
+		if fx_idx > 0x2000000 then -- range fx inside containers, or > 33554432
+		local GetConfigParm = r.ValidatePtr(obj, 'MediaTrack*') and r.TrackFX_GetNamedConfigParm 
+		or r.ValidatePtr(obj, 'MediaItem_Take*') and r.TakeFX_GetNamedConfigParm
+			if GetConfigParm then
+			local t, retval = {}
+				repeat
+				retval, fx_idx = GetConfigParm(obj, fx_idx, 'parent_container')
+					if retval then
+					table.insert(t, 1, fx_idx+0)
+					end
+				until not retval -- or #fx_idx == 0
+			return t
+			end
+		end
+	end
+		
+	if not obj then return end
+		
+local validate = r.ValidatePtr
+local tr, take = validate(obj, 'MediaTrack*'), validate(obj, 'MediaItem_Take*')
+local input_fx = fx_idx >= 0x1000000 and fx_idx <= 0x2000000 or fx_idx-0x2000000 >= 0x1000000 -- or 16777216 instead of 0x1000000 and 33554432 instead of 0x2000000
+local ChainVis, FloatingWnd, GetOpen, GetParm, SetParm, CountFX, Add, Show, Delete = 
+table.unpack(take and {r.TakeFX_GetChainVisible, r.TakeFX_GetFloatingWindow, r.TakeFX_GetOpen, r.TakeFX_GetNamedConfigParm, r.TakeFX_SetNamedConfigParm, r.TakeFX_GetCount, r.TakeFX_AddByName, r.TakeFX_Show, r.TakeFX_Delete}
+or tr and {input_fx and r.TrackFX_GetRecChainVisible or r.TrackFX_GetChainVisible, r.TrackFX_GetFloatingWindow, r.TrackFX_GetOpen, r.TrackFX_GetNamedConfigParm, r.TrackFX_SetNamedConfigParm, input_fx and r.TrackFX_GetRecCount or r.TrackFX_GetCount, r.TrackFX_AddByName, r.TrackFX_Show, r.TrackFX_Delete})
+
+	if fx_idx < 0x2000000 then -- not a container fx
+	return ChainVis(obj) == (input_fx and fx_idx-0x1000000 or fx_idx), -- for input fx the function returns regular index
+	FloatingWnd(obj, fx_idx)
+	elseif tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.06 then -- support for chain_sel and parent_container attributes in FX_GetSetNamedConfigParm()
+	local open = GetOpen(obj, fx_idx) -- open either in the fx chain, in a floating window or both
+		if open then -- find out how open
+		local t = get_fx_all_parent_containers(obj, fx_idx)		
+		local chain_open = ChainVis(obj) == t[1] -- only returns index of the fx in the main chain
+			if chain_open then -- if outermost parent container is open/elected in the chain
+			-- find if all parent containers are selected in their own chains 
+			-- which will mean that the target fx is open within the chain, i.e. it's UI is shown
+				for k, idx in ipairs(t) do
+			--	local ret, sel_idx = GetParm(obj, 0, 'chain_sel') -- fx index here is not required // UNSUITABLE BECAUSE THE PARAMETER DOESN'T SUPPORT CONTAINERS
+					if not GetOpen(obj, idx) then chain_open = false break end -- if at least one parent container isn't selected/open in its own chain, the target fx cannot be shown in the fx chain
+				end
+				if chain_open then -- if the fx is open in the chain, find if it's also open in the floating window because 'open' variable is not specific and will be true in either case
+				-- select another fx in the main chain which is not the target fx outermost parent container
+				-- to ensure that the targer fx isn't shown in the chain
+				-- and if GetOpen() still returns truth the target fx is open in a floating window
+				local fx_cnt = CountFX(obj)
+				local temp_idx, temp_inst
+					for i=0, fx_cnt-1 do
+						if i ~= t[1] then temp_idx = i break end -- index different from the index of the outermost parent container
+					end
+					if not temp_idx then -- there're no other fx in the main chain, add temp container
+					temp_idx = Add(obj, 'Container', input_fx, -1)			
+					temp_inst = 1
+					end
+					-- select temp fx in the chain
+					if not GetOpen(obj, temp_idx) then				
+				--	Show(obj, temp_idx, 1) -- if used alone to switch the selection, it takes too long for GetOpen() below to receive the updated value and if used alongside SetParm(), prevents restoration of original fx selection further below
+					SetParm(obj, temp_idx, 'chain_sel', '1')
+					end
+				open = GetOpen(obj, fx_idx) -- re-evaluate the target fx state, if after changing fx selection in the chain the return value is still true, it's open in a floating window
+					if temp_inst then Delete(obj, temp_idx) end -- delete temp container				
+			--	SetParm(obj, t[1], 'chain_sel', '1') -- if used alone doesn't restore the original fx selection and if used alongside Show() while the fx inside container was last clicked rather than the outermost parent container, prevents restoration of original selection
+			 -- when the outermost parent container isn't the last clicked, and it's the target fx instance or one of the nested parent folders instead, restoration of target fx UI display in the chain with Show doesn't always work, especially when container depth is greater than 1, so the certain way to restore it is to toggle the fx chain window off and back on, this however results in noticable fx chain window blink and in focus shifting to the fx chain window disrupting the existing windows Z-order
+			 -- restore original fx selection in the chain
+				Show(obj, 0, 0)
+				Show(obj, t[1], 1)
+					if open then -- if open in a floating window, due to fx selection restoration in the chain by toggling fx chain window the floating window of the target fx will end up obscured by it, so bring it forward by toggling it as well
+					Show(obj, fx_idx, 2); Show(obj, fx_idx, 3)
+					end
+				end
+			end
+		return chain_open, open
+		end
 	end
 
 end
@@ -15114,6 +15548,7 @@ local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
 	if src then
 	src = obj
 	elseif take then
+		if r.TakeIsMIDI(obj) then return end
 	src = r.GetMediaItemTake_Source(obj) -- won't return accurate pointer for reversed source and source sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
 	src = r.GetMediaSourceParent(src) or src
 	end
@@ -15124,7 +15559,7 @@ local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
 			if typ:match(v) then
 				if v == 'VIDEO' then -- as of build 7.52 wma and m4a files are recognized as video even though they only contain audio, so need to be validated further https://forum.cockos.com/showthread.php?t=304924
 				local ext = r.GetMediaSourceFileName(src, ''):match('.+%.(.+)$')
-					if ext == 'wma' and ext == 'm4a' then
+					if ext == 'wma' or ext == 'm4a' then
 					return true
 					end
 				end
@@ -15494,16 +15929,18 @@ end
 
 
 
-function Import_Item_To_RS5k(item, track, rs5k_idx) -- doesn't set sample Mode and doesn't map to a keyboard key
+function Import_Item_To_RS5k(item, track, rs5k_idx, item_idx) -- doesn't set sample Mode and doesn't map to a keyboard key
+-- item_idx is optional, only makes sense when importing
+-- multiple items into the same RS5k instance as velocity layers
 
 local is_source_looped = r.GetMediaItemInfo_Value(item, 'B_LOOPSRC') == 1
 local take = r.GetActiveTake(item)
 local pitch_shift = r.GetMediaItemTakeInfo_Value(take, 'D_PITCH') -- in semitones
 local env = r.GetTakeEnvelopeByName(take, 'Pitch')
-local pitch_env_val
+local pitch_env_val = 0
 	if env then -- pitch of only the 1st point in the envelope is respected
-	retval, time, pitch, shape, tens, is_sel = r.GetEnvelopePointEx(env, -1, 0)
-	pitch_env_val = pitch ~= 0 and pitch or 0
+	local retval, time, pitch, shape, tens, is_sel = r.GetEnvelopePointEx(env, -1, 0)
+	pitch_env_val = pitch
 	end
 
 -- get original media source to calculate unit for convertion of item boundaries into region boundaries within RS5k
@@ -15540,20 +15977,22 @@ or start_offset_take < 0 and len_item + start_offset_take > len_sect and len_sec
 or start_offset_take >= 0 and len_item > len_sect - start_offset_take and len_sect - start_offset_take -- item is extended beyond its source at the end
 or start_offset_take < 0 and len_item + start_offset_take -- item is extended beyond its source at the start
 or len_sect >= len_item and len_item -- item is or isn't trimmed at either end
+len = len == 0 and len_src or len -- if trimmed beyond the source on both sides, ignore trimming
 
 -- https://forum.cockos.com/showpost.php?p=1817782&postcount=5
-r.TrackFX_SetNamedConfigParm(track, rs5k_idx, 'FILE0', file_name)
+r.TrackFX_SetNamedConfigParm(track, rs5k_idx, 'FILE'..(item_idx or 0), file_name)
 r.TrackFX_SetNamedConfigParm(track, rs5k_idx, 'DONE', '')
 
-local set_inf = vol < 1 and r.TrackFX_SetParam(track, rs5k_idx, 2, 0) -- 'Gain for minimum velocity' aka 'Min vol' // set to -inf if item/take voulume < 0 so negative vol can be set
+--local set_inf = vol < 1 and r.TrackFX_SetParam(track, rs5k_idx, 2, 0) -- 'Gain for minimum velocity' aka 'Min vol' // set to -inf if item/take volume < 0 so negative vol can be set
+r.TrackFX_SetParam(track, rs5k_idx, 2, 0) -- 'Gain for minimum velocity' aka 'Min vol' // set to -inf
 r.TrackFX_SetParam(track, rs5k_idx, 0, vol) -- 'Volume' // Normalized type of function must not be used since take (and item) volume scale isn't linear
 -- no difference between the result of using functions below with or without Normalized
 r.TrackFX_SetParamNormalized(track, rs5k_idx, 13, start*unit) -- 'Sample start offset'
 -- r.TrackFX_SetParam(track, rs5k_idx, 13, start*unit)
 r.TrackFX_SetParamNormalized(track, rs5k_idx, 14, (start+len)*unit) -- 'Sample end offset'
 --r.TrackFX_SetParam(track, rs5k_idx, 14, (start+len)*unit)
-r.TrackFX_SetParam(track, rs5k_idx, 15, 0.5+pitch_shift+pitch_env_val*1/160) -- 'Pitch offset' aka Pitch adjust // starting with 0.5 because pitch has positive and negative ranges and 0.5 represents pitch 0 (middle) in the parameter range of 0-1
---r.TrackFX_SetParamNormalized(track, rs5k_idx, 15, 0.5+pitch_shift+pitch_env_val*1/160) -- 'Pitch offset' aka Pitch adjust
+r.TrackFX_SetParam(track, rs5k_idx, 15, 0.5+(pitch_shift+pitch_env_val)*1/160) -- 'Pitch offset' aka Pitch adjust // starting with 0.5 because pitch has positive and negative ranges and 0.5 represents pitch 0 (middle) in the parameter range of 0-1
+--r.TrackFX_SetParamNormalized(track, rs5k_idx, 15, 0.5+(pitch_shift+pitch_env_val)*1/160) -- 'Pitch offset' aka Pitch adjust
 end
 
 
@@ -18184,7 +18623,7 @@ local lane_count
 	local parm = 'I_LANENUMBER'
 	local lane_idx_init = r.GetRegionOrMarkerInfo_Value(0, obj, parm)
 	local lane_count
-		for i=100,0,-1 do
+		for i=100,0,-1 do -- the max lane count was increased to 48 in build 7.78, so 100 it's a bit much
 		r.SetRegionOrMarkerInfo_Value(0, obj, parm, i)
 		local lane_idx = r.GetRegionOrMarkerInfo_Value(0, obj, parm)
 			if lane_idx ~= lane_idx_init then
@@ -20213,11 +20652,14 @@ function Get_Child_Windows_JS1(parent_hwnd)
 -- neither are child window hexadecimal addresses constant,
 -- therefore if the child window lacks title or a fixed title, finding it will be impossible
 -- see alternative method of collecting children with fixed order
--- in Get_Window_And_Children_JS3 and Get_Window_And_Children_JS below
+-- in Get_Window_And_Children_JS3 and Get_Window_And_Children_JS below;
+-- BUT UNLIKE JS_Window_GetRelated() WHICH IS BASED ON Win32 API GetWindow()
+-- IT, BEING BASED ON Win32 API EnumChildWindows(), ALSO RETURNS ALL CHILDREN DESCENDANTS,
+-- https://github.com/juliansader/js_ReaScriptAPI/blob/52b2f2c6eae11437acabbd7a1e6017820cfb6ee3/js_ReaScriptAPI.cpp#L1746
 
 	if not parent_hwnd then return end -- exit, because JS_Window_ListAllChild() accepts invalid argument and returns system child windows instead
 
-local retval, list = r.JS_Window_ListAllChild(parent_hwnd)
+local retval, list = r.JS_Window_ListAllChild(parent_hwnd) -- if handle is invalid returns all top level windows
 local t = {}
 	for address in list:gmatch('0x%x+') do
 	local wnd = r.JS_Window_HandleFromAddress(address)
@@ -20234,14 +20676,17 @@ function Get_Child_Windows_JS2(parent_name, want_exact)
 -- neither are child window hexadecimal addresses constant,
 -- therefore if the child window lacks title or a fixed title, finding it will be impossible
 -- see alternative method of collecting children with fixed order
--- in Get_Window_And_Children_JS3 and Get_Window_And_Children_JS below;
--- want_exact is boolean
+-- in Get_Window_And_Children_JS3 and Get_Window_And_Children_JS below
+-- BUT UNLIKE JS_Window_GetRelated() WHICH IS BASED ON Win32 API GetWindow()
+-- IT, BEING BASED ON Win32 API EnumChildWindows(), ALSO RETURNS ALL CHILDREN DESCENDANTS,
+-- https://github.com/juliansader/js_ReaScriptAPI/blob/52b2f2c6eae11437acabbd7a1e6017820cfb6ee3/js_ReaScriptAPI.cpp#L1746
+-- want_exact is boolean, nil isn't supported;
 
-local parent_wnd = r.JS_Window_Find(parent_name, want_exact)
+local parent_wnd = r.JS_Window_Find(parent_name, want_exact or false)
 
 	if not parent_wnd then return end
 
-local retval, list = r.JS_Window_ListAllChild(parent_hwnd)
+local retval, list = r.JS_Window_ListAllChild(parent_wnd) -- if handle is invalid returns all top level windows
 local t = {}
 	for address in list:gmatch('0x%x+') do
 	local wnd = r.JS_Window_HandleFromAddress(address)
@@ -20261,14 +20706,15 @@ function Get_Child_Windows_JS3(parent_hwnd)
 	if not parent_hwnd then return end
 
 local child = r.JS_Window_GetRelated(parent_hwnd, 'CHILD')
+	if not child then return end -- no children
 local child_t = {}
 	if child then
 		repeat
 		local title = r.JS_Window_GetTitle(child)
 		child_t[title] = child
 	--[[ OR, depending on the design
-		child_t[#child_t+1] = {child=child, title=title}
-	]]
+		child_t[#child_t+1] = {child=child, title=title} -- the lower the index the heigher (closer to the foreground) the window is in the Z-order, because NEXT means below the previous window
+	--]]
 		child = r.JS_Window_GetRelated(child, 'NEXT')
 		until not child
 	end
@@ -20298,13 +20744,47 @@ local child_t = {}
 		local title = r.JS_Window_GetTitle(child)
 		child_t[title] = child
 	--[[ OR, depending on the design
-		child_t[#child_t+1] = {title=title, child=child}
+		child_t[#child_t+1] = {title=title, child=child} -- the lower the index the heigher (closer to the foreground) the window is in the Z-order, because NEXT means below the previous window
 	]]
 		child = r.JS_Window_GetRelated(child, 'NEXT')
 		until not child
 	end
 
 return wnd, child_t
+
+end
+
+
+
+function Get_Sibling_Windows_JS(wnd, excl_orig) -- see Get_Sibling_Windows()
+-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindow
+-- excl_orig is boolean to ignore wnd when collecting data
+
+	if not wnd then return end
+
+-- get first sibling window
+local i, wnd, sibl = 0, wnd
+	repeat
+	wnd = r.JS_Window_GetRelated(wnd, 'PREV')
+	sibl = wnd or sibl
+	i=i+1
+	until not wnd
+	
+	if not sibl then return end -- no siblings
+	
+local i, t =  0, {}
+	repeat
+	sibl = r.JS_Window_GetRelated(sibl, 'NEXT')
+		if sibl and (excl_orig and sibl ~= wnd or not excl_orig) then
+		local title = r.JS_Window_GetTitle(sibl)
+	--	t[title] = sibl
+	--[-[ OR, depending on the design
+		t[#t+1] = {sibl=sibl, title=title} -- the lower the index the heigher (closer to the foreground) the window is in the Z-order, because NEXT means below the previous window
+	--]]
+		end
+	until not sibl
+
+return (#t > 0 or next(t)) and t
 
 end
 
@@ -20325,16 +20805,95 @@ local i, t = 0, {}
 	repeat
 		if child then
 		local ret, txt = r.BR_Win32_GetWindowText(child)
-		t[#t+1] = {child=child, title=txt}
+		t[#t+1] = {child=child, title=txt} -- the lower the index the heigher (closer to the foreground) the window is in the Z-order, because NEXT means below the previous window
 	--[[ -- OR, depending on the design
 		t[txt] = child
-	]]
+	 ]]
 		end
 	child = r.BR_Win32_GetWindow(child, 2) -- 2 = GW_HWNDNEXT // get next sibling of each next found child window advancing until no child is found
 	i=i+1
 	until not child
 return #t > 0 and t
 end
+
+
+
+function Get_Sibling_Windows_SWS(wnd, excl_orig) -- see Get_Sibling_Windows()
+-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindow
+-- the function doesn't cover grandchildren
+-- once window handles have been collected;
+-- excl_orig is boolean to ignore wnd when collecting data
+
+	if not wnd then return end
+	
+-- get first sibling window
+local i, wnd, sibl = 0, wnd
+	repeat
+	wnd = r.BR_Win32_GetWindow(wnd, 3) -- 3 = GW_HWNDPREV
+	sibl = wnd or sibl
+	i=i+1
+	until not wnd
+	
+	if not sibl then return end
+
+local i, t = 0, {}
+	repeat
+	sibl = r.BR_Win32_GetWindow(sibl, 2) -- 2 = GW_HWNDNEXT
+		if sibl and (excl_orig and sibl ~= wnd or not excl_orig) then
+		local ret, txt = r.BR_Win32_GetWindowText(sibl)
+		t[#t+1] = {sibl=sibl, title=txt} -- the lower the index the heigher (closer to the foreground) the window is in the Z-order, because NEXT means below the previous window
+	--[[ -- OR, depending on the design
+		t[txt] = sibl
+	]]
+		end
+	i=i+1
+	until not sibl
+
+return #t > 0 and t
+
+end
+
+
+
+function Get_Sibling_Windows(wnd, excl_orig)
+-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindow
+-- excl_orig is boolean to ignore wnd when collecting data
+
+	if not wnd then return end
+	
+local sws, js = r.BR_Win32_GetWindow, r.JS_Window_GetRelated
+
+	if not sws and js then return end
+	
+-- get first sibling window
+local i, wnd, sibl = 0, wnd
+	repeat
+	wnd = sws and r.BR_Win32_GetWindow(wnd, 3) -- 3 = GW_HWNDPREV
+	or r.JS_Window_GetRelated(wnd, 'PREV')
+	sibl = wnd or sibl
+	i=i+1
+	until not wnd
+	
+	if not sibl then return end
+
+local i, t = 0, {}
+	repeat
+	sibl = sws and r.BR_Win32_GetWindow(sibl, 2) -- 2 = GW_HWNDNEXT
+	or r.JS_Window_GetRelated(sibl, 'NEXT')
+		if sibl and (excl_orig and sibl ~= wnd or not excl_orig) then
+		local ret, txt = table.unpack(sws and {r.BR_Win32_GetWindowText(sibl)} or {nil, r.JS_Window_GetTitle(sibl)}) -- the js extension function only returns a single value so matching to 2 return values of the sws function
+		t[#t+1] = {sibl=sibl, title=txt} -- the lower the index the heigher (closer to the foreground) the window is in the Z-order, because NEXT means below the previous window
+	--[[ -- OR, depending on the design
+		t[txt] = sibl
+	]]
+		end
+	i=i+1
+	until not sibl
+
+return #t > 0 and t
+
+end
+
 
 
 
@@ -20351,7 +20910,7 @@ end
 function Get_Top_Parent_Window(wnd, ignore_dock)
 -- ignore_dock is boolean to ignore internal 'REAPER_dock' window
 -- get window top parent window
--- the one inclding the window title,
+-- the one including the window title,
 -- excluding REAPER main window,
 -- useful for windows with many child windows
 -- which may be parents to one another
@@ -27148,28 +27707,24 @@ end
 
 
 
-function re_store_config_var(key, bit, val)
--- https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html#fxfloat_focus
+function re_store_config_var(key, bit, disable, val)
 -- requires either build 7.74 or sws extension
 -- key is string represnting reaper.ini key;
 -- bit is integer, the bit in the bitfield which matches the target preference
 -- see https://mespotin.uber.space/Ultraschall/Reaper_Config_Variables.html
 -- BUT NOT ALL VALUES ARE BITFIELDS,
--- and the function assumes that when the bit is set the preference is enabled
--- which is not always the case and for preferences which work in reverse
--- the expression 'cur_val+0&bit == bit' will have to be replaced with 'cur_val+0&bit ~= bit';
+-- disable is boolean to disable preference if enabled
+-- and the argument assumes that disable means unsetting the bit in a bitfield,
+-- keep it false/nil if in order to disable a preference its bit must be set;
 -- val is the original value assosiated with the key
 -- which is returned at the storage stage and restored at the restoration stage;
--- arg val must be nil in the storage stage while bit arg may be nil at the restoration stage
+-- arg val must be nil in the storage stage while bit and disable args may be nil at the restoration stage
 
 	if not key or type(key) ~= 'string' then return end
 
 local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.74 -- where set_config_var_string() isn't supported
+	
 	if old_build and not r.SNM_SetIntConfigVar then return end -- in older builds values can only be set with SWS extension API
-
---local key = 'fxfloat_focus', 65536
-local set = old_build and {r.SNM_SetIntConfigVar, key, val} 
-or {r.set_config_var_string, key, val, not val and 0 or 1} -- persist arg in set_config_var_string() depends on the stage, at the storage stage it's 0 so he value is not written into reaper.ini, otherwise 1 for the restored value to be written, OR PROBABLY since at the storage stage it's not written it will be preserved anyway so at the restoration stage 0 can be ued as well
 
 local ret, cur_val = r.get_config_var_string(key)
 
@@ -27179,21 +27734,29 @@ local upd_val
 
 	if not val then -- get to store
 	local bit_set = cur_val+0&bit == bit
-		if not bit_set then
-		upd_val = cur_val+0 | bit
+		if not disable and not bit_set then
+		upd_val = cur_val+0 | bit -- set bit
+		elseif disable and bit_set then
+		upd_val = cur_val+0 ~ bit -- unset bit
 		end
 	end
-	
-	if upd_val or val then -- store or restore
+
+local set = old_build and {r.SNM_SetIntConfigVar, key, val}
+or {r.set_config_var_string, key, val, not val and 0 or 1} -- persist arg in set_config_var_string() depends on the stage, at the storage stage it's 0 so the value is not written into reaper.ini, otherwise 1 for the restored value to be written, OR PROBABLY since at the storage stage it's not written it will be preserved anyway so at the restoration stage 0 can be ued as well
+
+	if upd_val or val then -- update value at the storage stage or restore
 	set[3] = val or upd_val -- update with the calculated value if val arg is nil, i.e. storage stage
-	set[1](table.unpack(set, 2)) -- ubpack starting from index 2
+	set[1](table.unpack(set, 2)) -- unpack starting from index 2
 	end
-	if not val and upd_val then -- OR 'if upd_val' // only return at the storage stage provided the setting 
+	if not val and upd_val then -- OR 'if upd_val' // only return at the storage stage provided the setting was updated
 	return cur_val+0 
 	end
 
 end
-
+-- USE:
+-- local orig_val = re_store_config_var(key, bit, disable, val)
+-- DO STUFF
+-- re_store_config_var(key, bit, disable, orig_val)
 
 
 
@@ -27393,6 +27956,7 @@ end
 -- then return r.defer(function() do return end end) end -- OR use no_undo() function
 
 
+
 function SWS_Version_Check(ver, older, newer, same)
 -- ver is a string contaning a version number
 -- to compare current version againts
@@ -27411,6 +27975,24 @@ function SWS_Version_Check(ver, older, newer, same)
 	end
 end
 
+
+
+function extension_installed1(ext_functon_name)
+-- ext_functon_name is a function, i.e. reaper.BR_Win32_SetFocus
+return ext_functon_name
+end
+
+
+function extension_installed2(ext_functon_name)
+-- ext_functon_name is a string, i.e. 'BR_Win32_SetFocus'
+return r.APIExists(ext_functon_name)
+end
+
+
+function sws_ext_installed(cmd_ID)
+-- cmd_ID is a string command ID of an sws action
+return r.NamedCommandLookup(cmd_ID) ~= 0
+end
 
 
 function No_Extensions(sws, js)
@@ -28069,9 +28651,12 @@ end
 --]]
 
 
-local is_new_value,filename,sectionID,cmdID,mode,resolution,val = r.get_action_context()-- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // the function must be outside as it cannot work properly inside more than 1 user function, in which case val will be 0
+local is_new_value,filename,sectionID,cmdID,mode,resolution,val, ctxstr = r.get_action_context()-- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // the function must be outside as it cannot work properly inside more than 1 user function, in which case val will be 0
+-- ctxstr return value is supported since version 7.0, 
+-- if it's 'key::0' the script is run with a mouse click from the Action list
+-- if empty string, it's run from a toolbar or a menu
 function Mousewheel_Or_Shortcut(val)
-return val == math.abs(15) or mode == 1, val == 63 or mode == 0 -- mousewheel, shortcut
+return val == math.abs(15) or mode == 1, val == 63 or mode == 0 -- mousewheel, shortcut or click
 end
 
 
@@ -30598,6 +31183,8 @@ M A T H
 	clamp1
 	clamp2
 	to_base36
+	encode_bools_into_integer
+	decode_bools_from_integer
 
 
 S T R I N G S
@@ -30695,7 +31282,8 @@ T A B L E S
 	truncate_array1
 	truncate_array2
 	shuffle_array
-	Randomize_Array
+	Randomize_Array1
+	Randomize_Array2
 	sort_notes_by_name
 	binary_search1
 	binary_search2
@@ -31058,6 +31646,10 @@ F X
 	Get_FX_All_Parent_Containers
 	GetSetClear_FX_Parm_Mapping_Across_Containers
 	Get_Container_Parm_Source_Props
+	Get_FX_Shown_In_Container
+	Concat_Container_FX_Wnd_Title
+	Collect_All_FX_Indices
+	Get_Regular_Cont_FX_Index
 	Get_FX_Parm_Orig_Name_s
 	Get_FX_Parm_By_Name_Or_Ident
 	Get_FX_Type
@@ -31073,7 +31665,9 @@ F X
 	Collect_FX_Parm_Aliases
 	Get_FX_Wet_Delta_Params
 	Move_FX_At_Index_To_Slot_N
-	Get_FX_Selected_In_Container
+	Close_All_FX_Windows
+	FX_AddByName_Alt
+	FX_GetOpen_Alt
 
 
 I T E M S
@@ -31289,7 +31883,10 @@ W I N D O W S
 	Get_Child_Windows_JS2
 	Get_Child_Windows_JS3
 	Get_Window_And_Children_JS
+	Get_Sibling_Windows_JS
 	Get_Child_Windows_SWS
+	Get_Sibling_Windows_SWS
+	Get_Sibling_Windows
 	Get_All_Parent_Windows
 	Get_Top_Parent_Window
 	Is_Parent_Window
@@ -31557,6 +32154,9 @@ U T I L I T Y
 	REAPER_Ver_Check2
 	REAPER_Ver_Check3
 	SWS_Version_Check
+	extension_installed1
+	extension_installed2
+	sws_ext_installed
 	No_Extensions
 	how_recently_the_project_was_saved
 	Time_Sel_Or_Loop_Exist
