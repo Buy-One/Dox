@@ -585,6 +585,7 @@ ACT 1 0 "d06c2dfeff8f9d4fafcfa930f232f3a6" "Custom: Set selected item right edge
 ACT 1 0 "23a764452e34514b97f94ddbd8cfbff8" "Custom: Set selected item right edge to start of next item on the same track (select track)" 40528 41173 41667 40625 40417 40626 40289 40718 41307 40635
 ACT 1 0 "e2ea8b4a5bb9bf47b0827d43279706e6" "Custom: Set selected item right edge to start of next item on the same track, extending left edge (select track)" 40528 41173 41667 40625 40417 40626 40289 40718 41307 40630 41666 41305 40635
 ACT 1 0 "063a97f5e5df8c4b8f92e3c0cbd1c7e3" "Custom: Set selected item to end of previous item on the same track, extending right edge (select track)" 40528 41173 41667 40626 41173 40416 41174 40625 40289 40718 41306 40635
+ACT 1 0 "beb22356ac54d04fa56cc6072f24a52a" "Custom: Set time selection between first and last project markers (won't work if 1st marker is at project start) -- requires 7.62+" 2022 43487 2013 43487 40042 40173 40625 40043 40839 40839 40839 40839 40839 40839 40839 40839 40839 40839 40839 40839 40172 40626 2013 43487
 ACT 1 0 "f85e8caa1a6f0d4fbe9790c905d7d0fb" "Custom: Set time selection to item in 1 key stroke" 40528 40290
 ACT 1 0 "5c39e86032728549a301c5289dfa71da" "Custom: WirrawayMusic_Nudge loop left/right and play (1st create a loop) -- bind to the mousewheel" 40623 2013 40040 2014 40039 40622 40635 40632 1007
 ACT 1 0 "b05b24511dcb7b4c8689060c94eb0dbf" "Custom: Shift loop left/right by the loop length (1st create a loop) -- bind to the mousewheel" 40623 2014 40037 2013 40038 40622 40635
