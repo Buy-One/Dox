@@ -110,7 +110,40 @@ r.Undo_EndBlock(undo, -1)
 else r.Undo_EndBlock('', -1) end
 
 
-function undo_block(undo) -- undo arg is a string, which isn't used at the beginning of the block and only used at its end
+function Undo(...)
+-- expects 2 arguments for Undo_EndBlock:
+-- description sring, and flag integer
+--[[
+flags: https://forum.cockos.com/showthread.php?p=2964417
+UNDO_STATE_ALL -1
+UNDO_STATE_TRACKCFG 1 // track/master vol/pan/routing, routing/hwout envelopes too
+UNDO_STATE_FX 2 // track/master fx
+UNDO_STATE_ITEMS 4 // track items
+UNDO_STATE_MISCCFG 8 // loop selection, markers, regions, extensions
+UNDO_STATE_FREEZE 16 // freeze state
+UNDO_STATE_TRACKENV 32 // non-FX envelopes only
+UNDO_STATE_FXENV 64 // FX envelopes, implied by UNDO_STATE_FX too
+UNDO_STATE_POOLEDENVS 128 // contents of automation items -- not position, length, rate etc of automation items, which is part of envelope state
+UNDO_STATE_FX_ARA 256 // ARA state
+--]]
+local t = {...}
+	if #t==0 then
+	r.Undo_BeginBlock()
+	else
+	local undo = t[1] or r.get_action_context()})[2]:match('[^\\/]+_(.+)%.%w+') -- without path, scripter name & ext
+	r.Undo_EndBlock(undo, t[2])
+	end
+end
+-- USE:
+-- Undo() -- start block
+-- DO STUFF
+-- Undo('my undo', -1) -- end block
+
+
+function undo_block(undo) 
+-- undo arg is a string, 
+-- which isn't used at the beginning of the block 
+-- and only used at its end
 	if not undo then r.Undo_BeginBlock()
 	else r.Undo_EndBlock(undo, -1)
 	end
@@ -127,6 +160,7 @@ r.Undo_EndBlock(r.Undo_CanUndo2(0) or '', -1) -- prevent display of the generic 
 function Force_MIDI_Undo_Point1(take)
 -- a trick shared by juliansader to force MIDI API to register undo point; Undo_OnStateChange() works too but with native actions it may create extra undo points, therefore Undo_Begin/EndBlock() functions must stay
 -- https://forum.cockos.com/showpost.php?p=1925555
+-- since build 7.78 the regular undo should work properly with MIDI
 local item = take and r.GetMediaItemTake_Item(take) or r.GetMediaItemTake_Item(r.MIDIEditor_GetTake(r.MIDIEditor_GetActive()))
 --r.SetMediaItemSelected(item, false)
 --r.SetMediaItemSelected(item, true)
@@ -138,6 +172,7 @@ end
 
 function Force_MIDI_Undo_Point2(take) -- may or may not work, the above version is more reliable
 -- https://forum.cockos.com/showpost.php?p=1925555
+-- since build 7.78 the regular undo should work properly with MIDI
 local item = r.GetMediaItemTake_Item(take)
 local tr = r.GetMediaItemTrack(item)
 r.MarkTrackItemsDirty(tr, item)
@@ -1031,10 +1066,11 @@ end
 function encode_bools_into_integer(int, ...)
 -- max supported int value is 256, i.e. first byte;
 -- vararg is list of boolean variables, i.e. true or false
+-- or they will treated as true or false, nil isn't supported
 local incr = 0
 	for k, bool in ipairs{...} do
 		if bool then
-		int = int + 2^(8+incr) -- or int|2^(8+incr)
+		int = int + 2^(8+incr) -- or int|2^(8+incr), or int|(1<<8+incr), or int + (1<<8+incr)
 		end
 	incr = incr+1
 	end
@@ -1042,22 +1078,50 @@ return int
 end
 
 
-function decode_bools_from_integer(int, ...)
+function decode_bools_from_integer(int, some, ...)
 -- int is value returned from encode_bools_into_integer;
--- vararg is list of boolean variables, i.e. true or false;
--- to extract the original integer all booleans must be uncluded 
-local incr = 0
+-- some arg defines the way vararg is interpreted, 
+-- if false, vararg must be a list of variables representng booleans
+-- passed into encode_bools_into_integer(), only their overall
+-- number matters, not actual boolean values, alternatively an integer
+-- representing their overall number may be passed,
+-- if true, vararg must be a list of exponents for number 2 signifying the encoded bits
+-- the lowest of which is 8 such that the one corresponding to the
+-- 1st boolean encoded with encode_bools_into_integer() is 8, to the 2nd boolean - 9,
+-- then 10 and so on, so only some booleans can be decoded from the int,
+-- e.g. to only decode 1st and 3d booleans 8 and 10 must be passed as vararg;
+-- the original integer will only be decoded when some arg is false
+local t = {...}
+count = not some and tonumber(...) and (...) or #t -- if vararg is integer use it
 local bools_t = {}
-	for k, bool in ipairs{...} do
-	local bit = 2^(8+incr)
-	bools_t[#bools_t+1] = int&bit == bit -- evaluate before sutracting from integer
-	int = int ~ bit -- or int|2^(8+incr)
-	incr = incr+1
+	for i=1, count do	
+--	for k, bool in ipairs{...} do
+	local bit = 2^(not some and 8+i-1 or t[i])
+	bools_t[#bools_t+1] = int&bit == bit -- evaluate before subtracting from integer
+		if not some then -- keep decoding the original integer
+		int = int ~ bit
+		end
 	end
 return int, bools_t -- or table.unpack(bools_t)
 end
 
 
+function to_signed32(value)
+-- https://github.com/TouristKiller/TK-Scripts/blob/master/Tools/TK_Latency_Presets.lua
+value = math.floor(tonumber(value) or 0)
+	if value > 2147483647 then value = value - 4294967296 end
+	if value < -2147483648 then value = value + 4294967296 end
+return value
+end
+
+
+function sign(n)
+-- exists in Javascript and in some Lua libraries
+return n > 0 and 1 or n < 0 and -1 or 0
+end
+-- USE: reduce number by 1 keeping its sign
+-- 5 - sign(5) = 4
+-- -5 - sign(-5) = -4
 
 
 --================================ M A T H  E N D ===================================
@@ -2702,6 +2766,32 @@ end
 -- filter_inplace(t, 1)
 
 
+function filter_inplace3(t, func)
+-- https://stackoverflow.com/questions/49709998/how-to-filter-a-lua-array-inplace
+-- func is a function which defines the rule 
+-- by which the table will be filtered
+-- see example below
+
+local new_idx, size_orig = 1, #t
+
+	for old_idx, v in ipairs(t) do
+		if func(v, old_idx) then
+		t[new_idx] = v
+		new_idx = new_idx + 1
+		end
+	end
+	-- nuke all fields from the end of the
+	-- filtered array to the end of the original
+	for i = new_idx, size_orig do 
+	t[i] = nil 
+	end
+
+end
+-- EX
+-- filter_inplace(arr, function(val) return val > 5 end) -- filter numbers lower than 5
+
+
+
 function merge_2_arrays_at_index(t1,t2,index)
 -- the result is updated t1
 -- index applies to t1
@@ -3469,15 +3559,16 @@ r.MarkTrackItemsDirty(tr, item)
 end
 
 
-function Lane_Type_To_Event_Data(ME) -- relies on Error_Tooltip() for error message
+function Lane_Type_To_Event_Data(ME, last_clicked_lane) -- relies on Error_Tooltip() for error message
 -- further implementation see in Insert or edit MIDI event at edit cursor.lua
 local ME = not ME and r.MIDIEditor_GetActive()
-local last_clicked_lane = r.MIDIEditor_GetSetting_int(ME, 'last_clicked_cc_lane')
+local last_clicked_lane = last_clicked_lane or r.MIDIEditor_GetSetting_int(ME, 'last_clicked_cc_lane')
 
 	if last_clicked_lane == -1 then  -- last clicked lane return value is -1 when the Piano roll was last clicked context
 	Error_Tooltip('\n\nthe last clicked lane is undefined\n\n  click any lane to make it active \n\n', 1, 1) -- caps, spaced true
 	return end
-
+	
+--[[ INEFFICIENT
 return (last_clicked_lane >= 0 and last_clicked_lane <= 119 -- regular 7-bit cc lanes
 or last_clicked_lane >= 256 and last_clicked_lane <= 287) -- 14-bit lanes
 and 176
@@ -3488,6 +3579,22 @@ or last_clicked_lane == 516 and 176 -- Bank/Program select // the data in this l
 or last_clicked_lane == 517 and 1 -- text events, between 1 and 14, currently only 9 are available // the value will be fine tuned in the loop so that all text event types are covered
 or last_clicked_lane == 518 and -1 -- sysex event
 or last_clicked_lane == 520 and 15 -- notation event
+--]]
+
+local t = {
+[513] = 224, -- pitch
+[514] = 192, -- program change
+[515] = 208, -- channel pressure (aftertouch)
+[516] = 176, -- Bank/Program select // the data in this lane is linked to CC#00 Bank select MSB lane, events created in one automatically appear in the other, for both MIDI_GetCC() chanmsg return value is 176
+[517] = 1, -- text events, between 1 and 14, currently only 9 are available // the value will be fine tuned in the loop so that all text event types are covered
+[518] = -1, -- sysex event
+[520] = 15, -- notation event
+[521] = 160 -- poly aftertouch 
+}
+
+return t[last_clicked_lane] or (last_clicked_lane >= 0 and last_clicked_lane <= 119 -- regular 7-bit cc lanes
+or last_clicked_lane >= 256 and last_clicked_lane <= 287) -- 14-bit lanes
+and 176
 
 end
 
@@ -3556,7 +3663,7 @@ local ME = r.MIDIEditor_GetActive()
 local take = r.MIDIEditor_GetTake(ME)
 
 
-function are_notes_selected(ME, take)
+function are_notes_selected(ME, take) -- see more efficient Notes_Selected()
 local ME = not ME and r.MIDIEditor_GetActive() or ME
 local take = not take and r.MIDIEditor_GetTake(ME) or take
 local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take)
@@ -3567,15 +3674,8 @@ local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take)
 end
 
 
-function Notes_Selected(ME, take) -- in current MIDI channel
-local ME = not ME and r.MIDIEditor_GetActive() or ME
-local take = not take and r.MIDIEditor_GetTake(ME) or take
-return r.MIDI_EnumSelNotes(take, -1) ~= -1 -- OR >= 0 OR > -1 // 1st selected note
-end
-
-
 -- MUCH SIMPLER r.MIDI_EnumSelNotes(take, -1) == 0
-function selected_notes_exist(ME, take)
+function selected_notes_exist(ME, take) -- see more efficient Notes_Selected()
 local ME = not ME and r.MIDIEditor_GetActive() or ME
 local take = not take and r.MIDIEditor_GetTake(ME) or take
 local noteidx = -1 -- since MIDI_EnumSelNotes returns the index of the next selected MIDI note, the first of which would be 0
@@ -3583,6 +3683,13 @@ local noteidx = -1 -- since MIDI_EnumSelNotes returns the index of the next sele
 	noteidx = r.MIDI_EnumSelNotes(take, noteidx)
 		if noteidx > 0 then break end -- at least 1 sel note
 	until noteidx == -1 -- -1 if there are no more or no selected events
+end
+
+
+function Notes_Selected(ME, take) -- in current MIDI channel
+local ME = not ME and r.MIDIEditor_GetActive() or ME
+local take = not take and r.MIDIEditor_GetTake(ME) or take
+return r.MIDI_EnumSelNotes(take, -1) ~= -1 -- OR >= 0 OR > -1 // 1st selected note
 end
 
 
@@ -4503,7 +4610,7 @@ local evt_t, ch_t = {}, {}
 	repeat
 	idx = r.MIDI_EnumSelCC(take, idx)
 		if idx > -1 then
-		local retval, sel, muted, ppqpos, chanmsg, chan, msg2, msg3 = r.MIDI_GetCC(take, idx) -- point indices are based on their time position hence points with sequential indices will likely belong to different CC envelopes // only targets events in the current MIDI channel if Channel filter is enabled // if looking for all events use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
+		local retval, sel, muted, ppqpos, chanmsg, chan, msg2, msg3 = r.MIDI_GetCC(take, idx) -- point indices are based on their time position hence points with sequential indices are likely to belong to different CC envelopes // only targets events in the current MIDI channel if Channel filter is enabled // if looking for all events use Clear_Restore_MIDI_Channel_Filter() to disable filter if enabled and re-enable afterwards
 		local stored
 			for _, cc in ipairs(evt_t) do
 				if cc == msg2 or cc == chanmsg then stored = 1 break end
@@ -4765,6 +4872,67 @@ local ch_t = {2,5,13,15} -- channels to delete from
 	Delete_Notes(take, ch, want_active_ch)
 	end
 ]]
+
+
+
+function Delete_CC_Events_Within_Time(ME, take, data_type, CC_No, st, fin)
+-- ME is MIDI Editor handle returned by r.MIDIEditor_GetActive();
+-- data_type, integer, see values of chanmsg attribute below,
+-- passed either manually or converted from current lane type
+-- with Lane_Type_To_Event_Data();
+-- CC_No only relevant if expected data_type is 176
+-- to only be able to affect events in a particular CC envelope,
+-- if data_type is fed from current lane type via Lane_Type_To_Event_Data()
+-- CC_No will be the actual value
+-- returned by r.MIDIEditor_GetSetting_int(ME, 'last_clicked_cc_lane')
+
+-- chanmsg (event type):
+-- 0 - non-CC: (off) velocity, text/notation/sysex events, 160 - Poly Aftertouch, 176 - CC, Bank/Program select, Bank select, 192 - Program change, 208 - Channel pressure (aftertouch), 224 - Pitch (bend)
+-- msg2:
+-- always 0 for non-CC, Bank/Program select, 00 Bank select MSB events
+-- first 7 bits (MSB) of event value for Pitch (msg3 provides second 7 bits (LSB))
+-- program number for Program
+-- event value for Channel pressure
+-- CC message number for CC events starting from 0
+-- msg3:
+-- always 0 for non-CC, Program, Channel pressure
+-- second 7 bits (LSB) of event value for Pitch (msg2 provides first 7 bits (MSB))
+-- bank MSB for Bank/Program select and 00 Bank select MSB events, 0 if Bank/Program select event doesn't have .reabank loaded
+-- event value for CC events
+
+local ME = ME or r.MIDIEditor_GetActive()
+local take  = take or r.MIDIEditor_GetTake(ME)
+
+local retval, notecnt, ccevtcnt, textsyxevtcnt = r.MIDI_CountEvts(take)
+
+	if ccevtcnt == 0 then return end
+
+-- table of supported data types,
+-- if all data types should be supported, the table is useless
+-- and t[chanmsg] condition should be removed from the loop
+local t = {
+[160] = 'poly aftertouch',
+[176] = 'CC', -- includes Bank/Program select, Bank select but these aren't supported by the script and trigger error message if selected in CC lane
+[192] = 'program',
+[208] = 'ch press',
+[224] = 'pitch'
+}
+
+local st = r.MIDI_GetPPQPosFromProjTime(take, st)
+local fin = r.MIDI_GetPPQPosFromProjTime(take, fin)
+local cur_ch = r.MIDIEditor_GetSetting_int(ME, 'default_note_chan') -- 0-15 // returns last channel when channel filter is set to 'All Channels' or 'Multichannel'
+
+	for i=ccevtcnt,0,-1 do
+	local retval, sel, muted, ppqpos, chanmsg, chan, msg2, msg3 = r.MIDI_GetCC(take, i) -- point indices are based on their time position hence points with sequential indices are likely to belong to different CC envelopes // only targets events in the current MIDI channel if Channel filter is enabled
+		if ppqpos >= st and ppqpos <= fin and chan == cur_ch
+		and t[chanmsg] and data_type == chanmsg
+		and (data_type == 176 and msg2 == CC_No or data_type ~= 176)
+		then
+		r.MIDI_DeleteCC(take, i)
+		end
+	end
+
+end
 
 
 
@@ -11299,34 +11467,97 @@ end
 
 function Get_FX_Container_Chunk(obj, cont_idx)
 -- supported since 7.06;
--- relies on GetObjChunk2() and Esc();
+-- relies on GetObjChunk() and Esc()
 -- the retured chunk ends with the GUID of container at cont_idx
 -- which is short of the full chunk which also includes 
 -- WAK and optional attributes such as PARALLEL
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-local ret, chunk = GetObjChunk2(take and r.GetMediaItemTake_Item(obj) or obj)
+local ret, chunk = GetObjChunk(take and r.GetMediaItemTake_Item(obj) or obj)
 
-	if ret == 'err_mess' then return end
+	if ret == 'err_mess' or not ret then return end
 
 local GetGUID, GetParm = table.unpack(take and {r.TakeFX_GetFXGUID, r.TakeFX_GetNamedConfigParm} 
 or {r.TrackFX_GetFXGUID, r.TrackFX_GetNamedConfigParm})
+local input_fx_chain = cont_idx >= 0x1000000 and cont_idx <= 0x2000000 or cont_idx-0x2000000 >= 0x1000000 -- or 16777216 instead of 0x1000000 and 33554432 instead of 0x2000000 // TrackFX_GetRecChainVisible() gives false positives because it's valid regardless of the window being focused
+
+--[[ PART OF THE FLAWED CONCEPT, see below
+
 local GUID_start = GetGUID(obj, cont_idx) -- container GUID
+--local ret, cont_fx_cnt = GetParm(obj, cont_idx, 'container_count')
 local ret, idx = GetParm(obj, cont_idx, 'container_item.0') -- get index of the 1st fx inside container
-	
+
 	if not ret then return end -- OR idx == '' // container is empty
 	
 local GUID_end = GetGUID(obj, idx) -- GUID of the first fx inside the container
+
+--]]
+
+local GUID = GetGUID(obj, cont_idx) -- container GUID
+
+	local function count_intervening_containers(obj, parent_idx, cur_cont_idx)
+	local ret, count = GetParm(obj, parent_idx, 'container_count')
+	local ret, first_idx = GetParm(obj, parent_idx, 'container_item.0')
+		if cur_cont_idx and (count+0 == 1 or first_idx+0 == cur_cont_idx) then return 0
+		else
+		local extra_cont = 0
+			for i=0, count-1 do
+			local ret, idx = GetParm(obj, parent_idx, 'container_item.'..i)
+				if idx+0 ~= cur_cont_idx and GetFXType(obj, idx) == 8 then 
+				extra_cont = extra_cont+1
+				-- go recursive counting nested containers in containers which precede
+				-- the one at cur_cont_idx, ommitting cur_cont_idx argiment 
+				-- because in those nested containers it's irrelevant, it only makes
+				-- sense in the fx chain it belongs to, this allows evaluating all fx
+				-- in those nested containers both downstream and upstream
+				extra_cont = extra_cont + count_intervening_containers(obj, idx)
+				elseif idx+0 == cur_cont_idx then return extra_cont
+				end
+			end
+		return extra_cont
+		end
+	return 0
+	end
+
+local i, depth = 0, 1
+	repeat
+	-- the main loop counts parent containers, count_intervening_containers() function 
+	-- counts containers which precede the current one and every one of its parent containers 
+	-- within their respective fx chains
+	local ret, par_idx = GetParm(obj, cont_idx, 'parent_container')
+		if #par_idx > 0 then
+		depth = depth + count_intervening_containers(obj, par_idx, cont_idx) -- account for intervening containers between the current one and its outermost parent container to be able to accurately calculate number of <CONTAINER tokens in the chunk from object chunk start when isolating current container chunk
+		depth, cont_idx = depth+1, par_idx+0
+		end
+	i=i+1
+	until #par_idx == 0
+	
+	-- account for containers preceding the outermost parent container 
+	-- at cont_idx stemming from the above loop, in the main fx chain
+	for i=0, CountFX(obj)-1 do
+	local i = input_fx_chain and i+0x1000000 or i
+		if i < cont_idx and GetFXType(obj, i) == 8 then -- 8 means container
+		depth = depth+1
+		depth = depth + count_intervening_containers(obj, i)
+		end
+	end	
 
 local t = {}
 	for line in chunk:gmatch('[^\n\r]+') do
 		if line then t[#t+1] = line end
 	end
-	
+
+local cont_chunk, found = ''
+
+--[=[ 
 -- extract container chunk parsing from its GUID backwards
--- while counting other GUIDs which the loop comes across
 -- until the GUID of the first fx inside the container is found
-local fx_counter, cont_chunk, found = 0, ''
+
+-- FLAWED, FAILS WHEN 1ST ITEM INSIDE SOURCE CONTAINER IS NOT FX BUT A NESTED CONTAINER
+-- LEADING TO LOOP NEVER REACHING THE BEGINNING OF THE SOURCE CONTAINER
+-- AND EXITING EARLY BECAUSE ALL CONTANTER GUIDs ARE LISTED AT THE BOTTOM OF THE CHUNK
+-- INCLUDING THAT NESTED CONTAINER GUID
+
 	for i=#t,1,-1 do
 	local line  = t[i]
 		if line:match(Esc(GUID_start)) then found = 1
@@ -11336,6 +11567,28 @@ local fx_counter, cont_chunk, found = 0, ''
 			if line:match(Esc(GUID_end)) then found = 2 
 			elseif found == 2 and line:match('<CONTAINER') then break
 			end
+		end
+	--[[
+		if found == 2 then		
+		cont_chunk = line..'\n'..cont_chunk
+		--	if line:match('<CONTAINER') then break end
+		end
+	--]]
+	end
+--]=]
+	
+local counter, rec_chain = 0
+	for i=1, #t do
+	local line = t[i]
+		if input_fx_chain and line:match('<FXCHAIN_REC') then rec_chain = 1 end
+		if (not input_fx_chain or rec_chain) and line:match('<CONTAINER') 
+		then counter = counter+1 end
+		if counter == depth and not found then
+		found = 1
+		cont_chunk = line
+		elseif found then
+		cont_chunk = cont_chunk..'\n'..line
+			if line:match(Esc(GUID)) then break end
 		end
 	end
 
@@ -11795,10 +12048,11 @@ end
 
 
 
-function Is_FX_Chain_Open(obj)
+function Is_FX_Chain_Open(obj, want_input_chain)
+-- want_input_chain is boolean
 local validate = r.ValidatePtr
 local tr, take = validate(obj, 'MediaTrack*'), validate(obj, 'MediaItem_Take*')
-local Open = take and r.TakeFX_GetChainVisible or tr and r.TrackFX_GetChainVisible
+local Open = take and r.TakeFX_GetChainVisible or tr and want_input_chain and r.TrackFX_GetRecChainVisible or r.TrackFX_GetChainVisible
 return Open(obj) ~= -1
 end
 
@@ -11807,24 +12061,10 @@ end
 function Is_FX_Open(obj, fx_index) -- open in the fx chain and in a floating window
 local validate = r.ValidatePtr
 local tr, take = validate(obj, 'MediaTrack*'), validate(obj, 'MediaItem_Take*')
-local GetCount, GetOpen, GetFloatingWindow = table.unpack(take and {r.TakeFX_GetCount, r.TakeFX_GetOpen, r.TakeFX_GetFloatingWindow} or tr and {r.TrackFX_GetCount, r.TrackFX_GetOpen, r.TrackFX_GetFloatingWindow})
-return GetOpen(obj, fx_index), GetFloatingWindow(obj,fx_index)
---[[-- not clear why i used this // this is useful when searching if there're ANY fx selected in the chain and/or open in floating window
-	if tr or take then
-		for fx_idx = 0, GetCount(obj)-1 do
-			if GetOpen(obj, fx_idx) and fx_idx == fx_index then
-			return true, GetFloatingWindow(obj,fx_index)
-			end
-		end
-		if tr then
-			for fx_idx = 0, r.TrackFX_GetRecCount(tr)-1 do
-				if r.TrackFX_GetOpen(tr, fx_idx+0x1000000) and fx_idx+0x1000000 == fx_index then
-				return true, GetFloatingWindow(obj,fx_index)
-				end
-			end
-		end
-	end
-	]]
+local input_fx = fx_num >= 0x1000000 and fx_num <= 0x2000000 or fx_num-0x2000000 >= 0x1000000 -- or 16777216 instead of 0x1000000 and 33554432 instead of 0x2000000 // TrackFX_GetRecChainVisible() gives false positives because it's valid regardless of the window being focused
+local GetCount, GetOpen, ChainVis, GetFloatingWindow = table.unpack(take and {r.TakeFX_GetCount, r.TakeFX_GetOpen, r.TakeFX_GetChainVisible, r.TakeFX_GetFloatingWindow} or tr and {r.TrackFX_GetCount, r.TrackFX_GetOpen, input_fx and r.TrackFX_GetRecChainVisible or r.TrackFX_GetChainVisible, r.TrackFX_GetFloatingWindow})
+return ChainVis(obj) == fx_index + (input_fx and 0x1000000 or 0), GetFloatingWindow(obj, fx_index) -- for input fx ChainVis returns regular index so must be converted to index format used in the input fx chain 
+--return GetOpen(obj, fx_index), GetFloatingWindow(obj,fx_index) -- wrong, because GetOpen() returns truth when fx is open either in the fx chain or in the floating window
 end
 
 
@@ -12435,7 +12675,7 @@ end
 
 function Get_FX_Selected_In_FX_Chain(obj, input_fx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensive version
 -- input_fx is boolean for use in builds 7.06+ to target input/Monitoring FX chain
--- doesn't support containers
+-- doesn't support containers, see Get_FX_Shown_Or_Selected_In_Container() and Get_FX_Selected_In_Container()
 
 local take, tr = r.ValidatePtr(obj, 'MediaItem_Take*'), r.ValidatePtr(obj, 'MediaItem_Track*')
 FX_GetNamedConfigParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
@@ -12462,25 +12702,27 @@ end
 
 
 
-function Set_FX_Selected_In_FX_Chain(obj, input_fx, fx_idx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensive vesrion
--- before build 7.06 relies on SetObjChunk() and on Esc() for dealing with takes
--- functions FX_Copy_To_Take(), FX_Copy_To_Track() in particular change fx selection in the source chain, making selected the last addressed fx
--- so the original selection requires restoration
--- doesn't support containers
--- since 7.06 can be done with FX_SetNamedConfigParm()
--- input_fx is boolean for use in builds 7.06+ to target input/Monitoring FX chain
+function Set_FX_Selected_In_FX_Chain(obj, fx_idx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensive vesrion
+-- before build 7.06 relies on SetObjChunk2(), and on Esc() for dealing with takes,
+-- functions FX_Copy_To_Take(), FX_Copy_To_Track() in particular 
+-- change fx selection in the source chain, making selected the last addressed fx
+-- so the original selection requires restoration,
+-- doesn't support containers, see Set_FX_Selected_In_Container(),
+-- since 7.06 can be done with FX_SetNamedConfigParm() and 'chain_sel' parameter
+
+	if fx_idx >= 0x2000000 then return end -- container fx
 
 local take, tr = r.ValidatePtr(obj, 'MediaItem_Take*'), r.ValidatePtr(obj, 'MediaItem_Track*')
 local FX_Chain_Vis, FX_Open, FX_SetNamedConfigParm = table.unpack(take and {r.TakeFX_GetChainVisible, r.TakeFX_SetOpen, r.TakeFX_SetNamedConfigParm} or tr and {r.TrackFX_GetChainVisible, r.TrackFX_SetOpen, r.TrackFX_SetNamedConfigParm} or {})
-local input_fx = tr and input_fx -- validate so it's only valid if object is track
+local input_fx = tr and fx_idx >= 0x1000000 -- validate so it's only valid if object is track
 
 	if take or tr then
 		if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.06 then
 		FX_SetNamedConfigParm(obj, input_fx and 0x1000000 or 0, 'chain_sel', math.floor(fx_idx)..'') -- converting to string without trailing decimal 0
 		elseif FX_Chain_Vis(obj) ~= -1 -- -1 chain hidden, -2 chain visible but no effect selected
 		then -- FX chain open
-		FX_Open(obj, fx_idx, true) -- open true
-		else -- to select FX in a closed FX chain technically it can be done with FX_SetOpen after opening the chain and then closing it, but you're running the risk of removing the focus from any currently focused windows which is a bad practice
+		FX_Open(obj, fx_idx, true) -- open true // will change windows focus
+		else -- to select FX in a closed FX chain technically it can be done with FX_SetOpen() after opening the chain and then closing it, but you're running the risk of removing the focus from any currently focused windows which is a bad practice
 		local cur_sel_idx, found
 			if tr and tr ~= r.GetMasterTrack(0) then -- ?????? TO TEST Monitoring FX selection cannot be set via chunk because their chunk is stored in reaper-hwoutfx.ini file rather than in the master track chunk and the file cannot be updated as long as REAPER runs
 				for line in chunk:gmatch('[^\n\r]+') do
@@ -12512,22 +12754,25 @@ end
 
 function GetSet_FX_Selected_In_FX_Chain(obj, sel_idx, chunk, input_fx)
 -- before build 7.06 relies on SetObjChunk() and on Esc() for dealing with takes
--- functions FX_Copy_To_Take(), FX_Copy_To_Track() in particular change fx selection in the source chain if the source and destination FX indices are identical https://forum.cockos.com/showthread.php?t=285177#18
+-- functions FX_Copy_To_Take(), FX_Copy_To_Track() in particular 
+-- change fx selection in the source chain if the source and destination FX indices are identical https://forum.cockos.com/showthread.php?t=285177#18
 -- (their non-identity can be used as a conditon to avoid setting selection)
 -- so the original selection requires restoration
--- sel_idx is string, input_fx is boolean to address input fx chain
--- chunk comes from GetObjChunk(), relevant at both stages
--- used in builds older than 7.06, as well as SetObjChunk()
+-- sel_idx is string, input_fx is boolean to address input fx chain, only for GET,
+-- chunk comes from GetObjChunk2(), relevant at both stages
+-- used in builds older than 7.06, as well as SetObjChunk2()
 -- Since 7.06 FX_GetNamedConfigParm() 'chain_sel' can be used, e.g.
 -- FX_GetNamedConfigParm(obj, 0, 'chain_sel') -- 0x1000000 for input fx instead of 0
 -- FX_SetNamedConfigParm(obj, 0, 'chain_sel', fx_idx) -- fx_idx is a string
 -- https://forum.cockos.com/showthread.php?t=285177#19
--- doesn't support containers
+-- doesn't support containers, see Set_FX_Selected_In_Container()
+
+	if sel_idx and sel_idx >= 0x2000000 then return end -- container fx
 
 local old = tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.06
 local take, tr = r.ValidatePtr(obj, 'MediaItem_Take*'), r.ValidatePtr(obj, 'MediaItem_Track*')
 local FX_Chain_Vis, FX_Open, Get_Conf_Parm, Set_Conf_Parm = table.unpack(take and {r.TakeFX_GetChainVisible, r.TakeFX_SetOpen, r.TakeFX_GetNamedConfigParm,r.TakeFX_SetNamedConfigParm} or tr and {r.TrackFX_GetChainVisible, r.TrackFX_SetOpen, r.TrackFX_GetNamedConfigParm, r.TrackFX_SetNamedConfigParm} or {})
-local input_fx = tr and input_fx -- validate so it's only valid if object is track
+local input_fx = input_fx or tr and fx_idx and fx_idx >= 0x1000000 -- validate so it's only valid if object is track
 
 	if not sel_idx then -- GET
 		if not old then
@@ -12548,6 +12793,9 @@ local input_fx = tr and input_fx -- validate so it's only valid if object is tra
 	else -- SET
 		if not old and #sel_idx > 0 then -- only when certain fx was selected, would be empty string if no fx in the chain
 		Set_Conf_Parm(obj, input_fx and 0x1000000 or 0, 'chain_sel', math.floor(fx_idx)..'') -- converting to string without trailing decimal 0
+		elseif FX_Chain_Vis(obj) ~= -1 -- -1 chain hidden, -2 chain visible but no effect selected
+		then -- FX chain open
+		FX_Open(obj, sel_idx, true) -- open true // will change windows focus
 		else -- use chunk
 		-- if object data changed in between the function executions
 		-- the chunk must be re-get for the restoration stage
@@ -12686,6 +12934,17 @@ fx_cnt = fx_cnt or ({GetConfig(obj, parent_cntnr_idx, 'container_count')})[2]
 
 local t = t or {} -- add table for the outermost FX chain on the very first run
 
+-- THE TWO LOOPS CAN PROBABLY BE COMBINED INTO ONE
+
+	for i = 0, fx_cnt-1 do
+	local i = not parent_cntnr_idx and recFX and i+0x1000000 or i
+	i = parent_cntnr_idx and (i+1)*parents_fx_cnt+parent_cntnr_idx or i
+	t[#t+1] = i
+		if GetIOSize(obj, fx_idx) == 8 then -- container
+		
+		end
+	end
+
 	-- collect all fx instances in a chain, including containers
 	for i = 0, fx_cnt-1 do
 	local i = not parent_cntnr_idx and recFX and i+0x1000000 or i
@@ -12700,9 +12959,9 @@ local t = t or {} -- add table for the outermost FX chain on the very first run
 	local retval, cont_fx_cnt = GetConfig(obj, fx_idx, 'container_count') -- retval true even if container is empty
 		if container and cont_fx_cnt+0 > 0 then -- non-empty container
 		t[i] = {fx_idx, {}} -- replace container index with a nested table containing its index and another nested table to collect indices of fx inside it
-		local parent_cntnr_idx = parent_cntnr_idx and fx_idx or 0x2000000+fx_idx+1
+		local parent_cntnr_idx = parent_cntnr_idx and fx_idx or 0x2000000+fx_idx+1 -- 0x2000000 is only added once, to the index of the outermost parent container
 		local parents_fx_cnt = (parents_fx_cnt or 1) * (#t+1) -- #t is equal to fx count in the parent container
-		-- the function must not return table, otherwise its structure will be reversed
+		-- the function must not return table here, otherwise its structure will be reversed
 		-- starting from the innermost fx chain with no way to get higher
 		-- the table is the same throughout the entire recursive loop anyway
 		Collect_All_Container_FX_Indices(obj, t[i][2], recFX, parent_cntnr_idx, parents_fx_cnt) -- go recursive // t[i][2] is the address of the nested table for collecting container fx indices
@@ -12747,25 +13006,31 @@ end
 
 
 
-function Get_FX_All_Parent_Containers(obj, fx_idx)
+function Get_FX_All_Parent_Containers(obj, fx_idx, want_hash)
 -- supported since build 7.06
--- returns table where container indices are listed in ascending order
--- i.e. from the outermost to the innermost
+-- return table where container indices are listed in ascending order
+-- i.e. from the outermost to the innermost;
+-- want_hash is boolean to collect container indices
+-- into a nested table for quick evaluation
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 
 	if fx_idx > 0x2000000 and (tr or take) then -- range fx inside containers, or > 33554432
 	local GetConfigParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
-	local t, retval = {}
+	local t, retval = want_hash and {hash={}} or {}
 		repeat
 		retval, fx_idx = GetConfigParm(obj, fx_idx, 'parent_container')
 			if retval then
 			table.insert(t, 1, fx_idx+0)
+				if want_hash then
+				t.hash[fx_idx+0] = ''
+				end
 			end
 		until not retval -- or #fx_idx == 0
 	return t
 	end
 
 end
-
 
 
 
@@ -12830,6 +13095,7 @@ end
 
 
 
+
 function Get_Container_Parm_Source_Props(obj, cont_idx, parm_idx)
 -- function is supported since build 7.06
 
@@ -12870,34 +13136,369 @@ end
 
 
 
-
-function Get_FX_Shown_In_Container(obj, cont_idx)
+-- below see a more effeicient Get_FX_Selected_In_Container() which doesn't require using chunk
+function Get_FX_Shown_Or_Selected_In_Container(obj, cont_idx, want_selected, respect_empty_cont)
 -- find the FX currently shown in the open innermost container
--- because as of build 7.77 there's no API to get or set index 
--- of FX inside a container whose UI is displayed in the FX chain;
--- relies on Get_FX_Container_Chunk()
+-- or selected in the current container,
+-- because as of build 7.79 there's no API to get or set index 
+-- of FX inside a container whose UI is displayed in the FX chain
+-- of which is selected;
+-- traversing all fx within container and evaluating each with
+-- FX_GetOpen() to find shown fx is not reliable because the function returns truth
+-- when plugin UI is open not only within the fx chain but in floaitng
+-- window as well in which it's not necessarily selected in the chain as well;
+-- relies on Get_FX_Container_Chunk();
+-- cont_idx is index of the selected parent container at any level
+-- but originally the function implied index of the outermost selected parent container;
+-- want_selected is boolean to target LASTSEL attribute rather than SHOW
+-- which (SHOW) is only valid when FX UI is visible across entire container hierarchy
+-- starting from the outermost parent container, so that the function returns
+-- fx selected in the container at cont_idx without parsing the entire container 
+-- hierarchy downstream in case the selected fx is a nested container;
+-- respect_empty_cont is boolean to instruct the function to return
+-- index of the innermost selected/shown container in case it's empty
+-- because due to its being empty nil will be returned otherwise,
+-- only makes sense when want_selected is false otherwise the innermost
+-- nested container may not be reached in the first place
+
 
 local chunk = Get_FX_Container_Chunk(obj, cont_idx)
 
 	if not chunk then return end
 
--- get simple index of the fx currently shown inside the container
-local sel_fx = chunk:match('SHOW (%d+)') -- since SHOW value is 1-based, 0 means container is empty, the fx chain is closed or no UI is shown because the container itself or one of its parent containers are not selected in the chain
+-- get simple index of the fx currently shown/selected inside the container
+local attr = want_selected and 'LASTSEL' or 'SHOW'
+local idx = chunk:match(attr..' (%d+)')
 
-	if sel_fx == '0' then return end
+	if not want_selected and idx == '0' then return end -- since SHOW value is 1-based, 0 means the fx chain is closed or no UI is shown because the container itself or one of its parent containers are not selected in the chain; when an empty innermost container is selected in the chain the value will still be 1, but the function will return nil because there's no fx unless respect_empty_cont arg is true // when SHOW value isn't 0 it's identical to LASTSEL because in order for fx UI to be shown in the fx chain the fx must be selected, in this case they only differ by 1 because SHOW is 1-based while LASTSEL is 0-based
 
-sel_fx = sel_fx-1 -- convert to 0-based
+idx = want_selected and idx or idx-1 -- convert to 0-based if looking for shown fx
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-GetParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
-local ret, sel_fx_idx = GetParm(obj, cont_idx, 'container_item.'..sel_fx) -- get continer based index of the selected fx, i.e. with added 0x200000
+local GetIOSize, GetParm = table.unpack(take and {r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm} 
+or tr and {r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm})
+local ret, idx = GetParm(obj, cont_idx, 'container_item.'..idx) -- get container based index of the fx, i.e. with added 0x2000000
 
-	-- verify if it's a nested container
-	if Get_FX_Type(obj, sel_fx_idx) ~= 'Container' then return sel_fx_idx+0 -- fx, return its container based index converting it to integer because GetParm() return value is a string
+	if not ret then return end -- empty container
+
+idx = idx+0 -- converting to integer because GetParm() return value is a string
+
+	-- verify if it's a nested container, only if looking for shown fx
+	if want_selected or GetIOSize(obj, idx) ~= 8 then return idx -- fx, not container, return its container based index
 	else -- if nested container which cannot be displayed due to lack of a UI
-	return Get_FX_Shown_In_Container(obj, sel_fx_idx)+0 -- go recursive until a plugin is reached
+		if respect_empty_cont then
+		local ret, count = GetParm(obj, idx, 'container_count')
+			if count == '0' then return idx end -- empty container, no point to go recursive, return its own index
+		end
+	return Get_FX_Shown_Or_Selected_In_Container(obj, idx) -- go recursive until a plugin is reached within container hierarchy // may be nil if the innermost container is empty
 	end
 
 end
+
+
+
+
+function Get_FX_Selected_In_Container(obj, cont_idx, want_selected, respect_empty_cont)
+-- cont_idx is index of container from which the search starts;
+-- want_selected is boolean to have the function return fx selected
+-- in container at cont_idx without parsing the entire container
+-- hierarchy downstream in case the selected fx is a nested container;
+-- respect_empty_cont is boolean to have the function to return
+-- index of the innermost selected container in case it's empty
+-- because due to its being empty nil will be returned otherwise,
+-- only makes sense when want_selected is false otherwise the innermost
+-- nested container may not be reached in the first place;
+-- the function is agnostic about chain being open or closed
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+local GetIOSize, GetParm = table.unpack(take and {r.TakeFX_GetIOSize, r.TakeFX_GetNamedConfigParm} 
+or tr and {r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm})
+
+	if GetIOSize(obj, cont_idx) ~= 8 then return cont_idx end -- not container
+
+local i = 0
+	repeat
+	local ret, count = GetParm(obj, cont_idx, 'container_count')
+		if count == '0' then return respect_empty_cont and cont_idx end -- empty container
+	local ret, cont_chain_addr = GetParm(obj, cont_idx, 'container_item.0') -- container_item.0 to query value to be used as container chain address alongside chain_sel attribute and which must correspond to 0 used to address the main chain, much like 0x1000000 is used to address the input/monitoring chain // THE ABSOLUTELY CRUCIAL PART https://forum.cockos.com/showthread.php?t=310132
+	local ret, sel_idx = GetParm(obj, cont_chain_addr, 'chain_sel') -- returns regular 0-based index	
+	ret, sel_idx = GetParm(obj, cont_idx, 'container_item.'..sel_idx) -- convert into container aware format
+	sel_idx = #sel_idx > 0 and sel_idx+0 -- convert into integer
+		if want_selected or GetIOSize(obj, sel_idx) ~= 8 then -- fx or container if want_selected is true
+		return sel_idx
+		else -- get container chain address for the next cycle as loop advances along container hierarchy
+		cont_idx = sel_idx -- update for the next cycle
+		end
+	i=i+1
+	until not sel_idx
+
+end
+
+
+
+-- below see a more efficient version Set_FX_Selected_In_Container2() which doesn't rely on chunk 
+-- and multitude of helper functions
+function Set_FX_Selected_In_Container1(obj, cont_idx, fx_idx, fx_GUID)
+-- cont_idx is index of the outermost parent container or in fact any container,
+-- may be nil/false, in which case the fx will be only set selected 
+-- in its immediate parent container, rather than across the entire fx chain;
+-- fx_idx is index of the innermost container fx which has to be or originally
+-- was shown and selected in the chain when container at cont_idx was selected
+-- and whose UI display and selection the function aims at setting/restoring,
+-- OR index of any container fx in which case the selection will be set
+-- across the entire chain only up to this fx;
+-- fx_GUID is optional, a GUID of the innermost container fx originally
+-- shown in the chain or of any container fx at fx_idx as a safeguard against 
+-- change of fx position within its immediate parent container;
+-- relies on Esc(), GetObjChunk2(), SetObjChunk2(), Get_FX_Shown_Or_Selected_In_Container(), 
+-- Get_FX_Container_Chunk() and Get_FX_All_Parent_Containers()
+
+	if fx_idx-0x2000000 >= 0x1000000 and cont_idx and cont_idx < 0x1000000
+	-- distinguish between regular and input/monitoring chain indices
+	-- mixing them up causes error messages
+	then return 'mismatch between fx indices format' 
+	elseif fx_idx < 0x2000000 then return -- not container fx index
+	end
+
+local input_fx = cont_idx >= 0x1000000 and cont_idx <= 0x2000000 or cont_idx-0x2000000 >= 0x1000000
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+GetGUID, GetParm, SetParm, ChainVisible, Show = table.unpack(take and {r.TakeFX_GetFXGUID, r.TakeFX_GetNamedConfigParm, r.TakeFX_SetNamedConfigParm, r.TakeFX_GetChainVisible, r.TakeFX_Show}
+or tr and {r.TrackFX_GetFXGUID, r.TrackFX_GetNamedConfigParm, r.TrackFX_SetNamedConfigParm, input_fx and r.TrackFX_GetRecChainVisible or r.TrackFX_GetChainVisible, r.TrackFX_Show})
+	
+local item = take and r.GetMediaItemTake_Item(obj)	
+	
+	-- only fx_idx is supplied, set the fx selected in its parent container
+	if not cont_idx then
+	local ret, chunk = GetObjChunk(item or obj)
+		if ret == 'err_mess' or not ret then return end
+	local ret, par_idx = GetParm(obj, fx_idx, 'parent_container')
+	local ret, fx_cnt = GetParm(obj, par_idx, 'container_count')
+	-- find regular fx index in its parent container chain
+	-- because LASTSEL uses regular index
+		for i=0, fx_cnt-1 do
+		local ret, idx = GetParm(obj, par_idx, 'container_item.'..i)
+			if idx+0 == fx_idx or fx_GUID and GetGUID(obj, idx) == fx_GUID 
+			then fx_idx = i
+			break end
+		end		
+	local cont_chunk = Get_FX_Container_Chunk(obj, par_idx)	
+		if cont_chunk:match('LASTSEL (%d)')+0 ~= fx_idx then
+		local cont_chunk_upd = cont_chunk:gsub('LASTSEL %d+', 'LASTSEL '..fx_idx, 1) -- n 1, limit to the very first replacement which applies to the current container
+	--	cont_chunk_upd = cont_chunk_upd:gsub('SHOW %d+', 'SHOW '..(i+1), 1) -- SHOW attribute value is 1-based // redundant, doesn't affect selection whether chain is open or closed
+		cont_chunk = Esc(cont_chunk)
+		cont_chunk_upd = cont_chunk_upd:gsub('%%','%%%%')
+		chunk_upd = chunk_upd:gsub(cont_chunk, cont_chunk_upd)
+			if chunk_upd ~= chunk then 
+			SetObjChunk(item or obj, chunk_upd) 
+			-- fx chain isn't updated if open, so toggle,
+			-- this will only work if cont_idx arg passed to the function
+			-- belongs to the main chain, if not, the index of the outermost parent container
+			-- will have to be found with Get_FX_All_Parent_Containers(obj, cont_idx)
+			-- and used to toggle the fx chain window
+				if ChainVisible(obj) > -1 then -- open chain with fx
+				-- will change windows focus
+				Show(obj, 0, 0) -- close chain
+				Show(obj, cont_idx, 1) -- open
+				end
+			end
+		end
+	return end
+	
+
+-- set fx selected across multiple parent containers
+-- or the entire fx chain
+	
+local cur_fx_idx = Get_FX_Shown_Or_Selected_In_Container(obj, cont_idx)
+
+	if cur_fx_idx == fx_idx then return end
+
+local par_t = Get_FX_All_Parent_Containers(obj, fx_idx, 1) -- want_hash true
+
+	if #par_t == 0 then return end -- the index of the original target fx has likely changed and the index passed as the argument is no longer valid therefore no parent container chain has been detected
+
+local cur_fx_GUID = GetGUID(obj, fx_idx)
+
+	if fx_GUID and cur_fx_GUID ~= fx_GUID then
+	-- GUIDs don't match, the original fx instance index
+	-- may have changed due to fx being moved within its innermost parent container
+	-- i.e. the last stored in par_t table,
+	-- find its current index
+	fx_idx = nil -- reset
+	local par_idx = par_t[#par_t]
+	local ret, fx_cnt = GetParm(obj, par_idx, 'container_count')
+		for i=0, fx_cnt-1 do
+		local ret, idx = GetParm(obj, par_idx, 'container_item.'..i)
+		local GUID = GetGUID(obj, idx)
+			if GUID == fx_GUID then fx_idx = idx+0 break end
+		end
+		if not fx_idx then return end -- the original fx wasn't found in its parent container
+	-- could have been searched across the entire fx chain, but that's probably overkill
+	end
+
+	
+-- make sure that all child containers are selected 
+-- in their respective parent containers
+
+-- select the outermost container in the main chain if relevant
+-- Get/SetParm() only support main chain
+	if input_fx and cont_idx <= 0x2000000 or cont_idx < 0x1000000 then -- accounting for input/monitoring fx chain if cont_idx fits the main chain format
+	local chain = input_fx and 0x1000000 or 0
+	local ret, sel_idx = GetParm(obj, chain, 'chain_sel') -- for input/monitoring chain returns regular index
+	local cont_idx = input_fx and cont_idx-0x1000000 or cont_idx -- conform to the format returned by GetParm() and used by SetParm()
+		if sel_idx+0 ~= cont_idx then
+		SetParm(obj, chain, 'chain_sel', cont_idx)
+		end
+	end
+
+local ret, chunk = GetObjChunk(item or obj)
+	if ret == 'err_mess' or not ret then return end
+	
+local chunk_upd = chunk
+
+	for k, par_idx in ipairs(par_t) do
+	local ret, fx_cnt = GetParm(obj, par_idx, 'container_count')
+	-- find regular index of each parent container
+	-- within its own parent container
+	-- or of the target fx in its parent container
+	-- because LASTSEL uses regular index
+		for i=0, fx_cnt-1 do
+		local ret, idx = GetParm(obj, par_idx, 'container_item.'..i)
+			if k == #par_t and idx+0 == fx_idx or par_t.hash[idx+0] then -- when the loop has reached the innermost container use the target fx idx for evaluation because it's the one which has to be selected in the innermost container and whose index won't be found in par_t.hash table
+			local cont_chunk = Get_FX_Container_Chunk(obj, par_idx)
+				if cont_chunk:match('LASTSEL (%d)')+0 ~= i then
+				local cont_chunk_upd = cont_chunk:gsub('LASTSEL %d+', 'LASTSEL '..i, 1) -- n 1, limit to the very first replacement which applies to the current container
+			--	cont_chunk_upd = cont_chunk_upd:gsub('SHOW %d+', 'SHOW '..(i+1), 1) -- SHOW attribute value is 1-based // redundant, doesn't affect selection whether chain is open or closed
+				cont_chunk = Esc(cont_chunk)
+				cont_chunk_upd = cont_chunk_upd:gsub('%%','%%%%')
+				chunk_upd = chunk_upd:gsub(cont_chunk, cont_chunk_upd)
+				end
+			end
+		end
+	end
+
+	if chunk_upd ~= chunk then
+	SetObjChunk(item or obj, chunk_upd)
+	-- fx chain isn't updated if open (sometimes updated when fx selection is changed
+	-- in the main chain, like selection of the outermost parent container, but it's unreliable)
+	-- so toggle,
+	-- this will only work if cont_idx arg passed to the function
+	-- belongs to the main chain, if not, the index of the outermost parent container
+	-- will have to be found with Get_FX_All_Parent_Containers(obj, cont_idx)
+	-- and used to toggle the fx chain window
+		if ChainVisible(obj) > -1 then -- open chain with fx
+		-- will change windows focus
+		Show(obj, 0, 0) -- close chain
+		Show(obj, cont_idx, 1) -- open
+		end
+	end
+
+end
+
+
+
+
+function Set_FX_Selected_In_Container2(obj, fx_idx, fx_GUID, want_parent)
+-- fx_idx is container aware index of the container fx 
+-- which has to be selected across the entire container hierarchy 
+-- fx_GUID is optional, an expected GUID of the fx at fx_idx
+-- as a safeguard against change of fx position 
+-- within its immediate parent container;
+-- want_parent is boolean to only select the fx in its immediate
+-- parent container rather than across the entire container hierarchy
+
+	local function convert_fx_idx(fx_idx)
+	-- convert to 0-based index
+		if fx_idx < 0x2000000 then return fx_idx end
+	local ret, par_idx = GetParm(obj, fx_idx, 'parent_container')
+	local ret, fx_cnt = GetParm(obj, par_idx, 'container_count')
+		for i=0, fx_cnt-1 do
+		local ret, idx = GetParm(obj, par_idx, 'container_item.'..i)
+			if idx+0 == fx_idx then return i end
+		end
+	end
+
+--[[
+	if fx_idx-0x2000000 >= 0x1000000 and cont_idx and cont_idx < 0x1000000
+	-- distinguish between regular and input/monitoring chain indices
+	-- mixing them up causes error messages
+	then return 'mismatch between fx indices format'
+	end
+--]]
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+GetGUID, GetParm, SetParm = table.unpack(take and {r.TakeFX_GetFXGUID, r.TakeFX_GetNamedConfigParm, r.TakeFX_SetNamedConfigParm}
+or tr and {r.TrackFX_GetFXGUID, r.TrackFX_GetNamedConfigParm, r.TrackFX_SetNamedConfigParm})
+local ret, GUID = GetGUID(obj, fx_idx)
+local ret, par_idx = GetParm(obj, fx_idx, 'parent_container')
+
+	if not ret then return end -- not container fx
+
+	if fx_GUID and GUID ~= fx_GUID then
+	-- GUIDs don't match, the original fx instance index
+	-- may have changed due to fx being moved within its parent container
+	-- find its current index
+	fx_idx = nil -- reset
+	local ret, fx_cnt = GetParm(obj, par_idx, 'container_count')
+		for i=0, fx_cnt-1 do
+		local ret, idx = GetParm(obj, par_idx, 'container_item.'..i)
+		local GUID = GetGUID(obj, idx)
+			if GUID == fx_GUID then fx_idx = idx+0 break end -- 0-based index
+		end
+	if not fx_idx then return end -- the original fx wasn't found in its parent container
+	-- could have been searched across the entire fx chain, but that's probably overkill
+	end
+
+-- first select fx inside its immediate parent container
+local ret, cont_chain_addr = GetParm(obj, par_idx, 'container_item.0') -- container_item.0 to query value to be used as container chain address alongside chain_sel attribute and which must correspond to 0 used to address the main chain, much like 0x1000000 is used to address the input/monitoring chain // THE ABSOLUTELY CRUCIAL PART https://forum.cockos.com/showthread.php?t=310132
+SetParm(obj, cont_chain_addr, 'chain_sel', convert_fx_idx(fx_idx))
+
+	if want_parent then return end -- no need to continue after fx has been selected in its immediate parent container
+	
+-- continue, selecting parent containers across the entire 
+-- parent container hierarchy starting from par_idx
+local fx_idx, i = par_idx+0, 0
+	repeat
+	local ret, par_idx = GetParm(obj, fx_idx, 'parent_container')
+		if not ret then -- reached the outermost chain
+		SetParm(obj, fx_idx-0x2000000 < 0x1000000 and 0 or 0x1000000, 'chain_sel', convert_fx_idx(fx_idx)) -- adjust container chain address depending on the chain type, main or input/monitoring
+		break
+		else
+		-- select latest found container in its own container
+		local ret, cont_chain_addr = GetParm(obj, par_idx, 'container_item.0')
+		SetParm(obj, cont_chain_addr, 'chain_sel', convert_fx_idx(fx_idx))
+		fx_idx = par_idx+0 -- update for the next cycle
+		end
+	i=i+1
+	until not ret
+
+end
+
+
+
+
+function Get_First_Floating_Container(obj, fx_idx)
+-- the function is meant to determine within which container, if any,
+-- the fx selected at the farthest end of container hierarchy is shown,
+-- this only makes sense if the fx itself isn't open in a floating window;
+-- fx_idx is index of the fx open in the innermost container
+-- returned by Get_FX_Shown_Or_Selected_In_Container() with want_selected false
+-- or by or Get_FX_Selected_In_Container()
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+
+	if fx_idx < 0x2000000 or not tr and not take then return end
+
+local GetConfigParm, GetFloatingWnd = table.unpack(take and {r.TakeFX_GetNamedConfigParm, r.TakeFX_GetFloatingWindow}
+or {r.TrackFX_GetNamedConfigParm, r.TrackFX_GetFloatingWindow})
+
+local retval
+	repeat
+	retval, fx_idx = GetConfigParm(obj, fx_idx, 'parent_container')
+		if retval and GetFloatingWnd(obj, fx_idx+0) then return fx_idx+0
+		end
+	until not retval -- or #fx_idx == 0
+
+end
+
 
 
 
@@ -13166,7 +13767,8 @@ or take and {r.TakeFX_GetFXName, r.TakeFX_GetNamedConfigParm, r.TakeFX_CopyToTra
 	-- OR EXCLUDING ONLY CERTAIN JSFX AS EFFECTS
 	-- AS ATTEMPTED IN THE REST OF THE FUNCTION with 
 	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.40 then
-	return ConfigParm(obj, fx_idx, 'is_instrument')
+	local ret, instr = ConfigParm(obj, fx_idx, 'is_instrument') -- ret is useless here because it's always true
+	return instr == '1'
 	end
 
 -- retrieve from the instance name in FX chain
@@ -13830,6 +14432,8 @@ end
 
 
 
+-- REDUNDANT, FX_GetFloatingWindow() actually does work with fx inside containers
+-- see Is_FX_Open()
 function FX_GetOpen_Alt(obj, fx_idx)
 -- the function addresses the limitation of the native API
 -- where FX_GetFloatingWindow() functions don't recognize
@@ -18611,14 +19215,24 @@ function Get_Ruler_Lane_Count(want_visible)
 	-- only supported since build 7.62
 	if not r.GetRegionOrMarker then return end
 	
-local lane_count
+local lane_count = 0
 	
 	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.71 then
 	lane_count = r.GetSetProjectInfo(0, 'RULER_LANE_COUNT', 0, false) -- is_set false
 	else
 	r.PreventUIRefresh(1)
 	local index = r.AddProjectMarker(0, false, 0, 0, '', 0xFFFF) -- isrgn false, pos 0, rgnend 0, wantidx 0xFFFF, to be able to easily find it for deletion // insert temp marker
-	local obj = r.GetRegionOrMarker(0, 0, '') -- index 0, guidStr empty
+	local obj = r.GetRegionOrMarker(0, 0, '') -- index 0, guidStr empty // the function requires timeline index BUT INSERTING THE TEMP MARKER AT POS 0 MAY NOT NECESSARILY MAKE IT THE VERY FIRST IN THE PROJECT IF THERE'S ANOTHER OBJECT ON THE LANE ABOVE, SO A SAFER WAY IS LOOKING FOR IT IN THE LOOP BELOW
+--[[
+	local i, obj = 0
+		repeat
+		local retval, isrgn, pos, rgnend, name, vis_idx = r.EnumProjectMarkers(i)
+			if retval > 0 and vis_idx == 0xFFFF then
+			obj = r.GetRegionOrMarker(0, i, '') -- requires timeline index, not the displayed one
+			break end
+		i=i+1
+		until retval == 0
+--]]
 	r.SetRegionOrMarkerInfo_Value(0, obj, 'B_HIDDEN', 1) -- hide, although not strictly necessary thanks to PreventUIRefresh()
 	local parm = 'I_LANENUMBER'
 	local lane_idx_init = r.GetRegionOrMarkerInfo_Value(0, obj, parm)
@@ -18684,6 +19298,7 @@ end
 
 function Get_Lane_Mrkrs_Regns(lane_idx, want_vis)
 -- lane_idx can be chosen from lane_count returned by Get_Ruler_Lane_Count()
+-- want_vis is boolean to only get visible regions/markers on a visible lane
 
 local Get = r.GetRegionOrMarkerInfo_Value
 
@@ -18706,8 +19321,10 @@ return t
 end
 
 
+
 function Get_Mrkrs_Regns_Per_Lane(lane_count, want_vis)
 -- lane_count stems from by Get_Ruler_Lane_Count()
+-- want_vis is boolean to only get visible regions/markers on visible lanes
 
 local Get = r.GetRegionOrMarkerInfo_Value
 
@@ -23084,74 +23701,6 @@ local i = 0
 end
 
 
-function get_ini_cont()
-local f = io.open(r.get_ini_file(), 'r')
-local cont = f:read('*a')
-f:close()
-return cont
-end
-
-
-function Check_reaper_ini(section, key, value)
--- the args must be strings
--- section is the one found in reaper.ini file
--- and needs not to include square brackets
--- if the key isn't subsumed under any section
--- section arg can be nil
--- however to get values of standalone keys
--- reaper.get_config_var_string() is more efficient;
--- value arg is optional, only useful if
--- you expect a certain value to be able
--- to verify if it's set
-
---[-[-- METHOD 1
-local found
-	for line in io.lines(r.get_ini_file()) do
-		if section and line == '['..section..']' then found = 1
-		elseif not section then
-		val = line:match(key..'=(.+)')
-			if val then return val, val == value end
-		elseif found then
-		local val = line:match(key..'=(.+)')
-			if val then return val, val == value end
-		end
-	end
---]]
-
---[[
----- METHOD 2
-local f = io.open(r.get_ini_file(),'r')
-local cont = f:read('*a')
-f:close()
-cont = cont..'\n' -- add in case there's no terminating new line so that the capture works on the very last line as well
-local patt = '.-\n'..key..'=(.-)\n'
-local patt = section and '['..section..']'..patt or patt
-local val = cont:match(patt)
---local val = cont:match(key..'=([%.%d]+)') == value -- OR '=(.-)\n'
--- OR SIMPLY: return cont:match(key..'=([%.%d]+)') == value
-return val, val == value
---]]
-end
--- same as the native
--- retval, buf = reaper.get_config_var_string()
--- BUT ONLY IF key/value aren't subsumed under a separate section
-
-
-function Extract_reaper_ini_val1(key) -- the arg must be string
--- same as reaper.get_config_var_string(), see below
-local f = io.open(r.get_ini_file(),'r')
-local cont = f:read('*a')
-f:close()
-return cont:match(key..'=(.-)\n')
-end
-
-
-function Extract_reaper_ini_val2(key) -- the arg must be string
-local ret, val = r.get_config_var_string(key)
-return val
-end
-
-
 
 function Get_File_Cont(f_path)
 local f = io.open(f_path,'r')
@@ -25204,12 +25753,26 @@ if not Reminder_Off(REMINDER_OFF) then return r.defer(function() do return end e
 -- before build 6.82 gfx.showmenu didn't work on Windows without gfx.init
 -- https://forum.cockos.com/showthread.php?t=280658#25
 -- https://forum.cockos.com/showthread.php?t=280658&page=2#44
+--[[ THIS SEEMS INCORRECT
 -- the earliest appearence of a particular character in the menu can be used as a shortcut
 -- in this case they don't have to be preceded with ampersand '&'
 -- only if particular instance of a character should be used as a shortcut
 -- such character must be preceded with ampresand '&' otherwise it will be overriden
 -- by its earliest appearance in the menu
 -- some characters still do need ampresand, e.g. < and >
+--]]
+-- a repeated character input from keyboard highlights one by one 
+-- menu items which include this character, that's unless a particular
+-- instance if the character is prefaced with the ampersand '&'
+-- in which case a click is simulated on the menu item which includes it;
+-- if several instances of a character in different menu items are prefaced 
+-- with the ampersand, only these are highlighed in response to the relevant 
+-- key input from keyboard;
+-- characters prefaces with the ampersand are underscored in the menu
+-- but only when the script is open in the IDE, bug report
+-- 
+-- otherwise they have to be explicitly embellished with the underscore
+-- using for example embellish_string() function
 local old = r.GetOS():match('Win') and tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.82
 -- screen reader used by blind users with OSARA extension may be affected
 -- by the absence if the gfx window therefore only disable it in builds
@@ -25794,7 +26357,7 @@ return sett_new_state == '1'
 
 end
 --[[ USE EXAMPLE:
-local sett_t = {sett1:match('%S') or false, sett2:match('%S') or false, sett3:match('%S') or false, sett4:match('%S') or false, sett5:match('%S') or false} -- maintaining the order of settings in the script USER SETTINGS // false alternative will be needed for Options_State_Readout() which doesn't support nil as well as for working with the table for other purposes
+local sett_t = {sett1:match('%S') or false, sett2:match('%S') or false, sett3:match('%S') or false, sett4:match('%S') or false, sett5:match('%S') or false} -- maintaining the order of settings in the script USER SETTINGS, ALL SETTINGS MUST BE INCLUDED, which implies that all are boolean // false alternative will be needed for Options_State_Readout() which doesn't support nil as well as for working with the table for other purposes
 ::RELOAD::
 local output = Reload_Menu_at_Same_Pos(menu)
 	if output < 4  then -- all 3 settings are first in the menu, i.e. at indices 1-3, if not, the output value will have to be offset by the number of intervening menu items
@@ -27707,6 +28270,75 @@ end
 
 
 
+function get_ini_cont()
+local f = io.open(r.get_ini_file(), 'r')
+local cont = f:read('*a')
+f:close()
+return cont
+end
+
+
+
+function Check_reaper_ini(section, key, value)
+-- the args must be strings
+-- section is the one found in reaper.ini file
+-- and needs not to include square brackets
+-- if the key isn't subsumed under any section
+-- section arg can be nil
+-- however to get values of standalone keys
+-- reaper.get_config_var_string() is more efficient;
+-- value arg is optional, only useful if
+-- you expect a certain value to be able
+-- to verify if it's set
+
+--[-[-- METHOD 1
+local found
+	for line in io.lines(r.get_ini_file()) do
+		if section and line == '['..section..']' then found = 1
+		elseif not section then
+		val = line:match(key..'=(.+)')
+			if val then return val, val == value end
+		elseif found then
+		local val = line:match(key..'=(.+)')
+			if val then return val, val == value end
+		end
+	end
+--]]
+
+--[[
+---- METHOD 2
+local f = io.open(r.get_ini_file(),'r')
+local cont = f:read('*a')
+f:close()
+cont = cont..'\n' -- add in case there's no terminating new line so that the capture works on the very last line as well
+local patt = '.-\n'..key..'=(.-)\n'
+local patt = section and '['..section..']'..patt or patt
+local val = cont:match(patt)
+--local val = cont:match(key..'=([%.%d]+)') == value -- OR '=(.-)\n'
+-- OR SIMPLY: return cont:match(key..'=([%.%d]+)') == value
+return val, val == value
+--]]
+end
+-- same as the native
+-- retval, buf = reaper.get_config_var_string()
+-- BUT ONLY IF key/value aren't subsumed under a separate section
+
+
+function Extract_reaper_ini_val1(key) -- the arg must be string
+-- same as reaper.get_config_var_string(), see below
+local f = io.open(r.get_ini_file(),'r')
+local cont = f:read('*a')
+f:close()
+return cont:match(key..'=(.-)\n')
+end
+
+
+function Extract_reaper_ini_val2(key) -- the arg must be string
+local ret, val = r.get_config_var_string(key)
+return val
+end
+
+
 function re_store_config_var(key, bit, disable, val)
 -- requires either build 7.74 or sws extension
 -- key is string represnting reaper.ini key;
@@ -27758,6 +28390,20 @@ end
 -- DO STUFF
 -- re_store_config_var(key, bit, disable, orig_val)
 
+
+
+function GetSet_Ini_Value(section, key, value)
+-- the method is borrowed from MediaExplorer_SetDeviceOutput() in
+-- https://github.com/Ultraschall/ultraschall-lua-api-for-reaper/blob/main-branch/ultraschall_api/Modules/ultraschall_functions_HelperFunctions_Module.lua
+local path = r.get_ini_file()
+	if not value then
+	local retval, val = r.BR_Win32_GetPrivateProfileString(section, key, '', path)
+	return #val > 0 and val
+	else
+	local ok = r.BR_Win32_WritePrivateProfileString(section, key, value, path)
+	return ok
+	end
+end
 
 
 
@@ -31118,6 +31764,7 @@ reaper.GetSetMediaTrackInfo_String(tr,"P_BUFSTATS","",false)
 U N D O
 
 	no_undo
+	Undo
 	undo_block
 	Force_MIDI_Undo_Point1
 	Force_MIDI_Undo_Point2
@@ -31185,6 +31832,8 @@ M A T H
 	to_base36
 	encode_bools_into_integer
 	decode_bools_from_integer
+	to_signed32
+	sign
 
 
 S T R I N G S
@@ -31274,6 +31923,7 @@ T A B L E S
 	filter_table_vals
 	filter_inplace1
 	filter_inplace2
+	filter_inplace3
 	merge_2_arrays_at_index
 	merge_tables1
 	merge_tables2
@@ -31320,9 +31970,9 @@ M I D I
 	Lane_Type_To_Event_Data
 	MIDI_Take_Open_Close
 	Clear_Restore_MIDI_Channel_Filter
-	are_notes_selected
-	Notes_Selected
+	are_notes_selected	
 	selected_notes_exist
+	Notes_Selected
 	CC_Evts_Selected
 	Notes_CCEvts_Selected
 	Evts_Selected
@@ -31363,6 +32013,7 @@ M I D I
 	All_Sel_CCEvts_Belong_To_Visble_OR_Last_Clicked_Lane
 	Delete_Notes_In_MIDI_Channel
 	Delete_Notes
+	Delete_CC_Events_Within_Time
 	CC_Evts_Exist
 	Store_Insert_Notes_OR_Evts
 	Get_MIDI_Ed_Grid
@@ -31646,7 +32297,11 @@ F X
 	Get_FX_All_Parent_Containers
 	GetSetClear_FX_Parm_Mapping_Across_Containers
 	Get_Container_Parm_Source_Props
-	Get_FX_Shown_In_Container
+	Get_FX_Shown_Or_Selected_In_Container
+	Get_FX_Selected_In_Container
+	Set_FX_Selected_In_Container1
+	Set_FX_Selected_In_Container2
+	Get_First_Floating_Container
 	Concat_Container_FX_Wnd_Title
 	Collect_All_FX_Indices
 	Get_Regular_Cont_FX_Index
@@ -31974,10 +32629,6 @@ F I L E S
 	get_ini_file_path
 	get_proj_path
 	get_proj_title
-	get_ini_cont
-	Check_reaper_ini
-	Extract_reaper_ini_val1
-	Extract_reaper_ini_val2
 	Get_File_Cont
 	Get_Or_Create_Dummy_Project_File1
 	Get_Or_Create_Dummy_Project_File2
@@ -32141,7 +32792,12 @@ U T I L I T Y
 	Un_Set_MW_Config_Flags
 	Get_Mousewheel_Mode
 	trackselonmouse
+	get_ini_cont
+	Check_reaper_ini
+	Extract_reaper_ini_val1
+	Extract_reaper_ini_val2
 	re_store_config_var
+	GetSet_Ini_Value
 	Keep_ExtState_For_X_Mins1
 	Keep_ExtState_For_X_Mins2
 	ExtState_Expiry_Timer
