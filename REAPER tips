@@ -6646,3 +6646,23 @@ https://youtu.be/mrqPG9z1OGc?t=595
 
 =============================================================
 
+-- Trim items to the same length after file import
+
+For the purpose of trimming use an empty project, then transfer the trimmed items into the main one.
+
+1. Based on the target length calculate the tempo the project will have to be set to,
+using the formula 60 / target length, i.e. if items have to be trimmed down to 1.5 sec, 
+the tempo the project will have to be set to will be 40.
+It's implied that the target length equals 1 beat to be able to use an action in step 4.
+2. Set the project to the calculated BPM
+3. Import files to separate tracks or track lanes
+4. Run the following custom action
+
+Grid: Set to 1/4
+Transport: Go to start of project
+View: Move cursor right by grid division
+Item: Select all items
+Item: Trim items right of cursor
+
+
+=============================================================
