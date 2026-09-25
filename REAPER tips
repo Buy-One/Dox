@@ -6664,5 +6664,31 @@ View: Move cursor right by grid division
 Item: Select all items
 Item: Trim right edge of item to edit cursor
 
+Alternatively import items to the same track
+
+Perform steps 1 and 2 from the above sequence
+3. Move the items rightwards away from the project start ever so slightly, by some milliseconds.
+This is needed for the action 'View: Move edit cursor by grid division' to work properly due to a bug
+https://forum.cockos.com/showthread.php?t=311625
+4. Select the items track
+5. Place the edit cursor before the first item
+6. Repeatedly run the following custom action 
+
+Action: Skip next action, set CC parameter to relative +1 if action toggle state enabled, -1 if disabled, 0 if toggle state unavailable.
+Options: Toggle snapping
+Action: Skip next action if CC parameter <0/mid
+Options: Toggle snapping
+Grid: Set to 1/4
+Item: Unselect (clear selection of) all items
+Item navigation: Select and move to next item
+View: Move cursor right by grid division
+Item edit: Trim right edge of item to edit cursor
+Action: Skip next action if CC parameter <0/mid
+Options: Toggle snapping
+
+ACT 1 0 "631eef196e054c46887b84219e607915" "Custom: Trim items down to 1 beat length" 2022 1157 2013 1157 40779 40289 40417 43615 41311 2013 1157
+
+Then if needed close the gaps between item with 'Xenakios/SWS: Reposition selected items...'
+with the following settings: Add time interval to - Item end; Time interval - 0 sec
 
 =============================================================
