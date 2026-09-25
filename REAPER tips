@@ -6662,7 +6662,7 @@ Grid: Set to 1/4
 Transport: Go to start of project
 View: Move cursor right by grid division
 Item: Select all items
-Item: Trim items right of cursor
+Item: Trim right edge of item to edit cursor
 
 
 =============================================================
