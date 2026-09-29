@@ -6690,5 +6690,6 @@ ACT 1 0 "631eef196e054c46887b84219e607915" "Custom: Trim items down to 1 beat le
 
 Then if needed close the gaps between item with 'Xenakios/SWS: Reposition selected items...'
 with the following settings: Add time interval to - Item end; Time interval - 0 sec
+Alternatively use a script from https://forum.cockos.com/showpost.php?p=2965718
 
 =============================================================
