@@ -9,3 +9,4 @@ The default REAPER 5 theme with a bunch of tweaks such as
 * Fixed **Route (I/O)** button position in layouts **ai --- Standard Live Recording** and **ce --- Large Live Recording** where it was weirdly placed
 * Changed appearance of recording input/output indicator when the mode is *Record: disable (input monitoring only)* or *Input: None*
 * Included images for track record button when the mode is *Record: disable (input monitoring only)* or *Input: None* or option *Automatic record-arm when track selected* option is enabled, supported since REAPER 6.
+* Made MIDI editor keyboard and VKB note highlight color more salient.
