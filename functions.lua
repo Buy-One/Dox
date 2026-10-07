@@ -938,7 +938,7 @@ end
 
 
 function get_greatest_smallest_value1(want_smallest, field, ...)
--- if vararg is a list of tables, nested tables aren't supported
+-- vararg is a list of tables, nested tables aren't supported,
 -- OR variables containing numbers;
 -- field is either integer representing index in an indexed table
 -- or string represending field in an associative array,
@@ -948,7 +948,7 @@ function get_greatest_smallest_value1(want_smallest, field, ...)
 -- then to the resulting values of all tables;
 -- also useful for determining the longest indexed table out of several,
 -- to make the function return table pointer along with the value
--- embed the table length in its field, see embed_table_length functions
+-- embed the table length in its field, see embed_table_length() functions
 local t = {...}
 	local function select_source(s,field)
 	return field and type(s) == 'table' and s[field] or s
@@ -961,7 +961,7 @@ end
 
 
 function get_greatest_smallest_value2(want_smallest, field, ...)
--- if vararg is a list of tables, nested tables aren't supported
+-- vararg is a list of tables, nested tables aren't supported,
 -- OR variables containing numbers;
 -- field is either integer representing index in an indexed table
 -- or string represending field in an associative array,
@@ -971,7 +971,7 @@ function get_greatest_smallest_value2(want_smallest, field, ...)
 -- then to the resulting values of all tables;
 -- also useful for determining the longest indexed table out of several,
 -- to make the function return table pointer along with the value
--- embed the table length in its field, see embed_table_length functions
+-- embed the table length in its field, see embed_table_length() functions
 local t = {...}
 local compare = want_smallest and math.min or math.max
 local value = want_smallest and math.huge or math.huge*-1
@@ -1064,7 +1064,11 @@ end
 
 
 function encode_bools_into_integer(int, ...)
--- max supported int value is 256, i.e. first byte;
+-- max supported int value is 256, i.e. first byte,
+-- further bytes are reserved for booleans storage,
+-- i.e. 0000 0000 0011 0000,
+-- to increase it for example to 32,767, i.e. 16 bit, replace
+-- 8 with 16 in the loop here and in decode_bools_from_integer() function below;
 -- vararg is list of boolean variables, i.e. true or false
 -- or they will treated as true or false, nil isn't supported
 local incr = 0
@@ -1078,10 +1082,10 @@ return int
 end
 
 
-function decode_bools_from_integer(int, some, ...)
--- int is value returned from encode_bools_into_integer;
--- some arg defines the way vararg is interpreted, 
--- if false, vararg must be a list of variables representng booleans
+function decode_bools_from_integer(int, want_some, ...)
+-- int is value returned from encode_bools_into_integer();
+-- arg 'want_some' defines the way vararg is interpreted,
+-- if false, vararg must be a list of variables representing booleans
 -- passed into encode_bools_into_integer(), only their overall
 -- number matters, not actual boolean values, alternatively an integer
 -- representing their overall number may be passed,
@@ -1090,15 +1094,15 @@ function decode_bools_from_integer(int, some, ...)
 -- 1st boolean encoded with encode_bools_into_integer() is 8, to the 2nd boolean - 9,
 -- then 10 and so on, so only some booleans can be decoded from the int,
 -- e.g. to only decode 1st and 3d booleans 8 and 10 must be passed as vararg;
--- the original integer will only be decoded when some arg is false
+-- the original integer will only be decoded when want_some arg is false
 local t = {...}
-count = not some and tonumber(...) and (...) or #t -- if vararg is integer use it
+count = not want_some and tonumber(...) and (...) or #t -- if vararg is integer use it
 local bools_t = {}
 	for i=1, count do	
 --	for k, bool in ipairs{...} do
-	local bit = 2^(not some and 8+i-1 or t[i])
+	local bit = 2^(not want_some and 8+i-1 or t[i])
 	bools_t[#bools_t+1] = int&bit == bit -- evaluate before subtracting from integer
-		if not some then -- keep decoding the original integer
+		if not want_some then -- keep decoding the original integer
 		int = int ~ bit
 		end
 	end
@@ -11144,8 +11148,9 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 			if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.31 then
 			local ret
 			ret, fx_name = GetNamedConfigParm(obj, fx_num, 'fx_name')
-			fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
-			or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name -- if Video processor
+			-- comment out the following 2 lines if plugin architecture prefix is required in the returned name
+			fx_name = fx_name:match('^JS:') and fx_name:match('JS: (.+) %[') -- excluding path
+			or fx_name:match('^[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name -- if Video processor
 			end
 			
 		local bypassed = not GetEnabled(obj, fx_num)
@@ -11168,8 +11173,9 @@ function GetFocusedFX2() -- complemented with GetMonFXProps() to get Mon FX in b
 		or tr and {r.TrackFX_GetFXName, r.TrackFX_GetFXGUID, r.TrackFX_GetIOSize, r.TrackFX_GetNamedConfigParm, r.TrackFX_GetEnabled, r.TrackFX_GetOffline}) -- take is first to prevent false positive because when take valid track valud as well
 		local fx_alias, fx_GUID, is_cont = select(2, GetFXName(obj, fx_num)), GetFXGUID(obj, fx_num), GetIOSize(obj, fx_num) == 8
 		local ret, fx_name = GetNamedConfigParm(obj, fx_num, 'fx_name')
-		fx_name = fx_name:match('JS:') and fx_name:match('JS: (.+) %[') -- excluding path
-		or fx_name:match('[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name -- if Video processor or Container
+		-- comment out the following 2 lines if plugin architecture prefix is required in the returned name
+		fx_name = fx_name:match('^JS:') and fx_name:match('JS: (.+) %[') -- excluding path
+		or fx_name:match('^[VSTAUCLPDXi3]+:') and fx_name:match(': (.+)') or fx_name -- if Video processor or Container
 
 		local input_fx = fx_num >= 0x1000000 and fx_num <= 0x2000000 or fx_num-0x2000000 >= 0x1000000 -- or 16777216 instead of 0x1000000 and 33554432 instead of 0x2000000 // TrackFX_GetRecChainVisible() gives false positives because it's valid regardless of the window being focused
 		local cont_fx = fx_num >= 33554432 -- or fx_num >= 0x2000000
@@ -12388,52 +12394,56 @@ end
 
 
 
+-- REDUNDANT DUE TO NATIVE r.TrackFX_GetRecChainVisible()
 function TrackFX_GetRecChainVisible1(tr)
--- when fx is both selected in the fx chain and its is UI floating
+-- when fx is both selected in the fx chain and its UI is floating
 -- in track main and take fx chains such fx is determined
 -- with TrackFX_GetChainVisible() but it doesn't support input and monitoring fx chains
+	
 	if not tr or not r.ValidatePtr(tr, 'MediaTrack*') then return end
-	if tr then
-	local t = {}
-	local CountFX = r.TrackFX_GetRecCount
-	r.PreventUIRefresh(1)
-		for i = 0, CountFX(tr)-1 do -- close and store all floating windows
-		local idx = 0x1000000+i
-			if r.TrackFX_GetFloatingWindow(tr, idx) then
-			r.TrackFX_SetOpen(tr, idx, false) -- open false // close floating window
-			-- OR
-			-- r.TrackFX_Show(tr, idx, 2) -- showFlag 2 - close floating window
-			t[#t+1] = idx
-			end
+
+local t = {}
+local CountFX = r.TrackFX_GetRecCount
+r.PreventUIRefresh(1)
+	for i = 0, CountFX(tr)-1 do -- close and store all floating windows
+	local idx = 0x1000000+i
+		if r.TrackFX_GetFloatingWindow(tr, idx) then
+		r.TrackFX_SetOpen(tr, idx, false) -- open false // close floating window
+		-- OR
+		-- r.TrackFX_Show(tr, idx, 2) -- showFlag 2 - close floating window
+		t[#t+1] = idx
 		end
-	local open_fx_idx -- get fx whose UI is open in FX chain
-		for i = 0, CountFX(tr)-1 do
-		local idx = i+0x1000000
-			if r.TrackFX_GetOpen(tr, idx) then
-			open_fx_idx = idx break end
-		end
-	-- restore floating windows	// z-order and focused window won't be restored, the foreground will be occupied but the window of the fx selected in the fx chain if its window was floating, otherwise the windows are loaded in the fx order
-		for _, fx_idx in ipairs(t) do
-		r.TrackFX_Show(tr, fx_idx, 3) -- showFlag 3 - open in a floating window
-		end
-	r.PreventUIRefresh(-1)
-	return open_fx_idx
 	end
+local open_fx_idx -- get fx whose UI is open in FX chain
+	for i = 0, CountFX(tr)-1 do
+	local idx = i+0x1000000
+		if r.TrackFX_GetOpen(tr, idx) then -- open in fx chain, i.e. fx chain is visible
+		open_fx_idx = idx break end
+	end
+-- restore floating windows	// z-order and focused window won't be restored, the foreground will be occupied but the window of the fx selected in the fx chain if its window was floating, otherwise the windows are loaded in the fx order
+	for _, fx_idx in ipairs(t) do
+	r.TrackFX_Show(tr, fx_idx, 3) -- showFlag 3 - open in a floating window
+	end
+r.PreventUIRefresh(-1)
+return open_fx_idx
+
 end
 
 
 
+-- REDUNDANT DUE TO NATIVE r.TrackFX_GetRecChainVisible()
 function TrackFX_GetRecChainVisible2(tr) -- only returns fx chain window status
 	if not tr or not r.ValidatePtr(tr, 'MediaTrack*') then return end
 r.PreventUIRefresh(1)
 local chain_open, shown_fx
 	for i = 0, r.TrackFX_GetRecCount(tr)-1 do
 	local i = i+0x1000000
-		if r.TrackFX_GetOpen(tr, i)
-		and not r.TrackFX_GetFloatingWindow(tr, i)
-		then chain_open = true
-		elseif r.TrackFX_GetOpen(tr, i) then
-		shown_fx = i
+		if r.TrackFX_GetOpen(tr, i) then
+			if not r.TrackFX_GetFloatingWindow(tr, i) then
+			chain_open = true
+			else -- fx open either in fx chain or in a floating window
+			shown_fx = i
+			end
 		end
 	end
 	if not chain_open then -- retry in case the chain is open but empty or the fx open in the chain but also floating which in itself isn't reliable because it returns true even when the chain is closed
@@ -12921,7 +12931,10 @@ function Collect_All_Container_FX_Indices(obj, t, recFX, parent_cntnr_idx, paren
 -- obj is track or take, t must be nil, recFX is boolean to target input/Monitoring FX,
 -- parent_cntnr_idx, parents_fx_cnt must be nil
 -- fx indices from the outermost fx chain (the object main fx chain) are of course stored as well
--- see Loop_Over_FX_Container_Table() next
+-- see Loop_Over_FX_Container_Table() next;
+-- to address a particual container in the main fx chain directly
+-- the passed arguments must look as follows
+-- Collect_All_Container_FX_Indices(obj, _, recFX, 0x2000000+cont_idx+1, main_chain_fx_cnt+1)
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 
@@ -12934,17 +12947,26 @@ fx_cnt = fx_cnt or ({GetConfig(obj, parent_cntnr_idx, 'container_count')})[2]
 
 local t = t or {} -- add table for the outermost FX chain on the very first run
 
--- THE TWO LOOPS CAN PROBABLY BE COMBINED INTO ONE
 
+--[-[ LOOP COMBINING TWO LOOPS BELOW INTO ONE
 	for i = 0, fx_cnt-1 do
 	local i = not parent_cntnr_idx and recFX and i+0x1000000 or i
 	i = parent_cntnr_idx and (i+1)*parents_fx_cnt+parent_cntnr_idx or i
 	t[#t+1] = i
-		if GetIOSize(obj, fx_idx) == 8 then -- container
-		
+	local retval, cont_fx_cnt = GetConfig(obj, i, 'container_count') -- retval true even if container is empty
+		if GetIOSize(obj, i) == 8 and cont_fx_cnt+0 > 0 then -- non-empty container
+		t[#t] = {i, {}} -- replace container index with a nested table containing its index and another nested table to collect indices of fx inside it
+		local parent_cntnr_idx = parent_cntnr_idx and i or 0x2000000+i+1 -- 0x2000000 is only added once, to the index of the outermost parent container
+		local parents_fx_cnt = (parents_fx_cnt or 1) * (fx_cnt+1) -- fx_cnt is fx count in the parent container
+		-- the function must not return table here, otherwise its structure will be reversed
+		-- starting from the innermost fx chain with no way to get higher
+		-- the table is the same throughout the entire recursive loop anyway
+		Collect_All_Container_FX_Indices(obj, t[#t][2], recFX, parent_cntnr_idx, parents_fx_cnt) -- go recursive // t[i][2] is the address of the nested table for collecting container fx indices
 		end
 	end
+--]]
 
+--[[
 	-- collect all fx instances in a chain, including containers
 	for i = 0, fx_cnt-1 do
 	local i = not parent_cntnr_idx and recFX and i+0x1000000 or i
@@ -12967,6 +12989,7 @@ local t = t or {} -- add table for the outermost FX chain on the very first run
 		Collect_All_Container_FX_Indices(obj, t[i][2], recFX, parent_cntnr_idx, parents_fx_cnt) -- go recursive // t[i][2] is the address of the nested table for collecting container fx indices
 		end
 	end
+--]]
 
 return t
 
@@ -12988,19 +13011,60 @@ r.TakeFX_SetNamedConfigParm, r.TakeFX_GetFXName, r.TakeFX_Show} or {})
 
 	-- target fx instances in a chain ignoring containers
 	for k, fx_idx in ipairs(t) do
-		if tonumber(fx_idx) then -- fx instance // if container evaluation will be false since the value is a table
-	-- DO STUFF TO FX INSTANCES, e.g.
+		if tonumber(fx_idx) then -- fx instance // if container, evaluation will be false since the value is a table
+	-- DO STUFF TO FX INSTANCES, including containers in the main chain, e.g.
 	--	local ret, name = GetFXName(obj, fx_idx, '')
 		end
 	end
 	-- target containers, ignoring fx instances
 	for k, cont in ipairs(t) do
-		if not tonumber(cont) then -- table storing container index and its fx list
+		if not tonumber(fx_idx) then -- a table storing container index and its fx list
 	-- DO STUFF TO CONTAINER IF NEEDED USING ITS INDEX AT cont[1]
 		Loop_Over_FX_Container_Table(obj, cont[2]) -- go recursive to loop over container fx, cont[2] is the address of the nested table with container fx indices list, at cont[1] container own index is stored
 		end
 	end
 
+end
+
+
+
+function Collect_Container_FX(obj, cont_idx, recFX, t)
+-- collect all fx along the hirarchy of container at cont_idx in the main fx chain;
+-- for builds between 7 and 7.06 relies on Collect_All_Container_FX_Indices()
+-- and Loop_Over_FX_Container_Table();
+-- t is a table into which fx data is collected outside,
+-- the function would usually be called within fx loop 
+-- when container comes along with the condition
+--[[
+if r.TrackFX_GetIOSize(tr, i) == 8 then -- container
+Collect_Container_FX(tr, i, recFX, t)
+end
+]]
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+local Count, Get_Parm, Floating, GetIOSize = table.unpack(take and {r.TakeFX_GetCount,r.TakeFX_GetNamedConfigParm, r.TakeFX_GetFloatingWindow, r.TakeFX_GetIOSize} or tr and {recFX and r.TrackFX_GetRecCount or r.TrackFX_GetCount,  r.TrackFX_GetNamedConfigParm, r.TrackFX_GetFloatingWindow, r.TrackFX_GetIOSize})
+
+local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
+
+	if build >= 7 and build < 7.06 then
+	local cont_fx_t = Collect_All_Container_FX_Indices(obj, _, recFX, 0x2000000+cont_idx+1, Count(obj)+1)
+	Loop_Over_FX_Container_Table(obj, cont_fx_t, t)
+	elseif build >= 7.06 then
+	local ret, count = Get_Parm(obj, cont_idx, 'container_count')
+		if count == '0' then return end
+		for i=0, count-1 do
+		local ret, fx_idx = Get_Parm(obj, cont_idx, 'container_item.'..i)
+		fx_idx = fx_idx+0
+		local wnd = Floating(obj, fx_idx)
+			if wnd then	
+			t[#t+1] = fx_idx -- basic storage, the actual table cofig depends on the config of the t table fed into this function
+			end
+			if GetIOSize(obj, fx_idx) == 8 then -- container, go recursive
+			Collect_Container_FX(obj, fx_idx, recFX, t)
+			end
+		end
+	end
+return t -- return isn't necessary if t is the actual table variable passed into the function
 end
 
 
@@ -13501,8 +13565,77 @@ end
 
 
 
+function Get_FX_All_Parent_Container_Names(obj, fx_idx)
+-- supported since build 7.06
+-- return table where container names are listed in descending order
+-- i.e. from the innermost to the outermost
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+
+	if fx_idx+0 > 0x2000000 and (tr or take) then -- range fx inside containers, or > 33554432
+	local GetConfigParm, GetName, GetEnabled =
+	table.unpack(tr and {r.TrackFX_GetNamedConfigParm, r.TrackFX_GetFXName, r.TrackFX_GetEnabled}
+	or take and {r.TakeFX_GetNamedConfigParm, r.TakeFX_GetFXName, r.TakeFX_GetEnabled})
+	local t, retval = {}
+		repeat
+		retval, fx_idx = GetConfigParm(obj, fx_idx, 'parent_container')
+			if retval then
+			local ret, name = GetName(obj, fx_idx+0, '')
+			local bypassed = not GetEnabled(obj, fx_idx+0)
+		--	table.insert(t, 1, fx_idx+0)
+			t[#t+1] = name..(bypassed and ' [BYPASSED]' or '')
+			end
+		until not retval -- or #fx_idx == 0
+	return t, fx_idx
+	end
+
+end
+
+
+
+function Get_Regular_Cont_FX_Index(obj, fx_idx)
+-- retrieve regular 0-based index of fx inside container
+-- supported since build 7.06
+
+local fx_idx = fx_idx and fx_idx+0 -- convert to integer just in case
+
+	if fx_idx < 0x2000000 then return fx_idx end -- not fx inside container
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+GetConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
+local ret, parent_cont_idx = GetConfigParm(obj, fx_idx, 'parent_container')
+local ret, cont_fx_cnt = GetConfigParm(obj, parent_cont_idx+0, 'container_count')
+
+	for i=0, cont_fx_cnt-1 do
+	local ret, idx = GetConfigParm(obj, parent_cont_idx+0, 'container_item.'..i)
+		if idx+0 == fx_idx then return i end
+	end
+	
+--[[
+-- this only works for the very first container, due to the use GetFXCount(),
+-- for child containers the fx count must reference the fx count in the chain the parent container belongs to
+-- to be able to account for the index of the parent container
+local input_fx = fx_idx-0x2000000 >= 0x1000000
+local GetFXCount = take and r.TakeFX_GetCount or tr and (input_fx and r.TrackFX_GetRecCount or r.TrackFX_GetCount)
+local fx_cnt = GetFXCount(obj)
+
+	-- the calculation is based in the formula
+	-- 0x2000000 + 3*(TrackFX_GetCount(tr)+1) + 2
+	-- where 3 is 1-based fx index and 2 is 1-based index of the parent container in the chain it belongs to
+	for i=1, 100 do -- outermost container indices // 100 is a provisional count of fx in the chain the parent container is a part of, if it's main chain fx_cnt-1 could be used
+	local a = fx_idx-0x2000000-i -- subtractig i as possible parent container index
+		for i=1, 100 do -- indices of fx in the current container //  100 is a provisional count of fx inside the container the target fx belongs to
+			if a/i == fx_cnt+1 then return i end -- dividing by i as possible index of the target fx
+		end
+	end
+--]]
+
+end
+
+
 
 function Concat_Container_FX_Wnd_Title(obj, obj_name, tr_idx, fx_idx, fx_name, fx_bypassed, input_fx)
+-- relies on Get_FX_All_Parent_Container_Names() and Get_Regular_Cont_FX_Index();
 -- can then be searched among main REAPER window sibling windows;
 -- the title pattern of a floating window of fx inside container or child container (without angle brackets and NOT ALL CAPS):
 -- <BYPASSED -><FX INSTANCE NAME> - <PARENT CONTAINER NAME [BYPASSED]> / <NEXT CONTAINER NAME> / <OUTERMOST CONTAINER NAME> / TRACK <INDEX> <"NAME"> or ITEM <"NAME"> [BYPASSED] [<1-BASED FX INDEX>/<TOTAL FX COUNT INSIDE CONTAINER>]
@@ -13524,32 +13657,40 @@ function Concat_Container_FX_Wnd_Title(obj, obj_name, tr_idx, fx_idx, fx_name, f
 	local t = Get_FX_All_Parent_Container_Names(obj, fx_idx) -- regarding take precendence see comment above
 	local fx_idx_reg, cont_fx_cnt = Get_Regular_Cont_FX_Index(obj, fx_idx)
 	return (fx_bypassed and 'BYPASSED %- ' or '')..Esc(fx_name)..' %- '
---	..t and table.concat(t, ' / ')..' / ' -- escaping dashes 
 	..(t and table.concat(t, ' / ')..' / ' or '') -- escaping dashes // t will be nil when the parent container happens to be the outermost
 	..(master and (not input_fx and 'Master Track' or 'Monitoring') or tr and 'Track '..tr_idx+1 or take and 'Item')
 	..((master or #obj_name == 0 and '') or ' "'..Esc(obj_name)..'"')
 	..(not master and not take and input_fx and ' %(input FX chain%)' or '')
 	..(chain_bypassed and ' %[BYPASSED%]' or '')
---	..(cont_fx_cnt > 1 and ' %['..fx_idx_reg..'/'..cont_fx_cnt..'%]' or '')	
 	..(cont_fx_cnt and cont_fx_cnt > 1 and ' %['..fx_idx_reg..'/'..cont_fx_cnt..'%]' or '') -- cont_fx_cnt will be nil when the parent container happens to be the outermost
 	end
 	
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 
--- since when fx inside a container is focused it's impossible to determine 
--- whether it's focused in its own floating window or inside its parent container floating window
--- retrieve parent container data to concatenate its title as well and then evaluate both
-local GetConfigParm, GetFXName, GetEnabled = table.unpack(take and {r.TakeFX_GetNamedConfigParm, r.TakeFX_GetFXName, r.TakeFX_GetEnabled} 
-or tr and {r.TrackFX_GetNamedConfigParm, r.TrackFX_GetFXName, r.TrackFX_GetEnabled})
+-- since when fx inside a container is focused it's impossible to determine
+-- whether it's focused in its own floating window or inside one of its parent container floating windows
+-- retrieve data of the first parent container open in a floating window
+-- to concatenate its title as well and then evaluate both
+local GetConfigParm, GetFXName, GetEnabled, Floating = table.unpack(take and {r.TakeFX_GetNamedConfigParm, r.TakeFX_GetFXName, r.TakeFX_GetEnabled, r.TakeFX_GetFloatingWindow}
+or tr and {r.TrackFX_GetNamedConfigParm, r.TrackFX_GetFXName, r.TrackFX_GetEnabled, r.TrackFX_GetFloatingWindow})
 
-local ret, parent_cont_idx = GetConfigParm(obj, fx_idx, 'parent_container')
-parent_cont_idx = parent_cont_idx+0 -- convert into integer from string
-local ret, parent_cont_name = GetFXName(obj, parent_cont_idx)
-local parent_cont_bypassed = not GetEnabled(obj, parent_cont_idx)
+local i, parent_cont_idx = 0, fx_idx
+	repeat
+	local ret
+	ret, parent_cont_idx = GetConfigParm(obj, parent_cont_idx, 'parent_container')
+		if tonumber(parent_cont_idx) and Floating(obj, parent_cont_idx) then break end
+	i=i+1
+	until not tonumber(parent_cont_idx) -- OR #parent_cont_idx == ''
 
--- returns titles of fx window and its parent container window
-return concat_wnd_title(obj, obj_name, tr_idx, fx_idx, fx_name, fx_bypassed, input_fx, take, tr), concat_wnd_title(obj, obj_name, tr_idx, parent_cont_idx, parent_cont_name, parent_cont_bypassed, input_fx, take, tr)
+local parent_cont_title
+	if tonumber(parent_cont_idx) then
+	local ret, parent_cont_name = GetFXName(obj, parent_cont_idx)
+	local parent_cont_bypassed = not GetEnabled(obj, parent_cont_idx)
+	parent_cont_title = concat_wnd_title(obj, obj_name, tr_idx, parent_cont_idx, parent_cont_name, parent_cont_bypassed, input_fx, take, tr)
+	end
 
+-- returns titles of fx floating window and its first parent container open in a floating window
+return concat_wnd_title(obj, obj_name, tr_idx, fx_idx, fx_name, fx_bypassed, input_fx, take, tr), parent_cont_title
 
 end
 
@@ -13599,49 +13740,6 @@ local t = t or {} -- add table for the outermost FX chain on the very first run
 return t
 
 end
-
-
-
-
-function Get_Regular_Cont_FX_Index(obj, fx_idx)
--- rerieve regular 0-based index of fx inside container
--- supported since build 7.06
-
-local fx_idx = fx_idx and fx_idx+0 -- convert to integer just in case
-
-	if fx_idx < 0x2000000 then return fx_idx end -- not fx inside container
-
-local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-GetConfigParm = take and r.TakeFX_GetNamedConfigParm or tr and r.TrackFX_GetNamedConfigParm
-local ret, parent_cont_idx = GetConfigParm(obj, fx_idx, 'parent_container')
-local ret, cont_fx_cnt = GetConfigParm(obj, parent_cont_idx+0, 'container_count')
-
-	for i=0, cont_fx_cnt-1 do
-	local ret, idx = GetConfigParm(obj, parent_cont_idx+0, 'container_item.'..i)
-		if idx+0 == fx_idx then return i end
-	end
-	
---[[
--- this only works for the very first container, due to the use GetFXCount(),
--- for child containers the fx count must reference the fx count in the chain the parent container belongs to
--- to be able to account for the index of the parent container
-local input_fx = fx_idx-0x2000000 >= 0x1000000
-local GetFXCount = take and r.TakeFX_GetCount or tr and (input_fx and r.TrackFX_GetRecCount or r.TrackFX_GetCount)
-local fx_cnt = GetFXCount(obj)
-
-	-- the calculation is based in the formula
-	-- 0x2000000 + 3*(TrackFX_GetCount(tr)+1) + 2
-	-- where 3 is 1-based fx index and 2 is 1-based index of the parent container in the chain it belongs to
-	for i=1, 100 do -- outermost container indices // 100 is a provisional count of fx in the chain the parent container is a part of, if it's main chain fx_cnt-1 could be used
-	local a = fx_idx-0x2000000-i -- subtractig i as possible parent container index
-		for i=1, 100 do -- indices of fx in the current container //  100 is a provisional count of fx inside the container the target fx belongs to
-			if a/i == fx_cnt+1 then return i end -- dividing by i as possible index of the target fx
-		end
-	end
---]]
-
-end
-
 
 
 
@@ -20779,34 +20877,67 @@ end
 
 
 
-function Is_Window_Visible1(hwnd)
--- takes advantage of the fact that the following functions don't affect invisible windows
--- docked windows will be considered invisible because focus and foreground status can't be applied to them, they're children windows
--- r.JS_Window_IsVisible() isn't suitable since it may return true for invisible (closed) windows as well, such as FX chain;
--- may not be sutable when many windows are open because it changes foreground window or focus
--- OK if windows will get closed anyway
--- r.JS_Window_GetForeground() is safer when the window is surely closed because it doesn't remove focus from children of the currently focused window, e.g. list entry active status
+function Is_Window_Visible_JS1(hwnd)
+-- takes advantage of the fact that the following functions 
+-- don't affect invisible windows,
+-- docked windows will be considered invisible 
+-- because focus and foreground status can't be applied to them, 
+-- they're children windows
+-- r.JS_Window_IsVisible() isn't suitable since it may return true 
+-- for invisible (closed) windows as well, such as FX chain;
+-- r.JS_Window_GetForeground() is safer when the window is surely closed 
+-- because it doesn't remove focus from children of the currently focused window, 
+-- e.g. list entry active status
 --[-[
 local ForeGrnd = r.JS_Window_GetForeground
-local foregrnd = ForeGrnd()
+local foregrnd = ForeGrnd() -- store foreground/focused window
 	if foregrnd == hwnd then return true end
 r.JS_Window_SetForeground(hwnd)
-local foregrnd = ForeGrnd()
-return foregrnd == hwnd
+local foregrnd_new = ForeGrnd()
+r.JS_Window_SetForeground(foregrnd) -- restore
+return foregrnd_new == hwnd
 --]]
 --[[ OR
 local Focus = r.JS_Window_GetFocus
-local focus = Focus()
+local focus = Focus() -- store focused window
 	if focus == hwnd then return true end
 r.JS_Window_SetFocus(hwnd)
-local focus = Focus()
-return focus == hwnd
+local focus_new = Focus()
+r.JS_Window_SetFocus(focus) -- restore
+return focus_new == hwnd
 --]]
 end
 
 
 
-function Is_Window_Visible2(handle)
+function Is_Window_Visible_JS2(hwnd)
+-- visibility functions JS_Window_IsVisible() and BR_Win32_IsWindowVisible() 
+-- aren't suitable for visibility validation of windows in multi-window dockers 
+-- because these return false if a docked window is inactive, 
+-- but they're accurate if there's only one window in a docker
+local parent, parent_tit
+local toggle_state = r.GetToggleCommandStateEx
+local docker = toggle_state(0, 40279) == 1 -- 'View: Show docker'
+	for i = 1, 2 do
+	parent = r.JS_Window_GetParent(hwnd)
+	parent_tit = r.JS_Window_GetTitle(parent)
+		-- floating dockers
+		if parent_tit == 'Toolbar Docker' and toggle_state(0, 41084) == 1 -- 'Toolbar: Show/hide toolbar docker'
+		or parent_tit == 'Docker' and docker -- regular docker
+		or parent_tit:match('(docked)') and r.JS_Window_IsVisible(hwnd) -- single window in a floating toolbar / regular docker
+		then return hwnd end
+	hwnd = parent -- update for the next cycle
+	end
+	-- if floating docker wasn't found, search docker attached to the main window
+	-- it cannot be searched in the loop above because being a child of the floating docker window it precedes it in the parent search and would cause loop exit before the floating docker window title could be evaluated
+	if parent_tit == 'REAPER_dock' and docker then return hwnd end
+
+end
+
+
+
+
+function Is_Window_Visible_SWS(handle)
 -- OR BR_Win32_IsWindowVisible()
 -- handle arg is the target window handle, either a string created with BR_Win32_HwndToString()
 -- or light user data, i.e. direct handle
@@ -20825,7 +20956,7 @@ function Exclude_Visible_Windows(t) -- t stems from Re_Store_Windows_Props_By_Na
 	for i=#t,1,-1 do
 	local wnd = t[i]
 	local hwnd = r.JS_Window_Find(wnd.tit, true) -- exact true
-		if Is_Window_Visible1(hwnd) then
+		if Is_Window_Visible_JS(hwnd) then
 		table.remove(t,i)
 		end
 	end
@@ -20850,6 +20981,7 @@ local wnd, retval, title = wnd
 end
 
 
+
 function Is_Window_Docked2(wnd_sect_title)
 -- wnd_sect_title is a string of window section title in reaper.ini,
 -- most of them are the same as window identifiers
@@ -20858,7 +20990,8 @@ function Is_Window_Docked2(wnd_sect_title)
 -- however some window identifiers listed in Move_Window_To_Another_Dock()
 -- may differ from window section title required by this function,
 -- such as in case of Media Explorer:
--- 'explorer' and '[reaper_explorer]' respectively
+-- 'explorer' and '[reaper_explorer]' respectively;
+-- doesn't support FX chain windows because they have no section in reaper.ini
 
 local found
 	for line in io.lines(r.get_ini_file()) do
@@ -20874,13 +21007,20 @@ end
 
 
 
+function Is_Window_Docked3(hwnd)
+local dock_idx, isFloatingDocker = r.DockIsChildOfDock(hwnd)
+return dock_idx > -1 
+end
+
+
+
 function Is_Wnd_Docked_In_Floating_Docker1(wnd_id)
 -- the function determines if floating docker was the LAST docker
 -- the window was docked at and current visibility status of the docker
 -- and doesn't determine the state if window itself,
 -- whether currently docked or not, open or not,
 -- the window docked state info must be gleaned from the window section in reaper.ini
--- see Is_Window_Docked1() and Is_Window_Docked2()
+-- see Is_Window_Docked1(), Is_Window_Docked2() and Is_Window_Docked3()
 -- while its visibility status either from the window section or from the toggle state
 -- of the action which toggles its visibility;
 -- wnd_id is a string which identifies window in reaper.ini
@@ -21101,6 +21241,7 @@ local set
 end
 
 
+
 function Dock_Floating_Window(hwnd, tab_title, arg)
 -- hwnd can be obtained with Find_Window_SWS() or reaper.JS_Window_Find()
 -- or Get_Window_And_Children_JS()
@@ -21147,29 +21288,6 @@ function Send_Message(hwnd, msg)
 end
 
 
-
-function JS_Window_IsVisible(hwnd)
--- visibility functions JS_Window_IsVisible() and BR_Win32_IsWindowVisible() aren't suitable for visibility validation of windows in multi-window dockers because these return false if a docked window is inactive, but they're accurate if there's only one window in a docker
-local parent, parent_tit
-local toggle_state = r.GetToggleCommandStateEx
-local docker = toggle_state(0, 40279) == 1 -- 'View: Show docker'
-	for i = 1, 2 do
-	parent = r.JS_Window_GetParent(hwnd)
-	parent_tit = r.JS_Window_GetTitle(parent)
-		-- floating dockers
-		if parent_tit == 'Toolbar Docker' and toggle_state(0, 41084) == 1 -- 'Toolbar: Show/hide toolbar docker'
-		or parent_tit == 'Docker' and docker -- regular docker
-		or parent_tit:match('(docked)') and r.JS_Window_IsVisible(hwnd) -- single window in a floating toolbar / regular docker
-		then return hwnd end
-	hwnd = parent -- update for the next cycle
-	end
-	-- if floating docker wasn't found, search docker attached to the main window
-	-- it cannot be searched in the loop above because being a child of the floating docker window it precedes it in the parent search and would cause loop exit before the floating docker window title could be evaluated
-	if parent_tit == 'REAPER_dock' and docker then return hwnd end
-
-end
-
-
 -- r.BR_Win32_SendMessage(identifier hwnd, integer msg, integer lParam, integer wParam)
 -- https://learn.microsoft.com/en-us/windows/win32/winmsg/about-messages-and-message-queues
 -- https://learn.microsoft.com/en-us/windows/win32/controls/bumper-scroll-bars-reference-messages
@@ -21185,8 +21303,11 @@ end
 
 function Find_Window_SWS(wnd_name, want_main_children)
 -- THE FUNCTION IS CASE-AGNOSTIC
--- finds main window children, their siblings, their grandchildren and their siblings, including docked ones, floating windows and probably their children as well
--- want_main_children is boolean to search for internal or non-dockable main window children and for their children regardless of the dock being open, the dock condition in the routine is only useful for validating visibility of windows which can be docked
+-- finds main window children, their siblings, their grandchildren and their siblings, 
+-- including docked ones, floating windows and probably their children as well
+-- want_main_children is boolean to search for internal or non-dockable 
+-- main window children and for their children regardless of the dock being open, 
+-- the dock condition in the routine is only useful for validating visibility of windows which can be docked
 
 -- 1. search floating toolbars with BR_Win32_FindWindowEx(), including docked
 -- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindowtexta#return-value
@@ -21341,6 +21462,26 @@ end
 
 
 
+function Find_Child_Window_SWS(parent_hwnd, child_title, want_exact)
+-- want exact is boolean to search for exact title match,
+-- if false, child_title will be searched as a subtring in window titles
+
+local child = r.BR_Win32_GetWindow(parent_hwnd, 5) -- 5 = GW_CHILD
+
+	if not child then return end
+
+	repeat
+	local ret, txt = r.BR_Win32_GetWindowText(child)
+		if want_exact and txt == child_title or not want_exact and txt:match(child_title) then
+		return child
+		end
+	child = r.BR_Win32_GetWindow(child, 2) -- 2 = GW_HWNDNEXT
+	until not child
+
+end
+
+
+
 function Get_Window_And_Children_JS(wnd_title, want_exact_title)
 -- good for locating child windows which don't have a title,
 -- or a fixed title, by their index in the child windows list
@@ -21380,16 +21521,15 @@ function Get_Sibling_Windows_JS(wnd, excl_orig) -- see Get_Sibling_Windows()
 	if not wnd then return end
 
 -- get first sibling window
-local i, wnd, sibl = 0, wnd
+local wnd, sibl = wnd
 	repeat
 	wnd = r.JS_Window_GetRelated(wnd, 'PREV')
 	sibl = wnd or sibl
-	i=i+1
 	until not wnd
 	
 	if not sibl then return end -- no siblings
 	
-local i, t =  0, {}
+local t =  {}
 	repeat
 	sibl = r.JS_Window_GetRelated(sibl, 'NEXT')
 		if sibl and (excl_orig and sibl ~= wnd or not excl_orig) then
@@ -21418,7 +21558,7 @@ function Get_Child_Windows_SWS(parent_wnd)
 
 local child = r.BR_Win32_GetWindow(parent_wnd, 5) -- 5 = GW_CHILD, returns 1st child
 	if not child then return end -- no children
-local i, t = 0, {}
+local t = {}
 	repeat
 		if child then
 		local ret, txt = r.BR_Win32_GetWindowText(child)
@@ -21428,7 +21568,6 @@ local i, t = 0, {}
 	 ]]
 		end
 	child = r.BR_Win32_GetWindow(child, 2) -- 2 = GW_HWNDNEXT // get next sibling of each next found child window advancing until no child is found
-	i=i+1
 	until not child
 return #t > 0 and t
 end
@@ -21437,23 +21576,20 @@ end
 
 function Get_Sibling_Windows_SWS(wnd, excl_orig) -- see Get_Sibling_Windows()
 -- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getwindow
--- the function doesn't cover grandchildren
--- once window handles have been collected;
 -- excl_orig is boolean to ignore wnd when collecting data
 
 	if not wnd then return end
 	
 -- get first sibling window
-local i, wnd, sibl = 0, wnd
+local wnd, sibl = wnd
 	repeat
 	wnd = r.BR_Win32_GetWindow(wnd, 3) -- 3 = GW_HWNDPREV
 	sibl = wnd or sibl
-	i=i+1
 	until not wnd
 	
 	if not sibl then return end
 
-local i, t = 0, {}
+local t = {}
 	repeat
 	sibl = r.BR_Win32_GetWindow(sibl, 2) -- 2 = GW_HWNDNEXT
 		if sibl and (excl_orig and sibl ~= wnd or not excl_orig) then
@@ -21463,12 +21599,34 @@ local i, t = 0, {}
 		t[txt] = sibl
 	]]
 		end
-	i=i+1
 	until not sibl
 
 return #t > 0 and t
 
 end
+
+
+
+function find_sibling_window_SWS(init_hwnd, window_title, direction)
+-- init_hwnd is handle of the window whose sibibling is being searched for;
+-- window_title is the sibling expected title;
+-- direction is either 3 (backwards, GW_HWNDPREV)
+-- or 2 (forward, GW_HWNDNEXT)
+
+-- loop over sibling windows
+	repeat
+	sibl = reaper.BR_Win32_GetWindow(sibl, direction)
+		if sibl then
+		local ret, txt = reaper.BR_Win32_GetWindowText(sibl)
+			if txt == window_title then 
+			return sibl
+			end
+		end
+	until not sibl
+end
+-- USE:
+-- local hwnd = find_sibling_window_SWS(init_hwnd, window_title, 3)
+-- hwnd = hwnd or find_sibling_window_SWS(init_hwnd, window_title, 2)
 
 
 
@@ -21480,23 +21638,24 @@ function Get_Sibling_Windows(wnd, excl_orig)
 	
 local sws, js = r.BR_Win32_GetWindow, r.JS_Window_GetRelated
 
-	if not sws and js then return end
+	if not sws and not js then return end
 	
--- get first sibling window
-local i, wnd, sibl = 0, wnd
+local Get = r.BR_Win32_GetWindow or r.JS_Window_GetRelated
+	
+-- get first sibling window, looping backwards
+local dir = sws and 3 or 'PREV' -- 3 = GW_HWNDPREV
+local wnd, sibl = wnd
 	repeat
-	wnd = sws and r.BR_Win32_GetWindow(wnd, 3) -- 3 = GW_HWNDPREV
-	or r.JS_Window_GetRelated(wnd, 'PREV')
+	wnd = Get(wnd, dir)
 	sibl = wnd or sibl
-	i=i+1
 	until not wnd
 	
 	if not sibl then return end
 
-local i, t = 0, {}
+dir = sws and 2 or 'NEXT' -- 2 = GW_HWNDNEXT
+local t = {}
 	repeat
-	sibl = sws and r.BR_Win32_GetWindow(sibl, 2) -- 2 = GW_HWNDNEXT
-	or r.JS_Window_GetRelated(sibl, 'NEXT')
+	sibl = Get(sibl, dir)
 		if sibl and (excl_orig and sibl ~= wnd or not excl_orig) then
 		local ret, txt = table.unpack(sws and {r.BR_Win32_GetWindowText(sibl)} or {nil, r.JS_Window_GetTitle(sibl)}) -- the js extension function only returns a single value so matching to 2 return values of the sws function
 		t[#t+1] = {sibl=sibl, title=txt} -- the lower the index the heigher (closer to the foreground) the window is in the Z-order, because NEXT means below the previous window
@@ -21504,7 +21663,6 @@ local i, t = 0, {}
 		t[txt] = sibl
 	]]
 		end
-	i=i+1
 	until not sibl
 
 return #t > 0 and t
@@ -21563,6 +21721,53 @@ local last
 		end
 	until not hwnd or hwnd == last
 end
+
+
+
+function Get_Docked_Windows(t)
+-- t is table stemming from Get_Sibling_Windows()
+-- to continue collecting window handles,
+-- optional
+
+local sws, js = r.BR_Win32_GetWindow, r.JS_Window_GetRelated
+
+	if not sws and not js then return end
+	
+local Get = r.BR_Win32_GetWindow or r.JS_Window_GetRelated
+
+local get_child = sws and 5 or 'CHILD' -- 5 = GW_CHILD
+local main = r.GetMainHwnd()
+local dock_t = {}
+local child = Get(main, get_child) 
+
+	if not child then return dock_t end
+
+-- collect all docker windows, which are children of the main window
+local nxt = sws and 2 or 'NEXT' -- 2 = GW_HWNDNEXT
+	repeat
+	local ret, txt = table.unpack(sws and {r.BR_Win32_GetWindowText(child)} or {nil, r.JS_Window_GetTitle(child)}) -- the js extension function only returns a single value so matching to 2 return values of the sws function
+		if txt == 'REAPER_dock' then dock_t[child] = '' end
+	child = Get(child, nxt)
+	until not child
+
+local t = t or {}
+	-- collect children of all collected dockers
+	for docker in pairs(dock_t) do	
+	local child = Get(docker, get_child)
+		if child then
+			repeat
+				if child then t[#t+1] = child
+				end
+			child = Get(child, nxt)
+			until not child
+		end
+	end
+
+return t
+
+end
+
+
 
 
 
@@ -22461,6 +22666,141 @@ local h = GetSet(0, 'RULER_HEIGHT', 0, false) -- isSet false
 
 end
 
+
+
+function Extension_Window_API()
+
+local sws, js = r.BR_Win32_SetFocus, r.JS_Window_SetFocus
+
+	if not sws and not js then return end
+
+local wnd = {
+IsVisible = r.BR_Win32_IsWindowVisible or r.JS_Window_IsVisible,
+GetRect = r.BR_Win32_GetWindowRect or r.JS_Window_GetRect,
+GetFocus = r.BR_Win32_GetFocus or r.JS_Window_GetFocus,
+SetFocus = r.BR_Win32_SetFocus or r.JS_Window_SetFocus,
+GetForegrnd = r.BR_Win32_GetForegroundWindow or r.JS_Window_GetForeground,
+SetForegrnd = r.BR_Win32_SetForegroundWindow or r.JS_Window_SetForeground
+GetParent = r.BR_Win32_GetParent or r.JS_Window_GetParent
+-- parent can presumably also retrieved with r.BR_Win32_GetWindowLong(hwnd, -8) -- -8 GWL_HWNDPARENT
+-- which returns integer
+}
+	
+	local function assign(func) return func end
+		
+	local function GetWnd(wnd, mode)
+	-- sws function supports mode as integer, js function as a string,
+	-- this function expects integer, js function only supports 1 - 5,
+	-- integer mode corresponds to indices of string mode in the t table below
+--	local sws, js = r.BR_Win32_GetWindow, r.JS_Window_GetRelated
+	local Get = r.BR_Win32_GetWindow or r.JS_Window_GetRelated
+	local t = {'LAST', 'NEXT', 'PREV', 'OWNER', 'CHILD'}
+	return Get(wnd, sws and mode or t[mode])
+	end
+
+	local function SetPos(...)
+	-- order of args: hwnd, x, y, w, h, z_order, flags
+	-- z-order param names differ depending in the function, optional
+	-- this function expects integer which corresponds to indices in the z-order table below;
+	-- flags is integer in sws, can be 0, but mandatory, 
+	-- and comma separated string in js, optional, only sipports 7 values out of 15 (or essentially 13 because 2 are aliases)
+	-- listed in the 2nd table t below;
+	-- this finction accepts both formats and converts them as needed;
+	-- when setting position with coordinates obtained from GetRect()
+	-- MacOS y coordinate direction may need to be accounted for as follows
+	-- local w, h = rt-lt, r.GetOS():match('OSX') and tp-bt or bt-tp -- isn't necessary if r.JS_Window_Move() is used for restoration rather than r.JS_Window_SetPosition()	
+--	local sws, js = r.BR_Win32_SetWindowPos, r.JS_Window_SetPosition
+	local SetPosition = r.BR_Win32_SetWindowPos or r.JS_Window_SetPosition
+	local args = {...}
+	local wnd, x, y, w, h = table.unpack(args, 1, 5) -- first extract 5 mandatory args
+	local z_order, flags = table.unpack(#args > 5 and {args[6], args[7]} or {})
+	z_order, flags = z_order or '', flags or sws and 0 or js and ''
+		if tonumber(z_order) then
+		z_order = ({'NOTOPMOST', 'TOPMOST', 'TOP', 'BOTTOM'})[z_order]
+		z_order = not z_order and '' or sws and 'HWND_'..z_order or z_order
+		end
+		if flags and sws and not tonumber(flags) and flags ~= '' then -- convert string flags into integer for sws function
+		flags = 0
+		local t = {NOSIZE=1,NOMOVE=2,NOZORDER=4,NOREDRAW=8,NOACTIVATE=16,DRAWFRAME=32,FRAMECHANGED=32,SHOWWINDOW=64,
+		HIDEWINDOW=128,NOCOPYBITS=256,NOREPOSITION=512,NOOWNERZORDER=512,NOSENDCHANGING=1024,DEFERERASE=8192,ASYNCWINDOWPOS=16384}
+			for flag in flags:gmatch('%u+') do -- only upper case
+				if flag and t[flag] then
+				flags = flags|t[flag]
+				end
+			end		
+		elseif flags and js and tonumber(flags) and flags ~= 0 then -- convert integer flags into string for js function
+		local t = {[1]='NOSIZE',[2]='NOMOVE',[4]='NOZORDER',[16]='NOACTIVATE',[32]='FRAMECHANGED',
+		[64]='SHOWWINDOW',[256]='NOCOPYBITS'}
+		local int = flags
+		flags = ''
+			for i=0,10 do
+			local bit = 2^i
+			flags = flags..(#flags > 0 and ',' or '')..(int&bit == bit and t[bit] or '')
+			end
+		end
+	local a, b, c, d, e, f, g = table.unpack(sws and {wnd, z_order, x, y, w, h, flags}
+	or js and {wnd, x, y, w, h, z_order, flags} or {})
+	SetPosition(a, b, c, d, e, f, g)
+	end
+	
+	local function GetTitle(wnd)
+--	local sws, js = r.BR_Win32_GetWindowText, r.JS_Window_GetTitle
+	local GetTitle = r.BR_Win32_GetWindowText or r.JS_Window_GetTitle
+	return table.unpack(sws and {GetTitle(wnd)} or {nil, GetTitle(wnd)}) -- the js extension function only returns a single value so matching to 2 return values of the sws function
+	end
+	
+	local function Find(...)
+	-- sws supports 6 args, js 2
+	-- sws only searches for exact match, so for the sake of consistency 
+	-- 'exact' arg for js function must always be true;
+	-- pass 7 arguments following sws function order, 7th should be 'exact' boolean for the js function;
+	-- as hwndParent arg for sws function r.BR_Win32_HwndToString(parent_wnd) may be passed
+--	local sws, js = r.BR_Win32_FindWindowEx, r.JS_Window_Find
+	local Find = r.BR_Win32_FindWindowEx or r.JS_Window_Find
+	local args = {...}
+	local a, b, c, d, e, f, g = table.unpack(arg)
+	args = sws and {a, b, c, d, e, f} or js and {d, g}
+	return Find(table.unpack(args))
+	end
+	
+	local function FindChild(parent_hwnd, child_title, want_exact) -- relies on Find_Child_Window_SWS()	
+	-- want exact is boolean to search for exact title match, truth can be any valid value
+	-- if false, child_title will be searched as a subtring in window titles
+--	local sws, js = r.BR_Win32_FindWindowEx, r.JS_Window_Find
+	local FindChild = sws and Find_Child_Window_SWS or r.JS_Window_FindChild
+	local want_exact = sws and want_exact or js and want_exact and true -- js function only accepts boolean
+	return FindChild(parent_hwnd, child_title, want_exact)
+	end
+	
+	local function SendMsg(...)	
+	-- https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-sendmessage
+	-- https://ecs.syr.edu/faculty/fawcett/Handouts/CoreTechnologies/windowsprogramming/WinUser.h
+	-- msg is hex integer for sws function and hex string for js,
+	-- so pass as integer, it will be converted into a string for the latter
+	local hwnd, msg, wParm, lParm = table.unpack({...})
+	local SendMsg = r.BR_Win32_SendMessage or r.JS_WindowMessage_Send
+	-- js function expects 2 additional arguments wParamHighWord and lParamHighWord
+	-- after wParm and lParm respectively, but they're not used in most scenarios
+	local t = sws and {...} or {hwnd, msg..'', wParm, 0, lParm, 0}
+	return SendMsg(table.unpack(t))
+	end
+	
+-- the functions are returned by the assign() function that they're not executed during table construction,
+-- the sws and js being upvalues are stored inside the returned function
+-- and accessed on the fly the moment the stored function is executed
+wnd.GetWnd = assign(GetWnd)
+wnd.SetPos = assign(SetPos)
+wnd.GetTitle = assign(GetTitle)
+wnd.Find = assign(Find)
+wnd.FindChild = assign(FindChild)
+wnd.SendMsg = assign(SendMsg) -- there're cases where this function doesn't work while r.JS_WindowMessage_Post() does
+
+return wnd
+
+end
+-- USE:
+-- local ext = Extension_Window_API()
+-- ext.Find(arguments)
 
 
 
@@ -24539,6 +24879,39 @@ end
 
 
 
+function open_proj_directory()
+-- the action 'Show render path in explorer' is supported since 7.73
+local retval, render_path = r.GetSetProjectInfo_String(0, 'RENDER_FILE', '', false) -- is_set false
+local ret, proj_path = r.EnumProjects(-1) -- current project
+-- temporarily set render path to project path to open it with the action;
+-- alternatively RECORD_PATH and RECORD_PATH_SECONDARY could be used
+-- along with actions 'Show record path in explorer' and 'Show secondary record path in explorer'
+-- but if for some reason its restoration fails, potential damage is far greater
+r.GetSetProjectInfo_String(0, 'RENDER_FILE', proj_path:match('.+[\\/]'), true) -- is_set true // exluding project file
+r.Main_OnCommand(43206, 0) -- Show render path in explorer // open the project path
+-- restore original render path
+r.GetSetProjectInfo_String(0, 'RENDER_FILE', render_path, true) -- is_set true
+end
+
+
+
+function open_directory(dir)
+-- the action 'Show render path in explorer' is supported since 7.73
+-- dir is path to the directory to open
+	if not dir the return end
+local retval, render_path = r.GetSetProjectInfo_String(0, 'RENDER_FILE', '', false) -- is_set false
+-- temporarily set render path to project path to open it with the action;
+-- alternatively RECORD_PATH and RECORD_PATH_SECONDARY could be used
+-- along with actions 'Show record path in explorer' and 'Show secondary record path in explorer'
+-- but if for some reason its restoration fails, potential damage is far greater
+r.GetSetProjectInfo_String(0, 'RENDER_FILE', dir, true) -- is_set true
+r.Main_OnCommand(43206, 0) -- Show render path in explorer // open the dir
+-- restore original render path
+r.GetSetProjectInfo_String(0, 'RENDER_FILE', render_path, true) -- is_set true
+end
+
+
+
 --=================================== F I L E S   E N D =========================================
 
 
@@ -26003,6 +26376,32 @@ local output = Reload_Menu_at_Same_Pos_gfx(menu)
 	goto RELOAD
 	end
 ]]
+
+
+
+function get_set_toggle_settings(sett_cnt, bitfield, bool_t, sett_idx)
+-- sett_cnt is integer, number of settings
+-- bitfield is number, a string returned by Get(Proj)ExtState() or an integer;
+-- sett_idx is ordinal 1-based number of a setting in the settings list
+-- and in the bitfield, must match its index in the table bool_t
+	
+	if not bool_t or type(bool_t) ~= 'table' then -- get
+	local bitfield = tonumber(bitfield) and bitfield or #bitfield == 0 and 0 or bitfield+0
+	local bool_t = {}
+		for i=0,sett_cnt do
+		local bit = 2^i
+		bool_t[#bool_t+1] = bitfield&bit == bit
+		end
+	return bool_t
+	elseif sett_idx then -- toggle the bit
+	bool_t[sett_idx] = not bool_t[sett_idx] -- toggle
+	local bit = 2^(sett_idx-1)
+	bitfield = bool_t[sett_idx] and bitfield|bit or bitfield~bit -- update
+	return bitfield, bool_t -- return updated bitfield for storage in Set(Proj)ExtState(), bool_t is optional
+	end
+
+end
+
 
 
 
@@ -28265,6 +28664,39 @@ reaper.ShowConsoleMsg(tostring(ret)..'\n')
 reaper.ShowConsoleMsg(int..'\n')
 local respect = #RESPECT:gsub(' ','') > 0
 return respect and (int == '1' or int == '9') or not respect
+end
+
+
+
+function Get_Screensets_Autosave_Settings()
+local t = {
+-- Screensets: -3620 -- all off
+1, -- main window pos
+2, -- tool window pos
+32, -- docker sel tab
+512, -- mixer flags
+2048, -- layouts
+1024, -- last focus
+
+-- Trackviews: -221 -- all off
+4, -- cursor pos
+8, -- scroll pos
+128, -- horiz zoom
+16, -- tcp status
+64, -- mixer status
+
+}
+-- the setting, Auto-save when switching screenets
+local ret, bool = r.get_config_var_string('screenset_autosave')
+-- screensets
+local ret, screensets = r.get_config_var_string('screenset_as_win')
+-- trackviews
+local ret, trackviews = r.get_config_var_string('screenset_as_views')
+	for k, bit in ipairs(t) do
+	local bitfield = (k < 7 and screensets or trackviews) + 0
+	t[k] = bitfield&bit == bit
+	end
+return bool == '1', t -- OR table.unpack(t)
 end
 
 
@@ -31686,15 +32118,23 @@ local act_pres_idx, pres_cnt = r.TrackFX_GetPresetIndex(tr, fx_idx) -- if can't 
 -- Functions to get project path/directory
 
 
-reaper.GetProjectPath() -- returns primary record path and if not set returns project path,
-
-in both cases without the last slash
+reaper.GetProjectPath() -- returns primary record path and if not set returns project path, in both cases without the last slash
 
 reaper.EnumProjects(idx) -- returns full proj path a 2nd value
 
 reaper.EnumProjects(-1) -- returns full path of the current proj as a 2nd value; returns empty string if project doesn't have a file and returns path even if the project file and possibly folder was deleted while the project is open
 
 proj_full_path = select(2,r.EnumProjects(-1))
+
+
+-- Get project media path
+
+local proj_media_path = r.GetProjectPath('') -- for unsaved projects returns default recording path, i.e. '%USER%\Documents\REAPER Media', a dedicated ABSOLUTE path if configured in default Project Settings, or global path configured at Prefs -> General -> Paths -> Default recording path; for saved projects returns the project folder path unless a project dedicated media path is specified in the project settings
+-- to find out whether the project is saved
+-- local proj, proj_path = r.EnumProjects(-1)
+-- #proj_path > 0
+-- OR
+-- local proj_name = r.GetProjectName(0, '')
 
 --===================================================================================
 
@@ -31711,17 +32151,6 @@ reaper.PreventUIRefresh(1)
 -- STUFF
 -- NOT RECOMMENDED when UI parameter change needs monitoring, because in this case it won't update
 reaper.PreventUIRefresh(-1)
-
---===================================================================================
-
--- Get project media path
-
-local proj_media_path = r.GetProjectPath('') -- for unsaved projects returns default recording path, i.e. '%USER%\Documents\REAPER Media', a dedicated ABSOLUTE path if configured in default Project Settings, or global path configured at Prefs -> General -> Paths -> Default recording path; for saved projects returns the project folder path unless a project dedicated media path is specified in the project settings
--- to find out whether the project is saved
--- local proj, proj_path = r.EnumProjects(-1)
--- #proj_path > 0
--- OR
--- local proj_name = r.GetProjectName(0, '')
 
 --===================================================================================
 
@@ -32294,6 +32723,7 @@ F X
 	Process_FX_Incl_In_All_Containers
 	Collect_All_Container_FX_Indices
 	Loop_Over_FX_Container_Table
+	Collect_Container_FX
 	Get_FX_All_Parent_Containers
 	GetSetClear_FX_Parm_Mapping_Across_Containers
 	Get_Container_Parm_Source_Props
@@ -32302,9 +32732,10 @@ F X
 	Set_FX_Selected_In_Container1
 	Set_FX_Selected_In_Container2
 	Get_First_Floating_Container
+	Get_FX_All_Parent_Container_Names
+	Get_Regular_Cont_FX_Index
 	Concat_Container_FX_Wnd_Title
 	Collect_All_FX_Indices
-	Get_Regular_Cont_FX_Index
 	Get_FX_Parm_Orig_Name_s
 	Get_FX_Parm_By_Name_Or_Ident
 	Get_FX_Type
@@ -32522,29 +32953,33 @@ W I N D O W S
 	Re_Store_Windows_Props_By_Names2
 	Re_Store_Windows_Props_By_Names_And_Handles1
 	Re_Store_Windows_Props_By_Names_And_Handles2
-	Is_Window_Visible1
-	Is_Window_Visible2
+	Is_Window_Visible_JS1
+	Is_Window_Visible_JS2
+	Is_Window_Visible_SWS
 	Exclude_Visible_Windows
 	Is_Window_Docked1
 	Is_Window_Docked2
+	Is_Window_Docked3
 	Is_Wnd_Docked_In_Floating_Docker1
 	Is_Wnd_Docked_In_Floating_Docker2
 	Move_Window_To_Another_Dock
 	Dock_Floating_Window
-	Send_Message
-	JS_Window_IsVisible
+	Send_Message	
 	Find_Window_SWS
 	Get_Child_Windows_JS1
 	Get_Child_Windows_JS2
 	Get_Child_Windows_JS3
+	Find_Child_Window_SWS
 	Get_Window_And_Children_JS
 	Get_Sibling_Windows_JS
 	Get_Child_Windows_SWS
 	Get_Sibling_Windows_SWS
+	find_sibling_window_SWS
 	Get_Sibling_Windows
 	Get_All_Parent_Windows
 	Get_Top_Parent_Window
 	Is_Parent_Window
+	Get_Docked_Windows
 	Traverse_List1
 	Traverse_List2
 	GetSet_SWS_Notes_Wnd_Scroll_Pos
@@ -32570,6 +33005,7 @@ W I N D O W S
 	store_or_update_coordinates_after_quitting2
 	Refresh_Ruler_Height
 	Set_Ruler_Height
+	Extension_Window_API
 
 
 T H E M E
@@ -32658,6 +33094,8 @@ F I L E S
 	remove_line_breaks
 	is_image_file
 	get_file_mod_time
+	open_proj_directory
+	open_directory
 
 
 M E A S U R E M E N T S / C A L C U L A T I O N S
@@ -32736,6 +33174,7 @@ U T I L I T Y
 	Reload_Menu_at_Same_Pos1
 	Reload_Menu_at_Same_Pos2
 	Reload_Menu_at_Same_Pos_gfx
+	get_set_toggle_settings
 	Settings_Management_Menu_And_Help
 	Toggle_Settings_From_Menu1
 	Toggle_Settings_From_Menu2
@@ -32792,6 +33231,7 @@ U T I L I T Y
 	Un_Set_MW_Config_Flags
 	Get_Mousewheel_Mode
 	trackselonmouse
+	Get_Screensets_Autosave_Settings
 	get_ini_cont
 	Check_reaper_ini
 	Extract_reaper_ini_val1
