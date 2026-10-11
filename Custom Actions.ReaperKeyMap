@@ -94,6 +94,10 @@ ACT 0 0 "7ab1a1ec79adb44f946a1de83cebd364" "Custom: Create folder for each selec
 ACT 1 0 "88142361c8db9248a64b4fd96ece3d7a" "Custom: Create loop points between adjacent project markers (place edit cursor between markers or at the left one)" 40020 41667 40172 40222 40173 40223 40172
 ACT 1 0 "29d6ab187215e346a74e70ab40287efd" "Custom: Create multiple tracks and auto-activate name field of the 1st" 41067 40914 40696
 ACT 1 0 "a23764970763a24d999134b35def01b7" "Custom: Create seamless loop (tweak Pref -> Media item defaults -> Overlap split length)" 40528 _XENAKIOS_SELITEMSUNDEDCURSELTX 41995 40927 40757 40032 41051 40928 40635
+ACT 1 0 "073b1ebfed0a1d4898551d7ed99b04ff" "Custom: Create time selection between 2 selected items (place mouse cursor between items)" 40513 40318 40625 40319 40626
+ACT 1 0 "3fd3cf7986224040a8b0a60a79b5272b" "Custom: Create time selection between 2 adjacent items on selected track (place mouse cursor between items)" 40513 40416 40319 40625 40417 40626
+ACT 1 0 "583de500354972468013f0d47ac1b1d6" "Custom: Create time selection between 2 adjacent items on selected track (place edit cursor between items)" 40416 40319 40625 40417 40626
+ACT 1 0 "aecba5014476f743b2370af941f70c78" "Custom: Create time selection between 2 selected items (place edit cursor between items)" 40318 40625 40319 40626
 ACT 1 0 "1a84de03e6fe364996d078a42a3352bf" "Custom: Create time selection from loop (place cursor inside loop) -- to be assigned to Track mouse double-click" 40632 40625 40633 40626
 ACT 1 0 "cd39c3f36f2bd1489a0f774c4f2a1013" "Custom: Create time selection within region / between markers (place cursor within region) -- to be assigned to Track mouse double-click" 40172 40625 40173 40626
 ACT 1 0 "fdced7dba4e5b84a92cb1af847d665c2" "Custom: Create track and auto-activate name field" 40001 40914 40696
