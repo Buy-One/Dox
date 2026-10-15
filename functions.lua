@@ -74,7 +74,7 @@ F U N C T I O N   L I S T
 do return r.defer(function() end) end -- 'do return end' isn't required if it's the last line in the script
 
 function no_undo()
-do return end
+-- do return end -- unnecessary
 end
 -- USE:
 -- do return r.defer(no_undo) end
@@ -111,6 +111,7 @@ else r.Undo_EndBlock('', -1) end
 
 
 function Undo(...)
+-- DOESN'T PREVENT CREATION OF UNDO POINTS BY ACTIONS WHEN USED THIS WAY
 -- expects 2 arguments for Undo_EndBlock:
 -- description sring, and flag integer
 --[[
@@ -140,7 +141,8 @@ end
 -- Undo('my undo', -1) -- end block
 
 
-function undo_block(undo) 
+function undo_block(undo)
+-- DOESN'T PREVENT CREATION OF UNDO POINTS BY ACTIONS WHEN USED THIS WAY
 -- undo arg is a string, 
 -- which isn't used at the beginning of the block 
 -- and only used at its end
@@ -1126,6 +1128,20 @@ end
 -- USE: reduce number by 1 keeping its sign
 -- 5 - sign(5) = 4
 -- -5 - sign(-5) = -4
+
+
+function add_leading_zeros(max_num, cur_num) -- see also add_zero_padding()
+-- doesn't support negative numerals
+	local function calc(num)
+		for i=10,0,-1 do
+			if 10^i <= num then return i end -- equality operator accommodates tens, hundreds etc.
+		end
+	end
+local max_0 = calc(max_num)
+local min_0 = calc(cur_num)
+min_0 = cur_num == 0 and 0 or min_0
+return ('0'):rep(max_0-min_0)
+end
 
 
 --================================ M A T H  E N D ===================================
@@ -2397,7 +2413,7 @@ end
 
 
 
-function add_zero_padding(max_num)
+function add_zero_padding(max_num) -- see also add_leading_zeros()
 -- only supports integers
 	for i=0, max_num do
 	local pad = ('0'):rep(#(max_num..'')-#(i..'')) -- difference in integer length
@@ -2499,7 +2515,7 @@ return str:gsub(word, function(c) i = i and i+1 or 1; return c..' '..i end)
 end
 
 
-function sanitize_string_for_menu(name, pipe)
+function sanitize_string_for_menu(name, pipe) -- see also Esc_Menu_Ops()
 -- stripping leading !, #, < and > and replacing all instances of |
 -- so that being menu special characters they don't affect
 -- the way string is displayed in the menu;
@@ -6460,7 +6476,7 @@ r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINMIXER', 0) -- hide in Mixer
 r.SetMediaTrackInfo_Value(temp_track, 'B_SHOWINTCP', 0) -- hide in Arrange
 
 r.TrackFX_AddByName(temp_track, 'Video processor', 0, -1) -- insert
-local copy = take_GUID and r.TakeFX_CopyToTrack(obj, fx_idx, temp_track, 0, false) or not take_GUID and r.TrackFX_CopyToTrack(obj, fx_idx, temp_track, 0, false) -- is_move false // difficult to work with r.TrackFX_AddByName() using plugin names as they can be renamed which will only be reflected in reaper-vstrenames(64).ini, not in the chunk; 'not take_GUID' cond is needed to avoid error when object is take which doesn't fit TrackFX_CopyToTrack() function // when copying FX envelopes don't follow, only when moving; since 6.37 TrackFX_AddByName() can be safely used after retrieving fx name displayed in the FX browser with r.Track/TakeFX_GetNamedConfigParm(obj, fx_idx, 'original_name') or 'fx_name'
+local copy = take_GUID and r.TakeFX_CopyToTrack(obj, fx_idx, temp_track, 0, false) or not take_GUID and r.TrackFX_CopyToTrack(obj, fx_idx, temp_track, 0, false) -- is_move false // difficult to work with r.TrackFX_AddByName() using plugin names as they can be renamed which will only be reflected in reaper-vstrenames(64).ini, not in the chunk; 'not take_GUID' cond is needed to avoid error when object is take which doesn't fit TrackFX_CopyToTrack() function // when copying, FX envelopes don't follow, only when moving; since 6.37 TrackFX_AddByName() can be safely used after retrieving fx name displayed in the FX browser with r.Track/TakeFX_GetNamedConfigParm(obj, fx_idx, 'original_name') or 'fx_name'
 
 -- DO STUFF --
 
@@ -7745,7 +7761,8 @@ function Get_Last_Touched_Fixed_Item_Lane()
 -- that with the paste action items are pasted
 -- to the last touched lane;
 -- last touched lane doesn't change if lane enable
--- button is clicked
+-- button is clicked;
+-- THE FUNCTION OVERWRITES THE CLIPBOARD DUE TO USE OF THE COPY ACTION
 
 	local function re_store_selected_items(t, keep_last_selected)
 	-- at the restoration stage when evaluating whether any items
@@ -10663,15 +10680,16 @@ local function GetObjChunk2(obj)
 	if not obj then return end
 local t = {}
 -- 'TrackEnvelope*' works for take envelope as well
-	for k, typename in ipairs({'MediaTrack*', 'MediaItem*', 'TrackEnvelope*'}) do
+	for k, typename in ipairs({'MediaTrack*', 'MediaItem*', 'MediaItem_Take*', 'TrackEnvelope*'}) do
 	t[#t+1] = r.ValidatePtr(obj, typename)
 	end
-local tr, item, env = table.unpack(t)
+local tr, item, take, env = table.unpack(t)
 -- Try standard function -----
-local t = tr and {r.GetTrackStateChunk(obj, '', false)} or item and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
+local obj = take and r.GetMediaItemTake_Item(obj) or obj
+local t = tr and {r.GetTrackStateChunk(obj, '', false)} or (item or take) and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
 local ret, obj_chunk = table.unpack(t)
 -- OR
--- local ret, obj_chunk = table.unpack(tr and {r.GetTrackStateChunk(obj, '', false)} or item and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} or {x,x}) -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
+-- local ret, obj_chunk = table.unpack(tr and {r.GetTrackStateChunk(obj, '', false)} or (item or take) and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} or {x,x}) -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
 	if ret and obj_chunk and #obj_chunk >= 4194303 and not r.APIExists('SNM_CreateFastString') -- OR not r.SNM_CreateFastString
 	then return 'err_mess'
 	elseif ret and obj_chunk and #obj_chunk < 4194303 then return ret, obj_chunk -- 4194303 bytes (4.194303 Mb) = (4096 kb * 1024 bytes) - 1 byte // since build 4.20 http://reaper.fm/download-old.php?ver=4x
@@ -10691,7 +10709,8 @@ function Err_mess() -- if chunk size limit is exceeded and SWS extension isn't i
 local sws_ext_err_mess = "            The size of the data requires\n\n  the SWS/S&M extension to handle them.\n\nIf it's installed then it needs to be updated.\n\n         After clicking \"OK\" a link to the\n\n SWS extension website will be provided\n\n\tThe script will now quit."
 local sws_ext_link = 'Get the SWS/S&M extension at\n\nhttps://www.sws-extension.org/\n\nOR\n\nhttps://github.com/reaper-oss/sws/tags'
 local resp = r.MB(sws_ext_err_mess,'ERROR',0)
-	if resp == 1 then r.ShowConsoleMsg(sws_ext_link, r.ClearConsole()) return end
+	if resp == 1 then r.Main_OnCommand(42663, 0) -- ReaScript: Show ReaScript console // to override preference at Plug-ins -> ReaScript -> Do not auto-open ReaScript console which was added in 7.28, while the action was added in 7.0
+	r.ShowConsoleMsg(sws_ext_link, r.ClearConsole()) return end
 end
 
 
@@ -10706,11 +10725,12 @@ local function SetObjChunk2(obj, obj_chunk)
 	if not (obj and obj_chunk) then return end
 local t = {}
 -- 'TrackEnvelope*' works for take envelope as well
-	for k, typename in ipairs({'MediaTrack*', 'MediaItem*', 'TrackEnvelope*'}) do
+	for k, typename in ipairs({'MediaTrack*', 'MediaItem*', 'MediaItem_Take*', 'TrackEnvelope*'}) do
 	t[#t+1] = r.ValidatePtr(obj, typename)
 	end
-local tr, item, env = table.unpack(t)
-return tr and r.SetTrackStateChunk(obj, obj_chunk, false) or item and r.SetItemStateChunk(obj, obj_chunk, false) or env and r.SetEnvelopeStateChunk(obj, obj_chunk, false) -- isundo is false // https://forum.cockos.com/showthread.php?t=181000#9
+local tr, item, take, env = table.unpack(t)
+local obj = take and r.GetMediaItemTake_Item(obj) or obj
+return tr and r.SetTrackStateChunk(obj, obj_chunk, false) or (item or take) and r.SetItemStateChunk(obj, obj_chunk, false) or env and r.SetEnvelopeStateChunk(obj, obj_chunk, false) -- isundo is false // https://forum.cockos.com/showthread.php?t=181000#9
 end
 
 
@@ -12683,7 +12703,7 @@ end
 
 
 
-function Get_FX_Selected_In_FX_Chain(obj, input_fx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensive version
+function Get_FX_Selected_In_Main_Chain1(obj, input_fx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensive version
 -- input_fx is boolean for use in builds 7.06+ to target input/Monitoring FX chain
 -- doesn't support containers, see Get_FX_Shown_Or_Selected_In_Container() and Get_FX_Selected_In_Container()
 
@@ -12702,13 +12722,44 @@ local input_fx = tr and input_fx -- validate so it's only valid if object is tra
 	local found
 		for line in chunk:gmatch('[^\n\r]+') do
 			if (not input_fx or found) and line:match('LASTSEL') then
-			return line:match('%d+')
+			return line:match('[%-%d]+') -- value may be -1 if no fx or if it's been reset after copying FX chain as per the bug report https://forum.cockos.com/showthread.php?t=311951, therefore must be additionally validated by FX_GetCount()
 			elseif input_fx and line:match('<FXCHAIN_REC') then found = 1
 			end
 		end
 	end
 
 end
+
+
+
+function Get_FX_Selected_In_Main_Chain2(obj, input_fx)
+-- input_fx is boolean to target track input fx chain
+-- relies on GetObjChunk2() for builds older than 7.06
+-- doesn't support containers, see Get_FX_Shown_Or_Selected_In_Container() and Get_FX_Selected_In_Container()
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+local GetParm, CountFX = table.unpack(take and {r.TakeFX_GetNamedConfigParm, r.TakeFX_GetCount} 
+or {r.TrackFX_GetNamedConfigParm, input_fx and r.TrackFX_GetRecCount or r.TrackFX_GetCount})
+local idx
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.06 then
+	local ret
+	ret, idx = GetParm(obj, input_fx and 0x1000000 or 0, 'chain_sel')
+	else
+	local ret, chunk = GetObjChunk(obj)
+--Msg(chunk)
+		if ret == 'err_mess' then return end
+	chunk = tr and input_fx and (chunk:match('(<FXCHAIN_REC.*>)\n<ITEM') 
+	or chunk:match('(<FXCHAIN_REC.*WAK.*>)\n>')) or chunk
+	idx = chunk:match('LASTSEL ([%-%d]+)') -- value may be -1 if no fx or if it's been reset after copying FX chain as per the bug report https://forum.cockos.com/showthread.php?t=311951
+--Msg(idx)
+	end
+idx = tonumber(idx)
+-- due to the bug mentioned above, when value is -1 it must be validated by getting fx count
+-- because it's only accurate when there're no fx in the chain;
+-- when the chain is empty this value returns false
+return idx > -1 and idx or CountFX(obj) > 0 and 0
+end
+
 
 
 
@@ -12795,7 +12846,7 @@ local input_fx = input_fx or tr and fx_idx and fx_idx >= 0x1000000 -- validate s
 		local found
 			for line in chunk:gmatch('[^\n\r]+') do
 				if (not input_fx or found) and line:match('LASTSEL') then
-				return line:match('%d+')
+				return line:match('[%-%d]+') -- value may be -1 if no fx or if it's been reset after copying FX chain as per the bug report https://forum.cockos.com/showthread.php?t=311951, therefore must be additionally validated by FX_GetCount()
 				elseif line:match('<FXCHAIN_REC') then found = 1
 				end
 			end
@@ -16241,6 +16292,19 @@ local fade_in, fade_out, xfade_in, xfade_out, xfade_in_nonuniform, xfade_out_non
 
 
 
+function Take_Is_Forced_Offline(take)
+	if take and not r.TakeIsMIDI(take) then
+	local src = r.GetMediaItemTake_Source(take) -- won't return accurate pointer for reversed source and source sections, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+	src = r.GetMediaSourceParent(src) or src
+	local typ = r.GetMediaSourceType(src, '')
+		if typ ~= 'EMPTY' then return typ:match('OFFLINE') end -- to typ string of a media source forced online _OFFLINE_ prefix is added, setting online temporarily with actions
+		-- Item: Set selected media temporarily offline; Item: Set all media offline
+		-- isn't reflected anywhere in the chunk and the state cannot be queried with the API
+	end
+end
+
+
+
 function is_audio_src(obj)
 -- obj is either take source or take pointer
 -- take is advised in cases where source may be set to section or reversed
@@ -16258,7 +16322,7 @@ local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
 	if src then
 	local typ = r.GetMediaSourceType(src, '')
 		for k, v in ipairs({'MIDI', 'RPP', 'EMPTY', 'CLICK', 'LTC', 'VIDEO'}) do
-			if typ:match(v) then
+			if typ:match(v) then -- match() covers media forced offline state when type included _OFFLINE_ prefix
 				if v == 'VIDEO' then -- as of build 7.52 wma and m4a files are recognized as video even though they only contain audio, so need to be validated further https://forum.cockos.com/showthread.php?t=304924
 				local ext = r.GetMediaSourceFileName(src, ''):match('.+%.(.+)$')
 					if ext == 'wma' or ext == 'm4a' then
@@ -23272,7 +23336,7 @@ return package.searchpath(name, path..'?.'..ext)
 end
 
 
-function file_exists_alt(path) -- a fix for the buggy ReaScript API function
+function file_exists_alt(path) -- a fix for the peculiarity of the ReaScript API function
 -- file_exists() returns true if only a file name is passed and the file with the same name
 -- is found in the current working directory
 -- https://forum.cockos.com/showthread.php?t=300386
@@ -23809,7 +23873,7 @@ function ScanPath1(path)
     until not path_child
 
     repeat
-        fn = reaper.EnumerateFiles( path, fileindex )
+        fn = reaper.EnumerateFiles( path, fileindex ) -- only returns file names
         if fn then
             --t[#t+1] = path .. "/" .. fn
             t[#t+1] = fn
@@ -23826,8 +23890,10 @@ local t = ScanPath(path)
 -- My version
 function ScanPath2(path)
 
-local path = path:match('^%s*(.-)%s*$') -- trim spaces
+local path = path:match('^%s*(.-)%s*$') -- trim spaces // OR ('(%S.+)%s*$')
 local path = #path > 0 and path:match('.+[\\/]$') and path:match('(.+)[\\/]$') or path -- remove last separator if any
+-- OR
+-- local path = path:sub(-1):match('[\\/]') and path:sub(1,-2) or path -- strip trailing separator
 local sep = path:match('[\\/]') and path:match('[\\/]') or '/' -- extract the separator, if path is disk root where the separator isn't listed, use forward slash, which should work on Windows as well
 local t = {}
 local subdir_idx, file_idx, subdir = 0, 0
@@ -23858,6 +23924,7 @@ return t
 end
 
 
+
 function scandir(dir) -- not for Mac; REAPER API already has r.EnumerateSubdirectories()
 -- https://forum.cockos.com/showthread.php?t=159547
 -- A less elegant solution to get a directory list in lua without additional libraries is to use the os.execute and write the lines to a buffer. Works like a charm but you do get a very quick terminal window popping open to execute it. I used it a few times on my File Manager script if you want to see an example. This works on Mac. Instead of os.execute the native r.ExecProcess() could probably be used
@@ -23877,10 +23944,14 @@ function Count_Files_In_Folder(path,ext)
 --r.EnumerateFiles(path, -1) -- -1 to clear the cache, or pass another directory (invalid one is suppported), since 6.20
 -- https://forum.cockos.com/showthread.php?t=203235
 -- applies to r.EnumerateSubdirectories() as well
+local path = path:match('^%s*(.-)%s*$') -- trim spaces // OR ('(%S.+)%s*$')
+local path = #path > 0 and path:match('.+[\\/]$') and path:match('(.+)[\\/]$') or path -- remove last separator if any
+-- OR
+-- local path = path:sub(-1):match('[\\/]') and path:sub(1,-2) or path -- strip trailing separator
 local i = 0
 local f_cnt = 0
 	repeat
-	local file_n = r.EnumerateFiles(path, i)
+	local file_n = r.EnumerateFiles(path, i) -- only returns file names
 		if file_n and file_n:match('%.reapeaks') then os.remove(path..file_n) end -- delete .reapeaks files
 	i = i + 1
 		if file_n and file_n:match(''..ext..'$') then f_cnt = f_cnt+1 end
@@ -23889,10 +23960,15 @@ return f_cnt
 end
 
 
+
 function Remove_Peak_Files(path)
+local path = path:match('^%s*(.-)%s*$') -- trim spaces // OR ('(%S.+)%s*$')
+local path = #path > 0 and path:match('.+[\\/]$') and path:match('(.+)[\\/]$') or path -- remove last separator if any
+-- OR
+-- local path = path:sub(-1):match('[\\/]') and path:sub(1,-2) or path -- strip trailing separator
 local i = 0
 	repeat
-	local file_n = r.EnumerateFiles(path, i)
+	local file_n = r.EnumerateFiles(path, i) -- only returns file names
 		if file_n and file_n:match('%.reapeaks') then os.remove(path..file_n) end -- delete .reapeaks files
 	i = i + 1
 	until not file_n
@@ -24784,15 +24860,17 @@ function Copy_Or_Move_File(cur_file_path, new_file_path, want_move)
 -- new_file_path excludes file name
 local f = io.open(cur_file_path,'rb')
 local cont = f:read('*a')
+f:close()
 	if want_move then -- remove from old location
 	os.remove(cur_file_path)
 	end
 local sep = new_file_path:match('[\\/]')
-local path = new_file_path..(new_file_path:sub(-1) == sep and '' or sep)..cur_file_path:match('[^\\/]+') -- concatenate full path of the file at the new location
+local path = new_file_path..(new_file_path:sub(-1) == sep and '' or sep)..cur_file_path:match('.+[\\/](.+)')-- concatenate full path of the file at the new location
+-- may be enhanced with File_Exists3() or File_Exists4() to only move or copy when file doesn't exist
 f = io.open(path,'wb')
 f:write(cont)
 f:close()
-return r.file_exists(path) and path
+return r.file_exists(path) and path -- File_Exists3() or File_Exists4() can be used here instead of r.file_exists()
 end
 
 
@@ -26196,7 +26274,7 @@ end
 
 
 
-function Esc_Menu_Ops(str)
+function Esc_Menu_Ops(str) -- see also sanitize_string_for_menu()
 -- useful when user input or parsed content 
 -- can affect menu formatting
 	for k, op in ipairs({'!','#','>','<','|'}) do
@@ -30641,16 +30719,22 @@ function FX_Select_Function_Type2()
 -- after execution, the functions can be accessed
 -- with the syntax fx[function_name] or fx.function_name
 -- using function names listed in the table t below;
--- differs from FX_Select_Function_Type1() above
+-- differs from FX_Select_Function_Type1()
 -- in that this function doesn't have to be called
 -- only when the object pointer is available,
 -- enough to run it once at the very beginning of the script
 -- to be able to access the FX functions matching object type
 -- anywhere in the script;
 -- obviously both arguments and return values remain 
--- as required by the ReaScript API
+-- as required by the ReaScript API;
+-- !!! IMPORTANT: names GetCount and GetChainVisible
+-- cover input/monitoring fx chains as well
+-- and for input/monitoring fx chains, boolean true as a 2nd argument must be passed,
+-- while GetEnvelope covers envelopes in both object types,
+-- the relevant version is selected at runtimeme
 
-local t = {'AddByName','CopyToTake','CopyToTrack','Delete','EndParamEdit','FormatParamValue','FormatParamValueNormalized','GetChainVisible','GetCount','GetEnabled','GetEQ','GetEQBandEnabled','GetEQParam',tr and 'GetFXEnvelope' or take 'GetEnvelope','GetFloatingWindow','GetFXGUID','GetFXName','GetIOSize','GetNamedConfigParm','GetNumParams','GetOffline','GetOpen','GetParam','GetParameterStepSizes','GetParamEx','GetParamFromIdent','GetParamIdent','GetParamName','GetParamNormalized','GetParamSectionName','GetPinMappings','GetPreset','GetPresetIndex','GetRecChainVisible','GetRecCount','GetUserPresetFilename','NavigatePresets','SetEnabled','SetEQBandEnabled','SetEQParam','SetNamedConfigParm','SetOffline','SetOpen','SetParam','SetParamNormalized','SetPinMappings','SetPreset','SetPresetByIndex','Show'
+
+local t = {'AddByName','CopyToTake','CopyToTrack','Delete','EndParamEdit','FormatParamValue','FormatParamValueNormalized','GetChainVisible','GetCount','GetEnabled','GetEQ','GetEQBandEnabled','GetEQParam','GetEnvelope','GetFloatingWindow','GetFXGUID','GetFXName','GetIOSize','GetNamedConfigParm','GetNumParams','GetOffline','GetOpen','GetParam','GetParameterStepSizes','GetParamEx','GetParamFromIdent','GetParamIdent','GetParamName','GetParamNormalized','GetParamSectionName','GetPinMappings','GetPreset','GetPresetIndex','GetRecChainVisible','GetRecCount','GetUserPresetFilename','NavigatePresets','SetEnabled','SetEQBandEnabled','SetEQParam','SetNamedConfigParm','SetOffline','SetOpen','SetParam','SetParamNormalized','SetPinMappings','SetPreset','SetPresetByIndex','Show'
 }
 
 --[[ -- SEE USAGE IN THE LOOP BELOW
@@ -30660,10 +30744,14 @@ local t = {'AddByName','CopyToTake','CopyToTrack','Delete','EndParamEdit','Forma
 	-- and concatenated on the fly the moment the stored function is executed
 	-- i.e. fx.AddByName();	
 		return function(...)
-		local t = {...}
-		local obj = t[1]
+		local obj, input_fx = t[1], #t > 1 and t[#t] -- input_fx boolean value is only used for two functions for which only 1 argument is required, i.e. object, therefore whenever there're two, the last can be used as an indicator of input fx function, in all other cases where multiple arguments are expected the last argument won't affect function name selection even if true
+		local input_fx = fx_idx < 0x2000000 and fx_idx >= 0x1000000 or fx_idx >= fx_idx-0x2000000
 		local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-		local name = name and (tr and (name == 'GetFXEnvelope' and '' or 'TrackFX_') or 'TakeFX_')..name
+		local pref = tr and 'TrackFX_' or 'TakeFX_'
+		local name = name == 'GetEnvelope' and tr and 'GetFXEnvelope'			
+		or input_fx and (name == 'GetChainVisible' and pref..'GetRecChainVisible'
+		or name == 'GetCount' and pref..'GetRecCount')
+		or pref..name
 		return reaper[name](table.unpack(t))
 		end
 	end
@@ -30677,21 +30765,24 @@ local fx = {}
 					-- i.e. fx.AddByName(),
 					-- due to being anonymous the function isn't executed while being stored
 					local t = {...}
-					local obj = t[1]
+					local obj, input_fx = t[1], #t > 1 and t[#t] -- input_fx boolean value is only used for two functions for which only 1 argument is required, i.e. object, therefore whenever there're two, the last can be used as an indicator of input fx function, in all other cases where multiple arguments are expected the last argument won't affect function name selection even if true
 					local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-					local name = (tr and (name == 'GetFXEnvelope' and '' or 'TrackFX_') or 'TakeFX_')..name
+					local pref = tr and 'TrackFX_' or 'TakeFX_'
+					local name = name == 'GetEnvelope' and tr and 'GetFXEnvelope'			
+					or input_fx and (name == 'GetChainVisible' and pref..'GetRecChainVisible'
+					or name == 'GetCount' and pref..'GetRecCount')
+					or pref..name
 					return reaper[name](table.unpack(t))
 					end
 -- OR
 -- fx[name] = sel(name) -- using above local function
 	end
 
-
 return fx
 
 end
 -- USE:
--- fx = FX_Select_Function_Type2() -- run once at the beginning of the script
+-- fx = FX_Select_Function_Type() -- run once at the beginning of the script
 -- fx.AddByName(tr or take, name, instantiate) fx.CopyToTake(tr or take, fx_idx1, take, fx_idx2, false) etc.
 
 
@@ -32263,6 +32354,7 @@ M A T H
 	decode_bools_from_integer
 	to_signed32
 	sign
+	add_leading_zeros
 
 
 S T R I N G S
@@ -32717,9 +32809,10 @@ F X
 	RS5k_Calculate_Sample_Length
 	RS5k_Get_Note_Range
 	RS5k_Calculate_Sample_Playing_Time_At_Pitch	
-	Get_FX_Selected_In_FX_Chain
+	Get_FX_Selected_In_Main_Chain1
+	Get_FX_Selected_In_Main_Chain2
 	Set_FX_Selected_In_FX_Chain
-	GetSet_FX_Selected_In_FX_Chain	
+	GetSet_FX_Selected_In_FX_Chain
 	Process_FX_Incl_In_All_Containers
 	Collect_All_Container_FX_Indices
 	Loop_Over_FX_Container_Table
@@ -32804,6 +32897,7 @@ I T E M S
 	Item_Time_2_Proj_Time
 	ApplyNudge scenarios
 	Fades_Exist
+	Take_Is_Forced_Offline
 	is_audio_src
 	Get_Take_Source_File
 	Delete_Take_Src_File
