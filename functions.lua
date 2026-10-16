@@ -10842,23 +10842,31 @@ end
 
 
 
-function Get_Take_Chunk(take, item)
--- item is optional
+function Get_Take_Chunk(take, chunk)
+-- chunk is optional
+-- if chunk isn't supplied, the function relies on GetObjChunk2()
 -- relies on Esc() function
 local ret, GUID = r.GetSetMediaItemTakeInfo_String(take, 'GUID', '', false) -- isset false
+	if not chunk then
+	local ret
+	ret, chunk = GetObjChunk(take)
+		if ret == 'err_mess' then return ret end -- return to trigger Err_mess() outside, or may be triggered here
+	end
 local item = item or r.GetMediaItemTake_Item(take)
 local ret, chunk = r.GetItemStateChunk(item, '', false) -- isundo false
 local GUID = Esc(GUID)
 local take_chunk, take = {}
 	for line in chunk:gmatch('[^\n\r]+') do
-		if take and line:match('^TAKE') then break -- new take has come along, if no next take the loop will continue until chunk and and the table will include item chunk closure which will be discarded below
-		elseif not take and line and line:match('^NAME') or take then
-		take = 1
-		take_chunk[#take_chunk+1] = line
-		elseif take and line:match('GUID') and not line:match(GUID) then
-		-- reset, wrong take
+		if take and (line:match('^TAKE$') or line:match('^TAKE SEL$')) then break -- new take has come along, if no next take the loop will continue until chunk end and the table will include item chunk closure which will be discarded below
+		elseif take and not GUID_found and line:match('^GUID') and not line:match(GUID) then -- reset when wrong take, while preventing reset when correct take because when correct take GUID_found will be true making this condition invalid, meant to accommodate MIDI item chunks where take GUID is followed by another GUID in the <SOURCE section the purpose of which isn't clear
 		take_chunk = {}
 		take = nil
+		elseif not take and line and (line:match('^TAKE') or line:match('^NAME')) or take then -- first take chunk doesn't have <TAKE attribute and starts from NAME attribute // this condition will be true for any take, not necessarily the correct one, but once the loop reaches the take GUID line the data stored so far will be reset in the preceding block if this GUID doesn't match target take GUID
+		take = 1
+		take_chunk[#take_chunk+1] = line
+			if line:match(GUID) then -- set GUID_found to true to prevent resetting stored data after genuine take GUID has already been found, relevant to chunks of MIDI items where <SOURCE block contains another GUID {...} line the purpose of which isn't clear
+			GUID_found = 1
+			end
 		end
 	end
 	if #take_chunk > 0 then
@@ -15682,8 +15690,8 @@ end
 
 
 function REVERSE_TAKES_VIA_CHUNK(item)
-local ret, chunk = GetItemChunk(item) -- FUNCTION
-	if ret == 'error' then Err_mess() return end -- FUNCTION
+local ret, chunk = GetObjChunk2(item) -- FUNCTION
+	if ret == 'err_mess' then Err_mess() return end -- FUNCTION
 local take_cnt = r.CountTakes(item)
 	if take_cnt > 1 then
 	local chunk_t = {chunk:match('(.+)(NAME[%W].-)'..string.rep('(TAKE[%W].-)', take_cnt-2)..'(TAKE[%W].+)>')} -- GET TAKE CHUNKS; repeat as many times as take count -2 since first and last take chunks are different; [%W] makes sure that only 'TAKE' tag is captured disregarding words which contain it of which there're a few, that is must be followed by anything but alphanumeric characters
@@ -27343,6 +27351,35 @@ end
 
 
 
+function check1(sett1, sett2)
+-- checkmarking menu item when relevant boolean setting is enabled
+-- sett2 is variable of a boolean setting with which sett1 are mutually exclusive
+-- so that when sett2 is enabled, sett1 is grayed out,
+-- can be passed as several settings which are mutually excluive
+-- and 'or' operator
+return sett2 and '#' or sett1 and '!' or ''
+end
+-- USE:
+-- menu = check(sett1, sett2 or sett3 or sett4)..'Setting 1'
+
+
+function check2(t, idx)
+-- t is an indexed table containing variables of all mutually exclusive boolean settings,
+-- nils aren't supported because looping won't work, false should be used instead,
+-- idx is index of the setting variable in the table t
+-- whose menu item is being formatted
+	for k, truth in ipairs(t) do
+		-- if there's another enabled setting, gray out menu
+		-- item of the evaluated setting at index idx
+		if k ~= idx and truth then return '#' end
+	end
+return t[idx] and '!' or ''
+end
+-- USE:
+-- menu = check({sett1, sett2, sett3, sett4}, 2)..'Setting 2'
+
+
+
 function Toggle_Option(option, data, output, scr_ID)
 -- toggle in response to menu item click;
 -- option arg is string, one of the options stored as extended state in 0 and 1 format;
@@ -33278,6 +33315,8 @@ U T I L I T Y
 	Get_Set_Menu_Toggle_Options
 	Menu_With_Toggle_Options1
 	Menu_With_Toggle_Options2
+	check1
+	check2
 	Toggle_Option
 	Create_Submenus_Dynamically
 	Options_State_Readout
