@@ -482,6 +482,7 @@ ACT 1 0 "2bbe73138f0bf14eaa0aff4a38656324" "Custom: PooFox aka foxAsteria Zoom R
 ACT 1 0 "cb5b20312eff43499042b10e60253687" "Custom: PooFox aka foxAsteria Zoom Split and Edit" 41039 40031 40109
 ACT 1 0 "ebaea2d6886b9a4d81c33d3f76abc21e" "Custom: PooFox aka foxAsteria Zoom to Play Cursor" 40151 1012 40151
 ACT 1 0 "71650c01ed970a4fb613a862844f3a74" "Custom: PooFox aka foxAsteria_Duplicate all items in time selection moving later items" 40311 40718 40061 41296 40309
+ACT 1 0 "fcf78b76d8fe0b479c79dc1683002cfb" "Custom: Prepare selected track for Master output recording [t=312030]" _SWS_DISMPSEND 40497 40493 9
 ACT 1 0 "f8723a9989b8914eb4d2939a676af412" "Custom: prastya28_(Stereo Tool) Stereo Track --> Dual Mono" 40062 _SWS_UNSELONTRACKS _XENAKIOS_SELPREVTRACK 40179 40289 _XENAKIOS_SELNEXTTRACK 40421 40180
 ACT 1 0 "fc46e9af5d43dd47899e905e86215e62" "Custom: Preview: Move cursor to the next adjacent item on the track, retreat 1 beat and play (select all items) -- next click after playhead crossed item joint point" 40434 40319 40842 1016 1007
 ACT 1 0 "412aedf8dc03324399918bc077863ee3" "Custom: Preview: Move cursor to the next adjacent item on the track and retreat 1 beat (select track) - 1st click is idle" 41173 40417 40842
