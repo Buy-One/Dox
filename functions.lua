@@ -22975,7 +22975,7 @@ function get_package_path_for_require()
 local info = debug.getinfo(1,'S');
 local full_script_path = info.source
 local script_path = full_script_path:sub(2,-5) -- remove "@" and "file extension" from file name
-	if reaper.GetOS() == "Win64" or reaper.GetOS() == "Win32" then
+	if reaper.GetOS():match('Win') then
 	package.path = package.path .. ";" .. script_path:match("(.*".."\\"..")") .. "..\\Functions\\?.lua"
 	else
 	package.path = package.path .. ";" .. script_path:match("(.*".."/"..")") .. "../Functions/?.lua"
@@ -26298,7 +26298,7 @@ end
 
 
 function UnEsc_Menu_Ops(str, pipe)
--- function which reverses the result of Esc_Menu_Ops
+-- function which reverses the result of Esc_Menu_Ops() above
 -- by stripping leading space and restoring pipe replaced with
 -- Full Width Vertical Line (U+FF5C) '\239\189\156';
 -- pipe arg is boolean to reinstate the pipe char, 
@@ -26312,6 +26312,72 @@ local str = str:match('%S.*'):gsub('\239\189\156', pipe and '|' or '\226\157\152
 return str
 end
 
+
+
+function replace_pipe(str)
+-- in menu items custom names added by user
+	if str:match('|') or str:match('\226\157\152') then -- if pipe (Vetcial Line (U+007C) '\124') or Light Vertical Bar (U+2758) '\226\157\152' which is interpreted by REAPER as pipe, replace with Full Width Vertical Line (U+FF5C) '\239\189\156', OR can be replaced with Box Drawings Light Vertical (U+2502) '\226\148\132' or with Hangul character for /i/ (U+3163) '\227\133\163'
+	str = str:gsub('[|\226\157\152]', '\239\189\156')
+	end
+return str
+end
+
+
+
+function Restore_Script_Backup_Settings(cont, cur_sett, new_cont) -- used in Update_or_Retrieve_Script_Backup_Settings()
+-- in case deleted by the user
+-- cur_sett is setting currently being modified by the script
+-- new_cont is new data for such setting
+
+local t = {}
+local settings = cont:match('.+return r%.defer%(no_undo%)(.*)$') -- capture settings, if any, excluding the script code up to the last line, because parsing it with match() during the loop freezes REAPER // THE CAPTURE PATTERN DEPENDS ON THE SCRIPT CONTENT BUT IMPLIES THAT THE SETTINGS ARE STORED AFTER THE MAIN CODE
+local lack
+	for k, sett in ipairs({sett1,sett2,sett3,sett4}) do -- ALL ITEMS ARE SETTING NAMES IN STRING FORMAT WHICH IN THE SCRIPT CODE LOOK LIKE 'setting = x'
+	local scr_sett = settings:match('.*('..sett..'%s*=%C*)') -- OR ('.*('..sett..'%s*=.-)\n'), the pattern ensures capturing a single line only // ('.*('..sett..'%s*=%s*.-)\n') would capture the next line as well if the target line doesn't include any value or space after '=' sign
+		if not scr_sett then lack = 1 end
+		if sett == cur_sett then -- add new data to the setting currently being modified by the script, whether it exists or not
+		scr_sett = sett..' = '..new_cont
+		end
+	t[#t+1] = scr_sett or sett..' = ' -- either storing existing or updated setting OR re-adding non-existing setting empty
+	end
+	if lack then -- if at least one setting name was absent, re-add the entire section into the script with those which are present
+	local cont = cont:match('.+return r%.defer%(no_undo%)') -- capture the entire script up to the last line // THE CAPTURE PATTERN DEPENDS ON THE SCRIPT CONTENT
+	-- THE FOLLOWING IMPLIES THAT THE BACKUP SETTINGS
+	-- ARE STORED WITHIN A BLOCK COMMENT AFTER THE MAIN CODE
+	local sett = '-- DATA BACKUP\n--[[\n'..table.concat(t,'\n')..'\n]]'
+	return cont..('\n'):rep(10)..sett..('\n'):rep(2) -- return script code with appended backup settings section
+	end
+end
+
+
+function Update_or_Retrieve_Script_Backup_Settings(path, sett, new_cont)
+-- meant to retrieve from script settings stored as a backup 
+-- or update one specific setting when changed;
+-- sett is a setting name in string format, if invalid, the script
+-- returns all backup settings, if any;
+-- new_cont is the setting value in string or numeric format;
+-- see implementation in 
+-- MIDI Editor Event filter presets menu.lua
+
+local f = io.open(path,'r')
+local cont = f:read('*a')
+f:close()
+	if not sett then return cont:match('.+return r%.defer%(no_undo%)(.*)$') -- -- retrieve by capturing settings, if any, excluding the script code up to the last line // THE CAPTURE PATTERN DEPENDS ON THE SCRIPT CONTENT BUT IMPLIES THAT THE SETTINGS ARE STORED AFTER THE MAIN CODE
+	else -- update
+	local updated_cont = Restore_Script_Backup_Settings(cont, sett, new_cont)
+		if updated_cont then
+		cont = updated_cont
+		else -- no restoration is required, use the current
+		local cur_sett = cont:match('.*('..sett..'%s*=%C*)') or cont:match(sett..'%s*=%s*') -- OR ('.*('..sett..'%s*=.-)\n') // the pattern ensures capturing a single line only, ('.*('..sett..'%s*=%s*.-)\n') would capture the next line as well if the target line doesn't include any value after = sign
+		cur_sett = Esc(cur_sett)
+		new_cont = new_cont:gsub('%%', '%%%%')
+		cont, repl = cont:gsub(cur_sett, sett..' = '..new_cont, 1)
+		end
+	end
+local f = io.open(path,'w')
+f:write(cont)
+f:close()
+end
 
 
 
@@ -27377,6 +27443,29 @@ return t[idx] and '!' or ''
 end
 -- USE:
 -- menu = check({sett1, sett2, sett3, sett4}, 2)..'Setting 2'
+
+
+
+function calc_menu_item_idx(main_list_len, init_idx, main_list_offset, desc_order, user_offset)
+-- main_list_len is integer denoting count of menu items 
+-- in the main section of the menu, i.e. sans non-functional items, options etc.,
+-- which can be passed as a length of the table containing main section items data;
+-- init_idx is menu item original index in the main menu section, returned by gfx.showmenu();
+-- main_list_offset is number of menu items which precede the main
+-- section where item at init_idx is located, i.e. non-functional items, options etc.;
+-- desc_order is boolean denoting whether the main section items 
+-- are set to be listed in descending order, deoends on the script design;
+-- user_offset, an integer indicating the number of menu items the main menu 
+-- section display must be offset by, depends on the script design;
+-- the implementation see in
+-- MIDI Editor Event filter presets menu.lua
+-- and Temporary FX presets.lua
+local init_idx = init_idx-main_list_offset
+local user_offset = tonumber(user_offset) or 0
+local init_idx = desc_order and main_list_len+1-output or output -- account for list arrangement in descending order
+return init_idx + user_offset * (desc_order and -1 or 1) -- account for list display offset
+end
+
 
 
 
@@ -31192,6 +31281,8 @@ local err2 = not func_name2 and api_name2..err or ''
 	return end
 return true
 end
+
+
 function validate_dependency(lib_path)
 -- this function must be included in the main script which loads the lib via require
 -- https://github.com/ReaTeam/ReaScripts/blob/e6eeb7c9c6238657db4345d0e3a6c3e58e3f1136/View/talagan_Docking%20tools/actions/talagan_Maximize%20bottommost%20dock.lua
@@ -31204,8 +31295,6 @@ local ok, lib = pcall(require, lib_path)
 	if not lib.CheckDependencies() then return end
 return lib
 end
-
-
 
 
 -- amagalma breakpoint for debugging
@@ -31303,6 +31392,59 @@ local pos = aa_start
 
 reaper.DestroyAudioAccessor(audio)
 
+end
+
+
+
+function get_func_environment(func)
+local i = 1
+	while true do
+	-- Loop through the function's upvalues until we find "_ENV"
+	local name, val = debug.getupvalue(func, i)
+		if not name then break end
+		if name == "_ENV" then return val end
+	i = i + 1
+	end
+end
+
+
+function get_var_value(var_name)
+-- https://www.lua.org/pil/23.1.2.html
+-- First, we try a local variable. If there is more than one variable 
+-- with the given name, we must get the one with the highest index; 
+-- so we must always go through the whole loop. If we cannot find 
+-- any local variable with that name, then we try upvalues. 
+-- First, we get the calling function, with debug.getinfo(2).func, 
+-- and then we traverse its upvalues. Finally, if we cannot find 
+-- an upvalue with that name, then we get a global variable. 
+-- Notice the use of the argument 2 in the calls to debug.getlocal 
+-- and debug.getinfo to access the calling function.
+-- the level count starts with debug function itself, which is 0,
+-- the level of the function which calls debug, i.e. get_var_value()
+-- is 1, the level of its own parent function is 2 etc.
+
+-- try local variables
+local i = 1
+	while true do
+	local n, v = debug.getlocal(2, i) -- 2 is stack level, level of the function which called get_var_value()
+		if not n then break end
+		if n == var_name then return v end
+	i = i + 1
+	end
+
+-- https://www.gammon.com.au/mushclient/doc/lua/debug.getinfo.html
+-- not exited above with the value, try upvalues
+local func = debug.getinfo(2, 'f').func -- 2 is stack level, function which called get_var_value(), stored as func
+i = 1
+	while true do
+	local n, v = debug.getupvalue(func, i)
+	if not n then break end
+	if n == var_name then return v end
+	i = i + 1
+	end
+
+-- not found; get global
+return _G[var_name] -- OR _ENV[var_name]
 end
 
 
@@ -33302,6 +33444,9 @@ U T I L I T Y
 	Show_Menu_Dialogue
 	Esc_Menu_Ops
 	UnEsc_Menu_Ops
+	replace_pipe
+	Restore_Script_Backup_Settings
+	Update_or_Retrieve_Script_Backup_Settings
 	Reload_Menu_at_Same_Pos1
 	Reload_Menu_at_Same_Pos2
 	Reload_Menu_at_Same_Pos_gfx
@@ -33317,6 +33462,7 @@ U T I L I T Y
 	Menu_With_Toggle_Options2
 	check1
 	check2
+	calc_menu_item_idx
 	Toggle_Option
 	Create_Submenus_Dynamically
 	Options_State_Readout
@@ -33450,6 +33596,8 @@ U T I L I T Y
 	CheckDependencies and validate_dependency
 	Break
 	J_Reverb_randomizer
+	get_func_environment
+	get_var_value
 
 
 C O N V E R S I O N S
