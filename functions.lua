@@ -518,6 +518,20 @@ return num%1 == 0 and math.floor(num) or num
 end
 
 
+
+function modulo(a, b)
+-- modulo of negative value is negative
+-- unlike in the case of modulo operator %
+return math.fmod(a, b)
+end
+
+
+function mod(a, b) -- same as math.fmod(a,b) since Lua 5.1 and math.mod in Lua 5.0 or % operator
+-- https://stackoverflow.com/a/20858039/8883033
+    return a - (math.floor(a/b)*b)
+end
+
+
 math.randomseed(math.floor(r.time_precise()*1000)) -- seems to facilitate greater randomization at fast rate thanks to milliseconds count; math.floor() because the seeding number must be integer
 
 
@@ -622,12 +636,6 @@ local t = {}
 	t[#t+1] = i
 	end
 return t
-end
-
-
-function mod(a, b) -- same as math.fmod(a,b) since Lua 5.1 and math.mod in Lua 5.0 or % operator
--- https://stackoverflow.com/a/20858039/8883033
-    return a - (math.floor(a/b)*b)
 end
 
 
@@ -22474,6 +22482,56 @@ end
 -- Re_Store_Zoom(zoom) -- restore
 
 
+
+function restore_horiz_scroll_pos(time_init)
+-- time_init can originate from start_time return value of r.GetSet_ArrangeView2() 
+
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+local dir = start_time > time_init and -1 or start_time < time_init and 1 -- leftward scroll is -1, rightward 1
+
+	if not dir then return end -- no change
+
+r.PreventUIRefresh(1)
+	repeat
+	r.CSurf_OnScroll(dir, 0) -- scrolls by steps of 16 px
+	local start_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time)
+	until dir < 0 and start_time <= time_init or dir > 0 and start_time >= time_init
+r.PreventUIRefresh(-1)
+	
+end
+
+
+
+function scroll_arrange_to_closest_grid_div(grid_div_sec)
+-- r.SnapToGrid() only returns closest grid division 
+-- at current resolution set in 'Snap/Grid Settings' dialogue and only when it's enabled
+-- so inconvenient;
+-- the target grid division doesn't necessarily belong to the visible grid
+-- but it might if grid_div_sec stems from visible grid divisions
+
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+local ratio = start_time/grid_div_sec
+	if ratio <= 1 then return end
+
+local closest_div_time = grid_div_sec*math.floor(ratio+0.5) -- if fractional part of ratio is less than 0.5 then the closest grid division is to the left of arrange start time, otherwise - to the right
+local diff_sec = start_time-closest_div_time
+	if diff_sec == 0 then return end -- coincides with start time
+local diff_px = math.abs(diff_sec)*r.GetHZoomLevel()
+	if diff_px < 16 then return end -- horiz scroll step in r.CSurf_OnScroll() is 16 px can't scroll by finer steps
+local dir = diff_sec < 0 and 1 or -1
+
+r.PreventUIRefresh(1)
+	repeat
+	r.CSurf_OnScroll(dir, 0) -- scrolls by steps of 16 px // leftward scroll is -1, rightward 1
+	local start_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time)
+	until dir < 0 and start_time <= closest_div_time or dir > 0 and start_time >= closest_div_time
+r.PreventUIRefresh(-1)
+
+end
+
+
+
+
 function get_gfx_scale()
 -- https://forum.cockos.com/showthread.php?t=230120
 -- ideally should be included in the defer function as well to monitor any changes
@@ -25247,7 +25305,7 @@ function Get_Visible_Grid_Div_Length(grid_div_len)
 -- returns length of visible grid division in sec
 
 -- THE FUNCTION IS INCOMPATIBLE WITH MIDI EDITOR VISIBLE GRID
--- PRODUCING INACCURATE RESULT BECASUE MIDI EDITOR GRID WHEN FOLDED
+-- PRODUCING INACCURATE RESULT BECAUSE MIDI EDITOR GRID WHEN FOLDED
 -- DOESN'T RESPECT MIMIMUM LINE SPACING VALUE SET IN THE GRID SETTINGS
 -- (never respected before build 7.37 and only partially respects since)
 -- AND INSTEAD CREATES GREATER LINE SPACING WHICH IS IMPOSSIBLE TO CALCULATE
@@ -25277,7 +25335,28 @@ end
 
 
 function Get_Time_Of_Closest_Grid_Div(time)
+-- r.SnapToGrid() only returns closest grid division 
+-- at current resolution set in 'Snap/Grid Settings' dialogue and only when it's enabled
 return r.SnapToGrid(0, time)
+end
+
+
+
+function get_first_grid_div_relative_to_time(grid_div_sec, time, left)
+-- left is boolean, if true time of the last grid division
+-- before the time, otherwise first grid division 
+-- following the time
+local ratio = time/grid_div_sec
+	if ratio <= 1 then return grid_div_sec end
+local round = left and math.floor or math.ceil
+return grid_div_sec*round(ratio)
+end
+
+
+
+function get_grid_div_closest_to_time(grid_div_sec, time)
+local ratio = time/grid_div_sec
+return grid_div_sec*math.floor(ratio+0.5) -- if fractional part of ratio is less than 0.5 then the closest grid division is to the left of time, otherwise - to the right, unless conincides with it
 end
 
 
@@ -25299,7 +25378,7 @@ end
 
 
 function Scale_Time_By_Horiz_Zoom_Level(val, base_zoom)
--- mainly for scaling distance of mouse cursor from object
+-- mainly for scaling distance of mouse cursor from object such as item edge
 -- val is distance in sec/ms, base_zoom is pixels per sec at which the value isn't scaled
 -- e.g. if base_zoom is 100 the value isn't scaled at 100 px/sec (or rather in the neighbourhood since zoom value is never this exact) because 100/100 is 1, if the zoom decreases (goes below the base_zoom, zoom out) the value will be increased, if increases (goes above the base_zoom, zoom in) it will be decreased, because the greater the zoom the more precisely can the target value be hit thanks to greater resolution and smaller distance from the target is permissible
 -- the base_zoom value could be precise if extracted directly from GetHZoomLevel() at a specific zoom level beforehand
@@ -25377,18 +25456,21 @@ end
 
 
 
-function pixel_to_sec(val) -- converts interval in pixels to interval in seconds, val can be either integer or decimal number
+function pixel_to_sec(val) 
+-- converts interval in pixels to interval in seconds, val can be either integer or decimal number
 return val/r.GetHZoomLevel()
 end
 
 
-function Horiz_Scroll_Distance(SEC, VALUE) -- SEC is boolean to use seconds as scroll unit when VALUE is in seconds; otherwise musical division
+function Horiz_Scroll_Distance(SEC, VALUE)
+-- SEC is boolean to use seconds as scroll unit when VALUE is in seconds; otherwise musical division
 -- relies on Music_Div_To_Sec() function
 local px_per_sec = r.GetHZoomLevel()
 return SEC and VALUE and px_per_sec*VALUE or -- seconds
 VALUE and px_per_sec*Music_Div_To_Sec(VALUE) or -- musical interval
 px_per_sec*Music_Div_To_Sec(1/4) -- empty, 0 or non-numeric input so it defaults to 1 beat
 end
+
 
 
 function Get_Screen_Dims()
@@ -25574,6 +25656,21 @@ function get_time_sel_or_loop_len(want_loop)
 local want_loop = want_loop or false
 local st, fin = r.GetSet_LoopTimeRange(false, want_loop, 0, 0, false) -- isSet, allowautoseek false
 return fin-st
+end
+
+
+
+function semitones_to_playrate(cur_rate, st)
+-- st is interval in semitones, can be either negative 
+-- to shift pitch down or positive to shift pitch up;
+-- the function calculates the rate which corresponds
+-- to the interval in semitones relative to rate 1 
+-- which itself corresponds to the root note of the media source,
+-- it doesn't calculate the absolute pitch
+local exp = math.abs(st)/12
+local ratio = st > 0 and 2 or st < 0 and 0.5
+local rate_at_pitch = cur_rate*(ratio^exp)
+return rate_at_pitch
 end
 
 
@@ -29804,7 +29901,14 @@ return note:match('^/$')
 end
 
 
-function Custom_Horiz_Scroll(x, y, SEC, VALUE, mousewheel_dir, mousewheel_reverse, auto_zoom) -- x and y are integers representing the number of pixels; mousewheel_reverse, auto_zoom are boolean // relies on the round() function, Horiz_Scroll_Distance() function for x value and r.get_action_context() for mousewheel_dir ('val' return value) as this function doesn't work inside a user function !!! SEC and VALUE are passed to Horiz_Scroll_Distance() function below (SEC is boolean to use seconds as scroll unit when VALUE is in seconds; otherwise musical division)
+function Custom_Horiz_Scroll(x, y, SEC, VALUE, mousewheel_dir, mousewheel_reverse, auto_zoom) 
+-- x and y are integers representing the number of pixels; 
+-- mousewheel_reverse, auto_zoom are boolean 
+-- relies on the round() function, Horiz_Scroll_Distance() function for x value and r.get_action_context()
+-- for mousewheel_dir ('val' return value) as this function doesn't work 
+-- inside a user function !!! 
+-- SEC and VALUE are passed to Horiz_Scroll_Distance() function below 
+-- (SEC is boolean to use seconds as scroll unit when VALUE is in seconds; otherwise musical division)
 
 -- in CSurf_OnScroll() minimum possble x step is 16 px, not 1 px; minimum possble y step is 8 px; each next increment adds 16 or 8 px respectively, so the input value is multiplied by 16 or 8, e.g. value 16 means 256 px = 16 x 16
 
@@ -29830,7 +29934,7 @@ local y = y < 8 and 0 or round(y/8) -- same
 		repeat -- zoom in until the resolution is sufficient
 		r.adjustZoom(5, 0, true, -1) -- amt, forceset, doupd, centermode // HORIZONTAL ZOOM ONLY // amt > 0 zooms in, < 0 zooms out, the greater the value the greater the zoom; forceset ~= 0 zooms out, if amt value is 1 then zooms out fully, if amt is greater then depends on the amt value but the relationship isn't clear, if bound to mousewheel, amt must be modified by val return value of get_action_context() function to change direction of the zoom, positive IN, negative OUT; doupd false no zoomming; centermode ?????
 		-- forceset=0,doupd=true (do update),centermode=-1 for default
-		until Scroll_Distance(SEC, VALUE) >= 16 -- minimum required for horizontal scroll in CSurf_OnScroll()
+		until Horiz_Scroll_Distance(SEC, VALUE) >= 16 -- minimum required for horizontal scroll in CSurf_OnScroll()
 
 	elseif x == 0 then -- when auto_zoom is false
 	Error_Tooltip('\n\n     low resolution, \n\n zoom in horizontally. \n\n')
@@ -29933,17 +30037,20 @@ end
 --]]
 
 
-local is_new_value,filename,sectionID,cmdID,mode,resolution,val, ctxstr = r.get_action_context()-- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards // the function must be outside as it cannot work properly inside more than 1 user function, in which case val will be 0
+local is_new_value,filename,sectionID,cmdID,mode,resolution,val, ctxstr = r.get_action_context()
+-- if mouse scrolling up val = 15 - righwards, if down then val = -15 - leftwards 
+-- get_action_context() function must be outside as it cannot work properly inside more than 1 user function, 
+-- in which case val will be 0;
 -- ctxstr return value is supported since version 7.0, 
 -- if it's 'key::0' the script is run with a mouse click from the Action list
 -- if empty string, it's run from a toolbar or a menu
 function Mousewheel_Or_Shortcut(val)
-return val == math.abs(15) or mode == 1, val == 63 or mode == 0 -- mousewheel, shortcut or click
+return math.abs(val) == 15 or mode == 1, val == 63 or mode == 0 -- mousewheel, shortcut or click
 end
 
 
 function Is_Mousewheel(mode)
-return val == math.abs(15) or mode == 1 -- mousewheel, when sctipt is run with a shortcut val is 63, mode is 1
+return math.abs(val) == 15 or mode == 1 -- mousewheel, when sctipt is run with a shortcut val is 63, mode is 1
 end
 
 
@@ -32491,6 +32598,8 @@ M A T H
 	truncate
 	trim_trailing_decimal_zeros1
 	trim_trailing_decimal_zeros2
+	modulo
+	mod
 	math.randomseed
 	Get_Closest_Prev_Whole_Multiple
 	Get_Closest_Multiple_Of_Divisor1
@@ -32499,8 +32608,7 @@ M A T H
 	nmb
 	split_integer_to_1s_and_10s
 	range_to_sequence
-	gener_numer_seq
-	mod
+	gener_numer_seq	
 	get_integral_1
 	get_integral_2
 	get_fractional_1
@@ -33270,6 +33378,8 @@ W I N D O W S
 	Activate_Context
 	Set_Horiz_Zoom_Level
 	Re_Store_Zoom
+	restore_horiz_scroll_pos
+	scroll_arrange_to_closest_grid_div
 	get_gfx_scale
 	click_pad
 	keep_click_pad_size
@@ -33382,6 +33492,8 @@ M E A S U R E M E N T S / C A L C U L A T I O N S
 	Grid_Div_Dur_In_Sec
 	Get_Visible_Grid_Div_Length
 	Get_Time_Of_Closest_Grid_Div
+	get_first_grid_div_relative_to_time
+	get_grid_div_closest_to_time
 	Music_Div_To_Sec
 	Music_Div_To_Pixels
 	Scale_Time_By_Horiz_Zoom_Level
@@ -33405,6 +33517,7 @@ M E A S U R E M E N T S / C A L C U L A T I O N S
 	Offset_Shift_Value_To_Land_On_Natural_Keys1
 	Offset_Shift_Value_To_Land_On_Natural_Keys2
 	get_time_sel_or_loop_len
+	semitones_to_playrate
 
 
 U T I L I T Y
