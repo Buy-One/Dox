@@ -12111,6 +12111,38 @@ end
 
 
 
+function Is_FX_Accessible(obj, fx_idx)
+-- takes advantage of the fact that fx instances
+-- in fx chain, inaccessible to REAPER at their 
+-- registered installation path, nd showing the text
+-- 'The following effect plugin could not be loaded
+-- (effect configuration is preserved)'
+-- in their instance UI
+-- cannot be open in a floating window
+
+local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+local Window, Show = table.unpack(take and {r.TakeFX_GetFloatingWindow, r.TakeFX_Show}
+or tr and {r.TrackFX_GetFloatingWindow, r.TrackFX_Show})
+	
+	if Window(obj, fx_idx) then return true end -- if fx is open in a floating window it's 100% accessible
+
+Show(obj, fx_idx, 3) -- 3 show in floating window
+
+	if Window(obj, fx_idx) then -- restore state
+	Show(obj, fx_idx, 2) -- close floating window
+	return true end
+
+end
+
+
+
+function is_input_fx(fx_idx)
+-- accounting for container fx indices
+return fx_idx >= 0x1000000 and fx_idx < 0x2000000 or fx_idx-0x2000000 >= 0x1000000
+end
+
+
+
 function Count_FX(sel_trk_cnt, sel_itms_cnt)
 -- Count all FX in selected objects to determine if FX were added
 -- provided destination objects were initially empty
@@ -13095,7 +13127,7 @@ end
 
 
 
-function Collect_Container_FX(obj, cont_idx, recFX, t)
+function Collect_Container_FX1(obj, cont_idx, recFX, t) -- see also Collect_Container_FX2()
 -- collect all fx along the hirarchy of container at cont_idx in the main fx chain;
 -- for builds between 7 and 7.06 relies on Collect_All_Container_FX_Indices()
 -- and Loop_Over_FX_Container_Table();
@@ -13107,6 +13139,7 @@ if r.TrackFX_GetIOSize(tr, i) == 8 then -- container
 Collect_Container_FX(tr, i, recFX, t)
 end
 ]]
+-- the function is used in Restore FX windows after screenset change.lua
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 local Count, Get_Parm, Floating, GetIOSize = table.unpack(take and {r.TakeFX_GetCount,r.TakeFX_GetNamedConfigParm, r.TakeFX_GetFloatingWindow, r.TakeFX_GetIOSize} or tr and {recFX and r.TrackFX_GetRecCount or r.TrackFX_GetCount,  r.TrackFX_GetNamedConfigParm, r.TrackFX_GetFloatingWindow, r.TrackFX_GetIOSize})
@@ -13122,17 +13155,62 @@ local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
 		for i=0, count-1 do
 		local ret, fx_idx = Get_Parm(obj, cont_idx, 'container_item.'..i)
 		fx_idx = fx_idx+0
-		local wnd = Floating(obj, fx_idx)
-			if wnd then	
-			t[#t+1] = fx_idx -- basic storage, the actual table cofig depends on the config of the t table fed into this function
-			end
+		t[#t+1] = fx_idx -- basic storage, the actual table config depends on the config of the t table fed into this function
 			if GetIOSize(obj, fx_idx) == 8 then -- container, go recursive
-			Collect_Container_FX(obj, fx_idx, recFX, t)
+			Collect_Container_FX1(obj, fx_idx, recFX, t)
 			end
 		end
 	end
 return t -- return isn't necessary if t is the actual table variable passed into the function
 end
+
+
+
+
+function Collect_Container_FX2(obj, cont_idx, recFX, t)
+-- collect all fx along the hirarchy of container at cont_idx in the main fx chain;
+-- for builds between 7 and 7.06 relies on Collect_All_Container_FX_Indices();
+-- relies on FX_Select_Function_Type2();
+-- obj is track or take, 
+-- cont_idx is index of a container.
+-- recFX is boolean to address input/monitoring fx
+-- in builds older than 7.6,
+-- t is table to store the fx data into;
+-- the function would usually be called within fx loop 
+-- when container comes along with the condition
+--[[
+if r.TrackFX_GetIOSize(tr, i) == 8 then -- container
+Collect_Container_FX(tr, i, recFX, t)
+end
+]]
+
+	local function store(obj, fx_idx, t)	
+	-- STORE fx here based on some conditions,
+	-- unnecessary if storing with no conditions
+	return t
+	end
+
+
+local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
+
+	if build >= 7 and build < 7.06 then
+	local Count = recFX and fx.GetRecCount or fx.GetCount
+	local cont_fx_t = Collect_All_Container_FX_Indices(obj, _, recFX, 0x2000000+cont_idx+1, Count(obj)+1)
+	t = Loop_Over_FX_Container_Table(obj, cont_fx_t, t, store)
+	elseif build >= 7.06 then
+	local ret, count = fx.GetNamedConfigParm(obj, cont_idx, 'container_count')
+		if count == '0' then return end
+		for i=0, count-1 do
+		local ret, fx_idx = fx.GetNamedConfigParm(obj, cont_idx, 'container_item.'..i)
+		t = fx.GetIOSize(obj, fx_idx) == 8 and Collect_Container_FX2(obj, fx_idx, recFX, t) -- container, go recursive
+		or store(obj, fx_idx, t)
+		end
+	end
+
+return t -- return isn't necessary if t is the actual table variable passed into the function
+
+end
+
 
 
 
@@ -22436,17 +22514,114 @@ local pages = { -- prefpage_lastpage
 }
 
 
-function Set_Horiz_Zoom_Level(target_val)
+function Set_Horiz_Zoom_Level(target_val) -- see also Set_Or_Increment_Horiz_Zoom_Level()
 -- target_val is px/sec,
 -- example: if grid division length in sec * r.GetHZoomLevel() < X px
--- target_value (i.e. px/sec) arg is X / grid division length in sec
+-- target_value (i.e. px/sec) arg, that is value of GetHZoomLevel()
+-- is X / grid division length in sec
 local dir = r.GetHZoomLevel() > target_val and -1 or r.GetHZoomLevel() < target_val and 1
 	if dir then
 	r.PreventUIRefresh(1)
 		repeat
-		r.adjustZoom(0.1*dir, 0, true, 0) -- forceset 0, doupd true, centermode 0 // HORIZONTAL ZOOM ONLY // amt > 0 zooms in, < 0 zooms out, the greater the value the greater the zoom, amt value smaller than 1 is supported, however the zoom amount produced by the amt value seems to depend on the initial zoom level and as zoom level increases/decreases the delta between previous and next zoom levels gradually increases/decreases in comparison with the delta produced by the initial change, so it's hard to calculate in advance the amt value required for a particular zoom level to be able to set it in one go without the loop even though it's known that the zoom amount changes by a factor 10 time greater than the amt value i.e. 0.001 produces change by 0.0X px/sec, WITHOUT PreventUIRefresh() with values under 1 THE ZOOM CHANGES VERY SLOWLY, adjusting by r.GetHZoomLevel()/1000 changes zoom by 0.3 px/sec; forceset ~= 0 zooms out, if amt value is 1 then zooms out fully, if amt is greater then depends on the amt value but the relationship isn't clear, if bound to mousewheel, amt can be modified by val return value of get_action_context() function to change direction of the zoom, positive IN, negative OUT; doupd (do update) if false, no zoomming; centermode: 0 < or > 1 no center, window horizontally scrolls all the way rightwards (even though as per the API doc -1 for default, presumably as set at Pref -> Appearance -> Zoom/Scroll/Offset -> Horizontal zoom center), 0 or 1 edit cursor is the center, is adjusted so that the edit cursor ends up at the center, to use mouse as the center the action 'View: Move edit cursor to mouse cursor (no snapping)' must be used, then edit cursor pos should be restored
+	--	amt > 0 zooms in, < 0 zooms out, the greater the value the greater the zoom, 
+	-- amt value smaller than 1 is supported, however the zoom amount produced 
+	-- by the amt value seems to depend on the initial zoom level and as zoom level 
+	-- increases/decreases the delta between previous and next zoom levels gradually 
+	-- increases/decreases in comparison with the delta produced by the initial change, 
+	-- so it's hard to calculate in advance the amt value required for a particular 
+	-- zoom level to be able to set it in one go without the loop even though it's known 
+	-- that the zoom amount changes by a factor 10 time greater than the amt value i.e. 
+	-- 0.001 produces change by 0.0X px/sec, 
+	-- WITHOUT PreventUIRefresh() with values under 1 THE ZOOM CHANGES VERY SLOWLY, 
+	-- adjusting by r.GetHZoomLevel()/1000 changes zoom by 0.3 px/sec, 
+	-- if amt value is 1 then zooms out fully, if amt is greater, then depends on the amt 
+	-- value but the relationship isn't clear, if bound to mousewheel, amt can be modified 
+	-- by val return value of get_action_context() function to change direction of the zoom, 
+	-- positive IN, negative OUT; 
+	-- forceset ~= 0 zooms out;
+	-- doupd (do update) if false, no zoomming; 
+	-- centermode:
+	-- -1, 0, 1 Edit cursor, edit cursor moves or jumps to the center of Arrange and then remains there
+	-- 2 Center of view, 3 Mouse cursor, 4, 5 Edit cursor (preserve position),
+	-- 6+ Project start, the Arange is scrolled all the way to the left and then zoom is applied
+	-- Play cursor doesn't seem to be respected as in fact in the modes of 
+	-- Preferences -> Appearance -> Zoom/Scroll/Offset -> Horizontal zoom center
+	-- to use mouse as the center the action 'View: Move edit cursor to mouse cursor (no snapping)' 
+	-- must be used, then edit cursor pos should be restored
+		r.adjustZoom(0.1*dir, 0, true, 0) -- forceset 0, doupd true, centermode 0 // HORIZONTAL ZOOM ONLY
 		local zoom = r.GetHZoomLevel()
 		until dir < 0 and zoom <= target_val or dir > 0 and zoom >= target_val
+	r.PreventUIRefresh(-1)
+	end
+end
+
+
+
+function Set_Or_Increment_Horiz_Zoom_Level(taget_len_sec, val, want_mouse)
+-- taget_len_sec can be length of a grid division to zoom in or out to;
+-- val is 'value' return value of get_action_context(), i.e. mousewheel direction,
+-- or explicitly passed positive or negative value, depending on the script 
+-- requirements, of which only sign is taken into consideration,
+-- if valid the zoom level is incremented by taget_len_sec,
+-- if false the zoom level is set to taget_len_sec;
+-- want_mouse is boolean to make mouse cursor the center of the zoom,
+-- if false - the edit cursor is the center
+
+local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time) -- isSet false, screen_x_start & screen_x_end both 0 = GET // https://forum.cockos.com/showthread.php?t=227524#2 the function has 6 arguments; screen_x_start and screen_x_end (3d and 4th args) are not return values, they are for specifying where start_time and stop_time should be on the screen when non-zero when isSet is true
+local scrollbar_w = 17/r.GetHZoomLevel() -- 17 px is width of the vertical scrollbar which is included in the Arrange length in sec but is outside of the visible time line
+local arrange_len = end_time-scrollbar_w-start_time -- subtracting scrollbar width to ensure that after zoom the content is within view
+local dir 
+	if val then
+	dir = val > 0 and 1 or val < 0 and -1
+	else
+	dir = arrange_len < taget_len_sec and -1 or arrange_len > taget_len_sec and 1
+	end
+
+local target_len = not val and start_time+taget_len_sec
+or dir == 1 and end_time-scrollbar_w-taget_len_sec or end_time-scrollbar_w+taget_len_sec
+
+	if dir == 1 and arrange_len/taget_len_sec < 1.03 then return end -- SCRIPT SPECIFIC, prevents zooming in once Arrange length reaches taget_len_sec with a bit of leeway to ensure that the content is within view
+
+	if dir then
+	r.PreventUIRefresh(1)
+	-- move edit cursor to Arrange start because edit cursor is set as zoom center, i.e. 4,
+	-- to ensure that arrange start time value doesn't shift during zoom,
+	-- it will shift nonetheless but by minute amounts
+	local edit_cur_pos = r.GetCursorPosition()
+	r.SetEditCurPos(start_time, false, false) -- moveview, seekplay false	
+		repeat
+	--	amt > 0 zooms in, < 0 zooms out, the greater the value the greater the zoom, 
+	-- amt value smaller than 1 is supported, however the zoom amount produced 
+	-- by the amt value seems to depend on the initial zoom level and as zoom level 
+	-- increases/decreases the delta between previous and next zoom levels gradually 
+	-- increases/decreases in comparison with the delta produced by the initial change, 
+	-- so it's hard to calculate in advance the amt value required for a particular 
+	-- zoom level to be able to set it in one go without the loop even though it's known 
+	-- that the zoom amount changes by a factor 10 time greater than the amt value i.e. 
+	-- 0.001 produces change by 0.0X px/sec, 
+	-- WITHOUT PreventUIRefresh() with values under 1 THE ZOOM CHANGES VERY SLOWLY, 
+	-- adjusting by r.GetHZoomLevel()/1000 changes zoom by 0.3 px/sec, 
+	-- if amt value is 1 then zooms out fully, if amt is greater, then depends on the amt 
+	-- value but the relationship isn't clear, if bound to mousewheel, amt can be modified 
+	-- by val return value of get_action_context() function to change direction of the zoom, 
+	-- positive IN, negative OUT; 
+	-- forceset ~= 0 zooms out;
+	-- doupd (do update) if false, no zooming; 
+	-- centermode:
+	-- -1, 0, 1 Edit cursor, edit cursor moves or jumps to the center of Arrange and then remains there
+	-- 2 Center of view, 3 Mouse cursor, 4, 5 Edit cursor (preserve position),
+	-- 6+ Project start, the Arange is scrolled all the way to the left and then zoom is applied
+	-- Play cursor doesn't seem to be respected as in fact in the modes of 
+	-- Preferences -> Appearance -> Zoom/Scroll/Offset -> Horizontal zoom center
+	-- to use mouse as the center the action 'View: Move edit cursor to mouse cursor (no snapping)' 
+	-- must be used, then edit cursor pos should be restored
+		r.adjustZoom(0.01*dir, 0, true, want_mouse and 3 or 4) -- forceset 0, doupd true, centermode 3 Mouse cursor, 4 Edit cursor // HORIZONTAL ZOOM ONLY
+		local start_time, end_time = r.GetSet_ArrangeView2(0, false, 0, 0, start_time, end_time)
+		local arrange_len = end_time-start_time
+			if dir == 1 and arrange_len/taget_len_sec < 1.03 then return end
+		end_time = end_time-17/r.GetHZoomLevel()
+		until dir < 0 and end_time >= target_len or dir > 0 and end_time <= target_len		
+	r.SetEditCurPos(edit_cur_pos, false, false) -- moveview, seekplay false		
 	r.PreventUIRefresh(-1)
 	end
 end
@@ -23588,6 +23763,8 @@ function resolve_file_name_collision3(f_path)
 -- rather than the count is resumed from the greatest
 -- numeral found in the suffix
 
+r.EnumerateFiles(r.GetResourcePath(), 0) -- clear cache
+
 local path, f_name = f_path:match('(.+)[\\/]'), f_path:match('.+[\\/](.+)')
 local sep = f_path:match('[\\/]')
 local i, t = 0, {}
@@ -23630,6 +23807,8 @@ function resolve_file_name_collision4(f_path)
 -- it's NOT the first available numeral if there's
 -- gap in indexing of homonymous files, see resolve_file_name_collision5-7 below;
 -- may rely on Esc() function, see the code
+
+r.EnumerateFiles(r.GetResourcePath(), 0) -- clear cache
 
 local path, f_name, ext = f_path:match('(.+[\\/])'), f_path:match('.+[\\/](.+)(%.%w+)$') -- OR f_path:match('([^\\/]+)(%.%w+)$')
 
@@ -23679,6 +23858,8 @@ function resolve_file_name_collision5(f_path, index)
 -- not necessarily the one that's greater by 1 than the greatest found;
 -- may rely on Esc() function, see the code
 
+r.EnumerateFiles(r.GetResourcePath(), 0) -- clear cache
+
 local path, f_name, ext = f_path:match('(.+[\\/])'), f_path:match('.+[\\/](.+)(%.%w+)$') -- OR f_path:match('([^\\/]+)(%.%w+)$')
 
 -- when index is nil look for the original file name
@@ -23711,6 +23892,8 @@ function resolve_file_name_collision6(f_path)
 -- if collision is detected, adds first available numeral, 
 -- or the one greater by 1 than the greatest found or 1
 -- or if no collision returns the original path
+
+r.EnumerateFiles(r.GetResourcePath(), 0) -- clear cache
 
 local path, f_name, ext = f_path:match('(%S.+[\\/])(.+)(%..+%S)$')
 local i, t = 0, {}
@@ -23755,6 +23938,8 @@ function resolve_file_name_collision7(f_path)
 -- if collision is detected, adds first available numeral, 
 -- or the one greater by 1 than the greatest found or 1
 -- or if no collision returns the original path
+
+r.EnumerateFiles(r.GetResourcePath(), 0) -- clear cache
 
 local path, f_name, ext = f_path:match('(%S.+[\\/])(.+)(%..+%S)$')
 local i, t , greatest = 0, {}, 0
@@ -24010,6 +24195,9 @@ function Count_Files_In_Folder(path,ext)
 --r.EnumerateFiles(path, -1) -- -1 to clear the cache, or pass another directory (invalid one is suppported), since 6.20
 -- https://forum.cockos.com/showthread.php?t=203235
 -- applies to r.EnumerateSubdirectories() as well
+
+r.EnumerateFiles(r.GetResourcePath(), 0) -- clear cache
+
 local path = path:match('^%s*(.-)%s*$') -- trim spaces // OR ('(%S.+)%s*$')
 local path = #path > 0 and path:match('.+[\\/]$') and path:match('(.+)[\\/]$') or path -- remove last separator if any
 -- OR
@@ -24028,6 +24216,9 @@ end
 
 
 function Remove_Peak_Files(path)
+
+r.EnumerateFiles(r.GetResourcePath(), 0) -- clear cache
+
 local path = path:match('^%s*(.-)%s*$') -- trim spaces // OR ('(%S.+)%s*$')
 local path = #path > 0 and path:match('.+[\\/]$') and path:match('(.+)[\\/]$') or path -- remove last separator if any
 -- OR
@@ -24100,8 +24291,8 @@ end
 
 
 
-function open_dir_in_file_browser(dir)
--- REAPER Profile terminal_CLEAN.lua
+function open_dir_in_file_browser(dir) -- see also open_directory() below
+-- used in REAPER Profile terminal_CLEAN.lua
 local OS = r.GetOS():sub(1,3)
 local command = OS == 'Win' and {'explorer'} or (OS == 'OSX' or OS == 'mac') and {'open'} or {'nautilus', 'dolphin', 'gnome-open', 'xdg-open', 'gio open', 'caja', 'browse'}
 -- https://askubuntu.com/questions/31069/how-to-open-a-file-manager-of-the-current-directory-in-the-terminal
@@ -24110,6 +24301,42 @@ local command = OS == 'Win' and {'explorer'} or (OS == 'OSX' or OS == 'mac') and
 		if result then return end
 	end
 end
+
+
+
+function open_directory(dir)
+-- the action 'Show render path in explorer' is supported since 7.73
+-- dir is path to the directory to open
+	if not dir then return end
+local retval, render_path = r.GetSetProjectInfo_String(0, 'RENDER_FILE', '', false) -- is_set false
+-- temporarily set render path to project path to open it with the action;
+-- alternatively RECORD_PATH and RECORD_PATH_SECONDARY could be used
+-- along with actions 'Show record path in explorer' and 'Show secondary record path in explorer'
+-- but if for some reason its restoration fails, potential damage is far greater
+r.GetSetProjectInfo_String(0, 'RENDER_FILE', dir, true) -- is_set true
+r.Main_OnCommand(43206, 0) -- Show render path in explorer // open the dir
+-- restore original render path
+r.GetSetProjectInfo_String(0, 'RENDER_FILE', render_path, true) -- is_set true
+end
+
+
+
+
+function open_proj_directory()
+-- the action 'Show render path in explorer' is supported since 7.73
+local retval, render_path = r.GetSetProjectInfo_String(0, 'RENDER_FILE', '', false) -- is_set false
+local ret, proj_path = r.EnumProjects(-1) -- current project
+-- temporarily set render path to project path to open it with the action;
+-- alternatively RECORD_PATH and RECORD_PATH_SECONDARY could be used
+-- along with actions 'Show record path in explorer' and 'Show secondary record path in explorer'
+-- but if for some reason its restoration fails, potential damage is far greater
+r.GetSetProjectInfo_String(0, 'RENDER_FILE', proj_path:match('.+[\\/]'), true) -- is_set true // exluding project file
+r.Main_OnCommand(43206, 0) -- Show render path in explorer // open the project path
+-- restore original render path
+r.GetSetProjectInfo_String(0, 'RENDER_FILE', render_path, true) -- is_set true
+end
+
+
 
 
 function delete_string_from_file(f_path, to_delete) -- to_delete arg is a string
@@ -25023,35 +25250,82 @@ end
 
 
 
-function open_proj_directory()
--- the action 'Show render path in explorer' is supported since 7.73
-local retval, render_path = r.GetSetProjectInfo_String(0, 'RENDER_FILE', '', false) -- is_set false
-local ret, proj_path = r.EnumProjects(-1) -- current project
--- temporarily set render path to project path to open it with the action;
--- alternatively RECORD_PATH and RECORD_PATH_SECONDARY could be used
--- along with actions 'Show record path in explorer' and 'Show secondary record path in explorer'
--- but if for some reason its restoration fails, potential damage is far greater
-r.GetSetProjectInfo_String(0, 'RENDER_FILE', proj_path:match('.+[\\/]'), true) -- is_set true // exluding project file
-r.Main_OnCommand(43206, 0) -- Show render path in explorer // open the project path
--- restore original render path
-r.GetSetProjectInfo_String(0, 'RENDER_FILE', render_path, true) -- is_set true
+function process_directory_depth(relat_path, src_path)
+-- concatenate path relative to src_path
+-- based on relative path format,
+-- expected relat_path format:
+-- ../zz_libraries/colours_03_DS.png
+-- DS_files/DS_Keyboard4oct_04.png
+-- src_path is an absolute path ending with a separator;
+-- the type of the separator is immaterial, can be mixed
+relat_path = relat_path:sub(1,1):match('[\\/]') and relat_path:sub(2) or relat_path -- strip leading separator if any
+local sep = src_path:match('[\\/]')
+src_path = src_path:sub(-1) == sep and src_path or src_path..sep -- ensure that the src_path ends with a separator so that capture pattern works
+local target_depth = select(2, relat_path:gsub('%.%.[\\/]', ''))
+local current_depth = select(2, src_path:gsub('.-[\\/]+', ''))
+relat_path = relat_path:match('.*%.%.[\\/](.+)') or relat_path
+return src_path:match(('.-[\\/]'):rep(current_depth-target_depth))..relat_path
 end
 
 
 
-function open_directory(dir)
--- the action 'Show render path in explorer' is supported since 7.73
--- dir is path to the directory to open
-	if not dir the return end
-local retval, render_path = r.GetSetProjectInfo_String(0, 'RENDER_FILE', '', false) -- is_set false
--- temporarily set render path to project path to open it with the action;
--- alternatively RECORD_PATH and RECORD_PATH_SECONDARY could be used
--- along with actions 'Show record path in explorer' and 'Show secondary record path in explorer'
--- but if for some reason its restoration fails, potential damage is far greater
-r.GetSetProjectInfo_String(0, 'RENDER_FILE', dir, true) -- is_set true
-r.Main_OnCommand(43206, 0) -- Show render path in explorer // open the dir
--- restore original render path
-r.GetSetProjectInfo_String(0, 'RENDER_FILE', render_path, true) -- is_set true
+function scan_path_for_file(path, filename, t)
+-- t is optional
+
+r.EnumerateFiles(r.GetResourcePath(), 0) -- clear cache
+
+local path = path:sub(-1):match('[\\/]') and path:sub(1,-2) or path -- strip trailing separator
+local sep = path:match('[\\/]')
+local i = 0
+	repeat
+	local file = r.EnumerateFiles(path, i)
+		if file == filename then
+		t[#t+1] = path..sep..file
+		-- OR, if t isn't needed
+		-- filename = path..sep..file
+		i = nil -- reset to signal found file
+		break end
+	i = i+1
+	until not file
+	
+	if i then  -- file wasn't found, look in subdirectories
+	r.EnumerateSubdirectories(r.GetResourcePath(), 0) -- clear cache
+	local i = 0
+		repeat
+		local dir = r.EnumerateSubdirectories(path, i)
+			if dir then
+			t = scan_path_for_file(path..sep_dir, filename, t) -- do recursive search
+			end
+		i = i+1
+		until not dir
+	end
+
+return t, filename
+	
+end
+
+
+
+function collect_files_in_folder(path, t)
+-- r.EnumerateFiles(path..'..', 0) -- reset EnumerateFiles() cache by accessing a valid dummy dir, e.g. r.EnumerateFiles(r.GetResourcePath(), 0)
+--r.EnumerateFiles(path, -1) -- -1 to clear the cache, or pass another directory (invalid one is suppported), since 6.20
+-- https://forum.cockos.com/showthread.php?t=203235
+-- applies to r.EnumerateSubdirectories() as well;
+-- t is optional
+
+r.EnumerateFiles(r.GetResourcePath(), 0) -- clear cache
+local t = t or {}
+local path = path:sub(-1):match('[\\/]') and path:sub(1,-2) or path -- strip trailing separator
+local sep = path:match('[\\/]')
+local i = 0
+	repeat
+	local file = r.EnumerateFiles(path, i) -- only returns file names
+		if file then 
+		t[#t+1] = path..sep..file
+		end
+	i = i+1
+	until not file
+return t
 end
 
 
@@ -30918,7 +31192,7 @@ end
 
 
 
-function FX_Select_Function_Type1(obj) -- see a more effcient version below
+function FX_Select_Function_Type1(obj) -- see a more effcient FX_Select_Function_Type2() below
 -- to target either track or take;
 -- after execution, the functions can be accessed
 -- with the syntax fx[function_name] or fx.function_name
@@ -30941,7 +31215,7 @@ local fx = {}
 return fx
 
 end
--- USE:
+-- USE (must be run every time when function type selection based on the object is required):
 -- local fx = FX_Select_Function_Type1(track or take)
 -- fx.AddByName(take, name, instantiate) fx.CopyToTake(tr, fx_idx1, take, fx_idx2, false) etc.
 
@@ -30977,6 +31251,8 @@ local t = {'AddByName','CopyToTake','CopyToTrack','Delete','EndParamEdit','Forma
 	-- and concatenated on the fly the moment the stored function is executed
 	-- i.e. fx.AddByName();	
 		return function(...)
+		-- vararg is a list of standard arguments expected by the ReaScript API function,
+		-- due to being anonymous the function isn't executed while being returned
 		local obj, input_fx = t[1], #t > 1 and t[#t] -- input_fx boolean value is only used for two functions for which only 1 argument is required, i.e. object, therefore whenever there're two, the last can be used as an indicator of input fx function, in all other cases where multiple arguments are expected the last argument won't affect function name selection even if true
 		local input_fx = fx_idx < 0x2000000 and fx_idx >= 0x1000000 or fx_idx >= fx_idx-0x2000000
 		local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
@@ -30993,6 +31269,7 @@ local t = {'AddByName','CopyToTake','CopyToTrack','Delete','EndParamEdit','Forma
 local fx = {}
 	for k, name in ipairs(t) do
 	fx[name] = 	function(...)
+					-- vararg is a list of standard arguments expected by the ReaScript API function,
 					-- the 'name' var is stored inside the function and contcatenated on the fly 
 					-- the moment the stored function is executed
 					-- i.e. fx.AddByName(),
@@ -33079,6 +33356,8 @@ F X
 	Collect_FX_Output_Data
 	Is_FX_Chain_Open
 	Is_FX_Open
+	Is_FX_Accessible
+	is_input_fx
 	Count_FX
 	Get_FX_Env_Src_Parameter
 	Check_Presets_In_FX_In_Focused_FX_Chain
@@ -33103,7 +33382,8 @@ F X
 	Process_FX_Incl_In_All_Containers
 	Collect_All_Container_FX_Indices
 	Loop_Over_FX_Container_Table
-	Collect_Container_FX
+	Collect_Container_FX1
+	Collect_Container_FX2
 	Get_FX_All_Parent_Containers
 	GetSetClear_FX_Parm_Mapping_Across_Containers
 	Get_Container_Parm_Source_Props
@@ -33377,6 +33657,7 @@ W I N D O W S
 	Is_Window_Fully_Minimized
 	Activate_Context
 	Set_Horiz_Zoom_Level
+	Set_Or_Increment_Horiz_Zoom_Level
 	Re_Store_Zoom
 	restore_horiz_scroll_pos
 	scroll_arrange_to_closest_grid_div
@@ -33442,7 +33723,9 @@ F I L E S
 	get_file_timestamp2
 	get_file_timestamp3
 	get_file_timestamp4
-	open_dir_in_file_browser
+	open_dir_in_file_browser	
+	open_directory
+	open_proj_directory
 	delete_string_from_file
 	Read_Lines
 	get_ini_file_path
@@ -33477,8 +33760,9 @@ F I L E S
 	remove_line_breaks
 	is_image_file
 	get_file_mod_time
-	open_proj_directory
-	open_directory
+	process_directory_depth
+	scan_path_for_file
+	collect_files_in_folder
 
 
 M E A S U R E M E N T S / C A L C U L A T I O N S
