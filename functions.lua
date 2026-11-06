@@ -12120,17 +12120,23 @@ function Is_FX_Accessible(obj, fx_idx)
 -- in their instance UI
 -- cannot be open in a floating window
 
-local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
-local Window, Show = table.unpack(take and {r.TakeFX_GetFloatingWindow, r.TakeFX_Show}
-or tr and {r.TrackFX_GetFloatingWindow, r.TrackFX_Show})
+	if fx.GetFloatingWindow(obj, fx_idx) then return true end -- if fx is open in a floating window it's 100% accessible
 
-	if Window(obj, fx_idx) then return true end -- if fx is open in a floating window it's 100% accessible
-
-Show(obj, fx_idx, 3) -- 3 show in floating window
-
-	if Window(obj, fx_idx) then -- restore state
-	Show(obj, fx_idx, 2) -- close floating window
-	return true end
+-- offlined fx too cannot be open in a floating window
+-- so set online if necessary to prevent false positive
+local offline = fx.GetOffline(obj, fx_idx)
+	if offline then fx.SetOffline(obj, fx_idx, not offline) end
+	
+fx.Show(obj, fx_idx, 3) -- 3 show in floating window
+local ok
+	-- restore states
+	if fx.GetFloatingWindow(obj, fx_idx) then
+	fx.Show(obj, fx_idx, 2) -- close floating window
+	ok = 1
+	end
+	if offline then fx.SetOffline(obj, fx_idx, offline) end
+	
+return ok
 
 end
 
@@ -12753,7 +12759,11 @@ end
 
 function Get_FX_Selected_In_Main_Chain1(obj, input_fx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensive version
 -- input_fx is boolean for use in builds 7.06+ to target input/Monitoring FX chain
--- doesn't support containers, see Get_FX_Shown_Or_Selected_In_Container() and Get_FX_Selected_In_Container()
+-- doesn't support containers, see Get_FX_Shown_Or_Selected_In_Container() and Get_FX_Selected_In_Container();
+-- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1 
+-- if no fx or if it's been reset after copying FX chain 
+-- as per the bug report https://forum.cockos.com/showthread.php?t=311951, 
+-- fixed in build 7.83, therefore must be additionally validated by FX_GetCount()
 
 local take, tr = r.ValidatePtr(obj, 'MediaItem_Take*'), r.ValidatePtr(obj, 'MediaItem_Track*')
 FX_GetNamedConfigParm = tr and r.TrackFX_GetNamedConfigParm or take and r.TakeFX_GetNamedConfigParm
@@ -12770,7 +12780,7 @@ local input_fx = tr and input_fx -- validate so it's only valid if object is tra
 	local found
 		for line in chunk:gmatch('[^\n\r]+') do
 			if (not input_fx or found) and line:match('LASTSEL') then
-			return line:match('[%-%d]+') -- value may be -1 if no fx or if it's been reset after copying FX chain as per the bug report https://forum.cockos.com/showthread.php?t=311951, therefore must be additionally validated by FX_GetCount()
+			return line:match('[%-%d]+')
 			elseif input_fx and line:match('<FXCHAIN_REC') then found = 1
 			end
 		end
@@ -12783,7 +12793,12 @@ end
 function Get_FX_Selected_In_Main_Chain2(obj, input_fx)
 -- input_fx is boolean to target track input fx chain
 -- relies on GetObjChunk2() for builds older than 7.06
--- doesn't support containers, see Get_FX_Shown_Or_Selected_In_Container() and Get_FX_Selected_In_Container()
+-- doesn't support containers, see Get_FX_Shown_Or_Selected_In_Container() 
+-- and Get_FX_Selected_In_Container();
+-- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1 
+-- if no fx or if it's been reset after copying FX chain 
+-- as per the bug report https://forum.cockos.com/showthread.php?t=311951, 
+-- fixed in build 7.83, therefore must be additionally validated by FX_GetCount()
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
 local GetParm, CountFX = table.unpack(take and {r.TakeFX_GetNamedConfigParm, r.TakeFX_GetCount}
@@ -12794,12 +12809,10 @@ local idx
 	ret, idx = GetParm(obj, input_fx and 0x1000000 or 0, 'chain_sel')
 	else
 	local ret, chunk = GetObjChunk(obj)
---Msg(chunk)
 		if ret == 'err_mess' then return end
 	chunk = tr and input_fx and (chunk:match('(<FXCHAIN_REC.*>)\n<ITEM')
 	or chunk:match('(<FXCHAIN_REC.*WAK.*>)\n>')) or chunk
-	idx = chunk:match('LASTSEL ([%-%d]+)') -- value may be -1 if no fx or if it's been reset after copying FX chain as per the bug report https://forum.cockos.com/showthread.php?t=311951
---Msg(idx)
+	idx = chunk:match('LASTSEL ([%-%d]+)')
 	end
 idx = tonumber(idx)
 -- due to the bug mentioned above, when value is -1 it must be validated by getting fx count
@@ -12817,7 +12830,11 @@ function Set_FX_Selected_In_FX_Chain(obj, fx_idx, chunk) -- see GetSet_FX_Select
 -- change fx selection in the source chain, making selected the last addressed fx
 -- so the original selection requires restoration,
 -- doesn't support containers, see Set_FX_Selected_In_Container(),
--- since 7.06 can be done with FX_SetNamedConfigParm() and 'chain_sel' parameter
+-- since 7.06 can be done with FX_SetNamedConfigParm() and 'chain_sel' parameter;
+-- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1
+-- if no fx or if it's been reset after copying FX chain 
+-- as per the bug report https://forum.cockos.com/showthread.php?t=311951, 
+-- fixed in build 7.83, therefore must be additionally validated by FX_GetCount()
 
 	if fx_idx >= 0x2000000 then return end -- container fx
 
@@ -12862,7 +12879,7 @@ end
 
 
 function GetSet_FX_Selected_In_FX_Chain(obj, sel_idx, chunk, input_fx)
--- before build 7.06 relies on SetObjChunk() and on Esc() for dealing with takes
+-- before build 7.06 relies on SetObjChunk2() and on Esc() for dealing with takes,
 -- functions FX_Copy_To_Take(), FX_Copy_To_Track() in particular
 -- change fx selection in the source chain if the source and destination FX indices are identical https://forum.cockos.com/showthread.php?t=285177#18
 -- (their non-identity can be used as a conditon to avoid setting selection)
@@ -12874,7 +12891,11 @@ function GetSet_FX_Selected_In_FX_Chain(obj, sel_idx, chunk, input_fx)
 -- FX_GetNamedConfigParm(obj, 0, 'chain_sel') -- 0x1000000 for input fx instead of 0
 -- FX_SetNamedConfigParm(obj, 0, 'chain_sel', fx_idx) -- fx_idx is a string
 -- https://forum.cockos.com/showthread.php?t=285177#19
--- doesn't support containers, see Set_FX_Selected_In_Container()
+-- doesn't support containers, see Set_FX_Selected_In_Container();
+-- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1 
+-- if no fx or if it's been reset after copying FX chain 
+-- as per the bug report https://forum.cockos.com/showthread.php?t=311951, 
+-- fixed in build 7.83, therefore must be additionally validated by FX_GetCount()
 
 	if sel_idx and sel_idx >= 0x2000000 then return end -- container fx
 
@@ -12894,7 +12915,7 @@ local input_fx = input_fx or tr and fx_idx and fx_idx >= 0x1000000 -- validate s
 		local found
 			for line in chunk:gmatch('[^\n\r]+') do
 				if (not input_fx or found) and line:match('LASTSEL') then
-				return line:match('[%-%d]+') -- value may be -1 if no fx or if it's been reset after copying FX chain as per the bug report https://forum.cockos.com/showthread.php?t=311951, therefore must be additionally validated by FX_GetCount()
+				return line:match('[%-%d]+')
 				elseif line:match('<FXCHAIN_REC') then found = 1
 				end
 			end
@@ -12908,7 +12929,9 @@ local input_fx = input_fx or tr and fx_idx and fx_idx >= 0x1000000 -- validate s
 		else -- use chunk
 		-- if object data changed in between the function executions
 		-- the chunk must be re-get for the restoration stage
-		-- to select FX in a closed FX chain technically it can be done with FX_SetOpen after opening the chain and then closing it, but you're running the risk of removing the focus from any currently focused windows which is a bad practice
+		-- to select FX in a closed FX chain technically it can be done with FX_SetOpen 
+		-- after opening the chain and then closing it, but you're running the risk 
+		-- of removing the focus from any currently focused windows which is a bad practice
 		local fx_chain = ''
 			if tr then
 				for line in chunk:gmatch('[^\n\r]+') do
@@ -12916,7 +12939,7 @@ local input_fx = input_fx or tr and fx_idx and fx_idx >= 0x1000000 -- validate s
 					if not input_fx then
 					fx_chain = fx_chain..'\n'..line
 						if line:match('LASTSEL') then break end
-					elseif input_fx and obj ~= r.GetMasterTrack(0) then -- ?????? TO TEST Monitoring FX selection cannot be set via chunk because their chunk is stored in reaper-hwoutfx.ini file rather than in the master track chunk and the file cannot be updated as long as REAPER runs
+					elseif input_fx and obj ~= r.GetMasterTrack(0) then -- ?????? TO TEST, Monitoring FX selection cannot be set via chunk because their chunk is stored in reaper-hwoutfx.ini file rather than in the master track chunk and the file cannot be updated as long as REAPER runs
 						if line:match('<FXCHAIN_REC') or #fx_chain > 0 then
 						fx_chain = fx_chain..'\n'..line
 							if line:match('LASTSEL') then break end
@@ -15556,10 +15579,10 @@ NOTESWND 197 95 1198 659
 ]]
 
 r.Undo_BeginBlock()
--- the function will faulter here if it's already used outside of the function
+-- get_action_context() function will falter here if it's already used outside of this function
 -- in which case scr_name will have to be passed as an argument
 local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context()
-local img_name = 'Transcribing 2 toolbar layout.png'
+local img_name = 'image.png'
 local path = scr_name:match('.+[\\/]')..img_name
 	if r.file_exists(path) then
 	local GetSet = r.GetSetMediaTrackInfo_String
@@ -15585,7 +15608,7 @@ local path = scr_name:match('.+[\\/]')..img_name
 		img_tr = r.GetTrack(0,r.GetNumTracks()-1)
 		end
 	local item = r.AddMediaItemToTrack(img_tr)
-	GetSet(img_tr, 'P_NAME', 'Transcribing 2 toolbar layout', true) -- setNewValue true
+	GetSet(img_tr, 'P_NAME', 'name', true) -- setNewValue true
 	GetSet(img_tr, 'P_EXT:'..img_name, '1', true) -- setNewValue true
 	chunk = chunk:gsub('RESOURCEFN.-\n', 'RESOURCEFN "'..path..'"\n')
 	r.SetItemStateChunk(item, chunk, false) -- isundo false
@@ -15604,6 +15627,36 @@ local path = scr_name:match('.+[\\/]')..img_name
 --	r.UpdateArrange()
 	end
 r.Undo_EndBlock('Insert Transcribing toolbar layout image', -1)
+
+end
+
+
+
+
+function Add_Image_To_Item(item, f_path, mode)
+-- mode is 1 - Center/tile image, 3 - Stretch image/text
+-- or 5 - Full height image;
+-- relies on GetObjChunk() and SetObjChunk()
+-- when image is added text notes are unavailable
+-- which is REAPER's behavior even if image is added manually
+
+local ret, chunk = GetObjChunk(item)
+	if ret == 'err_mess' then return end
+
+local curr_image = chunk:match('RESOURCEFN "(.-)"')
+local src_patt = not curr_image and 'IGUID {.-}' or 'RESOURCEFN ".-"'
+local repl_patt = ((not curr_image and '%0\n' or '')..'RESOURCEFN "'..f_path:gsub('%%', '%%%%')..'"')
+chunk = chunk:gsub(src_patt, repl_patt, 1)
+
+local IMGRESOURCEFLAGS = chunk:match('IMGRESOURCEFLAGS (%d+)')
+Msg(IMGRESOURCEFLAGS,'flags')
+src_patt = not IMGRESOURCEFLAGS and 'RESOURCEFN ".-"' or 'IMGRESOURCEFLAGS %d+'
+-- to be able to change image display mode, word wrap bit must be set separately
+local word_wrap = IMGRESOURCEFLAGS and IMGRESOURCEFLAGS+0&8 == 8 -- &8 is Word wrap
+local bitfield = word_wrap and mode|8 or mode
+repl_patt = (not IMGRESOURCEFLAGS and '%0\n' or '')..'IMGRESOURCEFLAGS '..bitfield -- 
+chunk = chunk:gsub(src_patt, repl_patt, 1)
+SetObjChunk(item, chunk)
 
 end
 
@@ -18014,6 +18067,7 @@ function rgb2hex(r, g, b)
 end
 
 
+
 function RANDOM_RGB_COLOR()
 math.randomseed(math.floor(r.time_precise()*1000)) -- math.floor() because the seeding number must be integer; seems to facilitate greater randomization at fast rate thanks to milliseconds count
 --[[
@@ -18124,6 +18178,7 @@ function RGB_To_From_Integer2(r,g,b,integer)
 end
 
 
+
 function RGB_To_Normalized(R,G,B)
 local unit = 1/255
 return R and unit*R or 255, G and unit*G or 255, B and unit*B or 255
@@ -18135,14 +18190,34 @@ gfx.r, gfx.g, gfx.b = RGB_To_Normalized(R, G, B)
 
 
 
-function HEX_color_2_integer(HEX)
--- tonumber(HEX:gsub('#',''), 16) isn't suitable because it converts into a big endian number whereas color code is little endian, which seem only apply to Windows
+function hex_col_2_int1(HEX) -- see also next
+-- tonumber(HEX:gsub('#',''), 16) isn't suitable because it converts into a big endian number whereas color code is little endian, which seems to only apply to Windows
 -- https://forums.cockos.com/showthread.php?t=253981#5
 local r,g,b = HEX:match('(%x%x)(%x%x)(%x%x)')
 r, g, b = tonumber(r,16), tonumber(g,16), tonumber(b,16)
 return r|g<<8|b<<16 -- OR r+(g<<8)+(b<<16)
 end
 
+
+
+function hex_col_2_int2(hex)
+local t = {}
+	for byte in hex:gmatch('%x%x') do
+	t[#t+1] = tonumber(byte, 16)
+	end
+local r, g, b = table.unpack(t)
+return r+g*256+b*256^2
+end
+
+
+
+function HEX_Col_2_RGB(hex)
+-- https://github.com/ReaTeam/ReaScripts/pull/1759/changes/c46005fea78fbd92051663e02ba0ea4f66b7a09a
+local r = (hex >> 16) & 0xFF -- 255
+local g = (hex >>  8) & 0xFF
+local b = hex       	 & 0xFF
+return r, g, b
+end
 
 
 function Split_Integer_To_RGB_And_Combine(color)
@@ -23142,11 +23217,12 @@ end
 function find_layout(layout_name, want_mcp)
 -- want_mcp is boolean to search among MCP layouts,
 -- support for transport, EnvCP, master TCP and MCP
--- can be added
+-- can be added;
+-- if not found returns false and layouts count
 local i = 0
 	repeat
 	local retval, name = reaper.ThemeLayout_GetLayout(want_mcp and 'mcp' or 'tcp', i)
-		if name == alt_tcp_layout_name then return true end
+		if name == layout_name then return 1 end
 		i=i+1
 	until not retval
 return false, i
@@ -23544,6 +23620,15 @@ end
 
 
 
+function Dir_Or_File_Exists(path, want_dir)
+-- CROSS-PLATFORM, BUT RETURNS TRUE IF THE PATH DOESN'T INCLUDE THE ACTUAL FILE NAME
+-- so for file path validation file name presence must be ensured
+	if not want_dir and not path:match('.-%.%w+$') then return end -- file name is missing
+local ok, mess, code = os.rename(path, path)
+return (ok or code == 13) and path -- 13 is error code for 'exists but permission denied' on some systems
+end
+
+
 function File_Exists1(path)
 -- WINDOWS ONLY, see Fle_Exists3() below
 local f, mess = io.open(path, 'r')
@@ -23563,14 +23648,7 @@ return true
 end
 
 
-function File_Exists3(path)
--- CROSS-PLATFORM
-local ok, mess, code = os.rename(path, path)
-return (ok or code == 13) and path -- 13 is error code for 'exists but permission denied' on some systems
-end
-
-
-function File_Exists4(name, path, ext, sep)
+function File_Exists3(name, path, ext, sep)
 local sep = sep or path:match('[\\/]')
 local path = path:match('.+[\\/]$') and path or path..sep -- add trailing separator if not included
 return package.searchpath(name, path..'?.'..ext)
@@ -23624,7 +23702,7 @@ end
 function resolve_file_name_collision1(f_path) -- see more comprehensive verson 2 below
 -- the function is supposed to be used after existence
 -- of a homonymous file at the destination path
--- has already been ascertained with functions such as File_Exists3();
+-- has already been ascertained with functions such as Dir_Or_File_Exists();
 -- f_path is the file new path it's supposed to have after
 -- movement/copying;
 -- if the path after file name resolution exceeds 256 char limit
@@ -23644,7 +23722,7 @@ local path, name, ext = f_path:match('(%S.+[\\/])(.+%.)(.+%S)$')
 
 	for i=2,100 do -- starting with 2 to mark second or greater instance of the file
 	name = name:match('.+(%(%d+%)%.)') and name:gsub('%(%d+%)%.', '('..i..').', 1) or name:sub(1,-2)..' ('..i..').' -- if file name already contains suffix of numeral inside paranthesis, only update the numeral
-	local exists = File_Exists3(name, path, ext, sep)
+	local exists = Dir_Or_File_Exists(name, path, ext, sep)
 	--[[ OR
 	local num = name:match('.+(%(%d+%)%.)')
 	num = num and Esc(num)
@@ -23678,7 +23756,7 @@ end
 function resolve_file_name_collision2(f_path)
 -- for preventing collision the function is supposed to be used after existence
 -- of a homonymous file at the destination path
--- has already been ascertained with functions such as File_Exists3(),
+-- has already been ascertained with functions such as Dir_Or_File_Exists(),
 -- but it can also be used for mere truncation of the file name
 -- due to excessive path length;
 -- f_path is the file new path it's supposed to have after
@@ -23712,7 +23790,7 @@ local path, name, ext = f_path:match('(%S.+[\\/])(.+%.)(.+%S)$')
 	num = num and Esc(num)
 	name = num and name:gsub(num, '('..i..').', 1) or name:sub(1,-2)..' ('..i..').' -- if file name already contains suffix of numeral inside paranthesis, only update the numeral
 --[[ OPTIONAL
---	local exists = File_Exists3(name, path, ext, sep)
+--	local exists = Dir_Or_File_Exists(name, path, ext, sep)
 	--	if exists and Get_File_Size4(path..name..ext, 'rb') == ref_file_size
 	--	then return -- exit if identical file was already renamed and copied ------------- THIS MAY NOT WORK BECAUSE OF LAG IN FILE UPDATE ON THE DISK DUE TO WHICH BY THE TIME THIS CONDITION COMES ALONG THE FILE COPED EARLIER WON'T BE REGISTERED BY THE OS AND THUS ACCESSIBLE TO Lua
 	--	else
@@ -23730,7 +23808,7 @@ local path, name, ext = f_path:match('(%S.+[\\/])(.+%.)(.+%S)$')
 			-- shorten the name by removing the parenthesis around the number
 			local name, num = name:match('(.+)%((%d+)%)%.')
 			f_path = path..name..'_'..num..ext
-				if not File_Exists3(f_path) then break end
+				if not Dir_Or_File_Exists(f_path) then break end
 			else
 			local name = name:match('(.+)%(%d+%)') -- exclude number in parenthesis completely, file with such name already exists at the destination path which is why this function is being executed in the first place, so it still should not collide and since inclusion of a number makes its path go over the character limit it needs truncation instead
 			name_len = len(name) -- get length of name without number
@@ -25159,11 +25237,11 @@ f:close()
 	end
 local sep = new_file_path:match('[\\/]')
 local path = new_file_path..(new_file_path:sub(-1) == sep and '' or sep)..cur_file_path:match('.+[\\/](.+)')-- concatenate full path of the file at the new location
--- may be enhanced with File_Exists3() or File_Exists4() to only move or copy when file doesn't exist
+-- may be enhanced with Dir_Or_File_Exists() or File_Exists4() to only move or copy when file doesn't exist
 f = io.open(path,'wb')
 f:write(cont)
 f:close()
-return r.file_exists(path) and path -- File_Exists3() or File_Exists4() can be used here instead of r.file_exists()
+return r.file_exists(path) and path -- Dir_Or_File_Exists() or File_Exists4() can be used here instead of r.file_exists()
 end
 
 
@@ -25256,7 +25334,7 @@ function process_directory_depth(relat_path, src_path)
 -- expected relat_path format:
 -- ../zz_libraries/colours_03_DS.png
 -- DS_files/DS_Keyboard4oct_04.png
--- src_path is an absolute path ending with a separator;
+-- src_path is an absolute path;
 -- the type of the separator is immaterial, can be mixed
 relat_path = relat_path:sub(1,1):match('[\\/]') and relat_path:sub(2) or relat_path -- strip leading separator if any
 local sep = src_path:match('[\\/]')
@@ -26949,9 +27027,10 @@ function Settings_Management_Menu_And_Help(condition, want_help, want_run)
 	if not condition then return end -- this will allow the main script routine to run if the condition for menu display isn't met
 ]]
 
-::RELOAD::
 
 local is_new_value, scr_name, sect_ID, cmd_ID, mode, resol, val, contextstr = r.get_action_context() -- TO BE AWARE THAT HERE THIS FUNCTION WILL GLITCH OUT IF IT'S ALREADY USED OUTSIDE OF THE FUNCTION SO scr_name VAR MAY NEED TO BE FED AS AN ARGUMENT
+
+::RELOAD::
 
 local sett_t, help_t, about = {}, want_help and {} -- help_t is optional if help is important enough
 	for line in io.lines(scr_name) do
@@ -26984,7 +27063,7 @@ local menu_sett = {}
 		for k, line in ipairs(sett_t) do
 		local sett = line:match(v..'%s*=%s*"(.-)"')
 			if sett then
-			menu_sett[#menu_sett+1] = #sett:gsub(' ','') > 0 and '!' or ''
+			menu_sett[#menu_sett+1] = #sett:gsub(' ','') > 0 and '!' or '' -- OR sett:match('%S')
 			end
 		end
 	end
@@ -26994,7 +27073,7 @@ local menu = ('USER SETTINGS'):gsub('.','%0 ')..'||'..menu_sett[1]..'sett1||'
 ..menu_sett[2]..'sett2||'..menu_sett[3]..'sett3||'
 ..menu_sett[4]..'sett4|||View Help|'..(want_run and ('RUN'):gsub('.','%0 ') or ' ')
 
-local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
+local output = Reload_Menu_at_Same_Pos2(menu, 1) -- keep_menu_open true
 
 	if output == 6 and want_help and #help_t > 0 then -- THE output VALUE DEPENDS ON THE NUMBER OF MENU ITEMS
 	r.ShowConsoleMsg(table.concat(help_t,'\n'):match('(.+)%]%]'),r.ClearConsole()) -- trimming the first line of user settings section because it's captured by the loop
@@ -27015,7 +27094,7 @@ local repl = src..' = "'..sett..'"'
 local cur_settings = table.concat(sett_t,'\n')
 local upd_settings, cnt = cur_settings:gsub(src..'%s*=%s*".-"', repl, 1)
 
-	if cnt > 0 then -- settings were updated, get script
+	if cnt > 0 then -- OR cur_settings ~= upd_settings // settings were updated, get script
 	local f = io.open(scr_name,'r')
 	local cont = f:read('*a')
 	f:close()
@@ -27358,6 +27437,7 @@ local output = Reload_Menu_at_Same_Pos(menu)
 --]]
 
 
+
 function Display_Script_Help_Txt(scr_path)
 -- scr_path stems from get_action_context()
 
@@ -27506,6 +27586,7 @@ local output = Reload_Menu_at_Same_Pos(menu, 1) -- keep_menu_open true
 ]]
 
 
+
 function Menu_With_Toggle_Options1(scr_cmd_ID, sett_t, menu_t, default_sett_state)
 -- scr_cmd_ID comes from get_action_context()
 -- default_sett_state is optional, the format is e.g. '111', i.e. all 3 options
@@ -27515,7 +27596,7 @@ function Menu_With_Toggle_Options1(scr_cmd_ID, sett_t, menu_t, default_sett_stat
 
 ::RELOAD::
 
-local default_sett_state = default_sett_state and #default_sett_state == #sett_t and default_sett_state
+local default_sett_state = default_sett_state and sett_t and #default_sett_state == #sett_t and default_sett_state
 or ('0'):rep(#sett_t) -- if invalid or length doesn't match sett_t length default to all Off
 local sett = r.GetExtState(scr_cmd_ID, 'SETTINGS')
 local ret
@@ -27524,8 +27605,9 @@ local ret
 	end
 local sett_bools_t = {(#sett > 0 and sett or default_sett_state):match(('(%d)'):rep(#sett_t))} -- initializing defaults if first load
 
--- POPULATE WITH NAMES OF TOGGLE SETTINGS AS THEY APPEAR IN THE MENU
+-- POPULATE WITH NAMES OF TOGGLE SETTINGS AS THEY APPEAR IN THE MENU FOLLOWING ORDER OF sett_bools_t
 local sett_t = sett_t or {'My setting 1', 'My setting 2', 'My setting 3'}
+
 local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',  sett_t[2]..'|', 'Item 3|', sett_t[3]..'|'}
 
 -- OPTIONAL
@@ -27662,7 +27744,7 @@ local ret
 	end
 bitfield = #bitfield > 0 and bitfield+0 or default_sett_state or 0
 
--- POPULATE WITH NAMES OF TOGGLE SETTINGS AS THEY APPEAR IN THE MENU
+-- POPULATE WITH NAMES OF TOGGLE SETTINGS AS THEY APPEAR IN THE MENU FOLLOWING ORDER OF THE BITFIELD
 local sett_t = sett_t or {'My setting 1', 'My setting 2', 'My setting 3', 'My setting 4'}
 
 local menu_t = menu_t or {'Item 1|', 'Item 2|', sett_t[1]..'|',
@@ -27790,7 +27872,8 @@ end
 
 function check1(sett1, sett2)
 -- checkmarking menu item when relevant boolean setting is enabled
--- sett2 is variable of a boolean setting with which sett1 are mutually exclusive
+-- sett2 is optional, a variable of a boolean setting 
+-- with which sett1 are mutually exclusive
 -- so that when sett2 is enabled, sett1 is grayed out,
 -- can be passed as several settings which are mutually excluive
 -- and 'or' operator
@@ -33453,6 +33536,7 @@ I T E M S
 	Insert_Empty_Item_To_Display_Text1
 	Insert_Empty_Item_To_Display_Text2
 	Insert_Image
+	Add_Image_To_Item
 	Insert_Temp_Item
 	Insert_Item_On_Temp_Track1
 	Insert_Item_On_Temp_Track2
@@ -33521,7 +33605,7 @@ C O L O R
 	Validate_HEX_Color_Setting2
 	hex2rgb
 	FTC_HexToNormRGB
-	rgb2hex
+	rgb2hex	
 	RANDOM_RGB_COLOR
 	Generate_Random_Color_Val
 	zaibuyidao_RGBHexToDec
@@ -33531,6 +33615,9 @@ C O L O R
 	RGB_To_From_Integer1
 	RGB_To_From_Integer2
 	RGB_To_Normalized
+	hex_col_2_int1
+	hex_col_2_int2
+	HEX_Col_2_RGB
 	Split_Integer_To_RGB_And_Combine
 	Extract_Object_Color
 	close_gfx_wnd_and_store_coordinates
@@ -33700,10 +33787,10 @@ F I L E S
 	Dir_Exists1
 	Dir_Exists2
 	Dir_Exists3
+	Dir_Or_File_Exists
 	File_Exists1
-	File_Exists2
+	File_Exists2	
 	File_Exists3
-	File_Exists4
 	file_exists_alt
 	make_file_name_unique
 	create_unique_time_based_ID
