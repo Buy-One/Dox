@@ -7996,9 +7996,12 @@ end
 
 function Is_Track_Frozen(tr)
 -- returns freeze count, 0 if track is not frozen;
--- requires either SWS extension or GetObjChunk2() function
+-- in builds older than 7.43 requires either SWS extension 
+-- or GetObjChunk2() function
 local cnt
-	if r.BR_GetMediaTrackFreezeCount then
+	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.43 then
+	cnt = r.GetMediaTrackInfo_Value(tr, 'I_FREEZECOUNT')
+	elseif r.BR_GetMediaTrackFreezeCount then
 	cnt = r.BR_GetMediaTrackFreezeCount(tr)
 	else
 	local ret
