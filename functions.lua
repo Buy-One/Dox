@@ -7999,7 +7999,7 @@ function Is_Track_Frozen(tr)
 -- requires either SWS extension or GetObjChunk2() function
 local cnt
 	if r.BR_GetMediaTrackFreezeCount then
-	cnt r.BR_GetMediaTrackFreezeCount(tr)
+	cnt = r.BR_GetMediaTrackFreezeCount(tr)
 	else
 	local ret
 	ret, chunk = GetObjChunk2(tr)
