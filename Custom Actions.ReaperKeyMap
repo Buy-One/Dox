@@ -668,6 +668,7 @@ ACT 1 0 "e4771bc1e573954f90ff7f0440474a3f" "Custom: Tap tempo with proj. timebas
 ACT 1 0 "f2eddab3f3b3af459ec2b167ff34afc0" "Custom: Togggle zoom to sel. item + MIDI Inline Editor" 41622 40847
 ACT 1 0 "232617df6a36e045af178289604be280" "Custom: Toggle alternate M shortcut (proof of concept) -- activate 'Toggle show track icons in mixer' from toolbar button" 2022 40903 2014 40157 2013 6
 ACT 1 0 "00fabafea6f75f498afd096c3fa6f28d" "Custom: Toggle alternate M shortcut MOMENTARY (proof of concept) -- activate 'Toggle show track icons in mixer' from toolbar button" 2022 40903 2014 40157
+ACT 1 0 "eb3a8db3af74164e9a5b7c0924a42285" "Custom: Toggle arm selected track and record" _XENAKIOS_SELTRAX_RECARMED 1013 2022 1013 2014 40491
 ACT 1 0 "7c7e13f26fae334686d85030bb7940c9" "Custom: Toggle continuous scrolling during playback - Toggle auto-view-scroll OFF (component)" 2022 40036 2013 40036
 ACT 1 0 "142f3d684b07e64288384387141a782a" "Custom: Toggle continuous scrolling during playback - Toggle auto-view-scroll ON (component)" 2022 40036 2014 40036
 ACT 1 0 "88ef4a6a53f29b469efcb12832427002" "Custom: Toggle continuous scrolling during playback (both featured actions must be enabled and are toggled in sync)" 41817 2022 41817 2013 _142f3d684b07e64288384387141a782a 2014 _7c7e13f26fae334686d85030bb7940c9
