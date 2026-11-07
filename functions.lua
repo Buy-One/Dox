@@ -7994,6 +7994,22 @@ end
 
 
 
+function Is_Track_Frozen(tr)
+-- returns freeze count, 0 if track is not frozen;
+-- requires either SWS extension or GetObjChunk2() function
+local cnt
+	if r.BR_GetMediaTrackFreezeCount then
+	cnt r.BR_GetMediaTrackFreezeCount(tr)
+	else
+	local ret
+	ret, chunk = GetObjChunk2(tr)
+	cnt = chunk and select(2, chunk:gsub('<FREEZE', ''))
+	end
+return cnt
+end
+
+
+
 
 --================================ T R A C K S  E N D ================================
 
@@ -33440,6 +33456,7 @@ T R A C K S
 	Insert_New_Track
 	Create_Track_Template
 	track_TCP_likely_dragged
+	Is_Track_Frozen
 
 
 S E N D S / R E C E I V E S
