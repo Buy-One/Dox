@@ -12122,6 +12122,31 @@ function Is_FX_Accessible(obj, fx_idx)
 
 	if fx.GetFloatingWindow(obj, fx_idx) then return true end -- if fx is open in a floating window it's 100% accessible
 
+local old_build = tonumber(r.GetAppVersion():match('[%d%.]+')) < 7.74 -- where set_config_var_string() isn't supported
+local sws = r.SNM_SetIntConfigVar
+local ret, fx_pref = r.get_config_var_string('fxfloat_focus')
+local create_fx_undo = fx_pref+0&65536 ~= 65536 -- the setting is enabled when the bit is unset
+
+-- if the preference at Preferences -> Plugins -> Do not create undo points when closing FX windows
+-- is disabled AND 'Only allow one FX floating at a time' is enabled
+-- toggle them with re_store_config_var() for the duration of function execution
+-- to prevent creation of multiple undo points and auto-closing 
+-- of other fx foating windows when fx windows are toggled open and closed;
+-- if REAPER build the user runs doesn't support that function due to being old 
+-- or due to lack of the SWS extension and 'Do not create undo points' preference is disabled, 
+-- create a single custom undo point, the good thing about which 
+-- is that it won't multiply at repeated script executions
+-- and will only be created if the last action in the undo hitory is different
+-- so it will be created in-between other actions but won't inundate the undo history
+-- when the script is executed several times in a row to navigate between windows
+	if old_build and not sws and create_fx_undo then -- in older builds values can only be set with SWS extension API
+	r.Undo_BeginBlock() -- so initialize undo block
+	end
+
+-- disable
+re_store_config_var('fxfloat_focus', 65536, disable) -- Do not create undo points when closing FX windows', disable false because the preference must be enabled to prevent undo point creation // store original pref value and disable creation of undo point when fx windows are toggled // will only run if build is 7.74 or sws extension is installed
+re_store_config_var('fxfloat_focus', 2^24, 1) -- 'Only allow one FX floating at a time', disable true
+
 -- offlined fx too cannot be open in a floating window
 -- so set online if necessary to prevent false positive
 local offline = fx.GetOffline(obj, fx_idx)
@@ -12135,10 +12160,20 @@ local ok
 	ok = 1
 	end
 	if offline then fx.SetOffline(obj, fx_idx, offline) end
+
+	if old_build and not sws and create_fx_undo then -- in older builds values can only be set with SWS extension API
+	r.Undo_EndBlock('Toggle FX window open and closed',-1)
+	end
+
+-- restore original pref value, arg 2 and 3 a irrelevant here
+-- will only run if build is 7.74 or sws extension is installed
+re_store_config_var('fxfloat_focus', nil, nil, fx_pref) 
 	
 return ok
 
 end
+
+
 
 
 
@@ -12536,7 +12571,7 @@ end
 function FX_Exists(obj, fx_name, fx_parm_cnt, parmA_idx, parmA_name, parmB_idx, parmB_name, parmC_idx, parmC_name, fx_idx)
 -- fx_name is original fx name, will be used in builds 6.37 onwards
 -- fx_idx is optional, if passed the function will evaluate whether the FX with this particular index is the sought one
--- otherwise it searches for ar least one matching FX in the entire FX chain
+-- otherwise it searches for at least one matching FX in the entire FX chain
 -- the function currently doesn't support Input/Monitoring FX chains
 -- NOT failproof because if at least 1 parameter has an alias, its name won't match
 -- the default one if this is what's passed as an argument
@@ -14342,22 +14377,6 @@ end
 
 
 
-function Get_Open(obj, fx_idx)
--- evaluate whether the fx is open within fx chain or as a floating window
--- whether fx is open in a floating window can only be reliably determined
--- when it's not open within the fx chain or the fx chain is closed
--- because GetOpen function doesn't differentiate between open states
-local tr, take = r.ValidatePtr(obj,'MediaTrack*'), r.ValidatePtr(obj,'MediaItem_Take*')
-local GetChainVisible, GetOpen = table.unpack(tr and {r.TrackFX_GetChainVisible, r.TrackFX_GetOpen}
-or take and {r.TakeFX_GetChainVisible, r.TakeFX_GetOpen})
-local open_in_chain_idx = GetChainVisible(obj)
-local open = GetOpen(obj, fx_idx)
-return open_in_chain_idx == fx_idx, open_in_chain_idx ~= fx_idx and open -- 1st return value is true when fx is opened in the open fx chain, whether it's also open in a floating window is impossible to determine, 2nd return value is true when the fx isn't open in the fx chain or the fx chain is closed but it's open in a floating window
-
-end
-
-
-
 function Apply_Video_Proc_Preset(obj, fx_idx, preset, preset_idx) -- used inside Split_Active_Take_Name()
 -- obj is track or take pointer
 -- preset is preset name, preset_idx is its index, optional,
@@ -14696,6 +14715,144 @@ local fx_idx = Add(obj, fx_name, recFX, instantiate)
 
 end
 
+
+
+
+function Collect_Open_FX()
+-- i.e. visible in the open FX chain windows and in a floating windows
+-- the way the data are stored in the table is subject to change
+-- depending on script design;
+-- relies on Collect_All_Container_FX_Indices()
+
+	local function Loop_Over_FX_Container_Table(obj, t, t2) -- ued in collect_container_fx()
+	-- obj is track or take, t is the table returned by Collect_All_Container_FX_Indices()
+
+	local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+	local Floating = take and r.TakeFX_GetFloatingWindow or r.TrackFX_GetFloatingWindow
+
+		-- target fx instances in a chain ignoring containers
+		for k, fx_idx in ipairs(t) do
+			if tonumber(fx_idx) then -- fx instance // if container, evaluation will be false since the value is a table
+			local wnd = Floating(obj, fx_idx)
+				if wnd then
+				t2[#t2+1], t2[wnd] = wnd, '' -- dummy entries are stored to be able to get windows count for error message generation
+				end
+			end
+		end
+		-- target containers, ignoring fx instances
+		for k, cont in ipairs(t) do
+			if not tonumber(cont) then -- a table storing container index and its fx list
+			local wnd = Floating(obj, cont[1])
+				if wnd then
+				t2[#t2+1], t2[wnd] = wnd, '' -- dummy entries are stored to be able to get windows count for error message generation
+				end
+			Loop_Over_FX_Container_Table(obj, cont[2], t2) -- go recursive to loop over container fx, cont[2] is the address of the nested table with container fx indices list, at cont[1] container own index is stored
+			end
+		end
+
+	end
+
+
+	local function collect_container_fx(obj, cont_idx, recFX, t)
+	local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
+	local Count, Get_Parm, Floating = table.unpack(take and {r.TakeFX_GetCount,r.TakeFX_GetNamedConfigParm, r.TakeFX_GetFloatingWindow} or tr and {recFX and r.TrackFX_GetRecCount or r.TrackFX_GetCount,  r.TrackFX_GetNamedConfigParm, r.TrackFX_GetFloatingWindow})
+
+	local build = tonumber(r.GetAppVersion():match('[%d%.]+'))
+
+		if build >= 7 and build < 7.06 then
+		local cont_fx_t = Collect_All_Container_FX_Indices(obj, _, recFX, 0x2000000+cont_idx+1, Count(obj)+1)
+		Loop_Over_FX_Container_Table(obj, cont_fx_t, t)
+		elseif build >= 7.06 then
+		local ret, count = Get_Parm(obj, cont_idx, 'container_count')
+			if count == '0' then return end
+			for i=0, count-1 do
+			local ret, fx_idx = Get_Parm(obj, cont_idx, 'container_item.'..i)
+			fx_idx = fx_idx+0
+			local wnd = Floating(obj, fx_idx)
+				if wnd then
+				t[#t+1], t[wnd] = wnd, '' -- dummy entries are stored to be able to get windows count for error message generation
+				end
+				if Get_FX_Type(obj, fx_idx) == 'Container' then -- go recursive
+				collect_container_fx(obj, fx_idx, recFX, t)
+				end
+			end
+		end
+	end
+	
+	
+	local function collect_take_fx(t, tr)
+	local Count, Get = table.unpack(tr and {r.CountTrackMediaItems, r.GetTrackMediaItem} 
+	or {r.CountMediaItems, r.GetMediaItem})
+		for itm_idx=0, Count(tr or 0)-1 do
+		local item = Get(tr or 0, itm_idx)
+			for take_idx=0, r.CountTakes(item)-1 do
+			local take = r.GetTake(item, take_idx)
+			local chain_vis_idx = r.TakeFX_GetChainVisible(take) ~= -1
+				if chain_vis_idx then t[#t+1] = '' end -- dummy entry to signal that there's open fx chain window
+				for i=0, r.TakeFX_GetCount(take)-1 do
+				local wnd = r.TakeFX_GetFloatingWindow(take, i)
+					if wnd then
+					t[#t+1], t[wnd] = wnd, '' -- dummy entries are stored to be able to get windows count for error message generation
+					end
+					if Get_FX_Type(take, i) == 'Container' then
+					collect_container_fx(take, i, recFX, t) -- recFX nil
+					end
+				end
+			end
+		end
+	end
+
+
+local t = {}
+
+	for tr_idx=-1, r.CountTracks(0)-1 do -- start from -1 to accommodate master track
+	local tr = r.GetTrack(0,tr_idx) or r.GetMasterTrack(0)
+	local chain_vis_idx = r.TrackFX_GetChainVisible(tr) ~= -1
+		if chain_vis_idx then t[#t+1] = '' end -- dummy entry to signal that there's open fx chain window
+		for i=0, r.TrackFX_GetCount(tr)-1 do
+		local wnd = r.TrackFX_GetFloatingWindow(tr, i)
+			if wnd then
+			t[#t+1], t[wnd] = wnd, '' -- dummy entries are stored to be able to get windows count for error message generation
+			end
+			if Get_FX_Type(tr, i) == 'Container' then
+			collect_container_fx(tr, i, recFX, t) -- recFX nil
+			end
+		end
+		-- input fx windows
+	local chain_vis_idx = r.TrackFX_GetRecChainVisible(tr) ~= -1 -- the function returns regular index
+		if chain_vis_idx then t[#t+1] = '' end -- dummy entry to signal that there's open fx chain window
+		for i=0, r.TrackFX_GetRecCount(tr)-1 do
+		local wnd = r.TrackFX_GetFloatingWindow(tr, i+0x1000000)
+			if wnd then
+			t[#t+1], t[wnd] = wnd, ''
+			end
+			if Get_FX_Type(tr, i) == 'Container' then
+			collect_container_fx(tr, i, 1, t) -- recFX 1 true
+			end
+		end
+	-- take fx windows
+	collect_take_fx(t, tr)
+	end
+
+return t
+
+end
+
+
+
+
+function Get_Open(obj, fx_idx)
+-- evaluate whether the fx is open within fx chain or as a floating window
+-- whether fx is open in a floating window can only be reliably determined
+-- when it's not open within the fx chain or the fx chain is closed
+-- because GetOpen function doesn't differentiate between open states
+local tr, take = r.ValidatePtr(obj,'MediaTrack*'), r.ValidatePtr(obj,'MediaItem_Take*')
+local GetChainVisible, GetOpen = table.unpack(tr and {r.TrackFX_GetChainVisible, r.TrackFX_GetOpen}
+or take and {r.TakeFX_GetChainVisible, r.TakeFX_GetOpen})
+local open_in_chain_idx = GetChainVisible(obj)
+local open = GetOpen(obj, fx_idx)
+return open_in_chain_idx == fx_idx, open_in_chain_idx ~= fx_idx and open -- 1st return value is true when fx is opened in the open fx chain, whether it's also open in a floating window is impossible to determine, 2nd return value is true when the fx isn't open in the fx chain or the fx chain is closed but it's open in a floating window
+end
 
 
 -- REDUNDANT, FX_GetFloatingWindow() actually does work with fx inside containers
@@ -29471,7 +29628,7 @@ local upd_val
 local set = old_build and {r.SNM_SetIntConfigVar, key, val}
 or {r.set_config_var_string, key, val, not val and 0 or 1} -- persist arg in set_config_var_string() depends on the stage, at the storage stage it's 0 so the value is not written into reaper.ini, otherwise 1 for the restored value to be written, OR PROBABLY since at the storage stage it's not written it will be preserved anyway so at the restoration stage 0 can be ued as well
 
-	if upd_val or val then -- update value at the storage stage or restore
+	if upd_val or val then -- update value in reaper.ini at the storage stage or restore
 	set[3] = val or upd_val -- update with the calculated value if val arg is nil, i.e. storage stage
 	set[1](table.unpack(set, 2)) -- unpack starting from index 2
 	end
@@ -33491,7 +33648,6 @@ F X
 	FX_Enabled
 	Is_Same_Plugin
 	Validate_FX_Identity
-	Get_Open
 	Apply_Video_Proc_Preset
 	Insert_Video_Proc_With_Preset
 	Get_Vid_Proc_Instance_Default_Name
@@ -33501,6 +33657,8 @@ F X
 	Move_FX_At_Index_To_Slot_N
 	Close_All_FX_Windows
 	FX_AddByName_Alt
+	Collect_Open_FX
+	Get_Open
 	FX_GetOpen_Alt
 
 
