@@ -7253,7 +7253,7 @@ function Get_Track_Minimum_Height2() -- may be different from 24 px in certain t
 -- discussion of the topic https://forum.cockos.com/showthread.php?t=235862
 local tr = r.GetTrack(0,0)
 local H_orig = r.GetMediaTrackInfo_Value(tr, 'I_TCPH')
-r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1) -- decrease height // 0 resets TCP height to last height changed via zoom action 'Zoom vertically' AND temporarily disables height locked status without clearing the checkmark in the menu https://forum.cockos.com/showthread.php?p=2202082
+r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', 1) -- decrease height // 0 resets TCP height to last height changed via zoom action 'Zoom vertically' or other actions which affect vertical zoom, AND temporarily disables height locked status without clearing the checkmark in the menu https://forum.cockos.com/showthread.php?p=2202082
 r.TrackList_AdjustWindows(true) -- isMinor is true // updates TCP only https://forum.cockos.com/showthread.php?t=208275
 local H_min = r.GetMediaTrackInfo_Value(tr, 'I_TCPH') -- store
 r.SetMediaTrackInfo_Value(tr, 'I_HEIGHTOVERRIDE', H_orig) -- restore
@@ -8009,6 +8009,53 @@ local cnt
 	cnt = chunk and select(2, chunk:gsub('<FREEZE', ''))
 	end
 return cnt
+end
+
+
+
+
+function GetSet_Image(obj, path)
+-- track icon or item notes image
+-- contrary to the API doc GetSetMediaTrackInfo_String with P_ICON
+-- parameter returns FULL path to /Data/track_icons or /Data/toolbar_icons 
+-- and file name or relative path to project directory, 
+-- in the chunk in all 3 cases only the file name is listed in TRACKIMGFN attribute 
+-- or relative path under the project directory, 
+-- the same is true to item notes image chunk attribute RESOURCEFN;
+-- relies on Dir_Or_File_Exists()
+
+	if path and not file_exists(path) then return end -- if not validated before the function is called // may be used to trugger error message after the fact 
+
+local file, chunk
+	if r.ValidatePtr(obj, 'MediaItem*') then
+	local ret
+	ret, chunk = r.GetItemStateChunk(obj, '', false) -- is_undo false
+	elseif r.ValidatePtr(obj, 'MediaTrack*') then -- get or set depending on path argument validity
+	local ret
+	ret, file = r.GetSetMediaTrackInfo_String(obj, 'P_ICON', path or '', path or false) -- is_set false
+	end
+
+	if not file then -- item // when track, file var will be valid by this point
+		if not path then -- get
+		file = chunk:match('RESOURCEFN "(.-)"')
+		else
+		local cnt = 0
+		chunk, cnt = chunk:gsub('RESOURCEFN ".-"', 'RESOURCEFN "'..path..'"')
+			if cnt > 0 then
+			r.SetItemStateChunk(obj, chunk, false) -- is_undo false
+			file = path
+			end
+		end
+	end
+
+-- resolve_fn() function will return the path even if the file 
+-- has been deleted from its original location,
+-- so basically it retrieves the path cached when the project was loaded,
+-- and while it's loaded REAPER searches for the file in the project folder 
+-- then in /Data/track_icons and then in /Data/toolbar_icons,
+-- if not found a warning is displayed
+return file and Dir_Or_File_Exists(r.resolve_fn(file, ''))
+
 end
 
 
@@ -8850,6 +8897,8 @@ function Get_All_Descendants(...)
 -- arg is either parent track idx or parent track pointer
 
 local arg = {...}
+
+--[[
 local tr_idx, tr
 	if #arg > 0 then
 		if tonumber(arg[1]) then tr_idx = arg[1]
@@ -8859,8 +8908,22 @@ local tr_idx, tr
 	else return
 	end
 
-	if not tr then tr = r.CSurf_TrackFromID(tr_idx, false) end -- mcpView false
-	if not tr_idx then tr_idx = r.CSurf_TrackToID(tr, false)-1 end -- mcpView false
+	if not tr then tr = r.CSurf_TrackFromID(tr_idx, false) -- mcpView false
+	if not tr_idx then tr_idx = r.CSurf_TrackToID(tr, false)-1 -- mcpView false
+--]]
+--[-[ OR
+	if #arg == 0 then return end
+
+local tr_idx, tr
+
+	if tonumber(arg[1]) then tr_idx = arg[1]
+	elseif r.ValidatePtr(arg[1], 'MediaTrack*') then tr = arg[1]
+	else return
+	end
+
+tr = tr or r.CSurf_TrackFromID(tr_idx, false) end -- mcpView false
+tr_idx = tr_idx or r.CSurf_TrackToID(tr, false)-1 end -- mcpView false
+--]]
 
 local desc_t = {}
 
@@ -10677,7 +10740,10 @@ end
 
 --================================= C H U N K ========================================
 
-local function GetObjChunk1(retval, obj, obj_type) -- retval stems from r.GetFocusedFX(), value 0 is only considered at the pasting stage because in the copying stage it's error caught before the function
+local function GetObjChunk1(retval, obj, obj_type) -- see more efficient GetObjChunk2()
+-- retval stems from r.GetFocusedFX(), 
+-- its value 0 is only considered at the pasting stage 
+-- because in the copying stage it's error caught before the function
 -- https://forum.cockos.com/showthread.php?t=193686
 -- https://raw.githubusercontent.com/EUGEN27771/ReaScripts_Test/master/Functions/FXChain
 -- https://github.com/EUGEN27771/ReaScripts/blob/master/Various/FXRack/Modules/FXChain.lua
@@ -10701,6 +10767,7 @@ end
 
 
 local function GetObjChunk2(obj)
+-- optionally relies on create_random_name();
 -- https://forum.cockos.com/showthread.php?t=193686
 -- https://raw.githubusercontent.com/EUGEN27771/ReaScripts_Test/master/Functions/FXChain
 -- https://github.com/EUGEN27771/ReaScripts/blob/master/Various/FXRack/Modules/FXChain.lua
@@ -10718,7 +10785,18 @@ local ret, obj_chunk = table.unpack(t)
 -- OR
 -- local ret, obj_chunk = table.unpack(tr and {r.GetTrackStateChunk(obj, '', false)} or (item or take) and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} or {x,x}) -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
 	if ret and obj_chunk and #obj_chunk >= 4194303 and not r.APIExists('SNM_CreateFastString') -- OR not r.SNM_CreateFastString
-	then return 'err_mess'
+	then
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.53 then -- if no extension, extract chunk from a temporary track template
+		local path = r.GetProjectPath() -- media path, if no project file returns default recording path
+		path = path..path:match('[\\/]')..(create_random_name and create_random_name(4) or 'TMP_LATE') -- without file extension, unnecessary and lengthens file name risking to hit path character limit if too deep // since file extension is ommitted the likelihood of collision with existing file drops significantly so create_random_name() function could be dispensed with
+		r.Main_SaveProjectEx(0, path, 1|2|4) -- save as track template with items and envelopes
+		local f = io.open(path, 'r')
+			if f then
+			local chunk = f:read('*a'); f:close(); os.remove(path)
+			return true, chunk
+			end
+		else return 'err_mess'
+		end
 	elseif ret and obj_chunk and #obj_chunk < 4194303 then return ret, obj_chunk -- 4194303 bytes (4.194303 Mb) = (4096 kb * 1024 bytes) - 1 byte // since build 4.20 http://reaper.fm/download-old.php?ver=4x
 	end
 -- If chunk_size >= max_size, use wdl fast string --
@@ -10741,7 +10819,10 @@ local resp = r.MB(sws_ext_err_mess,'ERROR',0)
 end
 
 
-local function SetObjChunk1(retval, obj, obj_type, obj_chunk) -- retval stems from r.GetFocusedFX(), value 0 is only considered at the pasting stage because in the copying stage it's error caught before the function
+local function SetObjChunk1(retval, obj, obj_type, obj_chunk) -- see more efficient SetObjChunk2()
+-- retval stems from r.GetFocusedFX(), 
+-- its value 0 is only considered at the pasting stage 
+-- because in the copying stage it's error caught before the function
 	if not (obj and obj_chunk) then return end
 	if retval == 0 then retval = tonumber(obj_type) end -- for pasting stage when fx chains/floating windows are closed or not in focus
 return retval == 1 and r.SetTrackStateChunk(obj, obj_chunk, false) or r.SetItemStateChunk(obj, obj_chunk, false) -- isundo is false // https://forum.cockos.com/showthread.php?t=181000#9
@@ -12137,7 +12218,11 @@ function Is_FX_Accessible(obj, fx_idx)
 -- 'The following effect plugin could not be loaded
 -- (effect configuration is preserved)'
 -- in their instance UI
--- cannot be open in a floating window
+-- cannot be open in a floating window;
+-- relies on re_store_config_var() to prevent
+-- automatic undo point creation and affecting
+-- windows of other fx which will only be possible
+-- in builds 7.74+ unless SWS extension is installed
 
 	if fx.GetFloatingWindow(obj, fx_idx) then return true end -- if fx is open in a floating window it's 100% accessible
 
@@ -18181,6 +18266,10 @@ end
 
 
 
+-- GetSet_Image() see in T R A C K S
+
+
+
 --================================ I T E M S   E N D ==================================
 
 
@@ -23390,18 +23479,27 @@ reaper.ThemeLayout_RefreshAll()
 end
 
 
+
 function find_layout(layout_name, want_mcp)
+-- if layout_name is invalid returns current layout;
 -- want_mcp is boolean to search among MCP layouts,
 -- support for transport, EnvCP, master TCP and MCP
 -- can be added;
--- if not found returns false and layouts count
-local i = 0
-	repeat
-	local retval, name = reaper.ThemeLayout_GetLayout(want_mcp and 'mcp' or 'tcp', i)
-		if name == layout_name then return 1 end
-		i=i+1
-	until not retval
-return false, i
+-- if supplied layout_name is not found returns 
+--  false and layout count
+local Get = r.ThemeLayout_GetLayout
+	if layout_name then
+	local i = 0
+		repeat
+		local retval, name = Get(want_mcp and 'mcp' or 'tcp', i)
+			if name == layout_name then return 1 end
+			i=i+1
+		until not retval
+	return false, i+1
+	else
+	local retval, name = Get(want_mcp and 'mcp' or 'tcp', -1)
+	return name
+	end
 end
 
 
@@ -23864,13 +23962,41 @@ function create_unique_time_based_ID()
 	local chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 	local s = ''
 		repeat
-		  local r = n%36 + 1
-		  s = chars:sub(r,r)..s
-		  n = math.floor(n/36)
+		local r = n%36 + 1
+		s = chars:sub(r,r)..s
+		n = math.floor(n/36)
 		until n == 0
 	return s
 	end
 return to_base36(os.time())
+end
+
+
+
+function create_random_name(char_num)
+-- char_num is integer, the desired number of characters
+math.randomseed(math.floor(r.time_precise()*1000)) -- seems to facilitate greater randomization at fast rate thanks to milliseconds count; math.floor() because the seeding number must be integer
+local alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+local name = ''
+	for i=1,char_num do
+	local rand = math.random(1, #alphabet)
+	name = name..alphabet:sub(rand, rand)
+	end
+return name
+end
+
+
+
+function create_random_name(char_num)
+-- char_num is integer, the desired number of characters
+math.randomseed(math.floor(r.time_precise()*1000)) -- seems to facilitate greater randomization at fast rate thanks to milliseconds count; math.floor() because the seeding number must be integer
+local alphabet = '`~!@#$%^&()-_=+{}[];,.0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+local name = ''
+	for i=1,char_num do
+	local rand = math.random(1, #alphabet)
+	name = name..alphabet:sub(rand, rand)
+	end
+return name
 end
 
 
@@ -25580,6 +25706,34 @@ local i = 0
 	i = i+1
 	until not file
 return t
+end
+
+
+
+function Process_File_Path(f_path)
+-- searches depending on file path format:
+-- file name: project folder root, /Data/track_icons, /Data/toolbar_icons
+-- relative path: project folder subfolders, resource path subfolders
+-- absolute path: at the actual path;
+-- relies on Dir_Or_File_Exists()
+
+local f_path = f_path:match('%S') and f_path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
+	if not f_path then return end
+	
+local resources = r.GetResourcePath()
+local sep = resources:match('[\\/]')
+local proj, proj_path = r.EnumProjects(-1) -- proj_path may be empty if project has never been saved
+local t = not f_path:match('[\\/]') and f_path:match('.+%.%w+$') -- file name only, search in the project folder and /Data sufolders
+and {proj_path..sep..f_path, resources..sep..'Data'..sep..'track_icons'..sep..f_path,
+resources..sep..'Data'..sep..'toolbar_icons'..sep..f_path}
+or not f_path:match('^%u:') -- relative path, search in resource and project directories
+and {proj_path..sep..f_path, resources..sep..f_path}
+or {f_path}
+
+	for k, path in ipairs(t) do
+		if Dir_Or_File_Exists(path) then return path end
+	end
+
 end
 
 
@@ -32880,6 +33034,16 @@ local parent = r.CSurf_TrackFromID(idx, false) -- mpcView false
 
 --===================================================================================
 
+-- track I_HEIGHTOVERRIDE value changes when TCP height is adjusted by dragging 
+-- and is reset with 'Zoom vertically' and other actions which affect vertical zoom;
+-- value 0 resets TCP height to last height effected by 'Zoom vertically' 
+-- or other actions which affect vertical zoom;
+-- I_HEIGHTOVERRIDE temporarily disables height locked status 
+-- without clearing the checkmark in the track right click menu 
+-- https://forum.cockos.com/showthread.php?p=2202082
+
+--===================================================================================
+
 -- Functions to get item parent track
 
 r.GetMediaItemTrack(item)
@@ -32912,7 +33076,6 @@ r.GetMediaItemTakeInfo_Value(take, 'P_TRACK')
 
 -- Functions to count item takes
 
-
 reaper.GetMediaItemNumTakes(item)
 
 reaper.CountTakes(item)
@@ -32930,7 +33093,6 @@ r.GetMediaItemTake(item, take_idx)
 --==================================================================================
 
 -- Functions to get take name
-
 
 reaper.GetTakeName(take)
 
@@ -33034,7 +33196,6 @@ local act_pres_idx, pres_cnt = r.TrackFX_GetPresetIndex(tr, fx_idx) -- if can't 
 --===================================================================================
 
 -- Functions to get project path/directory
-
 
 reaper.GetProjectPath() -- returns primary record path and if not set returns project path, in both cases without the last slash
 
@@ -33460,6 +33621,8 @@ T R A C K S
 	Create_Track_Template
 	track_TCP_likely_dragged
 	Is_Track_Frozen
+	GetSet_Image
+
 
 
 S E N D S / R E C E I V E S
@@ -33775,6 +33938,7 @@ I T E M S
 	GetSet_Take_PitchShift_Algo
 	Item_Lane_Plays
 	Build_Peak_Files_For_Sel_Items
+	GetSet_Image
 
 
 C O L O R
@@ -33972,6 +34136,7 @@ F I L E S
 	file_exists_alt
 	make_file_name_unique
 	create_unique_time_based_ID
+	create_random_name
 	resolve_file_name_collision1
 	resolve_file_name_collision2
 	resolve_file_name_collision3
@@ -34033,6 +34198,7 @@ F I L E S
 	process_directory_depth
 	scan_path_for_file
 	collect_files_in_folder
+	Process_File_Path
 
 
 M E A S U R E M E N T S / C A L C U L A T I O N S
