@@ -341,6 +341,7 @@ ACT 1 0 "5eba81edff917d44823bb9ea6b912863" "Custom: Pinknoise_4 Points outside s
 ACT 0 0 "1c22ee9c0440b14db577aa8ad410e879" "Custom: Pinknoise_Bypass FX select next FX unbypass selected fX" _S&M_FXBYP_SETONSEL _S&M_SELFXNEXT _S&M_FXBYP_SETOFFSEL
 ACT 0 0 "aa18960d3f08f34da123a0fd73517766" "Custom: Pinknoise_Bypass FX select previous FX unbypass selected fX" _S&M_FXBYP_SETONSEL _S&M_SELFXPREV _S&M_FXBYP_SETOFFSEL
 ACT 1 0 "d49925f17ab36b4b94a3e10d1147c934" "Custom: Play and move play cursor to edit cursor at play time" 40044 1007
+ACT 1 0 "0deb31f960f384468e9a3776131923f0" "Custom: Play / stop moving edit cursor to play cursor" 40434 40044
 ACT 1 0 "f6ed9f6598bc054ea282edf6e6f21419" "Custom: Play and Stop playback at the end of selected item OFF" _SWS_SETREPEAT 40750 _SWS_RESTTIME1 41834
 ACT 1 0 "f486dfb342199a47b27f697f461a1163" "Custom: Play and Stop playback at the end of selected item ON" _SWS_SAVETIME1 40290 40749 _SWS_UNSETREPEAT 41834 40630 41173 1007
 ACT 1 0 "4022a51ba8adb74da75fbf691d529da7" "Custom: Play from loop start / Pause" 2022 1007 2013 1008 2014 40632 2014 1007
