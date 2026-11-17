@@ -1,2 +1,3 @@
 NAME "BuyOne Scripts"
 URL "https://forum.cockos.com/member.php?u=134058"
+INFO "reaper package notes.txt"
