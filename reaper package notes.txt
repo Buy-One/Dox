@@ -1,1 +1,17 @@
+!!!WARNING!!!
 
+If you update the scripts rather than install for the first time
+any script user setting you've configured will be overwritten.
+
+To retain those the recommended way of updating is by using
+the included 'BuyOne_Script updater and installer.lua' script
+residing in the root of '/BuyOne Scripts' folder.
+
+Unpack this package into a temporary directory like a regular
+zip archive. And run 'BuyOne_Script updater and installer.lua'
+script which by now must be available in the Main section of 
+the Action list. If it's not, you can run it from the temporary 
+directory via 'ReaScript: Run ReaScript (EEL2 or Lua)...' action. 
+In the end it will be installed with the rest of the scripts 
+and from there on out will be available in the Action list 
+for future use.
