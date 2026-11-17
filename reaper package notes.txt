@@ -1,3 +1,5 @@
+
+
 !!!WARNING!!!
 
 If you update the scripts rather than install for the first time
@@ -15,3 +17,5 @@ directory via 'ReaScript: Run ReaScript (EEL2 or Lua)...' action.
 In the end it will be installed with the rest of the scripts 
 and from there on out will be available in the Action list 
 for future use.
+
+For support contact via https://forum.cockos.com/member.php?u=134058
