@@ -3469,6 +3469,33 @@ end
 -- local t = remove_duplicates(1, t[1], t) -- begin from index 1
 
 
+
+function array_cleanup1(t)
+-- here array is cleaned from fields containing false value;
+-- the criteria may be different
+	for i=#t,1,-1 do
+-- OR
+--	for i=1,#t do
+		if not t[i] then table.remove(t,i)
+		return cleanup(t)
+		end
+	end
+return t
+end
+
+
+function array_cleanup2(t)
+-- here array is cleaned from fields containing false value;
+-- the criteria may be different
+	for k, v in ipairs(t) do
+		if not v then table.remove(t,k)
+		return cleanup(t)
+		end
+	end
+return t
+end
+
+
 -- see also get_greatest_smallest_value
 
 
@@ -7996,7 +8023,7 @@ end
 
 function Is_Track_Frozen(tr)
 -- returns freeze count, 0 if track is not frozen;
--- in builds older than 7.43 requires either SWS extension 
+-- in builds older than 7.43 requires either SWS extension
 -- or GetObjChunk2() function
 local cnt
 	if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 7.43 then
@@ -8017,14 +8044,16 @@ end
 function GetSet_Image(obj, path)
 -- track icon or item notes image
 -- contrary to the API doc GetSetMediaTrackInfo_String with P_ICON
--- parameter returns FULL path to /Data/track_icons or /Data/toolbar_icons 
--- and file name or relative path to project directory, 
--- in the chunk in all 3 cases only the file name is listed in TRACKIMGFN attribute 
--- or relative path under the project directory, 
+-- parameter returns FULL path to /Data/track_icons or /Data/toolbar_icons
+-- and file name or relative path to project directory,
+-- in the chunk in all 3 cases only the file name is listed in TRACKIMGFN attribute
+-- or relative path under the project directory,
 -- the same is true to item notes image chunk attribute RESOURCEFN;
 -- relies on Dir_Or_File_Exists()
 
-	if path and not file_exists(path) then return end -- if not validated before the function is called // may be used to trugger error message after the fact 
+	if path and (not ('PNG,JPG,JPEG'):lower():match(path:lower():match('.+%.(%w+)$'))
+	or not Dir_Or_File_Exists(path))
+	then return end -- if not validated before the function is called // may be used to trugger error message after the fact
 
 local file, chunk
 	if r.ValidatePtr(obj, 'MediaItem*') then
@@ -8048,10 +8077,10 @@ local file, chunk
 		end
 	end
 
--- resolve_fn() function will return the path even if the file 
+-- resolve_fn() function will return the path even if the file
 -- has been deleted from its original location,
 -- so basically it retrieves the path cached when the project was loaded,
--- and while it's loaded REAPER searches for the file in the project folder 
+-- and while it's loaded REAPER searches for the file in the project folder
 -- then in /Data/track_icons and then in /Data/toolbar_icons,
 -- if not found a warning is displayed
 return file and Dir_Or_File_Exists(r.resolve_fn(file, ''))
@@ -8082,7 +8111,7 @@ end
 function Is_Recv_Src_Track(src_tr, dest_tr)
 -- returns true if src_tr is found
 	for rcv_idx=0,r.GetTrackNumSends(dest_tr, -1)-1 do -- category -1 receive
-	local tr = r.GetTrackSendInfo_Value(dest_tr, 0, rcv_idx, 'P_SRCTRACK') -- category -1 receive
+	local tr = r.GetTrackSendInfo_Value(dest_tr, -1, rcv_idx, 'P_SRCTRACK') -- category -1 receive
 		if tr == src_tr then return true
 		end
 	end
@@ -8104,6 +8133,7 @@ function Remove_Track_Receives(tr)
 end
 
 
+
 function Get_Track_MIDI_Send_Recv_Channels(tr, idx, send)
 -- tr arg depends on the send arg, if true track is the send src track
 -- otherwise it's send dest track
@@ -8111,7 +8141,7 @@ function Get_Track_MIDI_Send_Recv_Channels(tr, idx, send)
 local category = send and 0 or -1 -- either send or receive
 local data = r.GetTrackSendInfo_Value(tr, category, idx, 'I_MIDIFLAGS')
 return
-data&31, -- src ch
+data&31, -- src ch // OR &0x1F -- 5 bit mask
 (data>>14)&255, -- OR &0xFF // src bus
 data>>5&31, -- dest ch
 (data>>22)&255 -- OR &0xFF // dest bus
@@ -10741,8 +10771,8 @@ end
 --================================= C H U N K ========================================
 
 local function GetObjChunk1(retval, obj, obj_type) -- see more efficient GetObjChunk2()
--- retval stems from r.GetFocusedFX(), 
--- its value 0 is only considered at the pasting stage 
+-- retval stems from r.GetFocusedFX(),
+-- its value 0 is only considered at the pasting stage
 -- because in the copying stage it's error caught before the function
 -- https://forum.cockos.com/showthread.php?t=193686
 -- https://raw.githubusercontent.com/EUGEN27771/ReaScripts_Test/master/Functions/FXChain
@@ -10766,8 +10796,16 @@ r.SNM_DeleteFastString(fast_str)
 end
 
 
-local function GetObjChunk2(obj)
--- optionally relies on create_random_name();
+
+
+local function GetObjChunk2(obj, want_proj)
+-- obj is track, item, take or envelope;
+-- want_proj is boolean to extract chunk from a temporary
+-- project file rather than temporary track template if
+-- certain data aren't stored in the latter, such as freeze chunks;
+-- optionally relies on create_random_name() when extracting from temp files;
+-- in order to use temp track template to extract the chunk
+-- the target track must be selected;
 -- https://forum.cockos.com/showthread.php?t=193686
 -- https://raw.githubusercontent.com/EUGEN27771/ReaScripts_Test/master/Functions/FXChain
 -- https://github.com/EUGEN27771/ReaScripts/blob/master/Various/FXRack/Modules/FXChain.lua
@@ -10785,17 +10823,44 @@ local ret, obj_chunk = table.unpack(t)
 -- OR
 -- local ret, obj_chunk = table.unpack(tr and {r.GetTrackStateChunk(obj, '', false)} or (item or take) and {r.GetItemStateChunk(obj, '', false)} or env and {r.GetEnvelopeStateChunk(obj, '', false)} or {x,x}) -- isundo = false // https://forum.cockos.com/showthread.php?t=181000#9
 	if ret and obj_chunk and #obj_chunk >= 4194303 and not r.APIExists('SNM_CreateFastString') -- OR not r.SNM_CreateFastString
-	then
-		if tonumber(r.GetAppVersion():match('[%d%.]+')) >= 6.53 then -- if no extension, extract chunk from a temporary track template
+	then -- extract from temporary track template or project file in supported builds
+		if tonumber(r.GetAppVersion():match('[%d%.]+')) < 6.53 or not tr then
+		return 'err_mess'
+		elseif tr then -- if no extension and the chunk is too large for the native function, extract chunk from a temporary track template or project file, mainly relevant for track chunk because it's potentially the largest, supported since 6.53
+			if not want_proj and not r.IsTrackSelected(obj) then return 'err_mess' end
 		local path = r.GetProjectPath() -- media path, if no project file returns default recording path
 		path = path..path:match('[\\/]')..(create_random_name and create_random_name(4) or 'TMP_LATE') -- without file extension, unnecessary and lengthens file name risking to hit path character limit if too deep // since file extension is ommitted the likelihood of collision with existing file drops significantly so create_random_name() function could be dispensed with
-		r.Main_SaveProjectEx(0, path, 1|2|4) -- save as track template with items and envelopes
+		r.Main_SaveProjectEx(0, path, want_proj and 0 or 1|2|4) -- save as temp project or SELECTED tracks template with items and envelopes
 		local f = io.open(path, 'r')
 			if f then
-			local chunk = f:read('*a'); f:close(); os.remove(path)
-			return true, chunk
+			obj_chunk = f:read('*a'); f:close(); os.remove(path) -- if temp proj file or SELECTED tracks template was created, this will return its entire content
+				if not want_proj then return true, obj_chunk
+				else -- extract track chunk from temp proj file
+				-- in project file '<TRACK' header is followed by the track GUID in the same line, but not in track template,
+				-- still this doesn't break the track when such chunk is set
+				local ret, GUID = r.GetSetMediaTrackInfo_String(obj, 'GUID', '', false) -- is_set false
+				local chunk, found = ''
+					for line in obj_chunk:gmatch('[^\n\r]+') do
+					line = line:match('%S.*') -- flatten the identation in the project file data and accounting for a single character on the line such as <>, and empty line, which is likely to conclude the project file
+						if line and line:match('<TRACK') then -- not validating track GUID on this line because this format only applies to project file
+							if found then break -- track chunk which follows the target one
+							else
+							chunk = chunk..(#chunk > 0 and '\n' or '')..line -- start assembling chunk and keep until track GUID is validated
+							end
+						elseif #chunk > 0 then
+						chunk = chunk..'\n'..line -- assemble the chunk
+							if line:match('TRACKID') then
+								if line:match('{.-}') == GUID then -- target track
+								found = 1 -- target track found, the chunk will keep being assembled
+								else
+								chunk, found = '' -- reset
+								end
+							end
+						end
+					end
+				return true, chunk
+				end
 			end
-		else return 'err_mess'
 		end
 	elseif ret and obj_chunk and #obj_chunk < 4194303 then return ret, obj_chunk -- 4194303 bytes (4.194303 Mb) = (4096 kb * 1024 bytes) - 1 byte // since build 4.20 http://reaper.fm/download-old.php?ver=4x
 	end
@@ -10814,14 +10879,14 @@ function Err_mess() -- if chunk size limit is exceeded and SWS extension isn't i
 local sws_ext_err_mess = "            The size of the data requires\n\n  the SWS/S&M extension to handle them.\n\nIf it's installed then it needs to be updated.\n\n         After clicking \"OK\" a link to the\n\n SWS extension website will be provided\n\n\tThe script will now quit."
 local sws_ext_link = 'Get the SWS/S&M extension at\n\nhttps://www.sws-extension.org/\n\nOR\n\nhttps://github.com/reaper-oss/sws/tags'
 local resp = r.MB(sws_ext_err_mess,'ERROR',0)
-	if resp == 1 then r.Main_OnCommand(42663, 0) -- ReaScript: Show ReaScript console // to override preference at Plug-ins -> ReaScript -> Do not auto-open ReaScript console which was added in 7.28, while the action was added in 7.0
-	r.ShowConsoleMsg(sws_ext_link, r.ClearConsole()) return end
+	if resp == 1 then r.Main_OnCommand(42663, 0) end -- ReaScript: Show ReaScript console // to override preference at Plug-ins -> ReaScript -> Do not auto-open ReaScript console which was added in 7.28, while the action was added in 7.0
+r.ShowConsoleMsg(sws_ext_link, r.ClearConsole())
 end
 
 
 local function SetObjChunk1(retval, obj, obj_type, obj_chunk) -- see more efficient SetObjChunk2()
--- retval stems from r.GetFocusedFX(), 
--- its value 0 is only considered at the pasting stage 
+-- retval stems from r.GetFocusedFX(),
+-- its value 0 is only considered at the pasting stage
 -- because in the copying stage it's error caught before the function
 	if not (obj and obj_chunk) then return end
 	if retval == 0 then retval = tonumber(obj_type) end -- for pasting stage when fx chains/floating windows are closed or not in focus
@@ -10830,6 +10895,7 @@ end
 
 
 local function SetObjChunk2(obj, obj_chunk)
+-- obj is track, item, take or envelope;
 	if not (obj and obj_chunk) then return end
 local t = {}
 -- 'TrackEnvelope*' works for take envelope as well
@@ -11857,49 +11923,48 @@ function Apply_FX_Chain(obj, fx_chain, recFX)
 -- if target chain already contains fx they're replaced,
 -- REAPER seems to respect the chain chunk which appears later in the track chunk
 -- so existence of several chain chunks of the same type doesn't break it,
--- for tracks, existing track items aren't a problem
+-- for tracks, existing track items aren't a problem;
 -- !!!! CAN BE DONE WITH reaper.TrackFX_AddByName() WITH FX CHAIN FILE NAME+EXTENSION
 -- AS fxname ARGUMENT, the minimal build isn't known
 
 local tr, item = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem*')
 
-	if tr or item then
+	if not tr and not item then return end
 
-	-- OR USE custom Get/SetObjChunk()
-	local GetChunk, SetChunk = table.unpack(tr and {r.GetTrackStateChunk, r.SetTrackStateChunk}
-	or item and {r.GetItemStateChunk, r.SetItemStateChunk})
+-- OR USE custom Get/SetObjChunk()
+local GetChunk, SetChunk = table.unpack(tr and {r.GetTrackStateChunk, r.SetTrackStateChunk}
+or item and {r.GetItemStateChunk, r.SetItemStateChunk})
 
-	local retval, chunk = GetChunk(obj , '', false) -- isundo false
+local retval, chunk = GetChunk(obj , '', false) -- isundo false
 
-	local f = io.open(fx_chain,'r')
-	local fx_chain = f:read('*a')
-	f:close()
+local f = io.open(fx_chain,'r')
+local fx_chain = f:read('*a')
+f:close()
 
-	local ch_cnt = chain_chunk:match('REQUIRED_CHANNELS (%d+)') -- will be absent if the chain only uses 2 channels
-		if ch_cnt then
-			if tr then
-			-- transfer channel count value required for the FX chain to the track chunk
-			-- if greater than the currently enabled
-			local tr_ch_cnt = r.GetMediaTrackInfo_Value(obj, 'I_NCHAN')
-				if tr_ch_cnt < ch_cnt+0 then
-				chunk = chunk:gsub('NCHAN %d+', 'NCHAN '..ch_cnt)
-				end
+local ch_cnt = fx_chain:match('REQUIRED_CHANNELS (%d+)') -- will be absent if the chain only uses 2 channels
+	if ch_cnt then
+		if tr then
+		-- transfer channel count value required for the FX chain to the track chunk
+		-- if greater than the currently enabled
+		local tr_ch_cnt = r.GetMediaTrackInfo_Value(obj, 'I_NCHAN')
+			if tr_ch_cnt < ch_cnt+0 then
+			chunk = chunk:gsub('NCHAN %d+', 'NCHAN '..ch_cnt)
 			end
-		chain_chunk = chain_chunk:match('REQUIRED_CHANNELS %d+(\n.+)') -- exclude channel data because it's not part of the chunk
-		else
-		chain_chunk = '\n'..chain_chunk -- add new line char to match structure of chain with channel data for appending to the chunk
 		end
-
-	local chunk1, chunk2 = chunk:match('(.+)(>)') -- split the chunk
-	-- adding fx chain to track after items code isn't a problem,
-	-- REAPER then places them in correct order
-	local merged = chunk1..(item and '<TAKEFX'
-	or ('<FXCHAIN'..(recFX and '_REC' or '')))..'\n'
-	..fx_chain..'>\n'..chunk2 -- concatenate a new one // works without '>\n' as well
-
-	SetChunk(obj, merged, false) -- isundo false
-
+	fx_chain = fx_chain:match('REQUIRED_CHANNELS %d+(\n.+)') -- exclude channel data because it's not part of the chunk
+	else
+	fx_chain = '\n'..fx_chain -- add new line char to match structure of chain with channel data for appending to the chunk
 	end
+
+local chunk1, chunk2 = chunk:match('(.+)(>)') -- split the chunk
+-- adding fx chain to track after items code isn't a problem,
+-- REAPER then places them in correct order
+local merged = chunk1..(item and '<TAKEFX'
+or ('<FXCHAIN'..(recFX and '_REC' or '')))..'\n'
+..fx_chain..'>\n'..chunk2 -- concatenate a new one // works without '>\n' as well
+
+SetChunk(obj, merged, false) -- isundo false
+
 
 end
 
@@ -12234,11 +12299,11 @@ local create_fx_undo = fx_pref+0&65536 ~= 65536 -- the setting is enabled when t
 -- if the preference at Preferences -> Plugins -> Do not create undo points when closing FX windows
 -- is disabled AND 'Only allow one FX floating at a time' is enabled
 -- toggle them with re_store_config_var() for the duration of function execution
--- to prevent creation of multiple undo points and auto-closing 
+-- to prevent creation of multiple undo points and auto-closing
 -- of other fx foating windows when fx windows are toggled open and closed;
--- if REAPER build the user runs doesn't support that function due to being old 
--- or due to lack of the SWS extension and 'Do not create undo points' preference is disabled, 
--- create a single custom undo point, the good thing about which 
+-- if REAPER build the user runs doesn't support that function due to being old
+-- or due to lack of the SWS extension and 'Do not create undo points' preference is disabled,
+-- create a single custom undo point, the good thing about which
 -- is that it won't multiply at repeated script executions
 -- and will only be created if the last action in the undo hitory is different
 -- so it will be created in-between other actions but won't inundate the undo history
@@ -12255,7 +12320,7 @@ re_store_config_var('fxfloat_focus', 2^24, 1) -- 'Only allow one FX floating at 
 -- so set online if necessary to prevent false positive
 local offline = fx.GetOffline(obj, fx_idx)
 	if offline then fx.SetOffline(obj, fx_idx, not offline) end
-	
+
 fx.Show(obj, fx_idx, 3) -- 3 show in floating window
 local ok
 	-- restore states
@@ -12271,8 +12336,8 @@ local ok
 
 -- restore original pref value, arg 2 and 3 a irrelevant here
 -- will only run if build is 7.74 or sws extension is installed
-re_store_config_var('fxfloat_focus', nil, nil, fx_pref) 
-	
+re_store_config_var('fxfloat_focus', nil, nil, fx_pref)
+
 return ok
 
 end
@@ -12899,9 +12964,9 @@ end
 function Get_FX_Selected_In_Main_Chain1(obj, input_fx, chunk) -- see GetSet_FX_Selected_In_FX_Chain() below for a comprehensive version
 -- input_fx is boolean for use in builds 7.06+ to target input/Monitoring FX chain
 -- doesn't support containers, see Get_FX_Shown_Or_Selected_In_Container() and Get_FX_Selected_In_Container();
--- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1 
--- if no fx or if it's been reset after copying FX chain 
--- as per the bug report https://forum.cockos.com/showthread.php?t=311951, 
+-- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1
+-- if no fx or if it's been reset after copying FX chain
+-- as per the bug report https://forum.cockos.com/showthread.php?t=311951,
 -- fixed in build 7.83, therefore must be additionally validated by FX_GetCount()
 
 local take, tr = r.ValidatePtr(obj, 'MediaItem_Take*'), r.ValidatePtr(obj, 'MediaItem_Track*')
@@ -12932,11 +12997,11 @@ end
 function Get_FX_Selected_In_Main_Chain2(obj, input_fx)
 -- input_fx is boolean to target track input fx chain
 -- relies on GetObjChunk2() for builds older than 7.06
--- doesn't support containers, see Get_FX_Shown_Or_Selected_In_Container() 
+-- doesn't support containers, see Get_FX_Shown_Or_Selected_In_Container()
 -- and Get_FX_Selected_In_Container();
--- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1 
--- if no fx or if it's been reset after copying FX chain 
--- as per the bug report https://forum.cockos.com/showthread.php?t=311951, 
+-- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1
+-- if no fx or if it's been reset after copying FX chain
+-- as per the bug report https://forum.cockos.com/showthread.php?t=311951,
 -- fixed in build 7.83, therefore must be additionally validated by FX_GetCount()
 
 local tr, take = r.ValidatePtr(obj, 'MediaTrack*'), r.ValidatePtr(obj, 'MediaItem_Take*')
@@ -12971,8 +13036,8 @@ function Set_FX_Selected_In_FX_Chain(obj, fx_idx, chunk) -- see GetSet_FX_Select
 -- doesn't support containers, see Set_FX_Selected_In_Container(),
 -- since 7.06 can be done with FX_SetNamedConfigParm() and 'chain_sel' parameter;
 -- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1
--- if no fx or if it's been reset after copying FX chain 
--- as per the bug report https://forum.cockos.com/showthread.php?t=311951, 
+-- if no fx or if it's been reset after copying FX chain
+-- as per the bug report https://forum.cockos.com/showthread.php?t=311951,
 -- fixed in build 7.83, therefore must be additionally validated by FX_GetCount()
 
 	if fx_idx >= 0x2000000 then return end -- container fx
@@ -13031,9 +13096,9 @@ function GetSet_FX_Selected_In_FX_Chain(obj, sel_idx, chunk, input_fx)
 -- FX_SetNamedConfigParm(obj, 0, 'chain_sel', fx_idx) -- fx_idx is a string
 -- https://forum.cockos.com/showthread.php?t=285177#19
 -- doesn't support containers, see Set_FX_Selected_In_Container();
--- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1 
--- if no fx or if it's been reset after copying FX chain 
--- as per the bug report https://forum.cockos.com/showthread.php?t=311951, 
+-- chunk LASTSEL and GetNamedConfigParm 'chain_sel' value may be -1
+-- if no fx or if it's been reset after copying FX chain
+-- as per the bug report https://forum.cockos.com/showthread.php?t=311951,
 -- fixed in build 7.83, therefore must be additionally validated by FX_GetCount()
 
 	if sel_idx and sel_idx >= 0x2000000 then return end -- container fx
@@ -13068,8 +13133,8 @@ local input_fx = input_fx or tr and fx_idx and fx_idx >= 0x1000000 -- validate s
 		else -- use chunk
 		-- if object data changed in between the function executions
 		-- the chunk must be re-get for the restoration stage
-		-- to select FX in a closed FX chain technically it can be done with FX_SetOpen 
-		-- after opening the chain and then closing it, but you're running the risk 
+		-- to select FX in a closed FX chain technically it can be done with FX_SetOpen
+		-- after opening the chain and then closing it, but you're running the risk
 		-- of removing the focus from any currently focused windows which is a bad practice
 		local fx_chain = ''
 			if tr then
@@ -14882,10 +14947,10 @@ function Collect_Open_FX()
 			end
 		end
 	end
-	
-	
+
+
 	local function collect_take_fx(t, tr)
-	local Count, Get = table.unpack(tr and {r.CountTrackMediaItems, r.GetTrackMediaItem} 
+	local Count, Get = table.unpack(tr and {r.CountTrackMediaItems, r.GetTrackMediaItem}
 	or {r.CountMediaItems, r.GetMediaItem})
 		for itm_idx=0, Count(tr or 0)-1 do
 		local item = Get(tr or 0, itm_idx)
@@ -15894,9 +15959,10 @@ end
 
 
 
-function Add_Image_To_Item(item, f_path, mode)
+function Add_Image_To_Remove_From_Item(item, f_path, mode)
+-- when f_path is invalid the image, if any, is removed
 -- mode is 1 - Center/tile image, 3 - Stretch image/text
--- or 5 - Full height image;
+-- or 5 - Full height image; not used here, defaults to 1
 -- relies on GetObjChunk() and SetObjChunk()
 -- when image is added text notes are unavailable
 -- which is REAPER's behavior even if image is added manually
@@ -15905,18 +15971,23 @@ local ret, chunk = GetObjChunk(item)
 	if ret == 'err_mess' then return end
 
 local curr_image = chunk:match('RESOURCEFN "(.-)"')
+
+	if not f_path and not curr_image then return end -- when removing, exit if there's no image in the item
+
 local src_patt = not curr_image and 'IGUID {.-}' or 'RESOURCEFN ".-"'
-local repl_patt = ((not curr_image and '%0\n' or '')..'RESOURCEFN "'..f_path:gsub('%%', '%%%%')..'"')
+local repl_patt = (not curr_image and '%0\n' or '')..(f_path and 'RESOURCEFN "'..f_path:gsub('%%', '%%%%')..'"' or '')
 chunk = chunk:gsub(src_patt, repl_patt, 1)
 
-local IMGRESOURCEFLAGS = chunk:match('IMGRESOURCEFLAGS (%d+)')
-Msg(IMGRESOURCEFLAGS,'flags')
-src_patt = not IMGRESOURCEFLAGS and 'RESOURCEFN ".-"' or 'IMGRESOURCEFLAGS %d+'
--- to be able to change image display mode, word wrap bit must be set separately
-local word_wrap = IMGRESOURCEFLAGS and IMGRESOURCEFLAGS+0&8 == 8 -- &8 is Word wrap
-local bitfield = word_wrap and mode|8 or mode
-repl_patt = (not IMGRESOURCEFLAGS and '%0\n' or '')..'IMGRESOURCEFLAGS '..bitfield -- 
-chunk = chunk:gsub(src_patt, repl_patt, 1)
+	if f_path then
+	local IMGRESOURCEFLAGS = chunk:match('IMGRESOURCEFLAGS (%d+)')
+	src_patt = not IMGRESOURCEFLAGS and 'RESOURCEFN ".-"' or 'IMGRESOURCEFLAGS %d+'
+	-- to be able to change image display mode, word wrap bit must be set separately
+	local word_wrap = IMGRESOURCEFLAGS and IMGRESOURCEFLAGS+0&8 == 8 -- &8 is Word wrap
+	local bitfield = word_wrap and 1|8 or 1 -- &1 Center/Tile image
+	repl_patt = (not IMGRESOURCEFLAGS and '%0\n' or '')..'IMGRESOURCEFLAGS '..bitfield
+	chunk = chunk:gsub(src_patt, repl_patt, 1)
+	end
+
 SetObjChunk(item, chunk)
 
 end
@@ -16713,7 +16784,7 @@ end
 
 
 
-function is_audio_src(obj)
+function is_audio_src(obj) -- see also Audio_Or_MIDI_Takes()
 -- obj is either take source or take pointer
 -- take is advised in cases where source may be set to section or reversed
 
@@ -16727,11 +16798,16 @@ local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
 	src = r.GetMediaSourceParent(src) or src
 	end
 
+-- audio source types returned by GetMediaSourceType() are
+-- 'WAVE', 'MP3', 'VORBIS', 'OPUS', 'REX', 'FLAC', 'SD2', 'WAVPACK', 'SECTION', 'OFFLINE'
+-- 'RPP_PROJECT', 'CLICK' and 'LTC' may be considered audio as well, but of a special type
+
 	if src then
-	local typ = r.GetMediaSourceType(src, '')
-		for k, v in ipairs({'MIDI', 'RPP', 'EMPTY', 'CLICK', 'LTC', 'VIDEO'}) do
-			if typ:match(v) then -- match() covers media forced offline state when type included _OFFLINE_ prefix
-				if v == 'VIDEO' then -- as of build 7.52 wma and m4a files are recognized as video even though they only contain audio, so need to be validated further https://forum.cockos.com/showthread.php?t=304924
+	local typ = r.GetMediaSourceType(src, ''):gsub('_OFFLINE_', '') -- media forced offline state when type includes _OFFLINE_ prefix
+	--[[ WORKS, LESS EFFICIENT
+		for k, v in ipairs({'MIDI', 'RPP', 'EMPTY', 'CLICK', 'LTC', 'VIDEO'}) do -- MIDI covers MIDI and MIDIPOOL types
+			if typ == v then
+				if v == 'VIDEO' then -- as of build 7.52 wma and m4a files are recognized as video even though they only contain audio, so need to be validated further https://forum.cockos.com/showthread.php?t=304924; VIDEO type covers image files as well
 				local ext = r.GetMediaSourceFileName(src, ''):match('.+%.(.+)$')
 					if ext == 'wma' or ext == 'm4a' then
 					return true
@@ -16740,6 +16816,15 @@ local src, take = validate(obj, 'PCM_source*'), validate(obj, 'MediaItem_Take*')
 			return
 			end
 		end
+	--]]
+	--[-[ MORE EFFICIENT WAY OF EVALUATION
+	local ext = r.GetMediaSourceFileName(src, ''):match('.+%.(.+)$')
+	local types = 'MIDI,RPP_PROJECT,EMPTY,CLICK,LTC'
+		if types:match(typ) -- MIDI covers MIDI and MIDIPOOL types
+		or typ == 'VIDEO' and (ext ~= 'wma' or ext ~= 'm4a') -- as of build 7.52 wma and m4a files are recognized as video even though they only contain audio, so need to be validated further https://forum.cockos.com/showthread.php?t=304924; VIDEO type covers image files as well
+		then return
+		end
+	--]]
 	return true
 	end
 
@@ -16824,6 +16909,8 @@ return r.GetMediaSourceNumChannels(src)
 end
 
 
+
+
 function Select_Items_With_Same_Src_Media(src_take) -- select only items where active take has the same media source as the source take, don't select the source take parent item if it's unselected
 -- relies on Get_Take_Src_Props()
 local src_take_file = ({Get_Take_Src_Props(src_take)})[5]
@@ -16841,18 +16928,30 @@ r.PreventUIRefresh(-1)
 end
 
 
+
+
 function Audio_Or_MIDI_Takes(item) -- only returns valid value if all takes are either audio or midi
 local audio, midi
 	for i = 0, r.CountTakes(item)-1 do
-	local is_midi = r.TakeIsMIDI(r.GetTake(item,i))
+	local take = r.GetTake(item,i)
+	local is_midi = take and r.TakeIsMIDI(take)
 		if is_midi then
 		midi = true
-		else
-		audio = true
+		elseif take then
+		local src = r.GetMediaItemTake_Source(take)
+		src = src or r.GetMediaSourceParent(src) -- won't return accurate pointer for reversed source and source section, that is those which have either 'Section' or 'Reverse' checkboxes checked in the 'Item properties' window, hence next line
+		local typ = r.GetMediaSourceType(src, ''):gsub('_OFFLINE_', '') -- media forced offline state when type includes _OFFLINE_ prefix
+		audio = ('WAVE,RPP_PROJECT,CLICK,LTC,MP3,VORBIS,OPUS,REX,FLAC,SD2,WAVPACK,SECTION,OFFLINE'):match(typ)
+			if typ == 'VIDEO' then
+			local ext = r.GetMediaSourceFileName(src, ''):match('.+%.(%w+)$')
+			audio = ext == 'wma' or ext == 'm4a'
+			end
 		end
 	end
-return audio and not midi and 'audio' or midi and not audio and 'midi'
+return audio and not midi and 'audio' or midi and not audio and 'midi' or audio and midi and 'mixed'
 end
+
+
 
 
 function Get_Src_Orig_Length(take)
@@ -18326,6 +18425,7 @@ function FTC_HexToNormRGB(color) -- by FTC
     return {r / 255, g / 255, b / 255}
 end
 
+
 function rgb2hex(r, g, b)
 -- https://gist.github.com/yfyf/6704830
     return string.format("#%0.2X%0.2X%0.2X", r, g, b)
@@ -18476,6 +18576,13 @@ end
 
 
 
+function int_col2hex(int, zero_pref)
+local hex = string.format('%x', int)
+return (zero_pref and '0x' or '#')..hex
+end
+
+
+
 function HEX_Col_2_RGB(hex)
 -- https://github.com/ReaTeam/ReaScripts/pull/1759/changes/c46005fea78fbd92051663e02ba0ea4f66b7a09a
 local r = (hex >> 16) & 0xFF -- 255
@@ -18563,14 +18670,14 @@ fx = {
 			-- item color if not set explicitly is inherited from the track if track color has been customized and is item default color
 			if color == 0 then -- default item color, inherited from track if track color has been customized, get track color
 			color = GetTr(r.GetMediaItemTrack(item), 'I_CUSTOMCOLOR')
-				if color ~= 0 and color ~= 16576 then return color end -- only return if not default track color because only in this case it overrides item default color // track default color integer is 16576 immediatedly after REAPER startup which equals 192,64,0 - RGB, the color selected in the track color picker by default but not applied; if 'Track: Set to default color' action was applied at least once the value becomes 0 (relevant to versions 5 - 7, didn't test earlier)
+				if color ~= 0 and color >= 0x1000000 then return color end -- only return if not default track color (integer 0) because only in this case it overrides item default color // if returned color integer is smaller than 0x1000000 then it was stored but not appilied, in which case the track with be colored with theme default color; tcp default color integer is 16576 immediatedly after REAPER startup which equals 192,64,0 - RGB, the color selected in the track color picker by default, selected but not applied; if 'Track: Set to default color' action was applied at least once the value becomes 0 (relevant to versions 5 - 7, didn't test earlier)
 			else -- item custom color
 			return color
 			end
 		-- item color if not set explicitly is inherited from the track if track color has been customized and is item default color
 		elseif is_itm and color == 0 then -- default item color, inherited from track if track color has been customized, get track color
 		local color = GetTr(r.GetMediaItemTrack(obj), 'I_CUSTOMCOLOR')
-			if color ~= 0 and color ~= 16576 then return color end -- only return if not default track color because only in this case it overrides item default color // see comment above
+			if color ~= 0 and color >= 0x1000000 then return color end -- only return if not default track color because only in this case it overrides item default color // see comment above
 		end
 	return color -- no change
 	end
@@ -18631,7 +18738,7 @@ local tr_color_alt
 	-- col_seltrack : Selected track control panel background
 	-- col_seltrack2 : Unselected track control panel background (enabled with 'Theme overrides' checkbox above) // if the checkbox is enabled the color integer is negative otherwise positive, should be used as is
 	local key
-	local tr_default_col = color == 16576 or color == 0 -- default (theme settings dependent) color // track default color integer is 16576 immediatedly after REAPER startup which equals 192,64,0 - RGB, the color selected in the track color picker by default but not applied; if 'Track: Set to default color' action was applied at least once the value becomes 0 (relevant to versions 5 - 7, didn't test earlier)
+	local tr_default_col = color < 0x1000000 or color == 0 -- default (theme settings dependent) color // if returned color integer is smaller than 0x1000000 then it was stored but not appilied, in which case the track with be colored with theme default color, i.e. integer 0; tcp default color integer is 16576 immediatedly after REAPER startup which equals 192,64,0 - RGB, the color selected in the track color picker by default, but not applied; if 'Track: Set to default color' action was applied at least once the value becomes 0 (relevant to versions 5 - 7, didn't test earlier)
 		if is_tr and tr_default_col then
 		key = 'col_seltrack2' -- only non-selected state color is extracted
 		elseif (is_take or is_itm) and color == 0 then -- default theme settings dependent color
@@ -23485,7 +23592,7 @@ function find_layout(layout_name, want_mcp)
 -- want_mcp is boolean to search among MCP layouts,
 -- support for transport, EnvCP, master TCP and MCP
 -- can be added;
--- if supplied layout_name is not found returns 
+-- if supplied layout_name is not found returns
 --  false and layout count
 local Get = r.ThemeLayout_GetLayout
 	if layout_name then
@@ -25719,7 +25826,7 @@ function Process_File_Path(f_path)
 
 local f_path = f_path:match('%S') and f_path:match('^%s*(.-)%s*$') -- remove leading/trailing spaces // OR ('(%S.+)%s*$')
 	if not f_path then return end
-	
+
 local resources = r.GetResourcePath()
 local sep = resources:match('[\\/]')
 local proj, proj_path = r.EnumProjects(-1) -- proj_path may be empty if project has never been saved
@@ -25734,6 +25841,12 @@ or {f_path}
 		if Dir_Or_File_Exists(path) then return path end
 	end
 
+end
+
+
+
+function valid_image_extension(path)
+return ('PNG,JPG,JPEG'):lower():match(path:lower():match('.+%.(%w+)$'))
 end
 
 
@@ -28202,7 +28315,7 @@ end
 
 function check1(sett1, sett2)
 -- checkmarking menu item when relevant boolean setting is enabled
--- sett2 is optional, a variable of a boolean setting 
+-- sett2 is optional, a variable of a boolean setting
 -- with which sett1 are mutually exclusive
 -- so that when sett2 is enabled, sett1 is grayed out,
 -- can be passed as several settings which are mutually excluive
@@ -31209,45 +31322,6 @@ end
 
 
 
-function en_de_code_bitfield(t, bitfield)
--- only stores the max of 63 values on a 64 bit systems
--- and 52 on 32 bit systems
--- https://stackoverflow.com/questions/46442411/how-big-can-a-64-bit-unsigned-integer-be
--- https://stackoverflow.com/questions/6003492/how-big-can-a-64bit-signed-integer-be
-
-local limit = math.maxinteger == 9223372036854775807 and 63 or 52 -- OR math.maxinteger == 2^63 // setting the limit depending on the system bit width, because a max signed integer Lua v5.3+ can handle on a 32 bit system is 9007199254740991 or 0x1fffffffffffff, i.e. 2^53-1, in practical terms of conversion into hex value with dec2hex() function it's 2^52 0xfffffffffffff which prevents loss of precision, so the function can store a max of first 52 boolean thruths, while on a 64 bit system it's 9223372036854775807 or 0x7fffffffffffffff, i.e. 2^63, and a max of first 63 boolean thruths // only a max of FIRST 63 or 52 boolean thruths respectively can be stored because the storage depends on the index of the truth in the sequence which corresponds to the bit position in the bitfield, and depending on the system the integer created by bit setting cannot exceed 2^63 or 2^52 respectively // using numbers here to avoid calculation of rasing to power
-
-local s = ' '
-
-	if not bitfield then -- encode
-	local bitfield = 0
-		for k, truth in ipairs(t) do
-			if truth then
-				-- must be placed before bit setting in case the limit has been reached while there're still unaccounted for disabled actions, if it were placed after the setting it wouldn't be possible to ascertain that there're unaccounted for disabled actions because that could have been the loop end, so a counter would have to be employed
-				if k > limit then return
-			-- OR
-			--	if bitfield == 9223372036854775807 then return -- only valid for 64 bit system
-				s:rep(7)..'The system doesn\'t support\n\n'..s:rep(8)..'storage of disabled actions'
-				..'\n\n'..s:rep(9)..'at index greater than '..limit..'.'
-				end
-			bitfield = bitfield|2^(k-1)
-			end
-		end
-	return bitfield
-	else -- decode
-		for k, truth in ipairs(t) do
-		local bit = 2^(k-1)
-			if bitfield&bit == bit then
-			act_names_menu_t[k] = true
-			end
-		end
-	return t
-	end
-end
--- USE:
--- local bitfield = en_de_code_bitfield(t) -- encode
--- local t = en_de_code_bitfield(t, bitfield) -- decode
-
 
 function Action_list_sections()
 -- consists of bits used in https://forum.cockos.com/showthread.php?p=2883303#post2883303
@@ -31282,6 +31356,25 @@ local sect_names_non_Main = {[100]='Main (alt recording)', [32060]='MIDI Editor'
 return sectionIDs_t, sect_names
 
 end
+
+
+
+function Get_Layouts(section)
+-- section is 'mcp', 'tcp', 'trans' etc.
+local i, t = 1, {} -- 0 is index of the global default layout, for which the function returns empty string
+	repeat
+	local retval, name = r.ThemeLayout_GetLayout(section, i)
+--Msg(#name == 0, 'name')
+--Msg(retval)
+		if #name > 0 then -- or 'if retval'
+--Msg(name, i)
+		t[#t+1] = name
+		end
+	i=i+1
+	until #name == 0 -- or not retval
+return t
+end
+
 
 
 
@@ -31843,6 +31936,48 @@ end
 
 
 
+function en_de_code_bitfield(t, bitfield)
+-- only stores the max of 63 values on a 64 bit systems
+-- and 52 on 32 bit systems
+-- https://stackoverflow.com/questions/46442411/how-big-can-a-64-bit-unsigned-integer-be
+-- https://stackoverflow.com/questions/6003492/how-big-can-a-64bit-signed-integer-be
+
+local limit = math.maxinteger == 9223372036854775807 and 63 or 52 -- OR math.maxinteger == 2^63 // setting the limit depending on the system bit width, because a max signed integer Lua v5.3+ can handle on a 32 bit system is 9007199254740991 or 0x1fffffffffffff, i.e. 2^53-1, in practical terms of conversion into hex value with dec2hex() function it's 2^52 0xfffffffffffff which prevents loss of precision, so the function can store a max of first 52 boolean thruths, while on a 64 bit system it's 9223372036854775807 or 0x7fffffffffffffff, i.e. 2^63, and a max of first 63 boolean thruths // only a max of FIRST 63 or 52 boolean thruths respectively can be stored because the storage depends on the index of the truth in the sequence which corresponds to the bit position in the bitfield, and depending on the system the integer created by bit setting cannot exceed 2^63 or 2^52 respectively // using numbers here to avoid calculation of rasing to power
+
+local s = ' '
+
+	if not bitfield then -- encode
+	local bitfield = 0
+		for k, truth in ipairs(t) do
+			if truth then
+				-- must be placed before bit setting in case the limit has been reached while there're still unaccounted for disabled actions, if it were placed after the setting it wouldn't be possible to ascertain that there're unaccounted for disabled actions because that could have been the loop end, so a counter would have to be employed
+				if k > limit then return
+			-- OR
+			--	if bitfield == 9223372036854775807 then return -- only valid for 64 bit system
+				s:rep(7)..'The system doesn\'t support\n\n'..s:rep(8)..'storage of disabled actions'
+				..'\n\n'..s:rep(9)..'at index greater than '..limit..'.'
+				end
+			bitfield = bitfield|2^(k-1)
+			end
+		end
+	return bitfield
+	else -- decode
+		for k, truth in ipairs(t) do
+		local bit = 2^(k-1)
+			if bitfield&bit == bit then
+			act_names_menu_t[k] = true
+			end
+		end
+	return t
+	end
+end
+-- USE:
+-- local bitfield = en_de_code_bitfield(t) -- encode
+-- local t = en_de_code_bitfield(t, bitfield) -- decode
+
+
+
+
 function get_Lua_bitdepth()
 -- Lua compiler bitdepth which isn't necessarily system bitdepth
 -- https://stackoverflow.com/a/61326632/8883033
@@ -32119,6 +32254,7 @@ math.randomseed(reaper.time_precise()*os.time()/1e3) -- 1e3 = 10^3 = 1000
 local rnd = math.random(11000)/10000
 if rnd > 1 then return rnd = 1 else return rnd = math.random(10000)/10000 end
 end
+
 
 
 function Audio_Accessor_Noise_Gate()
@@ -33034,12 +33170,12 @@ local parent = r.CSurf_TrackFromID(idx, false) -- mpcView false
 
 --===================================================================================
 
--- track I_HEIGHTOVERRIDE value changes when TCP height is adjusted by dragging 
+-- track I_HEIGHTOVERRIDE value changes when TCP height is adjusted by dragging
 -- and is reset with 'Zoom vertically' and other actions which affect vertical zoom;
--- value 0 resets TCP height to last height effected by 'Zoom vertically' 
+-- value 0 resets TCP height to last height effected by 'Zoom vertically'
 -- or other actions which affect vertical zoom;
--- I_HEIGHTOVERRIDE temporarily disables height locked status 
--- without clearing the checkmark in the track right click menu 
+-- I_HEIGHTOVERRIDE temporarily disables height locked status
+-- without clearing the checkmark in the track right click menu
 -- https://forum.cockos.com/showthread.php?p=2202082
 
 --===================================================================================
@@ -33465,6 +33601,8 @@ T A B L E S
 	embed_table_length1
 	embed_table_length2
 	remove_duplicates
+	array_cleanup1
+	array_cleanup2
 
 
 M I D I
@@ -33877,7 +34015,7 @@ I T E M S
 	Insert_Empty_Item_To_Display_Text1
 	Insert_Empty_Item_To_Display_Text2
 	Insert_Image
-	Add_Image_To_Item
+	Add_Image_To_Remove_From_Item
 	Insert_Temp_Item
 	Insert_Item_On_Temp_Track1
 	Insert_Item_On_Temp_Track2
@@ -33947,7 +34085,7 @@ C O L O R
 	Validate_HEX_Color_Setting2
 	hex2rgb
 	FTC_HexToNormRGB
-	rgb2hex	
+	rgb2hex
 	RANDOM_RGB_COLOR
 	Generate_Random_Color_Val
 	zaibuyidao_RGBHexToDec
@@ -33959,6 +34097,7 @@ C O L O R
 	RGB_To_Normalized
 	hex_col_2_int1
 	hex_col_2_int2
+	int_col2hex
 	HEX_Col_2_RGB
 	Split_Integer_To_RGB_And_Combine
 	Extract_Object_Color
@@ -34131,7 +34270,7 @@ F I L E S
 	Dir_Exists3
 	Dir_Or_File_Exists
 	File_Exists1
-	File_Exists2	
+	File_Exists2
 	File_Exists3
 	file_exists_alt
 	make_file_name_unique
@@ -34199,6 +34338,7 @@ F I L E S
 	scan_path_for_file
 	collect_files_in_folder
 	Process_File_Path
+	valid_image_extension
 
 
 M E A S U R E M E N T S / C A L C U L A T I O N S
@@ -34404,8 +34544,8 @@ U T I L I T Y
 	MediaExplorer_OnCommand3
 	Main_OnCommand_alt
 	generate_custom_action_ID
-	en_de_code_bitfield
 	Action_list_sections
+	Get_Layouts
 	Generate_list_of_notes
 	calculate_note_idx_from_note_name
 	note_number2note_idx_within_octave
@@ -34419,6 +34559,7 @@ U T I L I T Y
 	set_loop_direction
 	is_key_down
 	mouse_cursor_moved
+	en_de_code_bitfield
 	get_Lua_bitdepth
 	get_system_bitdepth1
 	get_system_bitdepth2
